@@ -13,6 +13,7 @@ test-commands = []
 [dependencies]
 op-core = { path = "../op-core" }
 op-ops = { path = "../op-ops" }
+op-tools = { path = "../op-tools" }
 op-formats = { path = "../op-formats" }
 op-color = { path = "../op-color" }
 lcms2 = { version = "6.2.0", features = ["static"] }
