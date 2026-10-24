@@ -120,7 +120,14 @@ fn registered_ops() {
         top: make(),
     };
     let results = op_gpu::parity::run(&mut gpu, &inputs).unwrap();
-    assert_eq!(results.len(), 19);
+    assert_eq!(
+        results
+            .iter()
+            .filter(|(id, _, _)| !id.starts_with("effect.blur."))
+            .count(),
+        19
+    );
+    assert_eq!(results.len(), 25);
     assert!(
         results
             .iter()

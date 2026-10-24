@@ -32,5 +32,11 @@
     <Compile Include="../../.pdn-src/src/Effects/BrightnessAndContrastAdjustment.cs" />
     <Compile Include="../../.pdn-src/src/Effects/PosterizeAdjustment.cs" />
     <Compile Include="../../.pdn-src/src/Effects/GaussianBlurEffect.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/FragmentEffect.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/LocalHistogramEffect.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/MedianEffect.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/MotionBlurEffect.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/RadialBlurEffect.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/ZoomBlurEffect.cs" />
   </ItemGroup>
 </Project>
