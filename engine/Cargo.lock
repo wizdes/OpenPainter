@@ -1093,6 +1093,7 @@ dependencies = [
  "jpeg-encoder",
  "kamadak-exif",
  "lcms2",
+ "lcms2-sys",
  "op-color",
  "png 0.18.1",
  "thiserror 2.0.21",

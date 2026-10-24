@@ -1,4 +1,4 @@
-use crate::{Error, Result, bmp, checked_len, codec};
+use crate::{Error, Result, bmp, checked_len, codec, exif_ifd};
 use std::{borrow::Cow, io::Cursor};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -286,31 +286,26 @@ fn decode_jpeg(bytes: &[u8]) -> Result<Decoded> {
     let icc = dec.icc_profile();
     let exif = dec.exif().cloned();
     let xmp = dec.xmp().cloned();
+    use zune_jpeg::zune_core::colorspace::ColorSpace;
     let input_space = dec.input_colorspace();
-    if input_space == Some(zune_jpeg::zune_core::colorspace::ColorSpace::CMYK)
-        && let Some(profile_bytes) = &icc
-    {
-        let profile = op_color::Profile::from_icc(profile_bytes).map_err(codec)?;
-        let options = dec
-            .options()
-            .jpeg_set_out_colorspace(zune_jpeg::zune_core::colorspace::ColorSpace::CMYK);
+    if let Some(space @ (ColorSpace::CMYK | ColorSpace::YCCK)) = input_space {
+        // Ask for the stored channels unchanged and convert them here.
+        let options = dec.options().jpeg_set_out_colorspace(space);
         dec.set_options(options);
         let raw = dec.decode().map_err(codec)?;
-        if raw.len() != (w as usize) * (h as usize) * 4 {
+        if raw.len() != checked_len(w, h)? {
             return Err(Error::Invalid("CMYK JPEG pixel count"));
         }
-        let samples: Vec<[u8; 4]> = raw
-            .chunks_exact(4)
-            .map(|p| [255 - p[0], 255 - p[1], 255 - p[2], 255 - p[3]])
-            .collect();
-        let (rgba8, notice) = op_color::import_cmyk(&samples, &profile).map_err(codec)?;
+        let ink: Vec<[u8; 4]> = if space == ColorSpace::YCCK {
+            raw.chunks_exact(4).map(ycck_to_ink).collect()
+        } else {
+            raw.chunks_exact(4)
+                .map(|p| [255 - p[0], 255 - p[1], 255 - p[2], 255 - p[3]])
+                .collect()
+        };
+        let (rgba8, icc, notice) = cmyk_to_srgb(&ink, icc.as_deref())?;
         let mut out = Decoded::new(w, h, rgba8)?;
-        out.icc = Some(
-            op_color::Profile::builtin("srgb")
-                .map_err(codec)?
-                .bytes()
-                .to_vec(),
-        );
+        out.icc = icc;
         out.metadata.exif = exif;
         out.metadata.xmp = xmp;
         out.notices.push(notice);
@@ -325,11 +320,56 @@ fn decode_jpeg(bytes: &[u8]) -> Result<Decoded> {
     out.icc = icc;
     out.metadata.exif = exif;
     out.metadata.xmp = xmp;
-    if info.components == 4 {
-        out.notices
-            .push("CMYK JPEG converted to RGB by decoder".into());
-    }
     Ok(out)
+}
+/// Turn one stored YCCK sample into ink amounts (0 = no ink).
+///
+/// Adobe YCCK keeps (255 - C, 255 - M, 255 - Y) as YCbCr, which decodes to
+/// R = C ink, G = M ink, B = Y ink, and stores K inverted like Adobe CMYK.
+fn ycck_to_ink(p: &[u8]) -> [u8; 4] {
+    let (y, cb, cr) = (p[0] as f32, p[1] as f32 - 128.0, p[2] as f32 - 128.0);
+    let clamp = |v: f32| v.round().clamp(0.0, 255.0) as u8;
+    [
+        clamp(y + 1.402 * cr),
+        clamp(y - 0.344_136 * cb - 0.714_136 * cr),
+        clamp(y + 1.772 * cb),
+        255 - p[3],
+    ]
+}
+/// Convert ink amounts to sRGB.
+///
+/// With a usable CMYK ICC profile this goes through op-color (perceptual
+/// intent, black point compensation) and the result is tagged sRGB. Without
+/// one it uses the naive formula R = 255 * (1 - C) * (1 - K) (and the same for
+/// M with G and Y with B), which ignores ink behavior and can be visibly off;
+/// the result has no ICC profile and is meant to be read as sRGB. Both paths
+/// add a notice. JPEG CMYK is read with the Adobe convention (inverted
+/// samples), which is what Photoshop and most CMYK JPEG writers produce.
+fn cmyk_to_srgb(ink: &[[u8; 4]], icc: Option<&[u8]>) -> Result<(Vec<u8>, Option<Vec<u8>>, String)> {
+    let problem = match icc {
+        None => "the file has no ICC profile".to_string(),
+        Some(bytes) => {
+            match op_color::Profile::from_icc(bytes).and_then(|p| op_color::import_cmyk(ink, &p)) {
+                Ok((rgba8, notice)) => {
+                    let srgb = op_color::Profile::builtin("srgb").map_err(codec)?;
+                    return Ok((rgba8, Some(srgb.bytes().to_vec()), notice));
+                }
+                Err(e) => format!("the embedded ICC profile is not usable for CMYK ({e})"),
+            }
+        }
+    };
+    let mut rgba8 = Vec::with_capacity(ink.len() * 4);
+    for &[c, m, y, k] in ink {
+        let f = |v: u8| (((255 - v as u32) * (255 - k as u32) + 127) / 255) as u8;
+        rgba8.extend_from_slice(&[f(c), f(m), f(y), 255]);
+    }
+    Ok((
+        rgba8,
+        None,
+        format!(
+            "CMYK image converted to sRGB with the naive formula R = (1 - C)(1 - K) because {problem}; colors are approximate"
+        ),
+    ))
 }
 fn encode_jpeg(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     if !(1..=100).contains(&opt.jpeg_quality) {
@@ -518,11 +558,16 @@ fn decode_tiff(bytes: &[u8]) -> Result<Decoded> {
         .ok()
         .flatten()
         .and_then(|v| v.into_u8_vec().ok());
-    let exif = dec
-        .find_tag(tiff::tags::Tag::Unknown(65000))
-        .ok()
-        .flatten()
-        .and_then(|v| v.into_u8_vec().ok());
+    let mut notices = Vec::new();
+    let exif = match tiff_exif(bytes) {
+        Ok(exif) => exif,
+        Err(e) => {
+            notices.push(format!(
+                "TIFF EXIF metadata could not be read and was dropped: {e}"
+            ));
+            None
+        }
+    };
     let xmp = dec
         .find_tag(tiff::tags::Tag::Unknown(700))
         .ok()
@@ -537,7 +582,112 @@ fn decode_tiff(bytes: &[u8]) -> Result<Decoded> {
     out.icc = icc;
     out.metadata.exif = exif;
     out.metadata.xmp = xmp;
+    out.notices = notices;
     Ok(out)
+}
+/// Build a standalone EXIF block from a TIFF file: the picture metadata tags
+/// of IFD0 (`IFD0_METADATA`) plus the EXIF and GPS sub-directories.
+fn tiff_exif(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    let entries: Vec<_> = exif_ifd::parse(bytes)?
+        .into_iter()
+        .filter(|e| {
+            exif_ifd::IFD0_METADATA.contains(&e.tag)
+                || (matches!(e.tag, exif_ifd::EXIF_IFD | exif_ifd::GPS_IFD) && e.sub.is_some())
+        })
+        .collect();
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    exif_ifd::serialize(&entries).map(Some)
+}
+
+/// A TIFF value written with its original field type `K`.
+/// `data` holds the value bytes in native order, as the tiff encoder expects.
+struct RawValue<const K: u16> {
+    count: usize,
+    data: Vec<u8>,
+}
+const fn tiff_type(kind: u16) -> tiff::tags::Type {
+    use tiff::tags::Type;
+    match kind {
+        1 => Type::BYTE,
+        2 => Type::ASCII,
+        3 => Type::SHORT,
+        4 => Type::LONG,
+        5 => Type::RATIONAL,
+        6 => Type::SBYTE,
+        7 => Type::UNDEFINED,
+        8 => Type::SSHORT,
+        9 => Type::SLONG,
+        10 => Type::SRATIONAL,
+        11 => Type::FLOAT,
+        12 => Type::DOUBLE,
+        _ => Type::IFD,
+    }
+}
+const fn tiff_type_len(kind: u16) -> u8 {
+    match kind {
+        1 | 2 | 6 | 7 => 1,
+        3 | 8 => 2,
+        5 | 10 | 12 => 8,
+        _ => 4,
+    }
+}
+impl<const K: u16> tiff::encoder::TiffValue for RawValue<K> {
+    const BYTE_LEN: u8 = tiff_type_len(K);
+    const FIELD_TYPE: tiff::tags::Type = tiff_type(K);
+    fn count(&self) -> usize {
+        self.count
+    }
+    fn data(&self) -> std::borrow::Cow<'_, [u8]> {
+        std::borrow::Cow::Borrowed(&self.data)
+    }
+}
+fn write_raw_tag<W: std::io::Write + std::io::Seek, T: tiff::encoder::TiffKind>(
+    dir: &mut tiff::encoder::DirectoryEncoder<'_, W, T>,
+    e: &exif_ifd::Entry,
+) -> Result<()> {
+    let mut data = e.data.clone();
+    if cfg!(target_endian = "big") {
+        let (_, unit) = exif_ifd::kind_size(e.kind).ok_or(Error::Invalid("EXIF field type"))?;
+        for c in data.chunks_exact_mut(unit) {
+            c.reverse();
+        }
+    }
+    let tag = tiff::tags::Tag::Unknown(e.tag);
+    let count = e.count as usize;
+    macro_rules! put {
+        ($($k:literal)*) => {
+            match e.kind {
+                $($k => dir.write_tag(tag, RawValue::<$k> { count, data }),)*
+                _ => return Err(Error::Invalid("EXIF field type")),
+            }
+        };
+    }
+    put!(1 2 3 4 5 6 7 8 9 10 11 12).map_err(codec)
+}
+/// Write a sub-directory (and the sub-directories it points to) outside the
+/// image chain and return its file offset.
+fn write_tiff_subdir<W: std::io::Write + std::io::Seek>(
+    enc: &mut tiff::encoder::TiffEncoder<W>,
+    entries: &[exif_ifd::Entry],
+) -> Result<u32> {
+    let mut pointers = Vec::new();
+    for e in entries {
+        if let Some(sub) = &e.sub {
+            pointers.push((e.tag, write_tiff_subdir(enc, sub)?));
+        }
+    }
+    let mut dir = enc.extra_directory().map_err(codec)?;
+    for e in entries.iter().filter(|e| e.sub.is_none()) {
+        write_raw_tag(&mut dir, e)?;
+    }
+    for (tag, offset) in pointers {
+        dir.write_tag(tiff::tags::Tag::Unknown(tag), offset)
+            .map_err(codec)?;
+    }
+    let offsets = dir.finish_with_offsets().map_err(codec)?;
+    u32::try_from(offsets.pointer.0).map_err(|_| Error::Invalid("TIFF offset"))
 }
 fn encode_tiff(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     let mut out = Cursor::new(Vec::new());
@@ -545,9 +695,23 @@ fn encode_tiff(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
         TiffCompression::None => tiff::encoder::Compression::Uncompressed,
         TiffCompression::Lzw => tiff::encoder::Compression::Lzw,
     };
+    // EXIF goes the standard TIFF way: picture metadata tags join IFD0, and the
+    // EXIF and GPS directories are written apart and pointed to by tags 34665
+    // and 34853. Other IFD0 tags of the EXIF block (such as resolution) are
+    // owned by the TIFF image itself and are not copied.
+    let exif = match &image.metadata.exif {
+        Some(bytes) => exif_ifd::parse(bytes)?,
+        None => Vec::new(),
+    };
     let mut enc = tiff::encoder::TiffEncoder::new(&mut out)
         .map_err(codec)?
         .with_compression(compression);
+    let mut pointers = Vec::new();
+    for e in &exif {
+        if let (exif_ifd::EXIF_IFD | exif_ifd::GPS_IFD, Some(sub)) = (e.tag, &e.sub) {
+            pointers.push((e.tag, write_tiff_subdir(&mut enc, sub)?));
+        }
+    }
     let mut img = enc
         .new_image::<tiff::encoder::colortype::RGBA8>(image.width, image.height)
         .map_err(codec)?;
@@ -556,9 +720,15 @@ fn encode_tiff(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
             .write_tag(tiff::tags::Tag::Unknown(34675), icc.as_slice())
             .map_err(codec)?;
     }
-    if let Some(exif) = &image.metadata.exif {
+    for e in exif
+        .iter()
+        .filter(|e| e.sub.is_none() && exif_ifd::IFD0_METADATA.contains(&e.tag))
+    {
+        write_raw_tag(img.encoder(), e)?;
+    }
+    for (tag, offset) in pointers {
         img.encoder()
-            .write_tag(tiff::tags::Tag::Unknown(65000), exif.as_slice())
+            .write_tag(tiff::tags::Tag::Unknown(tag), offset)
             .map_err(codec)?;
     }
     if let Some(xmp) = &image.metadata.xmp {

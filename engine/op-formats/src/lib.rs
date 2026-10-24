@@ -2,6 +2,7 @@
 pub mod png;
 
 mod bmp;
+mod exif_ifd;
 mod io;
 pub use io::{
     ChromaSubsampling, Decoded, Format, Metadata, Options, PngCompression, TiffCompression, decode,
