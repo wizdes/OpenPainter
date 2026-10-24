@@ -28,6 +28,15 @@ struct Step {
     status: Status,
 }
 
+/// The engine workspace folder. `cargo run` sets CARGO_MANIFEST_DIR at run
+/// time; prefer it over the path fixed at compile time, because cargo can
+/// reuse an xtask binary built when the source lived somewhere else, and the
+/// checks would then run against that old folder.
+fn engine_dir(runtime: Option<std::ffi::OsString>, compiled: &str) -> PathBuf {
+    let manifest = runtime.map_or_else(|| PathBuf::from(compiled), PathBuf::from);
+    manifest.parent().expect("workspace parent").to_path_buf()
+}
+
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() != 3 || args[0] != "check" || args[1] != "--tier" {
@@ -39,10 +48,10 @@ fn main() -> ExitCode {
         eprintln!("Unknown tier: {tier}");
         return ExitCode::from(2);
     }
-    let engine = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("workspace parent")
-        .to_path_buf();
+    let engine = engine_dir(
+        std::env::var_os("CARGO_MANIFEST_DIR"),
+        env!("CARGO_MANIFEST_DIR"),
+    );
     let repo = engine.parent().expect("repository parent");
     let mut steps = Vec::new();
     run(
@@ -271,6 +280,16 @@ fn run_script(steps: &mut Vec<Step>, name: &str, repo: &Path, app: Option<&Path>
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn engine_dir_prefers_the_run_time_manifest_path() {
+        let dir = engine_dir(Some("/fresh/engine/xtask".into()), "/stale/engine/xtask");
+        assert_eq!(dir, PathBuf::from("/fresh/engine"));
+        assert_eq!(
+            engine_dir(None, "/stale/engine/xtask"),
+            PathBuf::from("/stale/engine")
+        );
+    }
 
     #[test]
     fn script_skip_is_recorded_as_skip() {
