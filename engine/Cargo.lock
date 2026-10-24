@@ -318,6 +318,14 @@ version = "0.1.0"
 [[package]]
 name = "op-ops"
 version = "0.1.0"
+dependencies = [
+ "op-core",
+ "op-formats",
+ "op-testkit",
+ "proptest",
+ "tempfile",
+ "thiserror",
+]
 
 [[package]]
 name = "op-testkit"

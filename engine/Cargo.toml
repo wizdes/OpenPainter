@@ -18,3 +18,11 @@ lto = "thin"
 codegen-units = 1
 strip = true
 panic = "unwind"
+
+# Debug builds keep overflow checks and debug assertions, but optimize so the
+# random-case pixel tests finish inside the fast tier's 2-minute budget.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
