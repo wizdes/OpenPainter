@@ -1,6 +1,16 @@
 use op_gpu::GpuContext;
 use op_ops::effect::{self, GpuKernel};
 
+struct NoSpill;
+impl op_core::tiles::SpillIo for NoSpill {
+    fn append(&self, _: &[u8]) -> std::io::Result<u64> {
+        Err(std::io::Error::other("unexpected spill"))
+    }
+    fn read_exact_at(&self, _: u64, _: &mut [u8]) -> std::io::Result<()> {
+        Err(std::io::Error::other("unexpected spill"))
+    }
+}
+
 #[test]
 fn registered_effect_kernels_are_byte_exact_and_dispatch() {
     let mut gpu = GpuContext::new().expect("GPU adapter");
@@ -36,7 +46,12 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                         >> 16) as u8;
                     pixel[..3].fill(value);
                 }
-                GpuKernel::BrightnessContrast | GpuKernel::TemperatureTint => {}
+                GpuKernel::BrightnessContrast
+                | GpuKernel::TemperatureTint
+                | GpuKernel::HighlightsShadows
+                | GpuKernel::Curves
+                | GpuKernel::Levels
+                | GpuKernel::Exposure => {}
                 GpuKernel::Posterize => {
                     for channel in &mut pixel[..3] {
                         let value = u32::from(*channel);
@@ -206,5 +221,211 @@ fn configurable_adjustments_match_cpu_on_random_pixels() {
                 "{id} byte {index}: {got} vs {want}"
             );
         }
+    }
+}
+
+#[test]
+fn m26_lut_kernels_match_tables_in_both_curve_modes() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (257, 3);
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| [i as u8, (i * 3) as u8, (i * 7) as u8, (i * 11) as u8])
+        .collect();
+    let lut: [[u8; 256]; 3] = std::array::from_fn(|channel| {
+        std::array::from_fn(|v| match channel {
+            0 => 255 - v as u8,
+            1 => ((v * 3) % 256) as u8,
+            _ => v as u8,
+        })
+    });
+    for kernel in [GpuKernel::Curves, GpuKernel::Levels, GpuKernel::Exposure] {
+        for luminosity in [false, true] {
+            let before = gpu.dispatch_count();
+            let actual = gpu
+                .effect_kernel_with_lut(kernel, width, height, &bytes, &lut, luminosity)
+                .unwrap();
+            assert_eq!(gpu.dispatch_count(), before + 1);
+            let mut expected = bytes.clone();
+            for pixel in expected.chunks_exact_mut(4) {
+                if luminosity {
+                    let old = ((7471 * u32::from(pixel[2])
+                        + 38470 * u32::from(pixel[1])
+                        + 19595 * u32::from(pixel[0]))
+                        >> 16) as u8;
+                    let diff = i16::from(lut[0][old as usize]) - i16::from(old);
+                    for channel in &mut pixel[..3] {
+                        *channel = (i16::from(*channel) + diff).clamp(0, 255) as u8;
+                    }
+                } else {
+                    for channel in 0..3 {
+                        pixel[channel] = lut[channel][pixel[channel] as usize];
+                    }
+                }
+            }
+            assert_eq!(actual, expected, "{kernel:?} luminosity={luminosity}");
+        }
+    }
+}
+
+#[test]
+fn m26_highlights_shadows_gpu_matches_cpu() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let spec = effect::find("effect.adjust.highlights_shadows").unwrap();
+    let bytes: Vec<u8> = (0..513u32)
+        .flat_map(|i| [i as u8, (i * 17) as u8, (i * 37) as u8, (i * 97) as u8])
+        .collect();
+    for (highlights, shadows) in [(-100, 100), (50, -75), (100, 100)] {
+        let mut params = spec.default_params();
+        params
+            .as_object_mut()
+            .unwrap()
+            .insert("Highlights".into(), highlights.into());
+        params
+            .as_object_mut()
+            .unwrap()
+            .insert("Shadows".into(), shadows.into());
+        let expected: Vec<u8> = bytes
+            .chunks_exact(4)
+            .flat_map(|pixel| {
+                let original = [pixel[0], pixel[1], pixel[2], pixel[3]];
+                (spec.render_cpu)(
+                    &|_, _| original,
+                    0,
+                    0,
+                    &effect::Prepared::default(),
+                    &params,
+                )
+            })
+            .collect();
+        let actual = gpu
+            .effect_kernel_with_params(
+                GpuKernel::HighlightsShadows,
+                513,
+                1,
+                &bytes,
+                [highlights, shadows, 0],
+            )
+            .unwrap();
+        assert_eq!(actual, expected);
+    }
+}
+
+#[test]
+fn m26_prepared_tables_match_cpu_on_metal() {
+    use op_core::doc::{DocState, SelectionState};
+    use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
+    use std::sync::Arc;
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let width = 257u32;
+    let bytes: Vec<u8> = (0..width)
+        .flat_map(|i| [i as u8, (i * 7) as u8, (i * 19) as u8, (i * 71) as u8])
+        .collect();
+    let store = Arc::new(TileStore::with_io(4 * TILE_BYTES, Box::new(NoSpill)));
+    let mut doc = DocState::new(store, width, 1, 96.0).unwrap();
+    for coord in effect::tile_coords(effect::Rect::new(0, 0, width, 1)) {
+        let mut tile = vec![0; TILE_BYTES];
+        for x in 0..TILE_SIZE {
+            let gx = coord.x as usize * TILE_SIZE + x;
+            if gx >= width as usize {
+                break;
+            }
+            tile[x * 4..x * 4 + 4].copy_from_slice(&bytes[gx * 4..gx * 4 + 4]);
+        }
+        doc = doc
+            .write_tile(
+                0,
+                TileCoord { x: coord.x, y: 0 },
+                TileData::try_from(tile).unwrap(),
+            )
+            .unwrap();
+    }
+    let cases = [
+        (
+            "effect.adjust.curves",
+            GpuKernel::Curves,
+            "Luminosity",
+            vec![vec![[0, 0], [64, 130], [255, 255]]],
+        ),
+        (
+            "effect.adjust.curves",
+            GpuKernel::Curves,
+            "Rgb",
+            vec![
+                vec![[0, 255], [255, 0]],
+                vec![[0, 0], [255, 255]],
+                vec![[0, 0], [255, 255]],
+            ],
+        ),
+    ];
+    for (id, kernel, mode, points) in cases {
+        let spec = effect::find(id).unwrap();
+        let mut params = spec.default_params();
+        params
+            .as_object_mut()
+            .unwrap()
+            .insert("ColorTransferMode".into(), mode.into());
+        let points: Vec<Vec<Vec<i32>>> = points
+            .into_iter()
+            .map(|channel| channel.into_iter().map(|point| point.to_vec()).collect())
+            .collect();
+        params
+            .as_object_mut()
+            .unwrap()
+            .insert("ControlPoints".into(), points.into());
+        let prepared = (spec.prepare)(&doc, &SelectionState::None, &params).unwrap();
+        let lut = prepared.channel_lut.as_ref().unwrap();
+        let luminosity = params["ColorTransferMode"] == "Luminosity";
+        let actual = gpu
+            .effect_kernel_with_lut(kernel, width, 1, &bytes, lut, luminosity)
+            .unwrap();
+        let expected: Vec<u8> = bytes
+            .chunks_exact(4)
+            .flat_map(|pixel| {
+                let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
+                (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params)
+            })
+            .collect();
+        assert_eq!(actual, expected, "{id} mode={luminosity}");
+    }
+    for (id, kernel, variant) in [
+        ("effect.adjust.levels", GpuKernel::Levels, "gamma"),
+        ("effect.adjust.levels", GpuKernel::Levels, "auto"),
+        ("effect.adjust.exposure", GpuKernel::Exposure, "stops"),
+    ] {
+        let spec = effect::find(id).unwrap();
+        let mut params = spec.default_params();
+        match variant {
+            "gamma" => {
+                params
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("Gamma".into(), vec![0.5, 2.0, 5.0].into());
+            }
+            "auto" => {
+                params
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("Auto".into(), true.into());
+            }
+            _ => {
+                params
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("Exposure".into(), 2.0.into());
+            }
+        }
+        let prepared = (spec.prepare)(&doc, &SelectionState::None, &params).unwrap();
+        let lut = prepared.channel_lut.as_ref().unwrap();
+        let actual = gpu
+            .effect_kernel_with_lut(kernel, width, 1, &bytes, lut, false)
+            .unwrap();
+        let expected: Vec<u8> = bytes
+            .chunks_exact(4)
+            .flat_map(|pixel| {
+                let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
+                (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params)
+            })
+            .collect();
+        assert_eq!(actual, expected, "{id} {variant}");
     }
 }

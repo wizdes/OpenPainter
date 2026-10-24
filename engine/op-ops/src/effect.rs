@@ -27,6 +27,9 @@ pub enum ParamKind {
     Bool,
     Choice(&'static [&'static str]),
     String,
+    Curve,
+    RgbBytes,
+    RgbGamma,
 }
 #[derive(Clone, Debug)]
 pub struct Param {
@@ -62,6 +65,36 @@ impl ParamSchema {
                 ParamKind::Float => v.as_f64().is_some_and(f64::is_finite),
                 ParamKind::Bool => v.is_boolean(),
                 ParamKind::String => v.is_string(),
+                ParamKind::Curve => v.as_array().is_some_and(|channels| {
+                    !channels.is_empty()
+                        && channels.len() <= 3
+                        && channels.iter().all(|channel| {
+                            channel.as_array().is_some_and(|points| {
+                                points.len() >= 2
+                                    && points.iter().all(|point| {
+                                        point.as_array().is_some_and(|xy| {
+                                            xy.len() == 2
+                                                && xy
+                                                    .iter()
+                                                    .all(|n| n.as_u64().is_some_and(|n| n <= 255))
+                                        })
+                                    })
+                            })
+                        })
+                }),
+                ParamKind::RgbBytes => v.as_array().is_some_and(|channels| {
+                    channels.len() == 3
+                        && channels
+                            .iter()
+                            .all(|n| n.as_u64().is_some_and(|n| n <= 255))
+                }),
+                ParamKind::RgbGamma => v.as_array().is_some_and(|channels| {
+                    channels.len() == 3
+                        && channels.iter().all(|n| {
+                            n.as_f64()
+                                .is_some_and(|n| n.is_finite() && (0.1..=10.0).contains(&n))
+                        })
+                }),
                 ParamKind::Choice(choices) => v.as_str().is_some_and(|s| choices.contains(&s)),
             };
             if !valid {
@@ -136,6 +169,10 @@ pub enum GpuKernel {
     Posterize,
     Sepia,
     TemperatureTint,
+    Curves,
+    Levels,
+    Exposure,
+    HighlightsShadows,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -205,9 +242,13 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::auto_level::spec(),
         crate::effects::black_and_white::spec(),
         crate::effects::brightness_contrast::spec(),
+        crate::effects::curves::spec(),
+        crate::effects::exposure::spec(),
+        crate::effects::highlights_shadows::spec(),
         crate::effects::hue_saturation::spec(),
         crate::effects::invert_alpha::spec(),
         crate::effects::invert_colors::spec(),
+        crate::effects::levels::spec(),
         crate::effects::posterize::spec(),
         crate::effects::sepia::spec(),
         crate::effects::temperature_tint::spec(),

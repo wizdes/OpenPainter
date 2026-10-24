@@ -82,6 +82,304 @@ fn m25_adjustments_are_registered_in_menu_order() {
 }
 
 #[test]
+fn m26_adjustments_are_registered_in_menu_order() {
+    let ids: Vec<_> = effect::registered()
+        .into_iter()
+        .map(|spec| spec.id)
+        .collect();
+    let expected = [
+        "effect.adjust.curves",
+        "effect.adjust.exposure",
+        "effect.adjust.highlights_shadows",
+        "effect.adjust.levels",
+    ];
+    let positions: Vec<_> = expected
+        .iter()
+        .map(|id| ids.iter().position(|v| v == id).expect(id))
+        .collect();
+    assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
+#[test]
+fn m26_levels_auto_matches_auto_level_and_tile_order() {
+    let doc = document(257, 3);
+    let rect = Rect::new(0, 0, 257, 3);
+    let levels = effect::find("effect.adjust.levels").unwrap();
+    let params = serde_json::json!({"Auto": true});
+    let whole = effect::render(&doc, &levels, rect, Some(params.clone())).unwrap();
+    let mut coords = effect::tile_coords(rect);
+    coords.reverse();
+    let parallel = effect::render_tiles(&doc, &levels, rect, &coords, true, Some(params)).unwrap();
+    let auto = effect::render(
+        &doc,
+        &effect::find("effect.adjust.auto_level").unwrap(),
+        rect,
+        None,
+    )
+    .unwrap();
+    for coord in effect::tile_coords(rect) {
+        assert_eq!(
+            whole.read_tile(0, coord).unwrap(),
+            parallel.read_tile(0, coord).unwrap()
+        );
+        assert_eq!(
+            whole.read_tile(0, coord).unwrap(),
+            auto.read_tile(0, coord).unwrap()
+        );
+    }
+}
+
+#[test]
+fn m26_parameterized_curves_tiles_match_parallel_and_reverse_order() {
+    let doc = document(257, 3);
+    let rect = Rect::new(0, 0, 257, 3);
+    let spec = effect::find("effect.adjust.curves").unwrap();
+    let params = serde_json::json!({"ColorTransferMode":"Rgb", "ControlPoints":[
+        [[0,0],[96,150],[255,255]], [[0,0],[128,90],[255,255]], [[0,0],[192,120],[255,255]]
+    ]});
+    let whole = effect::render(&doc, &spec, rect, Some(params.clone())).unwrap();
+    let mut coords = effect::tile_coords(rect);
+    coords.reverse();
+    let parallel = effect::render_tiles(&doc, &spec, rect, &coords, true, Some(params)).unwrap();
+    for coord in effect::tile_coords(rect) {
+        assert_eq!(
+            whole.read_tile(0, coord).unwrap(),
+            parallel.read_tile(0, coord).unwrap()
+        );
+    }
+}
+
+#[test]
+fn m26_curve_levels_and_own_effect_endpoints_keep_alpha_and_hidden_rgb() {
+    let doc = document(2, 1);
+    let rect = Rect::new(0, 0, 2, 1);
+    for (id, params) in [
+        (
+            "effect.adjust.curves",
+            serde_json::json!({"ColorTransferMode":"Rgb", "ControlPoints":[[[0,255],[255,0]],[[0,0],[255,255]],[[0,0],[255,255]]]}),
+        ),
+        (
+            "effect.adjust.levels",
+            serde_json::json!({"InputBlack":[0,0,0],"InputWhite":[255,255,255],"Gamma":[1.0,1.0,2.0],"OutputBlack":[0,0,0],"OutputWhite":[255,255,255]}),
+        ),
+        (
+            "effect.adjust.exposure",
+            serde_json::json!({"Exposure":5.0}),
+        ),
+        (
+            "effect.adjust.highlights_shadows",
+            serde_json::json!({"Highlights":100,"Shadows":-100}),
+        ),
+    ] {
+        let spec = effect::find(id).unwrap();
+        let result = effect::render(&doc, &spec, rect, Some(params)).unwrap();
+        let tile = result.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        assert_eq!(tile[3], 0, "{id}");
+        assert_ne!(&tile[..3], &[0, 0, 91], "{id}");
+    }
+}
+
+#[test]
+fn m26_curves_soft_mask_and_geometry_clip_output() {
+    let doc = document(3, 1);
+    let params = serde_json::json!({"ColorTransferMode":"Rgb", "ControlPoints":[[[0,255],[255,0]],[[0,0],[255,255]],[[0,0],[255,255]]]});
+    let spec = effect::find("effect.adjust.curves").unwrap();
+    let rect = Rect::new(0, 0, 3, 1);
+    let full = effect::render(&doc, &spec, rect, Some(params.clone())).unwrap();
+    let full_bytes = full.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    let soft = doc
+        .clone()
+        .set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+            MaskGrid {
+                width: 3,
+                height: 1,
+                bytes: Arc::from([0u8, 128, 255]),
+            },
+        ))));
+    let result = effect::render(&soft, &spec, rect, Some(params.clone())).unwrap();
+    let bytes = result.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&bytes[..4], &[0, 0, 91, 0]);
+    assert_eq!(&bytes[8..12], &full_bytes[8..12]);
+    assert_eq!(bytes[4], effect::coverage_lerp(1, full_bytes[4], 128));
+    let geometry = doc.set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+        PolygonSet(vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]]),
+    ))));
+    let result = effect::render(&geometry, &spec, rect, Some(params)).unwrap();
+    let bytes = result.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&bytes[..4], &full_bytes[..4]);
+    assert_eq!(&bytes[4..8], &[1, 0, 91, 1]);
+}
+
+#[test]
+fn m26_identity_gpu_reference_accepts_empty_preparation() {
+    for id in ["effect.adjust.curves", "effect.adjust.exposure"] {
+        let spec = effect::find(id).unwrap();
+        let source = [17, 93, 211, 0];
+        let actual = (spec.render_cpu)(
+            &|_, _| source,
+            0,
+            0,
+            &effect::Prepared::default(),
+            &spec.default_params(),
+        );
+        assert_eq!(actual, source, "{id}");
+    }
+}
+
+#[test]
+fn m26_own_defaults_keep_all_five_oracle_inputs() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/oracle/legacy336/effects/manifest.json")).unwrap(),
+    )
+    .unwrap();
+    let cases: Vec<_> = manifest
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["op"] == "Curves" && entry["parameters"] == serde_json::json!({}))
+        .collect();
+    assert_eq!(cases.len(), 5);
+    let doc = document(1, 1);
+    for id in ["effect.adjust.exposure", "effect.adjust.highlights_shadows"] {
+        let spec = effect::find(id).unwrap();
+        let params = spec.default_params();
+        let prepared = (spec.prepare)(&doc, &SelectionState::None, &params).unwrap();
+        for case in &cases {
+            let input = op_formats::png::decode_png(
+                &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
+            )
+            .unwrap();
+            for pixel in input.pixels.chunks_exact(4) {
+                let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
+                let actual = (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params);
+                assert_eq!(actual, source, "{id} {}", case["input"]);
+            }
+        }
+    }
+}
+
+#[test]
+fn m26_own_endpoint_variants_cover_all_five_oracle_inputs() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/oracle/legacy336/effects/manifest.json")).unwrap(),
+    )
+    .unwrap();
+    let cases: Vec<_> = manifest
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["op"] == "Curves" && entry["parameters"] == serde_json::json!({}))
+        .collect();
+    assert_eq!(cases.len(), 5);
+    let doc = document(1, 1);
+    for (id, field, endpoints) in [
+        ("effect.adjust.exposure", "Exposure", [-5.0, 5.0]),
+        (
+            "effect.adjust.highlights_shadows",
+            "Highlights",
+            [-100.0, 100.0],
+        ),
+        (
+            "effect.adjust.highlights_shadows",
+            "Shadows",
+            [-100.0, 100.0],
+        ),
+    ] {
+        let spec = effect::find(id).unwrap();
+        for endpoint in endpoints {
+            let mut params = spec.default_params();
+            let value = if id == "effect.adjust.exposure" {
+                serde_json::json!(endpoint)
+            } else {
+                serde_json::json!(endpoint as i64)
+            };
+            params.as_object_mut().unwrap().insert(field.into(), value);
+            let prepared = (spec.prepare)(&doc, &SelectionState::None, &params).unwrap();
+            let mut changed = false;
+            for case in &cases {
+                let input = op_formats::png::decode_png(
+                    &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
+                )
+                .unwrap();
+                for pixel in input.pixels.chunks_exact(4) {
+                    let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
+                    let actual = (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params);
+                    assert_eq!(actual[3], source[3], "{id} {field} {endpoint}");
+                    for channel in 0..3 {
+                        if endpoint > 0.0 {
+                            assert!(actual[channel] >= source[channel]);
+                        } else {
+                            assert!(actual[channel] <= source[channel]);
+                        }
+                        changed |= actual[channel] != source[channel];
+                    }
+                }
+            }
+            assert!(changed, "{id} {field} {endpoint}");
+        }
+    }
+}
+
+#[test]
+fn m26_all_adjustments_clip_nondefault_output_to_soft_and_geometry_selections() {
+    let doc = document(3, 1);
+    let rect = Rect::new(0, 0, 3, 1);
+    let soft = doc
+        .clone()
+        .set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+            MaskGrid {
+                width: 3,
+                height: 1,
+                bytes: Arc::from([0u8, 128, 255]),
+            },
+        ))));
+    let geometry = doc
+        .clone()
+        .set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+            PolygonSet(vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]]),
+        ))));
+    for (id, params) in [
+        (
+            "effect.adjust.curves",
+            serde_json::json!({"ColorTransferMode":"Rgb", "ControlPoints":[[[0,255],[255,0]],[[0,0],[255,255]],[[0,0],[255,255]]]}),
+        ),
+        (
+            "effect.adjust.levels",
+            serde_json::json!({"Gamma":[1.0,1.0,2.0]}),
+        ),
+        (
+            "effect.adjust.exposure",
+            serde_json::json!({"Exposure":2.0}),
+        ),
+        (
+            "effect.adjust.highlights_shadows",
+            serde_json::json!({"Shadows":100}),
+        ),
+    ] {
+        let spec = effect::find(id).unwrap();
+        let full = effect::render(&doc, &spec, rect, Some(params.clone())).unwrap();
+        let whole = full.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        let selected = effect::render(&soft, &spec, rect, Some(params.clone())).unwrap();
+        let bytes = selected.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        assert_eq!(&bytes[..4], &[0, 0, 91, 0], "{id}");
+        assert_eq!(&bytes[8..12], &whole[8..12], "{id}");
+        for channel in 0..4 {
+            assert_eq!(
+                bytes[4 + channel],
+                effect::coverage_lerp([1, 0, 91, 1][channel], whole[4 + channel], 128),
+                "{id}"
+            );
+        }
+        let selected = effect::render(&geometry, &spec, rect, Some(params)).unwrap();
+        let bytes = selected.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        assert_eq!(&bytes[..4], &whole[..4], "{id}");
+        assert_eq!(&bytes[4..8], &[1, 0, 91, 1], "{id}");
+    }
+}
+
+#[test]
 fn m25_profile_and_hidden_colors_do_not_change_the_result() {
     let doc = document(2, 1);
     let with_profile = doc.set_profile(Some(Arc::from([1u8, 2, 3])));
@@ -536,6 +834,8 @@ fn m25_pointwise_effects_match_legacy_pngs() {
         ("Sepia", "effect.adjust.sepia", 5, 1),
         ("Hue and Saturation", "effect.adjust.hue_saturation", 50, 0),
         ("Auto-Level", "effect.adjust.auto_level", 5, 1),
+        ("Levels", "effect.adjust.levels", 20, 1),
+        ("Curves", "effect.adjust.curves", 20, 0),
     ] {
         let cases: Vec<_> = manifest
             .as_array()
@@ -594,6 +894,19 @@ fn m25_pointwise_effects_match_legacy_pngs() {
             }
             if name == "Posterize" {
                 params.insert("LinkLevels".into(), serde_json::json!(false));
+            }
+            if name == "Levels"
+                && let Some(gamma) = case["parameters"].get("gamma")
+            {
+                params.insert("Gamma".into(), serde_json::json!([gamma, gamma, gamma]));
+            }
+            if name == "Curves" {
+                if let Some(mode) = case["parameters"].get("mode") {
+                    params.insert("ColorTransferMode".into(), mode.clone());
+                }
+                if let Some(points) = case["parameters"].get("points") {
+                    params.insert("ControlPoints".into(), points.clone());
+                }
             }
             let output =
                 effect::render(&doc, &spec, rect, Some(serde_json::Value::Object(params))).unwrap();

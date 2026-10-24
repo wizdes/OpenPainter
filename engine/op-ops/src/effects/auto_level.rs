@@ -39,7 +39,11 @@ pub fn spec() -> EffectSpec {
     }
 }
 
-fn prepare(doc: &DocState, selection: &SelectionState, _: &serde_json::Value) -> Result<Prepared> {
+pub(crate) fn prepare(
+    doc: &DocState,
+    selection: &SelectionState,
+    _: &serde_json::Value,
+) -> Result<Prepared> {
     // OpenPDN 3.36 builds its histogram from selected pixels. The soft mask
     // contributes a pixel once when coverage is nonzero, regardless of weight.
     let geometry = matches!(

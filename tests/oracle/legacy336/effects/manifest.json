@@ -962,6 +962,696 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Luminosity",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            130
+          ],
+          [
+            128,
+            160
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Curves_luminosity_points_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Luminosity",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            130
+          ],
+          [
+            128,
+            160
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Curves_luminosity_points_partial_alpha_64.png",
+    "output_sha256": "c05e25fd870f6d07118597d563253333d4b6b308d50e731566d4dc4072c3b843",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Luminosity",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            130
+          ],
+          [
+            128,
+            160
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Curves_luminosity_points_plasma_512x384.png",
+    "output_sha256": "af995eacdf650d9bf5194d86917fa367e717e6f97a831a4cbcf13c1a6ea236e1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Luminosity",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            130
+          ],
+          [
+            128,
+            160
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Curves_luminosity_points_plasma_alpha_512x384.png",
+    "output_sha256": "85a31c2f922b786455435b14e6f16aab26a5a2edae52bfe3ec5bebecac26de78",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Luminosity",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            130
+          ],
+          [
+            128,
+            160
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Curves_luminosity_points_alpha_edge_64.png",
+    "output_sha256": "7f298624127c3c6581b1083fc2a7a0ca56e7c65081763dee3bd11ed0ef3014aa",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            96,
+            150
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            128,
+            90
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            192,
+            120
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Curves_rgb_points_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            96,
+            150
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            128,
+            90
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            192,
+            120
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Curves_rgb_points_partial_alpha_64.png",
+    "output_sha256": "9a8f97c85d77429a1d93c7e98a414c48185c6ea32701aa7d5565783226b1fa85",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            96,
+            150
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            128,
+            90
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            192,
+            120
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Curves_rgb_points_plasma_512x384.png",
+    "output_sha256": "ebcd06a2688cf237c5e4b64d39680977305473eb7e4ee20d154d1f5a67463539",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            96,
+            150
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            128,
+            90
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            192,
+            120
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Curves_rgb_points_plasma_alpha_512x384.png",
+    "output_sha256": "eb25df12051d69c39cc95146cf1dad34783ffe2f9b33768d3aa51a2a24d8f303",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            96,
+            150
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            128,
+            90
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            192,
+            120
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Curves_rgb_points_alpha_edge_64.png",
+    "output_sha256": "aac4134248a4ba40f5e751bb7a109f97dc04a116fd9ac11a4e669cfd5ca216ab",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            255
+          ],
+          [
+            255,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Curves_red_endpoints_impulse_64.png",
+    "output_sha256": "10e1e1f9ac7e9f7b3a53ec181dbb77f8bae02241745fd6cd079c377b988567f0",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            255
+          ],
+          [
+            255,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Curves_red_endpoints_partial_alpha_64.png",
+    "output_sha256": "9c0e9bd2b14c3cb4c1b702b8538a1e7c8bcdb0561ad723bb64bdbadfd25b610d",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            255
+          ],
+          [
+            255,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Curves_red_endpoints_plasma_512x384.png",
+    "output_sha256": "ecc473aeae608b0d7bbd2cb111c81389cc264396d82b2b8a91457e453ec77702",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            255
+          ],
+          [
+            255,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Curves_red_endpoints_plasma_alpha_512x384.png",
+    "output_sha256": "31811c1b52623d2222048e05ed805226c8cb62ce367de4edae349ab6b9a04228",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {
+      "mode": "Rgb",
+      "points": [
+        [
+          [
+            0,
+            255
+          ],
+          [
+            255,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            0,
+            0
+          ],
+          [
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Curves_red_endpoints_alpha_edge_64.png",
+    "output_sha256": "c6cc1e4356be2dda49709fa513e22441d892437596c38f82dfe6f1c0cf51b9e9",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
     "op": "DentsEffect",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",

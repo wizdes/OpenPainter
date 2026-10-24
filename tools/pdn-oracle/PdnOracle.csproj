@@ -26,6 +26,7 @@
     <Compile Include="../../.pdn-src/src/Core/HsvColor.cs" />
     <Compile Include="../../.pdn-src/src/Core/Histogram.cs" />
     <Compile Include="../../.pdn-src/src/Core/HistogramRGB.cs" />
+    <Compile Include="../../.pdn-src/src/Core/SplineInterpolator.cs" />
     <Compile Include="../../.pdn-src/src/Core/ResamplingAlgorithm.cs" />
     <Compile Include="../../.pdn-src/src/Data/UserBlendOps.cs" />
     <Compile Include="../../.pdn-src/src/Data/UserBlendOp.cs" />

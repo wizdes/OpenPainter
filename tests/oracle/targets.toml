@@ -51,3 +51,27 @@ id = "effect.adjust.invert_alpha"
 target = "own"
 reference = "own goldens"
 tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.curves"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Curves_*.png"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.levels"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Levels_*.png"
+tolerance = "1/255"
+
+[[effect]]
+id = "effect.adjust.exposure"
+target = "own"
+reference = "provisional exposure stop curve; https://paint.net/doc/latest/AdjustmentsMenu.html; 5.1 capture pending"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.highlights_shadows"
+target = "own"
+reference = "provisional tone weighted shift; https://paint.net/doc/latest/AdjustmentsMenu.html; 5.1 capture pending"
+tolerance = "exact"

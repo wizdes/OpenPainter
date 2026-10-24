@@ -1,9 +1,13 @@
 pub mod auto_level;
 pub mod black_and_white;
 pub mod brightness_contrast;
+pub mod curves;
+pub mod exposure;
+pub mod highlights_shadows;
 pub mod hue_saturation;
 pub mod invert_alpha;
 pub mod invert_colors;
+pub mod levels;
 pub mod posterize;
 pub mod sepia;
 pub mod temperature_tint;
