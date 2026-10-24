@@ -21,3 +21,4 @@ mac/**/.build/
 # SwiftPM build output (mac/PresenterSpike)
 .build/
 .swiftpm/
+tools/pdn-oracle/Generated/

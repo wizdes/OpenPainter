@@ -9,6 +9,7 @@
     <Compile Include="Png.cs" />
     <Compile Include="Stubs/*.cs" />
     <Compile Include="Shims/*.cs" />
+    <Compile Include="Generated/FloodExtract.cs" />
     <Compile Include="../../.pdn-src/src/Core/ColorBgra.cs" />
     <Compile Include="../../.pdn-src/src/Base/IDeferredSerializable.cs" />
     <Compile Include="../../.pdn-src/src/Base/DeferredFormatter.cs" />
@@ -33,4 +34,7 @@
     <Compile Include="../../.pdn-src/src/Effects/PosterizeAdjustment.cs" />
     <Compile Include="../../.pdn-src/src/Effects/GaussianBlurEffect.cs" />
   </ItemGroup>
+  <Target Name="ExtractLegacyFlood" BeforeTargets="CoreCompile">
+    <Exec Command="python3 &quot;$(MSBuildProjectDirectory)/extract-flood.py&quot;" />
+  </Target>
 </Project>

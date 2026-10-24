@@ -30,8 +30,8 @@ internal static class Program
     private static void Write(string dir,string name,Png png,string op,object parameters,string input="",string notes="",string status="ok") {string path=Path.Combine(dir,name);png.Write(path);Record(dir,op,parameters,input,path,status,notes);}
     private static int Main(string[] args)
     {
-        try { if(args.Length==0)throw new ArgumentException("Use fixtures, vectors, blend, resample, effect <name> <json-params>, or effects-all");
-            switch(args[0]) {case "fixtures":MakeFixtures();break;case "vectors":Vectors();break;case "blend":Blend();break;case "resample":Resample();break;case "effect":if(args.Length<3)throw new ArgumentException("effect needs name and JSON parameters");Effects(args[1],args[2]);break;case "effects-all":EffectsAll();break;default:throw new ArgumentException("Unknown command: "+args[0]);}return 0;
+        try { if(args.Length==0)throw new ArgumentException("Use fixtures, vectors, blend, resample, flood, effect <name> <json-params>, or effects-all");
+            switch(args[0]) {case "fixtures":MakeFixtures();break;case "vectors":Vectors();break;case "blend":Blend();break;case "resample":Resample();break;case "flood":Flood();break;case "effect":if(args.Length<3)throw new ArgumentException("effect needs name and JSON parameters");Effects(args[1],args[2]);break;case "effects-all":EffectsAll();break;default:throw new ArgumentException("Unknown command: "+args[0]);}return 0;
         }catch(Exception e){Console.Error.WriteLine(e);return 1;}
     }
     private static uint Noise(int x,int y,int channel){uint h=(uint)(x*374761393+y*668265263+channel*1442695041+0x51ed270b);h=(h^(h>>13))*1274126177;return h^(h>>16);}
@@ -86,6 +86,36 @@ internal static class Program
     private static void Resample(){string dir=Path.Combine(Oracle,"resample");Directory.CreateDirectory(dir);string input=F("plasma_alpha_512x384");using var source=SurfaceOf(Png.Read(input));foreach((string label,int num,int den) in new[]{("0.5x",1,2),("0.37x",37,100),("1.6x",8,5),("3x",3,1)}){int w=(source.Width*num+den/2)/den,h=(source.Height*num+den/2)/den;foreach(string mode in new[]{"NearestNeighbor","Bilinear","Bicubic","SuperSampling"}){using var dest=new Surface(w,h);switch(mode){case "NearestNeighbor":dest.NearestNeighborFitSurface(source);break;case "Bilinear":dest.BilinearFitSurface(source);break;case "Bicubic":dest.BicubicFitSurface(source);break;case "SuperSampling":dest.SuperSamplingFitSurface(source);break;}Write(dir,$"{mode}_{label}.png",PngOf(dest),mode,new{scale=label,width=w,height=h},input);}}SaveManifest(dir);}
     // The M03 gate runs every effect on these 5 fixtures; alpha_edge_64 keeps straight color under zero alpha.
     private static readonly string[] EffectFixtures={"impulse_64","partial_alpha_64","plasma_512x384","plasma_alpha_512x384","alpha_edge_64"};
+    private static void Flood()
+    {
+        string dir=Path.Combine(Oracle,"flood");Directory.CreateDirectory(dir);
+        foreach((string name,int x,int y) in new[]{("impulse_64",32,32),("partial_alpha_64",32,32),("plasma_512x384",256,192),("plasma_alpha_512x384",256,192),("alpha_edge_64",32,32)})
+        {
+            string input=F(name);using var surface=SurfaceOf(Png.Read(input));
+            foreach(int percent in new[]{0,25,50,100})foreach(bool contiguous in new[]{true,false})
+                FloodCase(dir,input,surface,name,x,y,percent,contiguous);
+        }
+        var threshold=new Png(5,1);
+        threshold.Set(0,0,0,0,0,255);threshold.Set(1,0,128,0,0,255);threshold.Set(2,0,129,0,0,255);
+        threshold.Set(3,0,200,0,0,0);threshold.Set(4,0,0,200,0,0);
+        string thresholdInput=Path.Combine(dir,"threshold_input.png");threshold.Write(thresholdInput);
+        using(var surface=SurfaceOf(threshold))
+            foreach(bool contiguous in new[]{true,false})FloodCase(dir,thresholdInput,surface,"threshold",0,0,50,contiguous);
+        SaveManifest(dir);
+    }
+    private static void FloodCase(string dir,string input,Surface surface,string name,int x,int y,int percent,bool contiguous)
+    {
+        int t=(int)((percent/100.0)*(percent/100.0)*256);
+        var bits=new PaintDotNet.FloodBits(surface.Width,surface.Height);
+        Rectangle bounds;
+        if(contiguous)PaintDotNet.Tools.FloodExtract.FillStencilFromPoint(surface,bits,new Point(x,y),t,out bounds,null,false);
+        else PaintDotNet.Tools.FloodExtract.FillStencilByColor(surface,bits,surface[x,y],t,out bounds,null,false);
+        byte[] mask=new byte[surface.Width*surface.Height];
+        for(int py=0;py<surface.Height;py++)for(int px=0;px<surface.Width;px++)mask[py*surface.Width+px]=bits.GetUnchecked(px,py)?(byte)255:(byte)0;
+        string path=Path.Combine(dir,$"{name}_{percent}_{(contiguous?"contiguous":"global")}.bin");
+        File.WriteAllBytes(path,mask);
+        Record(dir,"FloodToolBase",new{seed=new[]{x,y},tolerance_percent=percent,t,contiguous,width=surface.Width,height=surface.Height},input,path);
+    }
     private static readonly string[] EffectNames={"Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Gaussian Blur","Add Noise","Frosted Glass","Clouds"};
     private static void EffectsAll()
     {

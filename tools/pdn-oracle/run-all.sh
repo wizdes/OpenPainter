@@ -12,7 +12,7 @@ if [[ "${PDN_ORACLE_SKIP_FETCH:-0}" != 1 ]]; then
   bash tools/pdn-oracle/fetch-source.sh
 fi
 dotnet build tools/pdn-oracle/PdnOracle.csproj
-for command in fixtures vectors blend resample effects-all; do
+for command in fixtures vectors blend resample effects-all flood; do
   dotnet run --no-build --project tools/pdn-oracle -- "$command"
 done
 python3 tests/oracle/legacy336/test_oracle.py

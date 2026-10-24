@@ -1,11 +1,15 @@
 //! Ordered document commands, immutable published views, and cancellable preview jobs.
 use arc_swap::ArcSwap;
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use op_core::doc::{DocState, LayerId, PolygonSet, SelectionSource, SelectionState};
+use op_core::doc::{
+    DocState, LayerId, PolygonSet, SelectionSource, SelectionState, ToolCompositeMode,
+};
 use op_core::history::History;
+use op_core::selection::CombineMode;
 use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use op_ops::effect::{self, Rect};
 pub use op_ops::effect::{Param, ParamKind, ParamSchema};
+use op_tools::flood::{self, AlphaMode, FloodOptions, Sampling};
 use op_tools::{BrushSettings, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
 use rayon::ThreadPool;
@@ -233,6 +237,150 @@ fn preview_fill(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
         .map_err(internal)?;
     Ok(Outcome::State(next))
 }
+fn flood_options(p: &Value) -> FloodOptions {
+    FloodOptions {
+        contiguous: p["contiguous"].as_bool().unwrap(),
+        tolerance: p["tolerance"].as_f64().unwrap(),
+        alpha: if p["alpha"].as_str().unwrap() == "premultiplied" {
+            AlphaMode::Premultiplied
+        } else {
+            AlphaMode::Straight
+        },
+        sampling: if p["sampling"].as_str().unwrap() == "image" {
+            Sampling::Image
+        } else {
+            Sampling::Layer
+        },
+        antialias: p["antialias"].as_bool().unwrap(),
+    }
+}
+fn flood_seed(p: &Value) -> Result<(u32, u32)> {
+    Ok((
+        u32::try_from(p["x"].as_i64().unwrap()).map_err(bad)?,
+        u32::try_from(p["y"].as_i64().unwrap()).map_err(bad)?,
+    ))
+}
+fn run_wand(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    ctx.check()?;
+    let mode = match p["combine"].as_str().unwrap() {
+        "replace" => CombineMode::Replace,
+        "add" => CombineMode::Add,
+        "subtract" => CombineMode::Subtract,
+        "intersect" => CombineMode::Intersect,
+        _ => CombineMode::Invert,
+    };
+    let next = flood::magic_wand(s, s.active_layer, flood_seed(p)?, flood_options(p), mode)
+        .map_err(bad)?;
+    ctx.check()?;
+    Ok(Outcome::State(next))
+}
+fn run_bucket(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    ctx.check()?;
+    let hex = p["color"].as_str().unwrap();
+    if hex.len() != 8 || !hex.is_ascii() {
+        return Err(bad("color must be eight RGBA hex digits"));
+    }
+    let mut color = [0; 4];
+    for (i, c) in color.iter_mut().enumerate() {
+        *c = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).map_err(bad)?;
+    }
+    let blend = if p["blend"].as_str().unwrap() == "overwrite" {
+        ToolCompositeMode::Overwrite
+    } else {
+        ToolCompositeMode::Normal
+    };
+    let next = flood::paint_bucket(
+        s,
+        s.active_layer,
+        flood_seed(p)?,
+        flood_options(p),
+        color,
+        blend,
+    )
+    .map_err(bad)?;
+    ctx.check()?;
+    Ok(Outcome::State(next))
+}
+fn flood_params(bucket: bool) -> ParamSchema {
+    let mut fields = vec![
+        Param {
+            key: "x",
+            kind: ParamKind::Int,
+            min: Some(0.0),
+            max: None,
+            default: None,
+        },
+        Param {
+            key: "y",
+            kind: ParamKind::Int,
+            min: Some(0.0),
+            max: None,
+            default: None,
+        },
+        Param {
+            key: "tolerance",
+            kind: ParamKind::Float,
+            min: Some(0.0),
+            max: Some(1.0),
+            default: Some(json!(0.0)),
+        },
+        Param {
+            key: "contiguous",
+            kind: ParamKind::Bool,
+            min: None,
+            max: None,
+            default: Some(json!(true)),
+        },
+        Param {
+            key: "alpha",
+            kind: ParamKind::Choice(&["straight", "premultiplied"]),
+            min: None,
+            max: None,
+            default: Some(json!("straight")),
+        },
+        Param {
+            key: "sampling",
+            kind: ParamKind::Choice(&["layer", "image"]),
+            min: None,
+            max: None,
+            default: Some(json!("layer")),
+        },
+        Param {
+            key: "antialias",
+            kind: ParamKind::Bool,
+            min: None,
+            max: None,
+            default: Some(json!(false)),
+        },
+    ];
+    if bucket {
+        fields.extend([
+            Param {
+                key: "color",
+                kind: ParamKind::String,
+                min: None,
+                max: None,
+                default: None,
+            },
+            Param {
+                key: "blend",
+                kind: ParamKind::Choice(&["normal", "overwrite"]),
+                min: None,
+                max: None,
+                default: Some(json!("normal")),
+            },
+        ]);
+    } else {
+        fields.push(Param {
+            key: "combine",
+            kind: ParamKind::Choice(&["replace", "add", "subtract", "intersect", "invert"]),
+            min: None,
+            max: None,
+            default: Some(json!("replace")),
+        });
+    }
+    ParamSchema { fields }
+}
 /// Test-only: toggles between no selection and a small triangle.
 fn toggle_selection(_: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
     let next = match s.selection {
@@ -353,6 +501,20 @@ fn convert_profile(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
 fn specs() -> Vec<CommandSpec> {
     let empty = || ParamSchema::default();
     let mut entries = vec![
+        CommandSpec {
+            id: "tool.magic_wand",
+            params: flood_params(false),
+            enabled: always,
+            run: run_wand,
+            previewable: true,
+        },
+        CommandSpec {
+            id: "tool.paint_bucket",
+            params: flood_params(true),
+            enabled: always,
+            run: run_bucket,
+            previewable: true,
+        },
         CommandSpec {
             id: "image.assign_profile",
             params: ParamSchema {
@@ -878,6 +1040,18 @@ impl Actor {
             return Err(Error::ReadOnly);
         }
         let p = self.preview.as_mut().ok_or_else(|| bad("no preview"))?;
+        let params = if p.command.starts_with("tool.") {
+            let mut merged = p.params.as_object().cloned().expect("validated parameters");
+            for (key, value) in params
+                .as_object()
+                .ok_or_else(|| bad("parameters must be an object"))?
+            {
+                merged.insert(key.clone(), value.clone());
+            }
+            Value::Object(merged)
+        } else {
+            params
+        };
         p.params = spec(p.command)?.params.validate(params).map_err(bad)?;
         self.publish(None);
         self.render_preview(ticket);

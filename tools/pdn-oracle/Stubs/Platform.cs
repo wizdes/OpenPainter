@@ -18,7 +18,12 @@ namespace PaintDotNet.SystemLayer {
 }
 namespace PaintDotNet {
   public static class Tracing { public static void Ping(string message) { } }
-  public sealed class PdnRegion { public Rectangle[] GetRegionScansReadOnlyInt() => throw new NotSupportedException(); }
+  public sealed class PdnRegion : IDisposable {
+    public PdnRegion(Rectangle bounds) { }
+    public void Xor(PdnRegion other) => throw new NotSupportedException("Oracle flood does not clip to selection");
+    public Rectangle[] GetRegionScansReadOnlyInt() => Array.Empty<Rectangle>();
+    public void Dispose() { }
+  }
   public static partial class PdnResources { public static string GetString(string key) => key; }
 }
 namespace PaintDotNet.Threading {
