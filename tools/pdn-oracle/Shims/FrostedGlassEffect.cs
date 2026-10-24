@@ -10,7 +10,7 @@
 // .                                                                           //
 /////////////////////////////////////////////////////////////////////////////////
 
-// Original C++ implementation by Jason Waltman as part of "Filter Explorer," 
+// Original C++ implementation by Jason Waltman as part of "Filter Explorer,"
 // http://www.jasonwaltman.com/thesis/index.html
 
 using PaintDotNet;
@@ -47,8 +47,8 @@ namespace PaintDotNet.Effects
         [ThreadStatic]
         private static Random threadRand;
 
-        public FrostedGlassEffect() 
-            : base(StaticName, 
+        public FrostedGlassEffect()
+            : base(StaticName,
                    StaticImage,
                    SubmenuNames.Distort,
                    EffectFlags.Configurable)
@@ -98,7 +98,7 @@ namespace PaintDotNet.Effects
         {
             double minRadiusP = newToken.GetProperty<DoubleProperty>(PropertyNames.MinScatterRadius).Value;
 
-            this.minRadius = Math.Min(minRadiusP, Math.Min(srcArgs.Width, srcArgs.Height) / 2); 
+            this.minRadius = Math.Min(minRadiusP, Math.Min(srcArgs.Width, srcArgs.Height) / 2);
             this.maxRadius = newToken.GetProperty<DoubleProperty>(PropertyNames.MaxScatterRadius).Value;
             this.sampleCount = newToken.GetProperty<Int32Property>(PropertyNames.NumSamples).Value;
 
@@ -109,7 +109,7 @@ namespace PaintDotNet.Effects
         {
             double radiusDelta = this.maxRadius - this.minRadius;
             double effectiveRadiusDelta = radiusDelta;
-            
+
             threadRand = new Random(0x51ed270b);
 
             ColorBgra* samples = stackalloc ColorBgra[sampleCount];

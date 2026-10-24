@@ -14,11 +14,11 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-files="$(git ls-files -co --exclude-standard -- engine scripts tests | while read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done)"
+files="$(git ls-files -co --exclude-standard -- engine scripts tests tools | while read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done)"
 mac_hash="$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)"
 
 dest=/tmp/op-linux-src
-printf '%s\n' "$files" | tr '\n' '\0' | tar --null -T - -cf - |
+printf '%s\n' "$files" | tr '\n' '\0' | COPYFILE_DISABLE=1 tar --null -T - -cf - |
   limactl shell op-linux -- bash -c "rm -rf $dest && mkdir -p $dest && tar -xf - -C $dest"
 
 vm_hash="$(printf '%s\n' "$files" | limactl shell op-linux -- bash -c "cd $dest && tr '\n' '\0' | xargs -0 sha256sum | sha256sum | cut -d' ' -f1")"
@@ -28,4 +28,4 @@ if [ "$mac_hash" != "$vm_hash" ]; then
 fi
 echo "Linux source hash matches: $mac_hash"
 
-limactl shell op-linux -- bash -lc "cd $dest/engine && export CARGO_HOME=/tmp/op-linux-cargo CARGO_TARGET_DIR=/tmp/op-linux-target && cargo xtask check --tier $tier"
+limactl shell op-linux -- bash -lc "cd $dest/engine && export CARGO_HOME=/tmp/op-linux-cargo CARGO_TARGET_DIR=/tmp/op-linux-target VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json && cargo xtask check --tier $tier"

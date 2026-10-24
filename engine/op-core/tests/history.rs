@@ -870,7 +870,7 @@ struct FaultIo {
 }
 struct SharedIo(Arc<Mutex<FaultIo>>);
 impl SpillIo for SharedIo {
-    fn append(&mut self, bytes: &[u8]) -> io::Result<u64> {
+    fn append(&self, bytes: &[u8]) -> io::Result<u64> {
         let mut io = self.0.lock().unwrap();
         match io.fault {
             Fault::ShortWrite => return Err(io::ErrorKind::WriteZero.into()),
@@ -881,7 +881,7 @@ impl SpillIo for SharedIo {
         io.bytes.extend_from_slice(bytes);
         Ok(offset)
     }
-    fn read_exact_at(&mut self, offset: u64, bytes: &mut [u8]) -> io::Result<()> {
+    fn read_exact_at(&self, offset: u64, bytes: &mut [u8]) -> io::Result<()> {
         let io = self.0.lock().unwrap();
         if matches!(io.fault, Fault::Read) {
             return Err(io::Error::other("injected read failure"));
@@ -921,19 +921,30 @@ fn storage_faults_leave_history_unchanged_and_recover() {
                 .unwrap(),
         );
         io.lock().unwrap().fault = fault;
-        assert!(
-            h.current_state()
-                .write_tile(
-                    0,
-                    TileCoord { x: 1, y: 0 },
-                    TileData::try_from(bytes).unwrap()
-                )
-                .is_err()
-        );
-        assert_eq!(h.current_index(), 1);
-        assert_eq!(h.len(), 2);
+        // Eviction is best effort (CP1 review): a failed spill write does not
+        // fail the edit. The tile stays in memory and the store reports it.
+        let mut other = bytes.clone();
+        other[..4].copy_from_slice(&[7, 8, 9, 0]);
+        let next = h
+            .current_state()
+            .write_tile(
+                0,
+                TileCoord { x: 1, y: 0 },
+                TileData::try_from(other).unwrap(),
+            )
+            .unwrap();
+        let stats = store.stats();
+        assert!(stats.evict_failures > 0);
+        assert!(stats.over_budget);
+        h.commit("paint", "paint", next);
+        assert_eq!(h.current_index(), 2);
+        assert_eq!(pixel(h.current_state(), 0, 256, 0), [7, 8, 9, 0]);
+        assert_eq!(pixel(h.state(1).unwrap(), 0, 0, 0), [1, 2, 3, 0]);
+        assert_eq!(pixel(h.state(1).unwrap(), 0, 256, 0), [0, 0, 0, 0]);
         io.lock().unwrap().fault = Fault::None;
+        h.undo();
         assert_eq!(pixel(h.current_state(), 0, 0, 0), [1, 2, 3, 0]);
+        assert!(!store.stats().over_budget);
         drop(h);
         assert_eq!(store.stats().tile_count, 0);
     }

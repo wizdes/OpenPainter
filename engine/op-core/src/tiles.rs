@@ -1,11 +1,17 @@
 //! Immutable RGBA8 tiles with a bounded memory cache and an append-only spill file.
+//!
+//! Where a tile lives (resident, compressed or spilled) is not part of its content, so
+//! eviction is best effort: a failed eviction write never fails the caller's operation.
+//! The tile keeps its previous state, the store counts the failure in `TileStats`, and
+//! the next operation tries again. Only loads and invalid counts return errors.
 
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::{Condvar, Mutex, MutexGuard};
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io;
 use std::ops::Deref;
-use std::path::Path;
+use std::os::unix::fs::FileExt;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
@@ -16,6 +22,8 @@ pub const DEFAULT_BUDGET: usize = 2 * 1024 * 1024 * 1024;
 const CODEC_VERSION: u8 = 1;
 const MAGIC: [u8; 4] = *b"OPTL";
 const HEADER_LEN: usize = 17;
+/// How many spill file names `TileStore::new` tries before it gives up.
+const OPEN_ATTEMPTS: usize = 1024;
 static FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -77,24 +85,29 @@ pub enum TileStateKind {
 }
 
 /// Pixel and compressed buffers are shared, so handing one out or snapshotting it never copies.
+/// A spilled tile's location is in `TileRecord::spill`.
 #[derive(Clone)]
 enum TileState {
     Resident(Arc<[u8]>),
     Compressed(Arc<[u8]>),
-    Spilled {
-        offset: u64,
-        len: usize,
-        checksum: u32,
-    },
+    Spilled,
 }
 
 impl TileState {
     fn memory_len(&self) -> usize {
         match self {
             TileState::Resident(bytes) | TileState::Compressed(bytes) => bytes.len(),
-            TileState::Spilled { .. } => 0,
+            TileState::Spilled => 0,
         }
     }
+}
+
+/// Where a tile's record sits in the spill file. Tiles are immutable, so a location stays
+/// valid for the tile's whole life, including while the tile is resident again.
+#[derive(Clone, Copy)]
+struct SpillLoc {
+    offset: u64,
+    len: usize,
 }
 
 /// Marks a record that an eviction is compressing or writing without the main lock.
@@ -106,53 +119,100 @@ struct MoveTicket {
 
 struct TileRecord {
     state: TileState,
-    pins: usize,
+    spill: Option<SpillLoc>,
+    /// Pins held by live `TileRef` guards.
+    guard_pins: usize,
+    /// Pins taken with `TileStore::pin` and given back with `TileStore::unpin`.
+    explicit_pins: usize,
     owners: usize,
     byte_size: usize,
     checksum: u32,
     codec_version: u8,
     last_use: u64,
-    /// Changes on every state change and every pin, so a finished move can tell whether
-    /// the record still matches the snapshot it compressed.
+    /// Changes on every state change and every unpin, so a finished move can tell whether
+    /// the tile was used while the move ran. Taking a pin does not change it; the pin
+    /// itself blocks the publish.
     version: u64,
     moving: Option<MoveTicket>,
+    /// A caller is reading and decoding this tile without the main lock.
+    loading: bool,
 }
 
 impl TileRecord {
+    fn pinned(&self) -> bool {
+        self.guard_pins > 0 || self.explicit_pins > 0
+    }
+
     fn is_eviction_candidate(&self) -> bool {
-        self.pins == 0 && self.moving.is_none() && !matches!(self.state, TileState::Spilled { .. })
+        !self.pinned()
+            && self.moving.is_none()
+            && !self.loading
+            && !matches!(self.state, TileState::Spilled)
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TileStats {
     pub resident_bytes: usize,
     pub compressed_bytes: usize,
+    /// Spill-file bytes of tiles that are in the spilled state now.
     pub spilled_bytes: usize,
     pub freed_bytes: usize,
     pub tile_count: usize,
+    /// Spill-file bytes that no live tile uses: records of freed tiles and writes whose
+    /// tile was freed before the write finished. Nothing reclaims them yet.
+    pub dead_spill_bytes: usize,
+    /// How many eviction runs stopped because a spill write failed.
+    pub evict_failures: u64,
+    /// The text of the most recent eviction failure.
+    pub last_evict_error: Option<String>,
+    /// Resident plus compressed memory is above the budget right now, because every
+    /// remaining tile is pinned or an eviction write failed.
+    pub over_budget: bool,
 }
 
-/// An append must report success only after all bytes were written and flushed.
-/// Failed appends may leave unused bytes in the file but must not publish a location.
-pub trait SpillIo: Send {
-    fn append(&mut self, bytes: &[u8]) -> io::Result<u64>;
-    fn read_exact_at(&mut self, offset: u64, bytes: &mut [u8]) -> io::Result<()>;
+/// Storage for spilled tiles. The spill file is a cache for one session: it is deleted
+/// when the store drops and nothing reads it after a crash, so appends need no fsync.
+/// An append reports success only after all bytes were handed to the file. A failed
+/// append may leave unused bytes in the file, but the store never publishes its location.
+/// Several threads may call at once, and a read must not wait for an append in progress.
+pub trait SpillIo: Send + Sync {
+    fn append(&self, bytes: &[u8]) -> io::Result<u64>;
+    fn read_exact_at(&self, offset: u64, bytes: &mut [u8]) -> io::Result<()>;
 }
 
-struct FileIo(File);
+struct FileIo {
+    file: File,
+    path: PathBuf,
+    /// The next append offset. Only appends take this lock; reads use positioned reads.
+    end: Mutex<u64>,
+}
 
 impl SpillIo for FileIo {
-    fn append(&mut self, bytes: &[u8]) -> io::Result<u64> {
-        let offset = self.0.seek(SeekFrom::End(0))?;
-        self.0.write_all(bytes)?;
-        self.0.flush()?;
+    fn append(&self, bytes: &[u8]) -> io::Result<u64> {
+        let mut end = self.end.lock();
+        let offset = *end;
+        self.file.write_all_at(bytes, offset)?;
+        *end = offset
+            .checked_add(bytes.len() as u64)
+            .ok_or_else(|| io::Error::other("spill file offset overflow"))?;
         Ok(offset)
     }
 
-    fn read_exact_at(&mut self, offset: u64, bytes: &mut [u8]) -> io::Result<()> {
-        self.0.seek(SeekFrom::Start(offset))?;
-        self.0.read_exact(bytes)
+    fn read_exact_at(&self, offset: u64, bytes: &mut [u8]) -> io::Result<()> {
+        self.file.read_exact_at(bytes, offset)
+    }
+}
+
+impl Drop for FileIo {
+    fn drop(&mut self) {
+        // A destructor cannot return the error, so report it instead of hiding it.
+        if let Err(error) = std::fs::remove_file(&self.path) {
+            eprintln!(
+                "op-core: cannot delete spill file {}: {error}",
+                self.path.display()
+            );
+        }
     }
 }
 
@@ -168,8 +228,11 @@ struct Inner {
     compressed_bytes: usize,
     spilled_bytes: usize,
     freed_bytes: usize,
+    dead_spill_bytes: usize,
     /// Memory that unfinished moves expect to release; other callers do not evict it again.
     moving_bytes: usize,
+    evict_failures: u64,
+    last_evict_error: Option<String>,
     deferred_error: Option<TileError>,
 }
 
@@ -189,24 +252,62 @@ struct MovePlan {
     moves: Vec<Move>,
 }
 
+/// The new storage a finished move offers to publish.
+enum Moved {
+    Compressed(Arc<[u8]>),
+    Spilled(SpillLoc),
+}
+
+/// What a load must read, copied out so it can run without the main lock.
+enum LoadSource {
+    Compressed(Arc<[u8]>),
+    Spilled(SpillLoc),
+}
+
+#[derive(Clone, Copy)]
+enum PinKind {
+    Guard,
+    Explicit,
+}
+
 pub struct TileStore {
     inner: Mutex<Inner>,
-    /// Lock order: `io` may be taken while holding `inner`, never the reverse.
-    io: Mutex<Box<dyn SpillIo>>,
+    /// Woken whenever a load finishes, so callers waiting on the same tile retry.
+    loaded: Condvar,
+    /// Never called while `inner` is held.
+    io: Box<dyn SpillIo>,
 }
 
 impl TileStore {
+    /// Opens a new spill file in `directory`. A name that already exists is skipped.
     pub fn new(directory: impl AsRef<Path>, budget: usize) -> Result<Self> {
-        let sequence = FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let path = directory
-            .as_ref()
-            .join(format!("op-tiles-{}-{sequence}.spill", std::process::id()));
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(path)?;
-        Ok(Self::with_io(budget, Box::new(FileIo(file))))
+        for _ in 0..OPEN_ATTEMPTS {
+            let sequence = FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let path = directory
+                .as_ref()
+                .join(format!("op-tiles-{}-{sequence}.spill", std::process::id()));
+            match OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(file) => {
+                    let io = FileIo {
+                        file,
+                        path,
+                        end: Mutex::new(0),
+                    };
+                    return Ok(Self::with_io(budget, Box::new(io)));
+                }
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(TileError::Io(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("no free spill file name after {OPEN_ATTEMPTS} attempts"),
+        )))
     }
 
     pub fn with_default_budget(directory: impl AsRef<Path>) -> Result<Self> {
@@ -225,13 +326,18 @@ impl TileStore {
                 compressed_bytes: 0,
                 spilled_bytes: 0,
                 freed_bytes: 0,
+                dead_spill_bytes: 0,
                 moving_bytes: 0,
+                evict_failures: 0,
+                last_evict_error: None,
                 deferred_error: None,
             }),
-            io: Mutex::new(io),
+            loaded: Condvar::new(),
+            io,
         }
     }
 
+    /// Adds a tile with one owner. Fails only when tile ids run out.
     pub fn insert(&self, data: TileData) -> Result<TileId> {
         let mut inner = self.inner.lock();
         let id = TileId(inner.next_id);
@@ -239,12 +345,14 @@ impl TileStore {
         let checksum = crc32fast::hash(data.as_bytes());
         let last_use = inner.tick();
         let state = TileState::Resident(Arc::from(data.0));
-        inner.add_bytes(&state);
+        inner.add_bytes(&state, None);
         inner.tiles.insert(
             id,
             TileRecord {
                 state,
-                pins: 0,
+                spill: None,
+                guard_pins: 0,
+                explicit_pins: 0,
                 owners: 1,
                 byte_size: TILE_BYTES,
                 checksum,
@@ -252,23 +360,16 @@ impl TileStore {
                 last_use,
                 version: last_use,
                 moving: None,
+                loading: false,
             },
         );
         inner.relist(id);
-        if let Err(error) = self.enforce_budget(&mut inner) {
-            let unseen = inner.tiles.get(&id).is_some_and(|record| record.pins == 0);
-            inner.remove_record(id);
-            // Reuse the id only if no other caller has pinned it in the meantime.
-            if unseen && inner.next_id == id.0 + 1 {
-                inner.next_id = id.0;
-            }
-            return Err(error);
-        }
+        self.enforce_budget(inner);
         Ok(id)
     }
 
     pub fn get(&self, id: TileId) -> Result<TileRef<'_>> {
-        let bytes = self.acquire(id)?;
+        let bytes = self.acquire(id, PinKind::Guard)?;
         Ok(TileRef {
             store: self,
             id,
@@ -276,29 +377,29 @@ impl TileStore {
         })
     }
 
+    /// Takes an explicit pin, loading the tile if needed. `unpin` gives it back.
     pub fn pin(&self, id: TileId) -> Result<()> {
-        self.acquire(id).map(drop)
+        self.acquire(id, PinKind::Explicit).map(drop)
     }
 
-    pub fn set_budget(&self, budget: usize) -> Result<()> {
+    /// Sets the budget and evicts toward it. The new budget stays even if an eviction fails.
+    pub fn set_budget(&self, budget: usize) {
         let mut inner = self.inner.lock();
-        let previous = inner.budget;
         inner.budget = budget;
-        if let Err(error) = self.enforce_budget(&mut inner) {
-            inner.budget = previous;
-            return Err(error);
-        }
-        Ok(())
+        self.enforce_budget(inner);
     }
 
+    /// Gives back one explicit pin. Guards from `get` are not explicit pins.
     pub fn unpin(&self, id: TileId) -> Result<()> {
         let mut inner = self.inner.lock();
-        let record = inner.tiles.get(&id).ok_or(TileError::Missing(id))?;
-        if record.pins == 0 {
-            return Err(TileError::InvalidCount);
-        }
-        inner.unpin_one(id);
-        self.enforce_budget(&mut inner)
+        let record = inner.tiles.get_mut(&id).ok_or(TileError::Missing(id))?;
+        record.explicit_pins = record
+            .explicit_pins
+            .checked_sub(1)
+            .ok_or(TileError::InvalidCount)?;
+        inner.after_unpin(id);
+        self.enforce_budget(inner);
+        Ok(())
     }
 
     pub fn retain(&self, id: TileId) -> Result<()> {
@@ -311,11 +412,12 @@ impl TileStore {
     pub fn release(&self, id: TileId) -> Result<()> {
         let mut inner = self.inner.lock();
         let record = inner.tiles.get_mut(&id).ok_or(TileError::Missing(id))?;
-        if record.owners == 0 {
-            return Err(TileError::InvalidCount);
-        }
-        record.owners -= 1;
+        record.owners = record
+            .owners
+            .checked_sub(1)
+            .ok_or(TileError::InvalidCount)?;
         inner.free_unowned(id);
+        self.enforce_budget(inner);
         Ok(())
     }
 
@@ -325,7 +427,7 @@ impl TileStore {
         Ok(match record.state {
             TileState::Resident(_) => TileStateKind::Resident,
             TileState::Compressed(_) => TileStateKind::Compressed,
-            TileState::Spilled { .. } => TileStateKind::Spilled,
+            TileState::Spilled => TileStateKind::Spilled,
         })
     }
 
@@ -337,17 +439,24 @@ impl TileStore {
             spilled_bytes: inner.spilled_bytes,
             freed_bytes: inner.freed_bytes,
             tile_count: inner.tiles.len(),
+            dead_spill_bytes: inner.dead_spill_bytes,
+            evict_failures: inner.evict_failures,
+            last_evict_error: inner.last_evict_error.clone(),
+            over_budget: inner.resident_bytes + inner.compressed_bytes > inner.budget,
         }
     }
 
     /// Recounts every record. Tests compare this with `stats`; normal code must not call it.
-    /// Panics if the eviction order or the moving-byte total disagrees with the records.
+    /// Panics if the eviction order, the moving-byte total or a mark disagrees with the records.
     #[doc(hidden)]
     pub fn debug_recount_stats(&self) -> TileStats {
         let inner = self.inner.lock();
         let mut stats = TileStats {
             freed_bytes: inner.freed_bytes,
             tile_count: inner.tiles.len(),
+            dead_spill_bytes: inner.dead_spill_bytes,
+            evict_failures: inner.evict_failures,
+            last_evict_error: inner.last_evict_error.clone(),
             ..TileStats::default()
         };
         let mut moving_bytes = 0;
@@ -356,13 +465,16 @@ impl TileStore {
             match &record.state {
                 TileState::Resident(bytes) => stats.resident_bytes += bytes.len(),
                 TileState::Compressed(bytes) => stats.compressed_bytes += bytes.len(),
-                TileState::Spilled { len, .. } => stats.spilled_bytes += len,
+                TileState::Spilled => {
+                    stats.spilled_bytes += record.spill.expect("spilled tile has a location").len;
+                }
             }
             moving_bytes += record.moving.map_or(0, |ticket| ticket.bytes);
             if record.is_eviction_candidate() {
                 candidates.insert(record.last_use, id);
             }
         }
+        stats.over_budget = stats.resident_bytes + stats.compressed_bytes > inner.budget;
         assert_eq!(inner.lru, candidates, "eviction order is out of sync");
         assert_eq!(
             inner.moving_bytes, moving_bytes,
@@ -371,59 +483,144 @@ impl TileStore {
         stats
     }
 
-    /// Returns an eviction error from releasing a `TileRef`, whose destructor cannot return it.
+    /// Returns the oldest eviction error not yet taken. Eviction errors never fail an
+    /// operation; `stats` also counts them and keeps the latest text.
     pub fn take_deferred_error(&self) -> Option<TileError> {
         self.inner.lock().deferred_error.take()
     }
 
     /// Makes the tile resident, pins it and returns a shared handle to its pixels.
-    fn acquire(&self, id: TileId) -> Result<Arc<[u8]>> {
+    /// A compressed or spilled tile is read and decoded without the main lock.
+    fn acquire(&self, id: TileId, kind: PinKind) -> Result<Arc<[u8]>> {
         let mut inner = self.inner.lock();
-        let record = inner.tiles.get(&id).ok_or(TileError::Missing(id))?;
-        let pins = record.pins.checked_add(1).ok_or(TileError::Overflow)?;
-        let previous = self.ensure_resident(&mut inner, id)?;
-        inner.unlist(id);
-        let tick = inner.tick();
-        let record = inner.tiles.get_mut(&id).expect("checked tile");
-        record.pins = pins;
-        record.last_use = tick;
-        record.version = tick;
-        let bytes = match &record.state {
-            TileState::Resident(bytes) => bytes.clone(),
-            _ => unreachable!("loaded tile is resident"),
-        };
-        if let Err(error) = self.enforce_budget(&mut inner) {
-            let record = inner.tiles.get(&id).expect("pinned tile");
-            // Restore the old storage only if nobody else used the tile while the lock was free.
-            let untouched = record.pins == 1 && record.version == tick;
-            inner.unpin_one(id);
-            if let Some(previous) = previous
-                && untouched
-                && inner.tiles.contains_key(&id)
-            {
-                inner.unlist(id);
-                inner.set_state(id, previous);
+        loop {
+            let record = inner.tiles.get(&id).ok_or(TileError::Missing(id))?;
+            let pins = match kind {
+                PinKind::Guard => record.guard_pins,
+                PinKind::Explicit => record.explicit_pins,
+            }
+            .checked_add(1)
+            .ok_or(TileError::Overflow)?;
+            if record.loading {
+                // Another caller is loading this tile; wait for it and look again.
+                self.loaded.wait(&mut inner);
+                continue;
+            }
+            let source = match &record.state {
+                TileState::Resident(bytes) => {
+                    let bytes = bytes.clone();
+                    inner.unlist(id);
+                    let tick = inner.tick();
+                    let record = inner.tiles.get_mut(&id).expect("checked tile");
+                    match kind {
+                        PinKind::Guard => record.guard_pins = pins,
+                        PinKind::Explicit => record.explicit_pins = pins,
+                    }
+                    record.last_use = tick;
+                    self.enforce_budget(inner);
+                    return Ok(bytes);
+                }
+                TileState::Compressed(bytes) => LoadSource::Compressed(bytes.clone()),
+                TileState::Spilled => {
+                    LoadSource::Spilled(record.spill.expect("spilled tile has a location"))
+                }
+            };
+            let (checksum, codec_version, byte_size) =
+                (record.checksum, record.codec_version, record.byte_size);
+            inner.unlist(id);
+            inner.tiles.get_mut(&id).expect("checked tile").loading = true;
+            drop(inner);
+            let mark = LoadMark { store: self, id };
+            let loaded = self.load(&source, checksum, codec_version, byte_size);
+            inner = self.inner.lock();
+            std::mem::forget(mark);
+            let exists = inner.tiles.contains_key(&id);
+            if exists {
+                inner.tiles.get_mut(&id).expect("checked tile").loading = false;
+            }
+            self.loaded.notify_all();
+            let raw = match loaded {
+                Ok(raw) => raw,
+                Err(error) => {
+                    inner.relist(id);
+                    return Err(error);
+                }
+            };
+            // A release may have freed the tile while it loaded; the next pass reports it.
+            if exists {
+                // No move publishes while `loading` is set, so the state is still not resident.
+                inner.set_state(id, TileState::Resident(raw));
                 inner.relist(id);
             }
-            return Err(error);
         }
-        Ok(bytes)
     }
 
-    /// Brings memory within budget. The lock is released while tiles are compressed and
-    /// written, so other callers keep working; results are published only for records
-    /// that did not change in the meantime. On error no record changes state.
-    fn enforce_budget(&self, inner: &mut MutexGuard<'_, Inner>) -> Result<()> {
-        while let Some(plan) = inner.plan_moves() {
-            let results = MutexGuard::unlocked(inner, || self.run_moves(&plan));
-            inner.finish_moves(plan, results)?;
+    /// Reads and checks a tile's stored form. Runs without the main lock.
+    fn load(
+        &self,
+        source: &LoadSource,
+        checksum: u32,
+        codec_version: u8,
+        byte_size: usize,
+    ) -> Result<Arc<[u8]>> {
+        match source {
+            LoadSource::Compressed(bytes) => decode(bytes, checksum),
+            LoadSource::Spilled(loc) => {
+                let mut bytes = vec![0; loc.len];
+                self.io
+                    .read_exact_at(loc.offset, &mut bytes)
+                    .map_err(|error| {
+                        if error.kind() == io::ErrorKind::UnexpectedEof {
+                            TileError::Corrupt
+                        } else {
+                            TileError::Io(error)
+                        }
+                    })?;
+                if bytes.len() < HEADER_LEN
+                    || bytes[..4] != MAGIC
+                    || bytes[4] != codec_version
+                    || u32::from_le_bytes(bytes[5..9].try_into().unwrap()) as usize != byte_size
+                    || Some(u32::from_le_bytes(bytes[9..13].try_into().unwrap()) as usize)
+                        != loc.len.checked_sub(HEADER_LEN)
+                    || u32::from_le_bytes(bytes[13..17].try_into().unwrap()) != checksum
+                {
+                    return Err(TileError::Corrupt);
+                }
+                decode(&bytes[HEADER_LEN..], checksum)
+            }
         }
-        Ok(())
+    }
+
+    /// Evicts toward the budget, then releases the lock. Tiles are compressed and written
+    /// without the lock, so other callers keep working; results are published only for
+    /// records that were not pinned or used in the meantime. A failed write stops this run,
+    /// leaves the tile as it was and is recorded in the stats; the next operation tries again.
+    fn enforce_budget<'s>(&'s self, mut inner: MutexGuard<'s, Inner>) {
+        loop {
+            let plan = inner.plan_moves();
+            if plan.moves.is_empty() {
+                return;
+            }
+            drop(inner);
+            let mut mark = MoveMarks {
+                store: self,
+                plan: Some(plan),
+            };
+            let (results, error) = self.run_moves(mark.plan.as_ref().expect("plan is set"));
+            inner = self.inner.lock();
+            let plan = mark.plan.take().expect("plan is set");
+            let failed = error.is_some();
+            inner.finish_moves(plan, results, error);
+            if failed {
+                return;
+            }
+        }
     }
 
     /// Compresses and writes the planned tiles in order until the need is covered.
     /// A tile whose compressed form alone covers the rest of the need stays compressed.
-    fn run_moves(&self, plan: &MovePlan) -> Result<Vec<TileState>> {
+    /// Stops at the first failed write and returns the results so far with the error.
+    fn run_moves(&self, plan: &MovePlan) -> (Vec<Moved>, Option<TileError>) {
         let mut need = plan.need;
         let mut results = Vec::new();
         for tile in &plan.moves {
@@ -438,21 +635,24 @@ impl TileStore {
                     &fresh
                 }
                 TileState::Compressed(bytes) => bytes,
-                TileState::Spilled { .. } => unreachable!("spilled tiles are not candidates"),
+                TileState::Spilled => unreachable!("spilled tiles are not candidates"),
             };
             let resident = matches!(tile.source, TileState::Resident(_));
             if resident && compressed.len() + need <= previous_len {
                 need = 0;
-                results.push(TileState::Compressed(Arc::from(compressed)));
+                results.push(Moved::Compressed(Arc::from(compressed)));
             } else {
-                results.push(self.write_spill(tile, compressed)?);
+                match self.write_spill(tile, compressed) {
+                    Ok(loc) => results.push(Moved::Spilled(loc)),
+                    Err(error) => return (results, Some(error)),
+                }
                 need = need.saturating_sub(previous_len);
             }
         }
-        Ok(results)
+        (results, None)
     }
 
-    fn write_spill(&self, tile: &Move, compressed: &[u8]) -> Result<TileState> {
+    fn write_spill(&self, tile: &Move, compressed: &[u8]) -> Result<SpillLoc> {
         let mut bytes = Vec::with_capacity(HEADER_LEN + compressed.len());
         bytes.extend_from_slice(&MAGIC);
         bytes.push(tile.codec_version);
@@ -460,53 +660,44 @@ impl TileStore {
         bytes.extend_from_slice(&(compressed.len() as u32).to_le_bytes());
         bytes.extend_from_slice(&tile.checksum.to_le_bytes());
         bytes.extend_from_slice(compressed);
-        let offset = self.io.lock().append(&bytes)?;
-        Ok(TileState::Spilled {
+        let offset = self.io.append(&bytes)?;
+        Ok(SpillLoc {
             offset,
             len: bytes.len(),
-            checksum: tile.checksum,
         })
     }
+}
 
-    /// Loads a compressed or spilled tile into memory and returns its previous state.
-    fn ensure_resident(&self, inner: &mut Inner, id: TileId) -> Result<Option<TileState>> {
-        let record = inner.tiles.get(&id).ok_or(TileError::Missing(id))?;
-        let raw = match &record.state {
-            TileState::Resident(_) => return Ok(None),
-            TileState::Compressed(bytes) => decode(bytes, record.checksum)?,
-            TileState::Spilled {
-                offset,
-                len,
-                checksum,
-            } => {
-                let mut bytes = vec![0; *len];
-                self.io
-                    .lock()
-                    .read_exact_at(*offset, &mut bytes)
-                    .map_err(|error| {
-                        if error.kind() == io::ErrorKind::UnexpectedEof {
-                            TileError::Corrupt
-                        } else {
-                            TileError::Io(error)
-                        }
-                    })?;
-                if bytes.len() < HEADER_LEN
-                    || bytes[..4] != MAGIC
-                    || bytes[4] != record.codec_version
-                    || u32::from_le_bytes(bytes[5..9].try_into().unwrap()) as usize
-                        != record.byte_size
-                    || u32::from_le_bytes(bytes[9..13].try_into().unwrap()) as usize
-                        != len - HEADER_LEN
-                    || u32::from_le_bytes(bytes[13..17].try_into().unwrap()) != *checksum
-                    || *checksum != record.checksum
-                {
-                    return Err(TileError::Corrupt);
-                }
-                decode(&bytes[HEADER_LEN..], *checksum)?
-            }
-        };
-        // The caller immediately holds this tile resident. Other tiles can be evicted later.
-        Ok(Some(inner.set_state(id, TileState::Resident(raw))))
+/// Clears a load mark if the load unwinds, so the tile is not stuck as loading.
+/// A normal finish forgets this guard and clears the mark itself.
+struct LoadMark<'a> {
+    store: &'a TileStore,
+    id: TileId,
+}
+
+impl Drop for LoadMark<'_> {
+    fn drop(&mut self) {
+        let mut inner = self.store.inner.lock();
+        if let Some(record) = inner.tiles.get_mut(&self.id) {
+            record.loading = false;
+        }
+        inner.relist(self.id);
+        self.store.loaded.notify_all();
+    }
+}
+
+/// Clears the moving marks of a plan if a move unwinds, so the tiles can be evicted later.
+/// A normal finish takes the plan out first.
+struct MoveMarks<'a> {
+    store: &'a TileStore,
+    plan: Option<MovePlan>,
+}
+
+impl Drop for MoveMarks<'_> {
+    fn drop(&mut self) {
+        if let Some(plan) = self.plan.take() {
+            self.store.inner.lock().finish_moves(plan, Vec::new(), None);
+        }
     }
 }
 
@@ -527,13 +718,25 @@ impl Deref for TileRef<'_> {
 impl Drop for TileRef<'_> {
     fn drop(&mut self) {
         let mut inner = self.store.inner.lock();
-        inner.unpin_one(self.id);
-        if let Err(error) = self.store.enforce_budget(&mut inner)
-            && inner.deferred_error.is_none()
-        {
-            inner.deferred_error = Some(error);
-        }
+        let record = inner
+            .tiles
+            .get_mut(&self.id)
+            .expect("a guarded tile is never freed");
+        // Only guards change `guard_pins`, and this guard holds one of them.
+        record.guard_pins = record
+            .guard_pins
+            .checked_sub(1)
+            .expect("guard pin count covers this guard");
+        inner.after_unpin(self.id);
+        self.store.enforce_budget(inner);
     }
+}
+
+#[derive(Clone, Copy)]
+enum Bucket {
+    Resident,
+    Compressed,
+    Spilled,
 }
 
 impl Inner {
@@ -542,33 +745,47 @@ impl Inner {
         self.clock
     }
 
-    fn counter(&mut self, state: &TileState) -> (&mut usize, usize) {
+    fn bucket(state: &TileState, spill: Option<SpillLoc>) -> (Bucket, usize) {
         match state {
-            TileState::Resident(bytes) => (&mut self.resident_bytes, bytes.len()),
-            TileState::Compressed(bytes) => (&mut self.compressed_bytes, bytes.len()),
-            TileState::Spilled { len, .. } => (&mut self.spilled_bytes, *len),
+            TileState::Resident(bytes) => (Bucket::Resident, bytes.len()),
+            TileState::Compressed(bytes) => (Bucket::Compressed, bytes.len()),
+            TileState::Spilled => (
+                Bucket::Spilled,
+                spill.expect("spilled tile has a location").len,
+            ),
         }
     }
 
-    fn add_bytes(&mut self, state: &TileState) {
-        let (counter, len) = self.counter(state);
-        *counter += len;
+    fn counter(&mut self, bucket: Bucket) -> &mut usize {
+        match bucket {
+            Bucket::Resident => &mut self.resident_bytes,
+            Bucket::Compressed => &mut self.compressed_bytes,
+            Bucket::Spilled => &mut self.spilled_bytes,
+        }
     }
 
-    fn sub_bytes(&mut self, state: &TileState) {
-        let (counter, len) = self.counter(state);
-        *counter -= len;
+    fn add_bytes(&mut self, state: &TileState, spill: Option<SpillLoc>) {
+        let (bucket, len) = Self::bucket(state, spill);
+        let counter = self.counter(bucket);
+        *counter = counter.checked_add(len).expect("byte counter overflow");
+    }
+
+    fn sub_bytes(&mut self, state: &TileState, spill: Option<SpillLoc>) {
+        let (bucket, len) = Self::bucket(state, spill);
+        let counter = self.counter(bucket);
+        *counter = counter.checked_sub(len).expect("byte counter underflow");
     }
 
     /// Replaces a record's state, keeps the byte counters exact and returns the old state.
     /// The caller keeps the eviction order in sync.
     fn set_state(&mut self, id: TileId, state: TileState) -> TileState {
         let version = self.tick();
-        self.add_bytes(&state);
+        let spill = self.tiles.get(&id).expect("existing tile").spill;
+        self.add_bytes(&state, spill);
         let record = self.tiles.get_mut(&id).expect("existing tile");
         record.version = version;
         let previous = std::mem::replace(&mut record.state, state);
-        self.sub_bytes(&previous);
+        self.sub_bytes(&previous, spill);
         previous
     }
 
@@ -588,49 +805,60 @@ impl Inner {
         }
     }
 
-    fn unpin_one(&mut self, id: TileId) {
+    /// Records a use after a pin count dropped, then lists or frees the tile.
+    fn after_unpin(&mut self, id: TileId) {
+        self.unlist(id);
+        let tick = self.tick();
         if let Some(record) = self.tiles.get_mut(&id) {
-            record.pins -= 1;
+            record.last_use = tick;
+            record.version = tick;
         }
         self.relist(id);
         self.free_unowned(id);
     }
 
-    fn remove_record(&mut self, id: TileId) -> Option<TileRecord> {
-        self.unlist(id);
-        let record = self.tiles.remove(&id)?;
-        self.sub_bytes(&record.state);
-        if let Some(ticket) = record.moving {
-            self.moving_bytes -= ticket.bytes;
-        }
-        Some(record)
-    }
-
     fn free_unowned(&mut self, id: TileId) {
-        if self
+        if !self
             .tiles
             .get(&id)
-            .is_some_and(|record| record.pins == 0 && record.owners == 0)
+            .is_some_and(|record| !record.pinned() && record.owners == 0)
         {
-            let record = self.remove_record(id).expect("checked above");
-            self.freed_bytes += record.byte_size;
+            return;
         }
+        self.unlist(id);
+        let record = self.tiles.remove(&id).expect("checked above");
+        self.sub_bytes(&record.state, record.spill);
+        if let Some(ticket) = record.moving {
+            self.moving_bytes = self
+                .moving_bytes
+                .checked_sub(ticket.bytes)
+                .expect("moving bytes cover the ticket");
+        }
+        if let Some(loc) = record.spill {
+            self.dead_spill_bytes += loc.len;
+        }
+        self.freed_bytes += record.byte_size;
     }
 
-    /// Picks the oldest candidates whose memory covers the overage and marks them moving.
-    /// Returns `None` when memory, minus moves already under way, is within budget.
-    fn plan_moves(&mut self) -> Option<MovePlan> {
-        let used = (self.resident_bytes + self.compressed_bytes).saturating_sub(self.moving_bytes);
-        if used <= self.budget {
-            return None;
-        }
-        let need = used - self.budget;
-        let mut remaining = need;
+    /// Evicts the oldest candidates until memory, minus moves already under way, is within
+    /// budget. A tile that already has a spill record goes straight back to spilled under
+    /// the lock. The others are marked moving and returned for an unlocked move.
+    fn plan_moves(&mut self) -> MovePlan {
+        let moving_before = self.moving_bytes;
         let mut moves = Vec::new();
-        while remaining > 0 {
+        loop {
+            let used =
+                (self.resident_bytes + self.compressed_bytes).saturating_sub(self.moving_bytes);
+            if used <= self.budget {
+                break;
+            }
             let Some((_, id)) = self.lru.pop_first() else {
                 break;
             };
+            if self.tiles.get(&id).expect("listed tile").spill.is_some() {
+                self.set_state(id, TileState::Spilled);
+                continue;
+            }
             let token = self.tick();
             let record = self.tiles.get_mut(&id).expect("listed tile");
             let bytes = record.state.memory_len();
@@ -645,38 +873,62 @@ impl Inner {
                 codec_version: record.codec_version,
             });
             self.moving_bytes += bytes;
-            remaining = remaining.saturating_sub(bytes);
         }
-        (!moves.is_empty()).then_some(MovePlan { need, moves })
+        // What the planned moves must free, after the instant spills above.
+        let need = (self.resident_bytes + self.compressed_bytes)
+            .saturating_sub(moving_before)
+            .saturating_sub(self.budget);
+        MovePlan { need, moves }
     }
 
     /// Clears the moving marks and publishes each result whose record is unpinned and
-    /// unchanged since planning. A failed run publishes nothing.
-    fn finish_moves(&mut self, plan: MovePlan, results: Result<Vec<TileState>>) -> Result<()> {
-        let (results, error) = match results {
-            Ok(results) => (results, None),
-            Err(error) => (Vec::new(), Some(error)),
-        };
+    /// unused since planning. A new spill location is kept on the record even when the
+    /// state cannot change, because it stays valid for the tile's life. An error is counted.
+    fn finish_moves(&mut self, plan: MovePlan, results: Vec<Moved>, error: Option<TileError>) {
         let mut results = results.into_iter();
         for tile in plan.moves {
             let result = results.next();
             let Some(record) = self.tiles.get_mut(&tile.id) else {
+                if let Some(Moved::Spilled(loc)) = result {
+                    self.dead_spill_bytes += loc.len;
+                }
                 continue;
             };
             let Some(ticket) = record.moving.filter(|ticket| ticket.token == tile.token) else {
                 continue;
             };
             record.moving = None;
-            let unchanged = record.pins == 0 && record.version == tile.version;
-            self.moving_bytes -= ticket.bytes;
-            if let Some(state) = result
-                && unchanged
-            {
-                self.set_state(tile.id, state);
+            let unchanged = !record.pinned() && !record.loading && record.version == tile.version;
+            self.moving_bytes = self
+                .moving_bytes
+                .checked_sub(ticket.bytes)
+                .expect("moving bytes cover the ticket");
+            match result {
+                Some(Moved::Spilled(loc)) => {
+                    let record = self.tiles.get_mut(&tile.id).expect("checked tile");
+                    if record.spill.is_none() {
+                        record.spill = Some(loc);
+                    } else {
+                        self.dead_spill_bytes += loc.len;
+                    }
+                    if unchanged {
+                        self.set_state(tile.id, TileState::Spilled);
+                    }
+                }
+                Some(Moved::Compressed(bytes)) if unchanged => {
+                    self.set_state(tile.id, TileState::Compressed(bytes));
+                }
+                _ => {}
             }
             self.relist(tile.id);
         }
-        error.map_or(Ok(()), Err)
+        if let Some(error) = error {
+            self.evict_failures += 1;
+            self.last_evict_error = Some(error.to_string());
+            if self.deferred_error.is_none() {
+                self.deferred_error = Some(error);
+            }
+        }
     }
 }
 

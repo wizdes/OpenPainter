@@ -4,7 +4,7 @@
 using System; using System.Drawing; using System.IO;
 namespace PaintDotNet { public static class Utility {
         // TODO: In v4.0 codebase, turn this into an extension method
-        public static double Clamp(double x, double min, double max) 
+        public static double Clamp(double x, double min, double max)
         {
             if (x < min)
             {
@@ -21,7 +21,7 @@ namespace PaintDotNet { public static class Utility {
         }
 
         // TODO: In v4.0 codebase, turn this into an extension method
-        public static float Clamp(float x, float min, float max) 
+        public static float Clamp(float x, float min, float max)
         {
             if (x < min)
             {
@@ -53,40 +53,8 @@ namespace PaintDotNet { public static class Utility {
                 return x;
             }
         }
-        
-        public static byte ClampToByte(double x) 
-        {
-            if (x > 255)
-            {
-                return 255;
-            }
-            else if (x < 0)
-            {
-                return 0;
-            }
-            else
-            {
-                return (byte)x;
-            }
-        }
-        
-        public static byte ClampToByte(float x) 
-        {
-            if (x > 255)
-            {
-                return 255;
-            }
-            else if (x < 0)
-            {
-                return 0;
-            }
-            else
-            {
-                return (byte)x;
-            }
-        }
-        
-        public static byte ClampToByte(int x) 
+
+        public static byte ClampToByte(double x)
         {
             if (x > 255)
             {
@@ -102,12 +70,44 @@ namespace PaintDotNet { public static class Utility {
             }
         }
 
-        public static float Lerp(float from, float to, float frac) 
+        public static byte ClampToByte(float x)
+        {
+            if (x > 255)
+            {
+                return 255;
+            }
+            else if (x < 0)
+            {
+                return 0;
+            }
+            else
+            {
+                return (byte)x;
+            }
+        }
+
+        public static byte ClampToByte(int x)
+        {
+            if (x > 255)
+            {
+                return 255;
+            }
+            else if (x < 0)
+            {
+                return 0;
+            }
+            else
+            {
+                return (byte)x;
+            }
+        }
+
+        public static float Lerp(float from, float to, float frac)
         {
             return (from + frac * (to - from));
         }
 
-        public static double Lerp(double from, double to, double frac) 
+        public static double Lerp(double from, double to, double frac)
         {
             return (from + frac * (to - from));
         }

@@ -7,6 +7,9 @@ import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 ORACLE = ROOT / 'tests/oracle/legacy336'
+# The M03 gate: every effect runs on these 5 fixtures.
+EFFECT_FIXTURES = ('impulse_64', 'partial_alpha_64', 'plasma_512x384',
+                   'plasma_alpha_512x384', 'alpha_edge_64')
 
 
 def rgba_at(path, x, y):
@@ -48,7 +51,7 @@ class OracleOutputTests(unittest.TestCase):
                 'Gaussian Blur', 'Add Noise', 'Frosted Glass', 'Clouds'}
         entries = [entry for entry in entries if entry['op'] in core
                    and entry['parameters'] == {}]
-        self.assertEqual(len(entries), 13 * 4)
+        self.assertEqual(len(entries), 13 * len(EFFECT_FIXTURES))
 
     def test_vectors_cover_all_byte_pairs(self):
         data = json.loads((ORACLE / 'vectors/fast_scale_byte_by_byte.json').read_text())
@@ -79,21 +82,40 @@ class OracleOutputTests(unittest.TestCase):
         for name in ('Hue and Saturation', 'Auto-Level', 'Levels', 'Curves'):
             rendered = [entry for entry in entries if entry['op'] == name
                         and entry['status'] == 'ok']
-            self.assertGreaterEqual(len(rendered), 4, name)
+            self.assertGreaterEqual(len(rendered), len(EFFECT_FIXTURES), name)
 
     def test_effect_classes_render(self):
         entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
         for name in ('Brightness and Contrast', 'Posterize', 'Gaussian Blur'):
             rendered = [entry for entry in entries if entry['op'] == name
                         and entry['status'] == 'ok']
-            self.assertGreaterEqual(len(rendered), 4, name)
+            self.assertGreaterEqual(len(rendered), len(EFFECT_FIXTURES), name)
 
     def test_seeded_effects_have_fixed_output(self):
         entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
         for name in ('Add Noise', 'Frosted Glass', 'Clouds'):
             rendered = [entry for entry in entries if entry['op'] == name
                         and entry['status'] == 'seed-patched']
-            self.assertGreaterEqual(len(rendered), 4, name)
+            self.assertGreaterEqual(len(rendered), len(EFFECT_FIXTURES), name)
+
+    def test_core_effects_run_on_all_five_fixtures(self):
+        entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
+        core = [entry for entry in entries if entry['status'] in ('ok', 'seed-patched')
+                and entry['parameters'] == {}]
+        for name in {entry['op'] for entry in core}:
+            inputs = sorted(pathlib.Path(entry['input']).stem for entry in core
+                            if entry['op'] == name)
+            self.assertEqual(inputs, sorted(EFFECT_FIXTURES), name)
+        self.assertEqual(len({entry['op'] for entry in core}), 13)
+
+    def test_effects_keep_hidden_color_fixture_bytes(self):
+        # alpha_edge_64 holds straight color under zero alpha, so its outputs exist and are hashed.
+        entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
+        rendered = [entry for entry in entries
+                    if entry['input'] == 'tests/fixtures/alpha_edge_64.png' and entry['output']]
+        self.assertGreaterEqual(len(rendered), 13)
+        for entry in rendered:
+            self.assertTrue((ROOT / entry['output']).is_file(), entry['output'])
 
     def test_every_effect_png_has_a_manifest_entry(self):
         directory = ORACLE / 'effects'

@@ -84,6 +84,8 @@ internal static class Program
     }
     private static void Blend(){string dir=Path.Combine(Oracle,"blend");Directory.CreateDirectory(dir);foreach(var pair in new[]{("plasma_512x384","plasma_alpha_512x384"),("checker_600x300","alpha_edge_64")}){Png lower=Png.Read(F(pair.Item1)),upper=Png.Read(F(pair.Item2));int w=Math.Min(lower.Width,upper.Width),h=Math.Min(lower.Height,upper.Height);foreach(Type t in UserBlendOps.GetBlendOps().OrderBy(t=>t.Name,StringComparer.Ordinal)){string name=t.Name.Replace("BlendOp","");if(!new[]{"Normal","Multiply","Additive","ColorBurn","ColorDodge","Reflect","Glow","Overlay","Difference","Negation","Lighten","Darken","Screen","Xor"}.Contains(name))continue;foreach(int opacity in new[]{0,64,128,192,255}){var op=UserBlendOps.CreateBlendOp(t).CreateWithOpacity(opacity);var result=new Png(w,h);for(int y=0;y<h;y++)for(int x=0;x<w;x++)Put(result,x,y,op.Apply(Get(lower,x,y),Get(upper,x,y)));Write(dir,$"{pair.Item1}_{pair.Item2}_{name}_{opacity}.png",result,name,new{opacity,upper=pair.Item2},F(pair.Item1),"Upper input SHA-256: "+Hash(F(pair.Item2)));}}}SaveManifest(dir);}
     private static void Resample(){string dir=Path.Combine(Oracle,"resample");Directory.CreateDirectory(dir);string input=F("plasma_alpha_512x384");using var source=SurfaceOf(Png.Read(input));foreach((string label,int num,int den) in new[]{("0.5x",1,2),("0.37x",37,100),("1.6x",8,5),("3x",3,1)}){int w=(source.Width*num+den/2)/den,h=(source.Height*num+den/2)/den;foreach(string mode in new[]{"NearestNeighbor","Bilinear","Bicubic","SuperSampling"}){using var dest=new Surface(w,h);switch(mode){case "NearestNeighbor":dest.NearestNeighborFitSurface(source);break;case "Bilinear":dest.BilinearFitSurface(source);break;case "Bicubic":dest.BicubicFitSurface(source);break;case "SuperSampling":dest.SuperSamplingFitSurface(source);break;}Write(dir,$"{mode}_{label}.png",PngOf(dest),mode,new{scale=label,width=w,height=h},input);}}SaveManifest(dir);}
+    // The M03 gate runs every effect on these 5 fixtures; alpha_edge_64 keeps straight color under zero alpha.
+    private static readonly string[] EffectFixtures={"impulse_64","partial_alpha_64","plasma_512x384","plasma_alpha_512x384","alpha_edge_64"};
     private static readonly string[] EffectNames={"Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Gaussian Blur","Add Noise","Frosted Glass","Clouds"};
     private static void EffectsAll()
     {
@@ -145,7 +147,7 @@ internal static class Program
         string manifest=Path.Combine(dir,"manifest.json");
         if(save&&entries.Count==0&&File.Exists(manifest))entries=JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(manifest))??new();
         bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Gaussian Blur" or "Add Noise" or "Frosted Glass" or "Clouds";
-        foreach(string fixture in new[]{"impulse_64","partial_alpha_64","plasma_512x384","plasma_alpha_512x384"})
+        foreach(string fixture in EffectFixtures)
         {
             string input=F(fixture);
             if(!supported)

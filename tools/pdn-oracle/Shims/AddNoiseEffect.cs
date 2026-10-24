@@ -196,7 +196,7 @@ namespace PaintDotNet.Effects
                             g = localLookup[localRand.Next(tableSize)];
                             b = localLookup[localRand.Next(tableSize)];
 
-                            i = (4899 * r + 9618 * g + 1867 * b) >> 14; 
+                            i = (4899 * r + 9618 * g + 1867 * b) >> 14;
 
                             r = i + (((r - i) * sat) >> 12);
                             g = i + (((g - i) * sat) >> 12);

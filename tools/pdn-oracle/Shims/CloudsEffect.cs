@@ -22,9 +22,9 @@ namespace PaintDotNet.Effects
 {
     public sealed class CloudsEffect
         : InternalPropertyBasedEffect
-    {        
+    {
         // This is so that repetition of the effect with CTRL+F actually shows up differently.
-        private byte instanceSeed = 0x5a; 
+        private byte instanceSeed = 0x5a;
 
         public static string StaticName
         {
@@ -132,7 +132,7 @@ namespace PaintDotNet.Effects
         {
             for (int i = startIndex; i < startIndex + length; ++i)
             {
-                RenderClouds(this.DstArgs.Surface, renderRects[i], this.scale, this.seed, 
+                RenderClouds(this.DstArgs.Surface, renderRects[i], this.scale, this.seed,
                     this.power, EnvironmentParameters.PrimaryColor, EnvironmentParameters.SecondaryColor);
 
                 if (blendOp != null)
@@ -151,7 +151,7 @@ namespace PaintDotNet.Effects
                 permuteLookup[i] = permutationTable[i];
             }
         }
-        
+
         // Adapted to 2-D version in C# from 3-D version in Java from http://mrl.nyu.edu/~perlin/noise/
         static private int[] permuteLookup = new int[512];
 
@@ -243,7 +243,7 @@ namespace PaintDotNet.Effects
 
                         dxr -= dxd;
                         dyr -= dyd;
-                        
+
                         double noise = Noise(
                             unchecked((byte)dxd),
                             unchecked((byte)dyd),

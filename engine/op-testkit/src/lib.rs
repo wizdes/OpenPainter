@@ -84,8 +84,12 @@ impl RgbaImage {
     }
 }
 
+/// The RGBA byte count for `width` x `height`. An overflow is an error, never a wrapped size.
 fn pixel_len(width: u32, height: u32) -> Result<usize> {
-    let len = u64::from(width) * u64::from(height) * 4;
+    let len = u64::from(width)
+        .checked_mul(u64::from(height))
+        .and_then(|pixels| pixels.checked_mul(4))
+        .with_context(|| format!("image dimensions {width}x{height} overflow"))?;
     usize::try_from(len).context("image dimensions exceed addressable memory")
 }
 
@@ -272,8 +276,12 @@ fn pixel_at(image: &RgbaImage, x: u32, y: u32) -> Option<&[u8]> {
     if x >= image.width || y >= image.height {
         return None;
     }
-    let offset = ((u64::from(y) * u64::from(image.width) + u64::from(x)) * 4) as usize;
-    image.data.get(offset..offset + 4)
+    let offset = u64::from(y)
+        .checked_mul(u64::from(image.width))?
+        .checked_add(u64::from(x))?
+        .checked_mul(4)?;
+    let offset = usize::try_from(offset).ok()?;
+    image.data.get(offset..offset.checked_add(4)?)
 }
 
 #[derive(Debug, Deserialize)]
@@ -383,6 +391,21 @@ mod tests {
         );
         assert!(!result.passed);
         assert!(result.message.contains("size mismatch"));
+    }
+
+    #[test]
+    fn overflowing_dimensions_fail_instead_of_passing() {
+        let huge = RgbaImage {
+            width: 1 << 31,
+            height: 1 << 31,
+            data: Vec::new(),
+        };
+        let result = compare(&huge, &huge, Tolerance::default());
+        assert!(!result.passed, "{result}");
+        assert!(result.message.contains("invalid image"), "{result}");
+        assert!(huge.validate().is_err());
+        assert!(pixel_len(u32::MAX, u32::MAX).is_err());
+        assert_eq!(pixel_len(3, 2).unwrap(), 24);
     }
 
     #[test]

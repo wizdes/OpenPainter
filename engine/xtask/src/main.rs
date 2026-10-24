@@ -37,6 +37,114 @@ fn engine_dir(runtime: Option<std::ffi::OsString>, compiled: &str) -> PathBuf {
     manifest.parent().expect("workspace parent").to_path_buf()
 }
 
+/// One command a tier runs, with any extra environment it needs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommandStep {
+    name: String,
+    program: &'static str,
+    args: Vec<&'static str>,
+    env: Vec<(&'static str, &'static str)>,
+    /// Runs from the repository root instead of the engine folder.
+    in_repo: bool,
+    /// A missing program is a SKIP instead of a FAIL.
+    skip_if_missing: bool,
+}
+
+impl CommandStep {
+    fn cargo(args: &[&'static str], env: &[(&'static str, &'static str)]) -> Self {
+        let prefix: String = env
+            .iter()
+            .map(|(key, value)| format!("{key}={value} "))
+            .collect();
+        Self {
+            name: format!("{prefix}cargo {}", args.join(" ")),
+            program: "cargo",
+            args: args.to_vec(),
+            env: env.to_vec(),
+            in_repo: false,
+            skip_if_missing: false,
+        }
+    }
+}
+
+/// How many cases each proptest runs in a tier's release test run.
+fn proptest_cases(tier: &str) -> Option<&'static str> {
+    match tier {
+        "milestone" => Some("1024"),
+        "checkpoint" => Some("10000"),
+        _ => None,
+    }
+}
+
+/// The engine checks every tier runs first.
+fn base_steps() -> Vec<CommandStep> {
+    vec![
+        CommandStep::cargo(&["fmt", "--all", "--check"], &[]),
+        CommandStep::cargo(
+            &[
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            &[],
+        ),
+        CommandStep::cargo(&["test", "--workspace"], &[]),
+    ]
+}
+
+/// The release tests, oracle tests and benchmarks of the milestone and checkpoint tiers.
+/// The debug test run above keeps the default case count, because debug proptests run
+/// about ten times slower.
+fn deep_steps(tier: &str) -> Vec<CommandStep> {
+    let Some(cases) = proptest_cases(tier) else {
+        return Vec::new();
+    };
+    let mut steps = vec![
+        CommandStep::cargo(
+            &["test", "--workspace", "--release"],
+            &[("OP_PROPTEST_CASES", cases)],
+        ),
+        CommandStep {
+            name: "python3 -B tests/oracle/legacy336/test_oracle.py".into(),
+            program: "python3",
+            args: vec!["-B", "tests/oracle/legacy336/test_oracle.py"],
+            env: Vec::new(),
+            in_repo: true,
+            skip_if_missing: true,
+        },
+    ];
+    if tier == "checkpoint" {
+        steps.push(CommandStep::cargo(
+            &[
+                "run",
+                "-p",
+                "op-core",
+                "--example",
+                "tile_bench",
+                "--release",
+            ],
+            &[],
+        ));
+    }
+    steps
+}
+
+fn run_step(steps: &mut Vec<Step>, step: &CommandStep, engine: &Path, repo: &Path) {
+    let dir = if step.in_repo { repo } else { engine };
+    run_with(
+        steps,
+        &step.name,
+        dir,
+        step.program,
+        &step.args,
+        &step.env,
+        step.skip_if_missing,
+    );
+}
+
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() != 3 || args[0] != "check" || args[1] != "--tier" {
@@ -54,34 +162,9 @@ fn main() -> ExitCode {
     );
     let repo = engine.parent().expect("repository parent");
     let mut steps = Vec::new();
-    run(
-        &mut steps,
-        "cargo fmt --all --check",
-        &engine,
-        "cargo",
-        &["fmt", "--all", "--check"],
-    );
-    run(
-        &mut steps,
-        "cargo clippy --workspace --all-targets -- -D warnings",
-        &engine,
-        "cargo",
-        &[
-            "clippy",
-            "--workspace",
-            "--all-targets",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    );
-    run(
-        &mut steps,
-        "cargo test --workspace",
-        &engine,
-        "cargo",
-        &["test", "--workspace"],
-    );
+    for step in base_steps() {
+        run_step(&mut steps, &step, &engine, repo);
+    }
     if repo.join("mac/project.yml").is_file() {
         // TODO: Generate the Xcode project from project.yml before this build when the Mac app exists.
         run(
@@ -100,14 +183,10 @@ fn main() -> ExitCode {
     } else {
         skip(&mut steps, "Swift build", "mac/project.yml is absent");
     }
+    for step in deep_steps(tier) {
+        run_step(&mut steps, &step, &engine, repo);
+    }
     if matches!(tier, "milestone" | "checkpoint") {
-        run(
-            &mut steps,
-            "cargo test --workspace --release",
-            &engine,
-            "cargo",
-            &["test", "--workspace", "--release"],
-        );
         let scenario_dir = repo.join("tests/scenarios");
         let mut scenarios = match fs::read_dir(&scenario_dir) {
             Ok(entries) => {
@@ -186,13 +265,34 @@ fn main() -> ExitCode {
 }
 
 fn run(steps: &mut Vec<Step>, name: &str, dir: &Path, program: &str, args: &[&str]) {
+    run_with(steps, name, dir, program, args, &[], false);
+}
+
+fn run_with(
+    steps: &mut Vec<Step>,
+    name: &str,
+    dir: &Path,
+    program: &str,
+    args: &[&str],
+    env: &[(&str, &str)],
+    skip_if_missing: bool,
+) {
     println!("Running {name}");
     let start = Instant::now();
-    let status = match Command::new(program).args(args).current_dir(dir).status() {
+    let mut command = Command::new(program);
+    command.args(args).current_dir(dir);
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let status = match command.status() {
         Ok(exit) if exit.success() => Status::Pass,
         Ok(exit) => {
             eprintln!("{name} exited with {exit}");
             Status::Fail
+        }
+        Err(error) if skip_if_missing && error.kind() == std::io::ErrorKind::NotFound => {
+            skip(steps, name, &format!("{program} is not installed"));
+            return;
         }
         Err(error) => {
             eprintln!("{name} could not start: {error}");
@@ -280,6 +380,92 @@ fn run_script(steps: &mut Vec<Step>, name: &str, repo: &Path, app: Option<&Path>
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn fast_tier_runs_only_the_base_checks() {
+        assert!(deep_steps("fast").is_empty());
+        assert_eq!(proptest_cases("fast"), None);
+        let names: Vec<_> = base_steps().into_iter().map(|step| step.name).collect();
+        assert_eq!(
+            names,
+            [
+                "cargo fmt --all --check",
+                "cargo clippy --workspace --all-targets -- -D warnings",
+                "cargo test --workspace",
+            ]
+        );
+    }
+
+    #[test]
+    fn milestone_tier_runs_1024_cases_and_the_oracle_tests() {
+        let steps = deep_steps("milestone");
+        assert_eq!(steps.len(), 2);
+        assert_eq!(steps[0].program, "cargo");
+        assert_eq!(steps[0].args, ["test", "--workspace", "--release"]);
+        assert_eq!(steps[0].env, [("OP_PROPTEST_CASES", "1024")]);
+        assert_eq!(
+            steps[0].name,
+            "OP_PROPTEST_CASES=1024 cargo test --workspace --release"
+        );
+        assert_eq!(steps[1].program, "python3");
+        assert_eq!(
+            steps[1].args,
+            ["-B", "tests/oracle/legacy336/test_oracle.py"]
+        );
+        assert!(steps[1].in_repo && steps[1].skip_if_missing);
+        assert!(!steps.iter().any(|step| step.args.contains(&"tile_bench")));
+    }
+
+    #[test]
+    fn checkpoint_tier_runs_10000_cases_oracle_tests_and_tile_bench() {
+        let steps = deep_steps("checkpoint");
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0].env, [("OP_PROPTEST_CASES", "10000")]);
+        assert_eq!(steps[0].args, ["test", "--workspace", "--release"]);
+        assert_eq!(
+            steps[1].args,
+            ["-B", "tests/oracle/legacy336/test_oracle.py"]
+        );
+        assert_eq!(
+            steps[2].args,
+            [
+                "run",
+                "-p",
+                "op-core",
+                "--example",
+                "tile_bench",
+                "--release"
+            ]
+        );
+        assert!(!steps[2].in_repo && !steps[2].skip_if_missing);
+    }
+
+    #[test]
+    fn a_missing_optional_program_is_a_skip_and_a_missing_required_one_fails() {
+        let dir = std::env::temp_dir();
+        let missing = "op-xtask-no-such-program";
+        let mut steps = Vec::new();
+        run_with(&mut steps, "optional", &dir, missing, &[], &[], true);
+        run_with(&mut steps, "required", &dir, missing, &[], &[], false);
+        assert!(matches!(steps[0].status, Status::Skip));
+        assert!(matches!(steps[1].status, Status::Fail));
+    }
+
+    #[test]
+    fn step_environment_reaches_the_command() {
+        let dir = std::env::temp_dir();
+        let mut steps = Vec::new();
+        run_with(
+            &mut steps,
+            "env",
+            &dir,
+            "sh",
+            &["-c", "test \"$OP_PROPTEST_CASES\" = 1024"],
+            &[("OP_PROPTEST_CASES", "1024")],
+            false,
+        );
+        assert!(matches!(steps[0].status, Status::Pass));
+    }
 
     #[test]
     fn engine_dir_prefers_the_run_time_manifest_path() {

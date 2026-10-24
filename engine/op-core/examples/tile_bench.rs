@@ -19,7 +19,7 @@ fn main() {
     }
     let insert = start.elapsed().as_secs_f64();
     let start = Instant::now();
-    store.set_budget(32 * 1024 * 1024).unwrap();
+    store.set_budget(32 * 1024 * 1024);
     let evict = start.elapsed().as_secs_f64();
     let start = Instant::now();
     for id in ids {
@@ -42,8 +42,8 @@ fn main() {
     }
     let resident_gets = start.elapsed().as_secs_f64();
     let mib = 100.0;
-    println!("{:.2}", mib / insert);
-    println!("{:.2}", 68.0 / evict);
-    println!("{:.2}", mib / reload);
-    println!("{:.0}", gets as f64 / resident_gets);
+    println!("insert MB/s: {:.2}", mib / insert);
+    println!("evict MB/s: {:.2}", 68.0 / evict);
+    println!("reload MB/s: {:.2}", mib / reload);
+    println!("resident gets/s: {:.0}", gets as f64 / resident_gets);
 }
