@@ -68,6 +68,30 @@ fn expands_common_8_bit_inputs() {
         assert_eq!(decode_png(&out).unwrap().pixels, expected, "{color:?}");
     }
 }
+#[test]
+fn gray_icc_is_converted_to_srgb_with_alpha() {
+    let gray = op_color::Profile::builtin("gray-2.2").unwrap();
+    let mut out = Vec::new();
+    let mut info = png::Info::with_size(2, 1);
+    info.color_type = png::ColorType::GrayscaleAlpha;
+    info.bit_depth = png::BitDepth::Eight;
+    info.icc_profile = Some(std::borrow::Cow::Owned(gray.bytes().to_vec()));
+    let mut writer = png::Encoder::with_info(&mut out, info)
+        .unwrap()
+        .write_header()
+        .unwrap();
+    writer.write_image_data(&[50, 0, 200, 128]).unwrap();
+    drop(writer);
+    let decoded = decode_png(&out).unwrap();
+    assert_eq!([decoded.pixels[3], decoded.pixels[7]], [0, 128]);
+    assert_ne!(&decoded.pixels[..3], &[50, 50, 50]);
+    assert_eq!(
+        op_color::Profile::from_icc(decoded.icc.as_ref().unwrap())
+            .unwrap()
+            .color_space(),
+        lcms2::ColorSpaceSignature::RgbData
+    );
+}
 
 #[test]
 fn rejects_oversize_and_wrong_pixel_length() {

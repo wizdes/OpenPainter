@@ -7,6 +7,100 @@ fn fresh() -> (Engine, u64) {
         .unwrap();
     (e, id)
 }
+#[test]
+fn assign_and_convert_profiles_are_single_atomic_history_steps() {
+    let e = Engine::new(None).unwrap();
+    let id = e
+        .import_pixels(2, 1, &[100, 120, 80, 128, 80, 140, 100, 0], None)
+        .unwrap();
+    let original = e.query(id, "doc.pixels", json!({})).unwrap();
+    let raw_before = e
+        .actor_probe(id)
+        .unwrap()
+        .0
+        .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+        .unwrap();
+    e.dispatch(id, "image.assign_profile", json!({"profile":"display-p3"}))
+        .unwrap();
+    assert_eq!(info(&e, id)["profile_description"], "Display P3");
+    assert_eq!(e.query(id, "doc.pixels", json!({})).unwrap(), original);
+    assert_eq!(info(&e, id)["history_index"], 1);
+    e.dispatch(
+        id,
+        "image.convert_profile",
+        json!({"profile":"srgb","intent":"relative","bpc":true}),
+    )
+    .unwrap();
+    let converted = e.query(id, "doc.pixels", json!({})).unwrap();
+    let raw_after = e
+        .actor_probe(id)
+        .unwrap()
+        .0
+        .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+        .unwrap();
+    assert_eq!(converted[3], 128);
+    assert_eq!(converted[7], 0);
+    assert_ne!(&raw_after[4..7], &raw_before[4..7]);
+    assert_eq!(raw_after[7], raw_before[7]);
+    assert_eq!(info(&e, id)["history_index"], 2);
+    assert!(
+        e.dispatch(id, "image.assign_profile", json!({"profile":"bad-profile"}))
+            .is_err()
+    );
+    assert_eq!(info(&e, id)["history_index"], 2);
+    assert_eq!(e.query(id, "doc.pixels", json!({})).unwrap(), converted);
+    e.dispatch(
+        id,
+        "image.convert_profile",
+        json!({"profile":"display-p3","intent":"relative","bpc":true}),
+    )
+    .unwrap();
+    let returned = e
+        .actor_probe(id)
+        .unwrap()
+        .0
+        .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+        .unwrap();
+    assert_eq!([returned[3], returned[7]], [128, 0]);
+    for i in [0, 1, 2, 4, 5, 6] {
+        assert!(
+            (returned[i] as i16 - raw_before[i] as i16).abs() <= 7,
+            "channel {i}"
+        );
+    }
+}
+#[test]
+fn profile_change_discards_open_preview_and_old_job() {
+    let (e, id) = fresh();
+    e.preview_begin(id, "test.preview_fill", json!({"value":60,"delay_ms":200}))
+        .unwrap();
+    let old = e.current_identity(id).unwrap();
+    e.dispatch(id, "image.assign_profile", json!({"profile":"display-p3"}))
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    assert!(e.snapshot(id).unwrap().preview.is_none());
+    assert!(e.preview_commit(id).is_err());
+    assert_ne!(
+        old.base_revision,
+        e.current_identity(id).unwrap().base_revision
+    );
+    assert_eq!(info(&e, id)["history_index"], 1);
+}
+#[test]
+fn gray_import_uses_document_rgb_profile() {
+    let e = Engine::new(None).unwrap();
+    let gray = op_color::Profile::builtin("gray-2.2").unwrap();
+    let id = e
+        .import_gray_pixels(2, 1, &[50, 200], Some(&[0, 128]), Some(&gray.bytes()))
+        .unwrap();
+    let state = e.actor_probe(id).unwrap().0;
+    assert!(state.profile.is_some());
+    let pixels = state
+        .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+        .unwrap();
+    assert_eq!([pixels[3], pixels[7]], [0, 128]);
+    assert_ne!(&pixels[..3], &[50, 50, 50]);
+}
 fn info(e: &Engine, id: u64) -> Value {
     serde_json::from_slice(&e.query(id, "doc.info", json!({})).unwrap()).unwrap()
 }

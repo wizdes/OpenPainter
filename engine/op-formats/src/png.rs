@@ -54,7 +54,9 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
     }
     let mut raw = vec![0; reader.output_buffer_size()];
     let output = reader.next_frame(&mut raw).map_err(err)?;
+    let embedded_icc = reader.info().icc_profile.as_ref().map(|p| p.to_vec());
     let mut pixels = Vec::with_capacity(len);
+    let mut gray_expanded = false;
     match output.color_type {
         png::ColorType::Rgba => pixels.extend_from_slice(&raw[..output.buffer_size()]),
         png::ColorType::Rgb => {
@@ -63,13 +65,36 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
             }
         }
         png::ColorType::Grayscale => {
-            for &g in &raw[..output.buffer_size()] {
-                pixels.extend_from_slice(&[g, g, g, 255]);
+            if let Some(icc) = &embedded_icc {
+                let src = op_color::Profile::from_icc(icc).map_err(err)?;
+                let dst = op_color::Profile::builtin("srgb").map_err(err)?;
+                pixels = op_color::expand_gray(&raw[..output.buffer_size()], None, &src, &dst)
+                    .map_err(err)?;
+                gray_expanded = true;
+            } else {
+                for &g in &raw[..output.buffer_size()] {
+                    pixels.extend_from_slice(&[g, g, g, 255]);
+                }
             }
         }
         png::ColorType::GrayscaleAlpha => {
-            for p in raw[..output.buffer_size()].chunks_exact(2) {
-                pixels.extend_from_slice(&[p[0], p[0], p[0], p[1]]);
+            if let Some(icc) = &embedded_icc {
+                let src = op_color::Profile::from_icc(icc).map_err(err)?;
+                let dst = op_color::Profile::builtin("srgb").map_err(err)?;
+                let gray: Vec<u8> = raw[..output.buffer_size()]
+                    .chunks_exact(2)
+                    .map(|p| p[0])
+                    .collect();
+                let alpha: Vec<u8> = raw[..output.buffer_size()]
+                    .chunks_exact(2)
+                    .map(|p| p[1])
+                    .collect();
+                pixels = op_color::expand_gray(&gray, Some(&alpha), &src, &dst).map_err(err)?;
+                gray_expanded = true;
+            } else {
+                for p in raw[..output.buffer_size()].chunks_exact(2) {
+                    pixels.extend_from_slice(&[p[0], p[0], p[0], p[1]]);
+                }
             }
         }
         _ => return Err(err("PNG color type unsupported in M04")),
@@ -78,7 +103,16 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
         return Err(err("PNG pixel count mismatch"));
     }
     reader.finish().map_err(err)?;
-    let icc = reader.info().icc_profile.as_ref().map(|p| p.to_vec());
+    let icc = if gray_expanded {
+        Some(
+            op_color::Profile::builtin("srgb")
+                .map_err(err)?
+                .bytes()
+                .to_vec(),
+        )
+    } else {
+        embedded_icc
+    };
     Ok(DecodedImage {
         width,
         height,

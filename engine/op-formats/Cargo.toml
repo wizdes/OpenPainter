@@ -9,3 +9,5 @@ workspace = true
 
 [dependencies]
 png = "0.17"
+op-color = { path = "../op-color" }
+lcms2 = { version = "6.2.0", features = ["static"] }

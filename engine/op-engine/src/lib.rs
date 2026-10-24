@@ -293,9 +293,148 @@ fn jump(_: &RunCtx, _: &DocState, p: &Value) -> Result<Outcome> {
 fn panic_run(_: &RunCtx, _: &DocState, _: &Value) -> Result<Outcome> {
     panic!("test command panic")
 }
+fn requested_profile(value: &Value) -> Result<op_color::Profile> {
+    let s = value
+        .as_str()
+        .ok_or_else(|| bad("profile must be a string"))?;
+    if let Ok(p) = op_color::Profile::builtin(s) {
+        return Ok(p);
+    }
+    let data = decode_base64(s.strip_prefix("base64:").unwrap_or(s))?;
+    op_color::Profile::from_icc(&data).map_err(bad)
+}
+fn decode_base64(s: &str) -> Result<Vec<u8>> {
+    let bytes = s.as_bytes();
+    if !bytes.len().is_multiple_of(4) || bytes.len() > 24 * 1024 * 1024 {
+        return Err(bad("invalid base64 ICC"));
+    }
+    let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+    for (i, chunk) in bytes.chunks_exact(4).enumerate() {
+        let mut v = [0u8; 4];
+        for j in 0..4 {
+            v[j] = match chunk[j] {
+                b'A'..=b'Z' => chunk[j] - b'A',
+                b'a'..=b'z' => chunk[j] - b'a' + 26,
+                b'0'..=b'9' => chunk[j] - b'0' + 52,
+                b'+' => 62,
+                b'/' => 63,
+                b'=' if i == bytes.len() / 4 - 1 && j >= 2 => 0,
+                _ => return Err(bad("invalid base64 ICC")),
+            };
+        }
+        if chunk[2] == b'=' && chunk[3] != b'=' {
+            return Err(bad("invalid base64 padding"));
+        }
+        let n = if chunk[2] == b'=' {
+            1
+        } else if chunk[3] == b'=' {
+            2
+        } else {
+            3
+        };
+        if n < 3 && ((n == 1 && v[1] & 15 != 0) || (n == 2 && v[2] & 3 != 0)) {
+            return Err(bad("invalid base64 padding"));
+        }
+        let bits =
+            ((v[0] as u32) << 18) | ((v[1] as u32) << 12) | ((v[2] as u32) << 6) | v[3] as u32;
+        out.push((bits >> 16) as u8);
+        if n > 1 {
+            out.push((bits >> 8) as u8);
+        }
+        if n > 2 {
+            out.push(bits as u8);
+        }
+    }
+    Ok(out)
+}
+fn assign_profile(_: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    let profile = requested_profile(&p["profile"])?;
+    if profile.color_space() != lcms2::ColorSpaceSignature::RgbData {
+        return Err(bad("document profile must be RGB"));
+    }
+    Ok(Outcome::State(s.set_profile(Some(profile.bytes()))))
+}
+fn convert_profile(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    let dst = requested_profile(&p["profile"])?;
+    let src = match &s.profile {
+        Some(bytes) => op_color::Profile::from_icc(bytes).map_err(bad)?,
+        None => op_color::Profile::builtin("srgb").map_err(bad)?,
+    };
+    let intent = op_color::RenderingIntent::parse(p["intent"].as_str().unwrap()).map_err(bad)?;
+    let mut next = s.clone();
+    for layer in 0..s.layers.len() {
+        let coords: Vec<_> = s.layers[layer]
+            .tiles
+            .iter()
+            .map(|(coord, _)| coord)
+            .collect();
+        for coord in coords {
+            ctx.check()?;
+            let mut tile = s.read_tile(layer, coord).map_err(internal)?;
+            op_color::convert_rgba(&src, &dst, intent, p["bpc"].as_bool().unwrap(), &mut tile)
+                .map_err(bad)?;
+            next = next
+                .write_tile(layer, coord, TileData::try_from(tile).map_err(internal)?)
+                .map_err(internal)?;
+        }
+    }
+    ctx.check()?;
+    Ok(Outcome::State(next.set_profile(Some(dst.bytes()))))
+}
 fn specs() -> Vec<CommandSpec> {
     let empty = || ParamSchema::default();
     vec![
+        CommandSpec {
+            id: "image.assign_profile",
+            params: ParamSchema {
+                fields: vec![Param {
+                    key: "profile",
+                    kind: ParamKind::String,
+                    min: None,
+                    max: None,
+                    default: None,
+                }],
+            },
+            enabled: always,
+            run: assign_profile,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "image.convert_profile",
+            params: ParamSchema {
+                fields: vec![
+                    Param {
+                        key: "profile",
+                        kind: ParamKind::String,
+                        min: None,
+                        max: None,
+                        default: None,
+                    },
+                    Param {
+                        key: "intent",
+                        kind: ParamKind::Choice(&[
+                            "perceptual",
+                            "relative",
+                            "saturation",
+                            "absolute",
+                        ]),
+                        min: None,
+                        max: None,
+                        default: Some(json!("perceptual")),
+                    },
+                    Param {
+                        key: "bpc",
+                        kind: ParamKind::Bool,
+                        min: None,
+                        max: None,
+                        default: Some(json!(false)),
+                    },
+                ],
+            },
+            enabled: always,
+            run: convert_profile,
+            previewable: false,
+        },
         CommandSpec {
             id: "layer.add",
             params: ParamSchema {
@@ -437,7 +576,13 @@ pub struct Published {
 }
 impl Published {
     pub fn info(&self) -> Value {
-        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision})
+        let profile_description = match &self.state.profile {
+            Some(bytes) => op_color::Profile::from_icc(bytes)
+                .map(|p| p.description().to_owned())
+                .unwrap_or_else(|e| format!("Invalid ICC profile: {e}")),
+            None => "sRGB".into(),
+        };
+        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision,"profile_description":profile_description})
     }
     pub fn pixels(&self, preview: bool) -> Result<Vec<u8>> {
         let state = if preview {
@@ -930,6 +1075,12 @@ impl Engine {
         if width == 0 || height == 0 || rgba.len() != len || len > 1024 * 1024 * 1024 {
             return Err(bad("invalid pixel dimensions or length"));
         }
+        if let Some(icc) = icc {
+            let p = op_color::Profile::from_icc(icc).map_err(bad)?;
+            if p.color_space() != lcms2::ColorSpaceSignature::RgbData {
+                return Err(bad("RGBA import requires an RGB profile"));
+            }
+        }
         let store =
             Arc::new(TileStore::new(std::env::temp_dir(), 64 * 1024 * 1024).map_err(internal)?);
         let mut state = DocState::new(store.clone(), width, height, 96.0).map_err(internal)?;
@@ -1003,6 +1154,47 @@ impl Engine {
     pub fn open_png(&self, bytes: &[u8]) -> Result<u64> {
         let d = op_formats::png::decode_png(bytes).map_err(bad)?;
         self.import_pixels(d.width, d.height, &d.pixels, d.icc.as_deref())
+    }
+    pub fn import_gray_pixels(
+        &self,
+        width: u32,
+        height: u32,
+        gray: &[u8],
+        alpha: Option<&[u8]>,
+        icc: Option<&[u8]>,
+    ) -> Result<u64> {
+        let count = (width as usize)
+            .checked_mul(height as usize)
+            .ok_or_else(|| bad("dimensions overflow"))?;
+        if gray.len() != count {
+            return Err(bad("gray pixel count mismatch"));
+        }
+        let src = match icc {
+            Some(bytes) => op_color::Profile::from_icc(bytes).map_err(bad)?,
+            None => op_color::Profile::builtin("gray-2.2").map_err(bad)?,
+        };
+        let dst = op_color::Profile::builtin("srgb").map_err(bad)?;
+        let rgba = op_color::expand_gray(gray, alpha, &src, &dst).map_err(bad)?;
+        self.import_pixels(width, height, &rgba, Some(&dst.bytes()))
+    }
+    pub fn import_cmyk_pixels(
+        &self,
+        width: u32,
+        height: u32,
+        cmyk: &[[u8; 4]],
+        icc: &[u8],
+    ) -> Result<(u64, String)> {
+        let count = (width as usize)
+            .checked_mul(height as usize)
+            .ok_or_else(|| bad("dimensions overflow"))?;
+        if cmyk.len() != count {
+            return Err(bad("CMYK pixel count mismatch"));
+        }
+        let src = op_color::Profile::from_icc(icc).map_err(bad)?;
+        let (rgba, notice) = op_color::import_cmyk(cmyk, &src).map_err(bad)?;
+        let dst = op_color::Profile::builtin("srgb").map_err(bad)?;
+        let doc = self.import_pixels(width, height, &rgba, Some(&dst.bytes()))?;
+        Ok((doc, notice))
     }
     fn doc(&self, id: u64) -> Result<Arc<Document>> {
         self.docs.lock().get(&id).cloned().ok_or(Error::NoSuchDoc)
