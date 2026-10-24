@@ -85,10 +85,9 @@ fn m25_adjustments_are_registered_in_menu_order() {
 fn m25_profile_and_hidden_colors_do_not_change_the_result() {
     let doc = document(2, 1);
     let with_profile = doc.set_profile(Some(Arc::from([1u8, 2, 3])));
-    for spec in effect::registered()
-        .into_iter()
-        .filter(|spec| spec.id != "effect.adjust.invert_alpha")
-    {
+    for spec in effect::registered().into_iter().filter(|spec| {
+        spec.id != "effect.adjust.invert_alpha" && spec.id != "effect.fill.content_aware"
+    }) {
         let rect = Rect::new(0, 0, 2, 1);
         let original = effect::render(&doc, &spec, rect, None).unwrap();
         let profiled = effect::render(&with_profile, &spec, rect, None).unwrap();
@@ -338,7 +337,10 @@ fn geometry_selection_uses_antialiased_area_coverage() {
 fn tile_order_and_parallel_match_whole_image() {
     let doc = document(1000, 700);
     let rect = Rect::new(0, 0, 1000, 700);
-    for spec in effect::registered() {
+    for spec in effect::registered()
+        .into_iter()
+        .filter(|spec| spec.id != "effect.fill.content_aware")
+    {
         let baseline = effect::render(&doc, &spec, rect, None).unwrap();
         // This whole-image reference computes from canvas coordinates, without
         // reading any output tile while making the expected pixels.

@@ -81,3 +81,9 @@ id = "effect.adjust.invert_alpha"
 target = "own"
 reference = "own goldens"
 tolerance = "exact"
+
+[[effect]]
+id = "effect.fill.content_aware"
+target = "own"
+reference = "synthetic fixture PSNR and SSIM"
+tolerance = "hole PSNR >= 30 dB; rim SSIM >= 0.95"
