@@ -2,3 +2,4 @@
 pub mod composite;
 pub mod effect;
 pub mod effects;
+pub mod image;

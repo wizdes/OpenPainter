@@ -21,6 +21,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
+mod image_commands;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -685,6 +686,7 @@ fn specs() -> Vec<CommandSpec> {
             previewable: false,
         },
     ];
+    entries.extend(image_commands::specs());
     for effect in effect::registered() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,

@@ -5,6 +5,99 @@ struct Params { width: u32, height: u32, mode: u32, opacity: u32, masked: u32 }
 @group(0) @binding(3) var output_tex: texture_storage_2d<rgba8uint, write>;
 @group(0) @binding(4) var coverage_tex: texture_2d<u32>;
 @compute @workgroup_size(16, 16)
+fn resample_nearest(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let source = textureDimensions(input_tex);
+  let sx = min(id.x * source.x / p.width, source.x - 1u);
+  let sy = min(id.y * source.y / p.height, source.y - 1u);
+  textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(i32(sx), i32(sy)), 0));
+}
+fn cubic_smooth(x: f32) -> f32 {
+  let a = abs(x);
+  if a < 1.0 { return (4.0 - 6.0*a*a + 3.0*a*a*a) / 6.0; }
+  if a < 2.0 { let t = 2.0-a; return t*t*t/6.0; }
+  return 0.0;
+}
+@compute @workgroup_size(16, 16)
+fn resample_bilinear(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let source = textureDimensions(input_tex);
+  let fx = f32(id.x * (source.x - 1u)) / f32(p.width - 1u);
+  let fy = f32(id.y * (source.y - 1u)) / f32(p.height - 1u);
+  let ix = u32(floor(fx)); let iy = u32(floor(fy));
+  let xf = u32(256.0 * (fx - f32(ix)));
+  let yf = u32(256.0 * (fy - f32(iy)));
+  let weights = vec4<u32>((256u-xf)*(256u-yf),xf*(256u-yf),(256u-xf)*yf,xf*yf);
+  let s0 = textureLoad(input_tex, vec2<i32>(i32(ix),i32(iy)),0);
+  let s1 = textureLoad(input_tex, vec2<i32>(i32(min(ix+1u,source.x-1u)),i32(iy)),0);
+  let s2 = textureLoad(input_tex, vec2<i32>(i32(ix),i32(min(iy+1u,source.y-1u))),0);
+  let s3 = textureLoad(input_tex, vec2<i32>(i32(min(ix+1u,source.x-1u)),i32(min(iy+1u,source.y-1u))),0);
+  let af = s0.a*weights.x+s1.a*weights.y+s2.a*weights.z+s3.a*weights.w;
+  let a = (af+32768u)>>16u;
+  var rgb = vec3<u32>(0u);
+  if a > 0u {
+    let weighted = vec3<f32>(s0.rgb)*f32(s0.a*weights.x)+vec3<f32>(s1.rgb)*f32(s1.a*weights.y)+vec3<f32>(s2.rgb)*f32(s2.a*weights.z)+vec3<f32>(s3.rgb)*f32(s3.a*weights.w);
+    rgb = vec3<u32>(floor(weighted/f32(af)));
+  }
+  textureStore(output_tex,vec2<i32>(id.xy),vec4<u32>(rgb,a));
+}
+@compute @workgroup_size(16, 16)
+fn resample_super_sampling(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let source = textureDimensions(input_tex);
+  let left = f32(id.x)*f32(source.x)/f32(p.width);
+  let right = f32(id.x+1u)*f32(source.x)/f32(p.width);
+  let top = f32(id.y)*f32(source.y)/f32(p.height);
+  let bottom = f32(id.y+1u)*f32(source.y)/f32(p.height);
+  var rgb = vec3<f32>(0.0); var alpha = 0.0;
+  for (var sy = u32(floor(top)); sy < min(u32(ceil(bottom)), source.y); sy++) {
+    let wy = max(min(bottom,f32(sy+1u))-max(top,f32(sy)),0.0);
+    for (var sx = u32(floor(left)); sx < min(u32(ceil(right)),source.x); sx++) {
+      let wx = max(min(right,f32(sx+1u))-max(left,f32(sx)),0.0);
+      let sample = textureLoad(input_tex, vec2<i32>(i32(sx),i32(sy)),0);
+      let weight = wx*wy*f32(sample.a);
+      alpha += weight;
+      rgb += vec3<f32>(sample.rgb)*weight;
+    }
+  }
+  var out_rgb = vec3<u32>(0u);
+  if alpha > 0.0 {out_rgb = vec3<u32>(round(clamp(rgb/alpha,vec3<f32>(0.0),vec3<f32>(255.0))));}
+  let out_alpha = u32(round(clamp(alpha/((right-left)*(bottom-top)),0.0,255.0)));
+  textureStore(output_tex,vec2<i32>(id.xy),vec4<u32>(out_rgb,out_alpha));
+}
+@compute @workgroup_size(16, 16)
+fn resample_bicubic(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let source = textureDimensions(input_tex);
+  if source.x < 2u || source.y < 2u || p.width < 2u || p.height < 2u { return; }
+  let fx = f32(id.x) * f32(source.x - 1u) / f32(p.width - 1u);
+  let fy = f32(id.y) * f32(source.y - 1u) / f32(p.height - 1u);
+  let ix = i32(floor(fx)); let iy = i32(floor(fy));
+  var rgb = vec3<f32>(0.0); var alpha = 0.0; var total = 0.0;
+  for (var n = -1; n <= 2; n++) {
+    let sy = iy + n;
+    if sy < 0 || sy >= i32(source.y) { continue; }
+    let wy = cubic_smooth(fy - f32(iy + n));
+    for (var m = -1; m <= 2; m++) {
+      let sx = ix + m;
+      if sx < 0 || sx >= i32(source.x) { continue; }
+      let w = wy * cubic_smooth(fx - f32(ix + m));
+      let sample = textureLoad(input_tex, vec2<i32>(sx,sy), 0);
+      let a = f32(sample.a);
+      rgb += vec3<f32>(sample.rgb) * (a*w);
+      alpha += a*w;
+      total += w;
+    }
+  }
+  var out_alpha = 0u;
+  var out_rgb = vec3<u32>(0u);
+  if total > 0.0 {
+    out_alpha = u32(round(clamp(alpha / total, 0.0, 255.0)));
+    if alpha > 0.0 { out_rgb = vec3<u32>(round(clamp(rgb / alpha, vec3<f32>(0.0), vec3<f32>(255.0)))); }
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(out_rgb,out_alpha));
+}
+@compute @workgroup_size(16, 16)
 fn effect_invert_colors(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }
   let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);

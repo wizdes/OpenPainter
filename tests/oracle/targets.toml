@@ -4,6 +4,36 @@ target = "legacy-3.36"
 reference = "tests/oracle/legacy336/effects/Invert_Colors_default_*.png"
 tolerance = "exact"
 
+[[image]]
+id = "image.resize.nearest"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/resample/NearestNeighbor_*.png"
+tolerance = "exact"
+
+[[image]]
+id = "image.resize.bilinear"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/resample/Bilinear_*.png"
+tolerance = "per-channel <= 1/255"
+
+[[image]]
+id = "image.resize.bicubic"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/resample/Bicubic_*.png"
+tolerance = "per-channel <= 1/255"
+
+[[image]]
+id = "image.resize.super_sampling"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/resample/SuperSampling_*.png"
+tolerance = "per-channel <= 1/255"
+
+[[image]]
+id = "image.resize.gamma"
+target = "own"
+reference = "own goldens"
+tolerance = "per-channel <= 1/255"
+
 [[effect]]
 id = "effect.adjust.black_and_white"
 target = "legacy-3.36"

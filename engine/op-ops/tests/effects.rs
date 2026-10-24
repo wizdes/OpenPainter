@@ -431,10 +431,13 @@ fn registry_matches_target_rows() {
         );
     }
     let ids: Vec<_> = rows
-        .lines()
-        .filter_map(|line| {
-            line.strip_prefix("id = \"")
-                .and_then(|s| s.strip_suffix('"'))
+        .split("[[effect]]")
+        .skip(1)
+        .filter_map(|section| {
+            section.lines().find_map(|line| {
+                line.strip_prefix("id = \"")
+                    .and_then(|s| s.strip_suffix('"'))
+            })
         })
         .collect();
     assert_eq!(ids.len(), effect::registered().len());
