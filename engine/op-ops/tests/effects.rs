@@ -158,6 +158,21 @@ fn geometry_selection_uses_pixel_centers() {
 }
 
 #[test]
+fn geometry_selection_uses_antialiased_area_coverage() {
+    // A rectangle covering the left half of pixel 0: the selection engine's
+    // analytic coverage is 0.5, so Invert Alpha moves alpha 0 halfway (128).
+    let doc =
+        document(2, 1).set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+            PolygonSet(vec![vec![(0.0, 0.0), (0.5, 0.0), (0.5, 1.0), (0.0, 1.0)]]),
+        ))));
+    let spec = effect::find("effect.adjust.invert_alpha").unwrap();
+    let out = effect::render(&doc, &spec, Rect::new(0, 0, 2, 1), None).unwrap();
+    let bytes = out.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(bytes[3], 128);
+    assert_eq!(&bytes[4..8], &[1, 0, 91, 1]);
+}
+
+#[test]
 fn tile_order_and_parallel_match_whole_image() {
     let doc = document(1000, 700);
     let rect = Rect::new(0, 0, 1000, 700);

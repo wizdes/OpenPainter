@@ -1,5 +1,6 @@
 //! Tile effect contracts and a deterministic CPU scheduler.
-use op_core::doc::{DocState, SelectionSource, SelectionState};
+use op_core::doc::{DocState, MaskGrid, SelectionSource, SelectionState};
+use op_core::selection::RasterMode;
 use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData};
 use rayon::prelude::*;
 use serde_json::Value;
@@ -222,30 +223,23 @@ pub fn coverage_lerp(original: u8, effected: u8, coverage: u8) -> u8 {
         + 127)
         / 255) as u8
 }
-fn mask_coverage(selection: &SelectionState, x: i32, y: i32) -> Result<u8> {
+/// Selection coverage at one pixel. Geometry selections use the selection
+/// engine's antialiased area coverage (`raster`), rasterized once per render.
+fn mask_coverage(
+    selection: &SelectionState,
+    raster: Option<&MaskGrid>,
+    x: i32,
+    y: i32,
+) -> Result<u8> {
     match selection {
         SelectionState::None => Ok(255),
-        SelectionState::Active(SelectionSource::Geometry(polygons)) => {
-            let px = x as f64 + 0.5;
-            let py = y as f64 + 0.5;
-            let mut inside = false;
-            for polygon in &polygons.0 {
-                if polygon.len() < 3 {
-                    continue;
-                }
-                let mut previous = polygon[polygon.len() - 1];
-                for &current in polygon {
-                    if (current.1 > py) != (previous.1 > py)
-                        && px
-                            < (previous.0 - current.0) * (py - current.1) / (previous.1 - current.1)
-                                + current.0
-                    {
-                        inside = !inside;
-                    }
-                    previous = current;
-                }
+        SelectionState::Active(SelectionSource::Geometry(_)) => {
+            let grid = raster.ok_or(EffectError::InvalidMask)?;
+            if x < 0 || y < 0 || x as u32 >= grid.width || y as u32 >= grid.height {
+                Ok(0)
+            } else {
+                Ok(grid.bytes[y as usize * grid.width as usize + x as usize])
             }
-            Ok(if inside { 255 } else { 0 })
         }
         SelectionState::Active(SelectionSource::Coverage(mask)) => {
             if mask.bytes.len() != mask.width as usize * mask.height as usize {
@@ -334,6 +328,11 @@ fn render_one(
         prepared,
         params,
     );
+    let geometry_raster = matches!(
+        doc.selection,
+        SelectionState::Active(SelectionSource::Geometry(_))
+    )
+    .then(|| doc.rasterize_selection(RasterMode::Antialiased));
     for py in 0..TILE_SIZE {
         for px in 0..TILE_SIZE {
             let x = x0 + px as i32;
@@ -349,7 +348,7 @@ fn render_one(
             {
                 continue;
             }
-            let coverage = mask_coverage(&doc.selection, x, y)?;
+            let coverage = mask_coverage(&doc.selection, geometry_raster.as_deref(), x, y)?;
             if coverage == 0 {
                 continue;
             }
