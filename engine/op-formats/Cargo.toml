@@ -8,6 +8,16 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-png = "0.17"
+png = "0.18"
 op-color = { path = "../op-color" }
 lcms2 = { version = "6.2.0", features = ["static"] }
+thiserror = "2"
+zune-jpeg = "0.5"
+jpeg-encoder = "0.6"
+gif = "0.13"
+tiff = { version = "0.10", features = ["lzw"] }
+image-webp = "0.2"
+kamadak-exif = "0.6"
+
+[dev-dependencies]
+lcms2-sys = { version = "4.0.7", default-features = false, features = ["static"] }

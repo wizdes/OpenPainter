@@ -52,7 +52,13 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
     if depth != png::BitDepth::Eight && reader.output_color_type().1 != png::BitDepth::Eight {
         return Err(err("PNG bit depth unsupported in M04"));
     }
-    let mut raw = vec![0; reader.output_buffer_size()];
+    let output_size = reader
+        .output_buffer_size()
+        .ok_or_else(|| err("PNG output size overflow"))?;
+    if output_size > 1024 * 1024 * 1024 {
+        return Err(err("PNG output exceeds 1 GiB"));
+    }
+    let mut raw = vec![0; output_size];
     let output = reader.next_frame(&mut raw).map_err(err)?;
     let embedded_icc = reader.info().icc_profile.as_ref().map(|p| p.to_vec());
     let mut pixels = Vec::with_capacity(len);
