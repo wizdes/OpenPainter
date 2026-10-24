@@ -1,6 +1,7 @@
 pub mod auto_level;
 pub mod black_and_white;
 pub mod brightness_contrast;
+pub mod content_aware;
 pub mod hue_saturation;
 pub mod invert_alpha;
 pub mod invert_colors;

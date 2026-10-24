@@ -205,6 +205,7 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::auto_level::spec(),
         crate::effects::black_and_white::spec(),
         crate::effects::brightness_contrast::spec(),
+        crate::effects::content_aware::spec(),
         crate::effects::hue_saturation::spec(),
         crate::effects::invert_alpha::spec(),
         crate::effects::invert_colors::spec(),
@@ -399,6 +400,18 @@ pub fn render_tiles(
     parallel: bool,
     params: Option<Value>,
 ) -> Result<DocState> {
+    if spec.id == "effect.fill.content_aware" {
+        let _ = spec
+            .schema
+            .validate(params.unwrap_or_else(|| serde_json::json!({})))?;
+        return crate::effects::content_aware::render_document(
+            doc,
+            dirty,
+            coords,
+            || Ok(()),
+            |_, _| {},
+        );
+    }
     let params = spec
         .schema
         .validate(params.unwrap_or_else(|| serde_json::json!({})))?;
@@ -445,6 +458,12 @@ pub fn render_tiles_checked(
     check: impl Fn() -> Result<()>,
     progress: impl Fn(usize, usize),
 ) -> Result<DocState> {
+    if spec.id == "effect.fill.content_aware" {
+        let _ = spec
+            .schema
+            .validate(params.unwrap_or_else(|| serde_json::json!({})))?;
+        return crate::effects::content_aware::render_document(doc, dirty, coords, check, progress);
+    }
     let params = spec
         .schema
         .validate(params.unwrap_or_else(|| serde_json::json!({})))?;
