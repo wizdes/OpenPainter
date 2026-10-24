@@ -1,4 +1,6 @@
 //! Immutable document snapshots backed by copy-on-write tile pages.
+pub use crate::selection::{MaskGrid, PolygonSet, SelectionSource, SelectionState};
+use crate::selection::{RasterMode, Selection};
 use crate::tiles::{
     TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileError, TileId, TileRef, TileStore,
 };
@@ -48,25 +50,6 @@ pub enum LayerBlendMode {
 pub enum ToolCompositeMode {
     Normal,
     Overwrite,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PolygonSet(pub Vec<Vec<(f64, f64)>>);
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MaskGrid {
-    pub width: u32,
-    pub height: u32,
-    pub bytes: Arc<[u8]>,
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum SelectionSource {
-    Geometry(Arc<PolygonSet>),
-    Coverage(Arc<MaskGrid>),
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum SelectionState {
-    None,
-    Active(SelectionSource),
 }
 
 static RELEASE_FAILURES: AtomicU64 = AtomicU64::new(0);
@@ -247,6 +230,8 @@ pub struct DocState {
     pub selection: SelectionState,
     pub metadata: Arc<BTreeMap<String, String>>,
     pub revision: u64,
+    pub selection_revision: u64,
+    selection_cache: Selection,
     next_layer_id: Arc<AtomicU64>,
     store: Arc<TileStore>,
 }
@@ -269,6 +254,8 @@ impl DocState {
             selection: SelectionState::None,
             metadata: Arc::new(BTreeMap::new()),
             revision: 0,
+            selection_revision: 0,
+            selection_cache: Selection::none(),
             next_layer_id: Arc::new(AtomicU64::new(2)),
             store,
         })
@@ -433,8 +420,17 @@ impl DocState {
     }
     pub fn set_selection(&self, selection: SelectionState) -> Self {
         let mut next = self.advanced();
+        next.selection_revision = self.selection_revision.saturating_add(1);
+        next.selection_cache = Selection::from_revision(selection.clone(), next.selection_revision);
         next.selection = selection;
         next
+    }
+    pub fn rasterize_selection(&self, mode: RasterMode) -> Arc<MaskGrid> {
+        self.selection_cache
+            .rasterize(self.width, self.height, mode)
+    }
+    pub fn selection_contours(&self) -> Arc<PolygonSet> {
+        self.selection_cache.contours(self.width, self.height)
     }
     pub fn set_profile(&self, profile: Option<Arc<[u8]>>) -> Self {
         let mut next = self.advanced();
