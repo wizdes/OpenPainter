@@ -1,0 +1,335 @@
+use op_core::doc::{DocState, MaskGrid, PolygonSet, SelectionSource, SelectionState};
+use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
+use op_ops::effect::{self, Rect};
+use std::sync::Arc;
+
+struct MemorySpill(std::sync::Mutex<Vec<u8>>);
+impl op_core::tiles::SpillIo for MemorySpill {
+    fn append(&self, bytes: &[u8]) -> std::io::Result<u64> {
+        let mut data = self.0.lock().unwrap();
+        let offset = data.len() as u64;
+        data.extend_from_slice(bytes);
+        Ok(offset)
+    }
+    fn read_exact_at(&self, offset: u64, bytes: &mut [u8]) -> std::io::Result<()> {
+        let data = self.0.lock().unwrap();
+        bytes.copy_from_slice(&data[offset as usize..offset as usize + bytes.len()]);
+        Ok(())
+    }
+}
+fn store() -> Arc<TileStore> {
+    Arc::new(TileStore::with_io(
+        64 * TILE_BYTES,
+        Box::new(MemorySpill(std::sync::Mutex::new(Vec::new()))),
+    ))
+}
+
+fn document(width: u32, height: u32) -> DocState {
+    let mut doc = DocState::new(store(), width, height, 96.0).unwrap();
+    for y in 0..height.div_ceil(TILE_SIZE as u32) {
+        for x in 0..width.div_ceil(TILE_SIZE as u32) {
+            let mut bytes = vec![0; TILE_BYTES];
+            for py in 0..TILE_SIZE {
+                for px in 0..TILE_SIZE {
+                    let gx = x as usize * TILE_SIZE + px;
+                    let gy = y as usize * TILE_SIZE + py;
+                    if gx < width as usize && gy < height as usize {
+                        let i = (py * TILE_SIZE + px) * 4;
+                        bytes[i..i + 4].copy_from_slice(&[
+                            gx as u8,
+                            gy as u8,
+                            91,
+                            ((gx + gy) % 256) as u8,
+                        ]);
+                    }
+                }
+            }
+            doc = doc
+                .write_tile(
+                    0,
+                    TileCoord {
+                        x: x as i32,
+                        y: y as i32,
+                    },
+                    TileData::try_from(bytes).unwrap(),
+                )
+                .unwrap();
+        }
+    }
+    doc
+}
+
+#[test]
+fn selection_coverage_and_empty() {
+    let doc = document(3, 1);
+    let selected = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+        MaskGrid {
+            width: 3,
+            height: 1,
+            bytes: Arc::from([0u8, 128, 255]),
+        },
+    ))));
+    let spec = effect::find("effect.adjust.invert_colors").unwrap();
+    let out = effect::render(&selected, &spec, Rect::new(0, 0, 3, 1), None).unwrap();
+    let bytes = out.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&bytes[0..4], &[0, 0, 91, 0]);
+    assert_eq!(&bytes[4..8], &[128, 128, 128, 1]);
+    assert_eq!(&bytes[8..12], &[253, 255, 164, 2]);
+    let empty = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+        MaskGrid {
+            width: 3,
+            height: 1,
+            bytes: Arc::from([0u8, 0, 0]),
+        },
+    ))));
+    let unchanged = effect::render(&empty, &spec, Rect::new(0, 0, 3, 1), None).unwrap();
+    assert_eq!(
+        unchanged.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap(),
+        doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()
+    );
+}
+
+#[test]
+fn neighborhood_reads_outside_selection() {
+    let mut doc = document(2, 1);
+    let mut tile = doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    tile[0] = 200;
+    tile[4] = 0;
+    doc = doc
+        .write_tile(
+            0,
+            TileCoord { x: 0, y: 0 },
+            TileData::try_from(tile).unwrap(),
+        )
+        .unwrap();
+    doc = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+        MaskGrid {
+            width: 2,
+            height: 1,
+            bytes: Arc::from([0u8, 255]),
+        },
+    ))));
+    let mut spec = effect::find("effect.adjust.invert_colors").unwrap();
+    spec.required_input =
+        |output, _| Rect::new(output.x - 1, output.y, output.width + 1, output.height);
+    spec.passes = &[effect::PassKind::Neighborhood];
+    spec.render_cpu = |sample, x, y, _, _| sample(x - 1, y);
+    let out = effect::render(&doc, &spec, Rect::new(0, 0, 2, 1), None).unwrap();
+    let bytes = out.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(bytes[0], 200);
+    assert_eq!(bytes[4], 200);
+}
+
+#[test]
+fn neighborhood_clamp_border_reads_edge_pixel() {
+    let mut doc = document(1, 1);
+    let mut tile = doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    tile[0] = 200;
+    doc = doc
+        .write_tile(
+            0,
+            TileCoord { x: 0, y: 0 },
+            TileData::try_from(tile).unwrap(),
+        )
+        .unwrap();
+    let mut spec = effect::find("effect.adjust.invert_colors").unwrap();
+    spec.required_input =
+        |output, _| Rect::new(output.x - 1, output.y, output.width + 1, output.height);
+    spec.passes = &[effect::PassKind::Neighborhood];
+    spec.render_cpu = |sample, x, y, _, _| sample(x - 1, y);
+    let output = effect::render(&doc, &spec, Rect::new(0, 0, 1, 1), None).unwrap();
+    assert_eq!(
+        output.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[0],
+        200
+    );
+}
+
+#[test]
+fn geometry_selection_uses_pixel_centers() {
+    let doc =
+        document(2, 1).set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+            PolygonSet(vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]]),
+        ))));
+    let spec = effect::find("effect.adjust.invert_alpha").unwrap();
+    let out = effect::render(&doc, &spec, Rect::new(0, 0, 2, 1), None).unwrap();
+    let bytes = out.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&bytes[..4], &[0, 0, 91, 255]);
+    assert_eq!(&bytes[4..8], &[1, 0, 91, 1]);
+}
+
+#[test]
+fn tile_order_and_parallel_match_whole_image() {
+    let doc = document(1000, 700);
+    let rect = Rect::new(0, 0, 1000, 700);
+    for spec in effect::registered() {
+        let baseline = effect::render(&doc, &spec, rect, None).unwrap();
+        // This whole-image reference computes from canvas coordinates, without
+        // reading any output tile while making the expected pixels.
+        for coord in effect::tile_coords(rect) {
+            let tile = baseline.read_tile(0, coord).unwrap();
+            for py in 0..TILE_SIZE {
+                for px in 0..TILE_SIZE {
+                    let x = coord.x as usize * TILE_SIZE + px;
+                    let y = coord.y as usize * TILE_SIZE + py;
+                    if x >= 1000 || y >= 700 {
+                        continue;
+                    }
+                    let original = [x as u8, y as u8, 91, ((x + y) % 256) as u8];
+                    let expected = if spec.id == "effect.adjust.invert_colors" {
+                        [255 - original[0], 255 - original[1], 164, original[3]]
+                    } else {
+                        [original[0], original[1], original[2], 255 - original[3]]
+                    };
+                    let i = (py * TILE_SIZE + px) * 4;
+                    assert_eq!(tile[i..i + 4], expected, "{} at {x},{y}", spec.id);
+                }
+            }
+        }
+        let mut coords = effect::tile_coords(rect);
+        coords.reverse();
+        let reverse = effect::render_tiles(&doc, &spec, rect, &coords, false, None).unwrap();
+        let parallel = effect::render_tiles(&doc, &spec, rect, &coords, true, None).unwrap();
+        for coord in effect::tile_coords(rect) {
+            let expected = baseline.read_tile(0, coord).unwrap();
+            assert_eq!(
+                reverse.read_tile(0, coord).unwrap(),
+                expected,
+                "{} {coord:?}",
+                spec.id
+            );
+            assert_eq!(
+                parallel.read_tile(0, coord).unwrap(),
+                expected,
+                "{} {coord:?}",
+                spec.id
+            );
+        }
+    }
+}
+
+#[test]
+fn invert_alpha_keeps_hidden_color_and_is_involution() {
+    let doc = document(1, 1);
+    let spec = effect::find("effect.adjust.invert_alpha").unwrap();
+    let once = effect::render(&doc, &spec, Rect::new(0, 0, 1, 1), None).unwrap();
+    assert_eq!(
+        &once.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[..4],
+        &[0, 0, 91, 255]
+    );
+    let twice = effect::render(&once, &spec, Rect::new(0, 0, 1, 1), None).unwrap();
+    assert_eq!(
+        twice.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap(),
+        doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()
+    );
+}
+
+#[test]
+fn effect_render_cpu_accepts_tile_inputs_and_returns_tile_bytes() {
+    let spec = effect::find("effect.adjust.invert_alpha").unwrap();
+    let sample = |_: i32, _: i32| [17, 29, 41, 0];
+    let input = effect::TileInputs {
+        output_rect: Rect::new(0, 0, TILE_SIZE as u32, TILE_SIZE as u32),
+        sample: &sample,
+    };
+    let bytes =
+        effect::EffectSpec::render_cpu(&spec, &input, &effect::Prepared, &serde_json::json!({}));
+    assert_eq!(bytes.len(), TILE_BYTES);
+    assert_eq!(&bytes[..4], &[17, 29, 41, 255]);
+}
+
+#[test]
+fn registry_matches_target_rows() {
+    let rows = include_str!("../../../tests/oracle/targets.toml");
+    for spec in effect::registered() {
+        assert!(
+            rows.contains(&format!("id = \"{}\"", spec.id)),
+            "missing {}",
+            spec.id
+        );
+    }
+    let ids: Vec<_> = rows
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix("id = \"")
+                .and_then(|s| s.strip_suffix('"'))
+        })
+        .collect();
+    assert_eq!(ids.len(), effect::registered().len());
+    for id in ids {
+        assert!(effect::find(id).is_some(), "unknown target row {id}");
+    }
+}
+
+#[test]
+fn invert_colors_matches_all_legacy_pngs() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/oracle/legacy336/effects/manifest.json")).unwrap(),
+    )
+    .unwrap();
+    let cases: Vec<_> = manifest
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["op"] == "Invert Colors")
+        .collect();
+    assert_eq!(cases.len(), 5);
+    let spec = effect::find("effect.adjust.invert_colors").unwrap();
+    for case in cases {
+        let input = op_formats::png::decode_png(
+            &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
+        )
+        .unwrap();
+        let expected = op_formats::png::decode_png(
+            &std::fs::read(root.join(case["output"].as_str().unwrap())).unwrap(),
+        )
+        .unwrap();
+        let mut doc = DocState::new(store(), input.width, input.height, 96.0).unwrap();
+        for coord in effect::tile_coords(Rect::new(0, 0, input.width, input.height)) {
+            let mut tile = vec![0; TILE_BYTES];
+            for py in 0..TILE_SIZE {
+                let y = coord.y as usize * TILE_SIZE + py;
+                if y >= input.height as usize {
+                    break;
+                }
+                for px in 0..TILE_SIZE {
+                    let x = coord.x as usize * TILE_SIZE + px;
+                    if x >= input.width as usize {
+                        break;
+                    }
+                    let src = (y * input.width as usize + x) * 4;
+                    let dst = (py * TILE_SIZE + px) * 4;
+                    tile[dst..dst + 4].copy_from_slice(&input.pixels[src..src + 4]);
+                }
+            }
+            doc = doc
+                .write_tile(0, coord, TileData::try_from(tile).unwrap())
+                .unwrap();
+        }
+        let output = effect::render(
+            &doc,
+            &spec,
+            Rect::new(0, 0, input.width, input.height),
+            None,
+        )
+        .unwrap();
+        let tiles: std::collections::HashMap<_, _> =
+            effect::tile_coords(Rect::new(0, 0, input.width, input.height))
+                .into_iter()
+                .map(|coord| (coord, output.read_tile(0, coord).unwrap()))
+                .collect();
+        let mut actual = Vec::with_capacity(input.pixels.len());
+        for y in 0..input.height as usize {
+            for x in 0..input.width as usize {
+                let coord = TileCoord {
+                    x: (x / TILE_SIZE) as i32,
+                    y: (y / TILE_SIZE) as i32,
+                };
+                let tile = &tiles[&coord];
+                let i = ((y % TILE_SIZE) * TILE_SIZE + x % TILE_SIZE) * 4;
+                actual.extend_from_slice(&tile[i..i + 4]);
+            }
+        }
+        assert_eq!(actual, expected.pixels, "{}", case["output"]);
+    }
+}

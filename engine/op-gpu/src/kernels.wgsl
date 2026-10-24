@@ -4,6 +4,18 @@ struct Params { width: u32, height: u32, mode: u32, opacity: u32, masked: u32 }
 @group(0) @binding(2) var<uniform> p: Params;
 @group(0) @binding(3) var output_tex: texture_storage_2d<rgba8uint, write>;
 @group(0) @binding(4) var coverage_tex: texture_2d<u32>;
+@compute @workgroup_size(16, 16)
+fn effect_invert_colors(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(255u - src.r, 255u - src.g, 255u - src.b, src.a));
+}
+@compute @workgroup_size(16, 16)
+fn effect_invert_alpha(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(src.r, src.g, src.b, 255u - src.a));
+}
 fn unit(x: u32) -> f32 { return f32(x) / 255.0; }
 fn byte(x: f32) -> u32 { return u32(floor(clamp(x, 0.0, 1.0) * 255.0 + 0.5)); }
 fn blend(mode: u32, b: f32, s: f32) -> f32 {

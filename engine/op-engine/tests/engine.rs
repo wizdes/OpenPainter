@@ -8,6 +8,53 @@ fn fresh() -> (Engine, u64) {
     (e, id)
 }
 #[test]
+fn registered_effect_commands_and_preview_commit_once() {
+    let (engine, id) = fresh();
+    engine
+        .dispatch(id, "effect.adjust.invert_alpha", json!({}))
+        .unwrap();
+    let raw = engine
+        .actor_probe(id)
+        .unwrap()
+        .0
+        .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+        .unwrap();
+    assert_eq!(&raw[..8], &[10, 20, 30, 0, 4, 5, 6, 255]);
+    engine
+        .preview_begin(id, "effect.adjust.invert_colors", json!({}))
+        .unwrap();
+    for _ in 0..100 {
+        engine.preview_update(id, json!({})).unwrap();
+    }
+    engine.preview_commit(id).unwrap();
+    let history = info(&engine, id)["history_labels"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(history.len(), 3);
+    assert_eq!(history[2], "Invert Colors");
+    let committed = engine
+        .actor_probe(id)
+        .unwrap()
+        .0
+        .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+        .unwrap();
+    assert_eq!(&committed[..8], &[245, 235, 225, 0, 251, 250, 249, 255]);
+    engine
+        .preview_begin(id, "effect.adjust.invert_alpha", json!({}))
+        .unwrap();
+    engine.preview_cancel(id).unwrap();
+    assert_eq!(
+        engine
+            .actor_probe(id)
+            .unwrap()
+            .0
+            .read_tile(0, op_core::tiles::TileCoord { x: 0, y: 0 })
+            .unwrap(),
+        committed
+    );
+}
+#[test]
 fn assign_and_convert_profiles_are_single_atomic_history_steps() {
     let e = Engine::new(None).unwrap();
     let id = e
