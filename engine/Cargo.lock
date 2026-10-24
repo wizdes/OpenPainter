@@ -114,6 +114,9 @@ version = "0.1.0"
 [[package]]
 name = "op-core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "op-engine"
@@ -126,6 +129,9 @@ version = "0.1.0"
 [[package]]
 name = "op-formats"
 version = "0.1.0"
+dependencies = [
+ "png",
+]
 
 [[package]]
 name = "op-gpu"
