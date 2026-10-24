@@ -3,4 +3,5 @@ pub mod doc;
 pub mod history;
 pub mod legacy;
 pub mod pixel;
+pub mod selection;
 pub mod tiles;
