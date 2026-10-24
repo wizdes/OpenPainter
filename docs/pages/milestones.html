@@ -1,0 +1,204 @@
+<title>OpenPainter Milestones</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a progress strip of 50 cells (like a pixel row), then one band per phase:
+   phase bar on the left, its milestones as rows on the right; checkpoints as divider rows. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --fg: #17202b; --muted: #586473; --line: #d9dee5;
+  --accent: #1764c0; --accent-soft: #e2edfa;
+  --e: #8a4b2a; --o: #2f8a5b; --u: #d9541e;
+  --done: #2f8a5b; --doing: #c98a12; --todo: #c4cad3;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161d; --surface: #18202a; --fg: #e6ebf1; --muted: #9aa6b4; --line: #2b3542;
+    --accent: #6aa8f0; --accent-soft: #1b2b40; --e: #d39a77; --o: #62c896; --u: #f08a5d;
+    --done: #62c896; --doing: #e8b04a; --todo: #3a4553; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161d; --surface: #18202a; --fg: #e6ebf1; --muted: #9aa6b4; --line: #2b3542;
+  --accent: #6aa8f0; --accent-soft: #1b2b40; --e: #d39a77; --o: #62c896; --u: #f08a5d;
+  --done: #62c896; --doing: #e8b04a; --todo: #3a4553; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 72px; }
+.wrap { max-width: 1040px; margin: 0 auto; }
+header { padding-block: 44px 8px; }
+.eyebrow { font: 500 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(34px, 6vw, 54px)/1.02 var(--display); margin: 10px 0 12px; text-wrap: balance; }
+h2 { font: 600 24px/1.2 var(--display); margin: 0 0 6px; text-wrap: balance; }
+.lede { font-size: 18px; color: var(--muted); max-width: 70ch; margin: 0; }
+.ask { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin-top: 16px; max-width: 75ch; }
+.strip { display: grid; grid-template-columns: repeat(50, 1fr); gap: 3px; margin: 26px 0 6px; }
+.strip i { aspect-ratio: 1; border-radius: 3px; background: var(--todo); display: block; }
+.strip i.done { background: var(--done); } .strip i.doing { background: var(--doing); }
+.strip i.cp { outline: 2px solid var(--fg); outline-offset: 1px; }
+.stats { display: flex; flex-wrap: wrap; gap: 18px; font: 500 14px var(--mono); color: var(--muted); }
+.stats b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 6px; }
+.filters button { font: 500 14px var(--body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.filters button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.phase { display: grid; grid-template-columns: 280px 1fr; gap: 22px; padding: 26px 0; border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .phase { grid-template-columns: 1fr; } }
+.pinfo { min-width: 0; }
+.pnum { font: 500 13px var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.bar { margin-top: 10px; font-size: 15px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.bar b { display: block; font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.rows { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.row { display: grid; grid-template-columns: 54px 1fr auto; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.row .id { font: 500 14px var(--mono); padding-top: 1px; }
+.row .name { font-weight: 600; }
+.row .gate { font-size: 14.5px; color: var(--muted); margin-top: 2px; }
+.row .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font: 500 12px var(--mono); white-space: nowrap; }
+.lane { padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.lane.E { color: var(--e); } .lane.O { color: var(--o); } .lane.U { color: var(--u); }
+.st { padding: 1px 7px; border-radius: 4px; background: var(--todo); color: var(--fg); }
+.st.done { background: var(--done); color: var(--bg); } .st.doing { background: var(--doing); color: #1a1205; }
+.star { color: var(--accent); }
+.cp { display: flex; align-items: center; gap: 10px; font: 500 13px var(--mono); color: var(--fg); padding: 6px 2px; }
+.cp::before, .cp::after { content: ""; flex: 1; height: 10px; border-radius: 2px;
+  background-image: linear-gradient(45deg, var(--line) 25%, transparent 25%, transparent 75%, var(--line) 75%), linear-gradient(45deg, var(--line) 25%, transparent 25%, transparent 75%, var(--line) 75%);
+  background-size: 10px 10px; background-position: 0 0, 5px 5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 14px; color: var(--muted); margin-top: 8px; }
+.notin { columns: 2 260px; gap: 28px; padding-left: 20px; }
+.notin li { margin: 4px 0; break-inside: avoid; }
+footer { color: var(--muted); font-size: 14.5px; margin-top: 36px; }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">OpenPainter · build plan · updated 24 Oct 2026</div>
+  <h1>50 milestones to version 1.0</h1>
+  <p class="lede">Six phases, each with a bar a real user would notice. A checkpoint comes every five milestones: the full tests, the Linux run, the speed and size bars, an outside review, and an update page for you.</p>
+  <div class="ask"><strong>What I need from you:</strong> nothing. Work continues with no stops. If you want a milestone moved, cut or added, say so and I will update this page.</div>
+  <div class="strip" id="strip" aria-label="Progress, one cell per milestone"></div>
+  <div class="stats" id="stats"></div>
+  <div class="legend"><span><span class="lane E">E</span> engine core (Rust)</span><span><span class="lane O">O</span> effects and GPU (Rust, WGSL)</span><span><span class="lane U">U</span> Mac app (Swift)</span><span><span class="star">★</span> deep design review before building</span></div>
+  <div class="filters" role="group" aria-label="Filter milestones">
+    <button id="f-all" data-f="all" aria-pressed="true">All</button>
+    <button id="f-E" data-f="E" aria-pressed="false">Engine</button>
+    <button id="f-O" data-f="O" aria-pressed="false">Effects and GPU</button>
+    <button id="f-U" data-f="U" aria-pressed="false">Mac app</button>
+    <button id="f-star" data-f="star" aria-pressed="false">★ Hard ones</button>
+    <button id="f-open" data-f="open" aria-pressed="false">Not done</button>
+  </div>
+</header>
+
+<main id="phases"></main>
+
+<section style="border-top:1px solid var(--line);padding-top:24px;margin-top:8px">
+  <h2>Not in version 1</h2>
+  <ul class="notin">
+    <li>.pdn and PSD import</li><li>Layer masks, groups, adjustment layers</li><li>16-bit, float or HDR pixels; CMYK editing</li>
+    <li>Animated GIF and WebP frames</li><li>A public plugin system, scripting, batch processing</li><li>Windows, Linux and iPad apps (the engine stays ready for them)</li>
+    <li>Printing, cloud sync, an App Store build</li><li>AI generative fill beyond content-aware fill and background removal</li>
+  </ul>
+</section>
+
+<footer>Source of truth: <code>docs/MILESTONES.md</code> in github.com/wizdes/OpenPainter. Hours are agent working hours; the total is about 300. With 2 builders at a time, that is roughly 150 to 180 hours of wall time.</footer>
+</div>
+
+<script>
+const STATUS = {}; // e.g. {"M01":"done","M02":"doing"}
+const UPDATED = "24 Oct 2026";
+const PHASES = [
+  { n: 1, name: "Foundations", bar: "The app opens a PNG and shows it with correct color, zoom and pan. The engine has layers, blend modes, unlimited undo and GPU results that match the CPU.", cps: ["CP1","CP2"] },
+  { n: 2, name: "Usable photo editor", bar: "Open a JPEG, HEIC or RAW photo. Crop at an aspect ratio and straighten, resize, run Levels and Curves, undo from History, and save with the color profile kept.", cps: ["CP3","CP4"] },
+  { n: 3, name: "Selections, painting, first effects", bar: "Everyday paint.net work: every selection tool, moving and rotating pixels, copy and paste, pen-pressure brushes, fills, gradients, and the common blur, sharpen, noise and stylize effects.", cps: ["CP5","CP6"] },
+  { n: 4, name: "Drawing tools, text, more effects", bar: "Every paint.net tool works, including text, lines and shapes that stay editable until Finish. Saving controls quality and metadata. Most of the Effects menu exists.", cps: ["CP7","CP8"] },
+  { n: 5, name: "Retouch and full parity", bar: "Healing brush, content-aware fill and remove background work. Every adjustment and effect is in paint.net's menu order and passes its accuracy check.", cps: ["CP9"] },
+  { n: 6, name: "Polish and release", bar: "A stranger downloads a signed app from GitHub, installs it, and edits photos day to day. The launch, size and accuracy bars are all met.", cps: ["CP10"] },
+];
+// [id, phase, lane, star, hours, name, exit gate]
+const M = [
+ ["M01",1,"E",0,4,"Repo and test harness","Fast tests pass on Mac and Linux; the harness rejects a 2/255 difference and accepts 1/255."],
+ ["M02",1,"O",0,8,"Reference images and paint.net capture","One command on the Windows PC captures Gaussian blur and Invert on 3 images, or a written fallback."],
+ ["M03",1,"E",0,4,"Pixel core","Ported pixel operations match paint.net 3.36 on 10,000 random pixels."],
+ ["M04",1,"E",1,8,"Tiles and undo history","200 random edits on a 24 MP image, undo all: identical to the start. Jumping 50 steps under 200 ms."],
+ ["M05",1,"E",1,6,"Layers and the 15 blend modes","Every mode at 5 opacities within ±1/255 of paint.net's math."],
+ ["M06",1,"O",1,7,"GPU backend and GPU-vs-CPU checker","GPU layer blending matches the CPU on Apple GPU and on Linux."],
+ ["M07",1,"E",0,5,"Engine to Swift bridge","A Swift test opens an image, adds a layer, inverts, undoes and reads pixels back, with no leaks."],
+ ["M08",1,"U",0,4,"Main window design: 3 mockups","3 rendered mockups, two critiques, one picked and specified."],
+ ["M09",1,"U",0,8,"App shell and Metal canvas","A 24 MP photo pans at 60 fps; zoom steps match paint.net."],
+ ["M10",1,"E",1,7,"Color management","sRGB→P3→sRGB within ±1/255; an Adobe RGB photo matches Preview within ΔE 1."],
+ ["M11",2,"U",0,6,"Open and save all formats","30 files per format round-trip; RAW from 3 camera makes; photo rotation honored."],
+ ["M12",2,"E",0,4,"Layered .opaint file","20 layers round-trip exactly; 10,000 damaged files cause no crash."],
+ ["M13",2,"U",0,6,"Main window and floating panels","F5–F8 toggle every panel; panel positions survive a relaunch."],
+ ["M14",2,"U",0,6,"Layers and History panels","Make 3 layers, set a blend mode, jump back in History and redo; pixels match."],
+ ["M15",2,"O",0,6,"Resize, canvas size, flip, rotate","Each resampling mode within ±1/255 of the references."],
+ ["M16",2,"E",1,8,"Selection engine","All 5 selection modes correct on 50 random shape pairs; smooth edges within ±1/255."],
+ ["M17",2,"U",0,7,"Crop tool and image dialogs","Crop at 3:2 with a 2.5° straighten gives the expected size."],
+ ["M18",2,"O",0,6,"Adjustments, part 1","Auto-Level, B&W, Brightness/Contrast, Invert, Posterize, Sepia, Hue/Sat match references."],
+ ["M19",2,"O",0,7,"Curves, Levels, Exposure, Highlights/Shadows","All four within ±1/255 of the references."],
+ ["M20",2,"U",0,6,"Effect dialogs with live preview","Preview under 100 ms on 12 MP; Cancel changes nothing; Cmd+F repeats."],
+ ["M21",3,"U",0,6,"Lasso, ellipse, rectangle select; Edit menu","Each tool in each of the 5 modes matches the engine."],
+ ["M22",3,"E",1,7,"Magic Wand and Paint Bucket","Masks pixel-exact against paint.net 5.1 on 10 images × 4 tolerances."],
+ ["M23",3,"E",1,8,"Move pixels and move selection","Rotate and scale within ±1/255; 100 drags undo as one step."],
+ ["M24",3,"U",0,4,"Copy and paste","Paste from Preview keeps pixels and color profile; paste opens with handles."],
+ ["M25",3,"O",0,7,"Blurs, part 1","7 blurs match references; Gaussian r=50 on 24 MP under 1 s."],
+ ["M26",3,"U",0,6,"Colors window and Color Picker","A paint.net palette file loads its 96 colors; hex round-trips."],
+ ["M27",3,"E",1,8,"Brushes with pen pressure","Recorded strokes replay to the reference; pen-to-screen under 16 ms."],
+ ["M28",3,"E",0,6,"Gradient tool","5 gradient types × 2 modes within ±1/255."],
+ ["M29",3,"O",0,6,"Artistic and Stylize effects","7 effects match references and the GPU check."],
+ ["M30",3,"O",0,6,"Noise and Photo effects","7 effects match; random noise is the same every run."],
+ ["M31",4,"E",0,5,"Clone Stamp and Recolor","Recorded strokes replay to the reference."],
+ ["M32",4,"E",1,7,"Line/Curve and edit-until-Finish","Lines within ±1/255; edits before Finish make one history step."],
+ ["M33",4,"O",0,6,"Distort effects, part 1","6 effects match references and the GPU check."],
+ ["M34",4,"E",0,7,"Shapes (29 presets)","29 shapes × fill, outline, both, within ±1/255."],
+ ["M35",4,"O",0,6,"Render effects","Clouds, fractals, turbulence, Voronoi: same seed, same result on CPU and GPU."],
+ ["M36",4,"U",1,8,"Text tool","Editable until Finish; one history step; typing in other languages works."],
+ ["M37",4,"O",0,7,"Blurs, part 2 (paint.net 5 only)","Bokeh, Sketch, Square, Surface match paint.net 5.1 captures."],
+ ["M38",4,"E",0,6,"Save options and photo metadata","Quality settings work per format; EXIF kept or GPS stripped as chosen."],
+ ["M39",4,"O",0,7,"Distort part 2 and Quantize","Crystalize, Dents, Morphology, Quantize match captures."],
+ ["M40",4,"O",0,7,"Object effects and 3D Rotate/Zoom","Drop shadow and friends match; Import from File converts color."],
+ ["M41",5,"E",0,7,"Healing brush and spot heal","No visible seams; blend error under threshold on 10 cases."],
+ ["M42",5,"O",1,8,"Content-aware fill","Under 5 s at 12 MP; quality target met on 10 test holes."],
+ ["M43",5,"U",0,3,"Remove background","Mask overlap ≥ 90% with hand-made masks on 10 photos."],
+ ["M44",5,"O",1,7,"GPU match sweep and speed table","No effect outside ±1/255; nothing over 3 s at 24 MP."],
+ ["M45",5,"U",0,6,"Menus complete in paint.net order","Menu order checked by script; Cmd+F works for every effect."],
+ ["M46",6,"U",0,5,"View menu, Settings, light and dark","Rulers correct in px, in, cm; both appearances look right."],
+ ["M47",6,"E",0,7,"Autosave, crash recovery, stress","Kill the app mid-edit and get the image back; 1 h of fuzzing, no crash."],
+ ["M48",6,"U",0,5,"Speed and size bars","Cold launch under 3 s; app under 75 MB; checked by script."],
+ ["M49",6,"U",0,5,"Shortcuts and accessibility","paint.net shortcuts mapped to Cmd; every control has a VoiceOver label."],
+ ["M50",6,"U",0,5,"Release","Signed DMG on GitHub opens with no warning; yili.dev page live."],
+];
+const CP_AFTER = {"M05":"CP1","M10":"CP2","M15":"CP3","M20":"CP4","M25":"CP5","M30":"CP6","M35":"CP7","M40":"CP8","M45":"CP9","M50":"CP10 · v1.0"};
+let filter = "all";
+try { const f = localStorage.getItem("op-ms-filter"); if (f) filter = f; } catch (e) {}
+
+function st(id) { return STATUS[id] || "todo"; }
+function render() {
+  const strip = document.getElementById("strip");
+  strip.innerHTML = M.map(m => `<i class="${st(m[0])}${CP_AFTER[m[0]] ? " cp" : ""}" title="${m[0]} ${m[5]}"></i>`).join("");
+  const done = M.filter(m => st(m[0]) === "done").length;
+  const hDone = M.filter(m => st(m[0]) === "done").reduce((a, m) => a + m[4], 0);
+  const hAll = M.reduce((a, m) => a + m[4], 0);
+  const doing = M.filter(m => st(m[0]) === "doing").map(m => m[0]).join(", ") || "none";
+  document.getElementById("stats").innerHTML =
+    `<span><b>${done}</b> of 50 done</span><span><b>${hDone}</b> of ${hAll} h</span><span>in progress: <b>${doing}</b></span><span>updated ${UPDATED}</span>`;
+  const keep = m => filter === "all" || (filter === "star" ? m[3] : filter === "open" ? st(m[0]) !== "done" : m[2] === filter);
+  document.getElementById("phases").innerHTML = PHASES.map(p => {
+    const ms = M.filter(m => m[1] === p.n);
+    const rows = ms.map(m => {
+      const s = st(m[0]);
+      const row = keep(m) ? `<div class="row"><div class="id">${m[0]}</div><div><div class="name">${m[3] ? '<span class="star">★</span> ' : ""}${m[5]}</div><div class="gate">${m[6]}</div></div><div class="meta"><span class="lane ${m[2]}">${m[2]}</span><span>${m[4]} h</span><span class="st ${s}">${s}</span></div></div>` : "";
+      const cp = CP_AFTER[m[0]] ? `<div class="cp">${CP_AFTER[m[0]]}</div>` : "";
+      return row + cp;
+    }).join("");
+    const pd = ms.filter(m => st(m[0]) === "done").length;
+    return `<section class="phase"><div class="pinfo"><div class="pnum">Phase ${p.n} · ${ms[0][0]}–${ms[ms.length-1][0]} · ${pd}/${ms.length} done</div><h2>${p.name}</h2><div class="bar"><b>Phase bar</b>${p.bar}</div></div><div class="rows">${rows}</div></section>`;
+  }).join("");
+  document.querySelectorAll(".filters button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === filter)));
+}
+document.querySelectorAll(".filters button").forEach(b => b.addEventListener("click", () => {
+  filter = b.dataset.f; try { localStorage.setItem("op-ms-filter", filter); } catch (e) {} render();
+}));
+render();
+</script>

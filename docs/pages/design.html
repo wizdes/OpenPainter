@@ -1,0 +1,283 @@
+<title>OpenPainter Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~70ch) with full-width diagram bands; a checkerboard
+   strip (the "transparent pixels" pattern every image editor shows) marks section breaks. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #17202b;
+  --muted: #586473;
+  --line: #d9dee5;
+  --accent: #1764c0;        /* paint.net-style selection blue */
+  --accent-soft: #e2edfa;
+  --swift: #d9541e;         /* Swift lane */
+  --rust: #8a4b2a;          /* Rust lane */
+  --gpu: #2f8a5b;           /* GPU */
+  --check-a: #e6e9ee;
+  --check-b: #ffffff;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161d; --surface: #18202a; --fg: #e6ebf1; --muted: #9aa6b4; --line: #2b3542;
+    --accent: #6aa8f0; --accent-soft: #1b2b40; --swift: #f08a5d; --rust: #d39a77; --gpu: #62c896;
+    --check-a: #1d2530; --check-b: #161d26; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161d; --surface: #18202a; --fg: #e6ebf1; --muted: #9aa6b4; --line: #2b3542;
+  --accent: #6aa8f0; --accent-soft: #1b2b40; --swift: #f08a5d; --rust: #d39a77; --gpu: #62c896;
+  --check-a: #1d2530; --check-b: #161d26; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font: 17px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 72px;
+}
+.wrap { max-width: 980px; margin: 0 auto; }
+.col { max-width: 70ch; }
+header { padding-block: 44px 20px; }
+.eyebrow { font: 500 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(34px, 6vw, 56px)/1.02 var(--display); margin: 10px 0 14px; letter-spacing: -.01em; text-wrap: balance; }
+h2 { font: 600 clamp(24px, 3.4vw, 32px)/1.15 var(--display); margin: 0 0 10px; text-wrap: balance; }
+h3 { font: 600 18px/1.3 var(--body); margin: 18px 0 6px; }
+p { margin: 10px 0; }
+.lede { font-size: 19px; color: var(--muted); }
+.ask { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin-top: 18px; }
+.checker { height: 14px; margin: 44px 0 28px; border-radius: 3px;
+  background-color: var(--check-b);
+  background-image: linear-gradient(45deg, var(--check-a) 25%, transparent 25%, transparent 75%, var(--check-a) 75%),
+                    linear-gradient(45deg, var(--check-a) 25%, transparent 25%, transparent 75%, var(--check-a) 75%);
+  background-size: 14px 14px; background-position: 0 0, 7px 7px; border: 1px solid var(--line); }
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 16px 0; }
+.diagram svg { display: block; min-width: 760px; width: 100%; height: auto; }
+svg text { font-family: var(--body); fill: var(--fg); }
+svg .mono { font-family: var(--mono); }
+svg .muted { fill: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; min-width: 0; }
+.card h3 { margin-top: 2px; }
+.card ul { margin: 6px 0 0; padding-left: 20px; }
+.card li { margin: 4px 0; }
+code { font: 14.5px var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 12.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip { display: inline-block; font: 500 12px var(--mono); padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.c-swift { color: var(--swift); } .c-rust { color: var(--rust); } .c-gpu { color: var(--gpu); } .c-acc { color: var(--accent); }
+footer { color: var(--muted); font-size: 15px; margin-top: 40px; }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">OpenPainter · design overview · 24 Oct 2026</div>
+  <h1>How OpenPainter is built</h1>
+  <p class="lede col">A simple, fast photo editor for the Mac, built in the spirit of paint.net. The pixel engine is Rust, so it can move to Windows and Linux later. The Mac app is Swift.</p>
+  <div class="ask col"><strong>What I need from you:</strong> nothing right now. This page is for reading. Building has started. The "Choices to check" list near the end shows the defaults I picked. Tell me if any of them is wrong, and I will change course.</div>
+</header>
+
+<section>
+  <h2>The two halves</h2>
+  <p class="col">OpenPainter has two parts. The <strong>Mac app</strong> draws the windows and passes on what you click. The <strong>engine</strong> holds the image and does all the pixel math. They talk through a small C interface. Every action, such as "Gaussian blur radius 4", is one named <em>command</em>. Menus, shortcuts, the History panel, tests and a command-line tool all send the same commands.</p>
+  <div class="diagram" role="img" aria-label="Component diagram: the Swift Mac app sends commands through a C interface to the Rust engine, which runs CPU and GPU kernels and draws the canvas.">
+    <svg viewBox="0 0 900 430" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker>
+      </defs>
+      <!-- Mac app -->
+      <rect x="10" y="10" width="880" height="118" rx="10" style="fill:none;stroke:var(--swift);stroke-width:2"/>
+      <text x="26" y="36" style="font-weight:600;fill:var(--swift)">Mac app · Swift</text>
+      <g>
+        <rect x="26" y="50" width="160" height="62" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+        <text x="40" y="74">Floating panels</text><text x="40" y="96" class="muted" style="font-size:13px">Tools · Colors · Layers · History</text>
+        <rect x="200" y="50" width="160" height="62" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+        <text x="214" y="74">Canvas view</text><text x="214" y="96" class="muted" style="font-size:13px">Metal layer, mouse, pen</text>
+        <rect x="374" y="50" width="160" height="62" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+        <text x="388" y="74">Effect dialogs</text><text x="388" y="96" class="muted" style="font-size:13px">built from each schema</text>
+        <rect x="548" y="50" width="160" height="62" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+        <text x="562" y="74">Menus and shortcuts</text><text x="562" y="96" class="muted" style="font-size:13px">paint.net order</text>
+        <rect x="722" y="50" width="152" height="62" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+        <text x="736" y="74">Mac services</text><text x="736" y="96" class="muted" style="font-size:13px">ImageIO · Vision · CoreText</text>
+      </g>
+      <!-- FFI -->
+      <rect x="260" y="150" width="380" height="40" rx="20" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+      <text x="450" y="175" text-anchor="middle" class="mono" style="font-size:14px">C interface · op_dispatch / op_query / events</text>
+      <line x1="300" y1="128" x2="300" y2="148" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#ar)"/>
+      <line x1="600" y1="150" x2="600" y2="130" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#ar)"/>
+      <text x="310" y="143" class="muted" style="font-size:12px">commands, pen events</text>
+      <text x="610" y="143" class="muted" style="font-size:12px">changes, progress</text>
+      <!-- Engine -->
+      <rect x="10" y="210" width="880" height="210" rx="10" style="fill:none;stroke:var(--rust);stroke-width:2"/>
+      <text x="26" y="236" style="font-weight:600;fill:var(--rust)">Engine · Rust (same code on Mac, Windows, Linux)</text>
+      <rect x="26" y="250" width="200" height="74" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+      <text x="40" y="274">Commands and jobs</text><text x="40" y="296" class="muted" style="font-size:13px">one ordered queue per image,</text><text x="40" y="314" class="muted" style="font-size:13px">cancellable effect jobs</text>
+      <rect x="240" y="250" width="200" height="74" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+      <text x="254" y="274">Document and history</text><text x="254" y="296" class="muted" style="font-size:13px">layers of 256×256 tiles,</text><text x="254" y="314" class="muted" style="font-size:13px">every step undoable</text>
+      <rect x="454" y="250" width="200" height="74" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+      <text x="468" y="274">Tools and selection</text><text x="468" y="296" class="muted" style="font-size:13px">brush, wand, move, shapes,</text><text x="468" y="314" class="muted" style="font-size:13px">5 selection modes</text>
+      <rect x="668" y="250" width="206" height="74" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+      <text x="682" y="274">Files and color</text><text x="682" y="296" class="muted" style="font-size:13px">PNG, JPEG, TIFF, WebP, .opaint;</text><text x="682" y="314" class="muted" style="font-size:13px">ICC profiles (lcms2)</text>
+      <rect x="26" y="338" width="414" height="70" rx="6" style="fill:var(--bg);stroke:var(--line)"/>
+      <text x="40" y="362">CPU kernels (the reference)</text><text x="40" y="384" class="muted" style="font-size:13px">14 blend modes, ~60 effects, adjustments, resampling.</text><text x="40" y="401" class="muted" style="font-size:13px">Ported from paint.net 3.36 (MIT). Exact, the test oracle.</text>
+      <rect x="454" y="338" width="420" height="70" rx="6" style="fill:var(--bg);stroke:var(--gpu)"/>
+      <text x="468" y="362" style="fill:var(--gpu);font-weight:600">GPU kernels (wgpu → Metal)</text><text x="468" y="384" class="muted" style="font-size:13px">Same math in shaders; must match the CPU within ±1/255.</text><text x="468" y="401" class="muted" style="font-size:13px">Also composites layers and draws the canvas.</text>
+    </svg>
+  </div>
+</section>
+
+<div class="checker" aria-hidden="true"></div>
+
+<section>
+  <h2>What happens when you run an effect</h2>
+  <p class="col">Using Gaussian Blur as the example:</p>
+  <div class="diagram" role="img" aria-label="Sequence: open dialog, preview renders on GPU in tiles from the view center, OK commits one history step.">
+    <svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+      <g style="font-size:14px">
+        <text x="70" y="24" text-anchor="middle" style="font-weight:600">You</text>
+        <text x="270" y="24" text-anchor="middle" style="font-weight:600">Dialog (Swift)</text>
+        <text x="500" y="24" text-anchor="middle" style="font-weight:600">Engine</text>
+        <text x="760" y="24" text-anchor="middle" style="font-weight:600">GPU</text>
+      </g>
+      <g style="stroke:var(--line);stroke-dasharray:4 4">
+        <line x1="70" y1="34" x2="70" y2="290"/><line x1="270" y1="34" x2="270" y2="290"/>
+        <line x1="500" y1="34" x2="500" y2="290"/><line x1="760" y1="34" x2="760" y2="290"/>
+      </g>
+      <g style="stroke:var(--accent);stroke-width:1.6;fill:none">
+        <line x1="70" y1="60" x2="266" y2="60" marker-end="url(#ar2)"/>
+        <line x1="270" y1="98" x2="496" y2="98" marker-end="url(#ar2)"/>
+        <line x1="500" y1="134" x2="756" y2="134" marker-end="url(#ar2)"/>
+        <line x1="760" y1="168" x2="504" y2="168" marker-end="url(#ar2)"/>
+        <line x1="70" y1="210" x2="266" y2="210" marker-end="url(#ar2)"/>
+        <line x1="270" y1="244" x2="496" y2="244" marker-end="url(#ar2)"/>
+        <line x1="500" y1="278" x2="274" y2="278" marker-end="url(#ar2)"/>
+      </g>
+      <g style="font-size:13px">
+        <text x="78" y="53">Effects › Blurs › Gaussian</text>
+        <text x="278" y="91">preview job, radius 4 (dialog built from the schema)</text>
+        <text x="508" y="127">render tiles, nearest to the view center first</text>
+        <text x="508" y="161" class="muted">tiles shown live; a radius change cancels and restarts</text>
+        <text x="78" y="203">click OK</text>
+        <text x="278" y="237" class="mono">op_dispatch("effect.blur.gaussian", {radius: 4})</text>
+        <text x="282" y="271">one new History row: "Gaussian Blur". Ctrl+Z puts it back.</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<div class="checker" aria-hidden="true"></div>
+
+<section>
+  <h2>How undo stays cheap and exact</h2>
+  <p class="col">Each layer is cut into 256×256 tiles. When an edit changes a tile, it makes a new copy of that tile. Every tile it did not touch is shared with the step before. So a small brush stroke on a 24-megapixel photo costs a few tiles, not the whole layer. Undo just points back to the older set of tiles. It also brings back the selection and the active layer. When memory gets tight, old history tiles are compressed and then written to disk.</p>
+  <div class="diagram" role="img" aria-label="Tiles diagram: step 2 shares 7 of 9 tiles with step 1; only the 2 tiles under the stroke are new.">
+    <svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg">
+      <g style="font-size:14px">
+        <text x="20" y="24" style="font-weight:600">Step 1 · Open</text>
+        <text x="480" y="24" style="font-weight:600">Step 2 · Brush stroke</text>
+      </g>
+      <g id="g1">
+        <rect x="20" y="40" width="160" height="160" style="fill:var(--bg);stroke:var(--line)"/>
+      </g>
+      <g style="stroke:var(--line);fill:var(--surface)">
+        <rect x="20" y="40" width="52" height="52"/><rect x="74" y="40" width="52" height="52"/><rect x="128" y="40" width="52" height="52"/>
+        <rect x="20" y="94" width="52" height="52"/><rect x="74" y="94" width="52" height="52"/><rect x="128" y="94" width="52" height="52"/>
+        <rect x="20" y="148" width="52" height="52"/><rect x="74" y="148" width="52" height="52"/><rect x="128" y="148" width="52" height="52"/>
+      </g>
+      <g style="stroke:var(--line);fill:var(--surface)">
+        <rect x="480" y="40" width="52" height="52"/><rect x="534" y="40" width="52" height="52"/><rect x="588" y="40" width="52" height="52"/>
+        <rect x="480" y="94" width="52" height="52"/><rect x="534" y="94" width="52" height="52" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/><rect x="588" y="94" width="52" height="52" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:2"/>
+        <rect x="480" y="148" width="52" height="52"/><rect x="534" y="148" width="52" height="52"/><rect x="588" y="148" width="52" height="52"/>
+      </g>
+      <path d="M545 125 C 570 105, 600 135, 630 112" style="fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round"/>
+      <g style="font-size:13.5px">
+        <text x="210" y="80">7 tiles: shared, no copy</text>
+        <text x="210" y="102" class="muted">(same memory in both steps)</text>
+        <line x1="200" y1="90" x2="470" y2="90" style="stroke:var(--muted);stroke-dasharray:3 3"/>
+        <text x="660" y="116" style="fill:var(--accent)">2 new tiles</text>
+        <text x="660" y="138" class="muted">(256 KB each)</text>
+        <text x="660" y="170" class="muted">Undo = point back to step 1's tiles</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<div class="checker" aria-hidden="true"></div>
+
+<section>
+  <h2>How "exactly right" is checked</h2>
+  <p class="col">Each image operation is tested against a known-correct result, at most 1 step out of 255 per color channel. The references come from three places. When they disagree, the first one in this list wins:</p>
+  <div class="grid2">
+    <div class="card"><h3><span class="chip c-acc">1</span> Real paint.net 5.1</h3><p>Captures made on your Windows PC. The same input image and the same settings, saved as PNG. This is the gold standard.</p></div>
+    <div class="card"><h3><span class="chip c-acc">2</span> paint.net 3.36 source</h3><p>The MIT-licensed code. Ported line for line, so its own math becomes the check.</p></div>
+    <div class="card"><h3><span class="chip c-acc">3</span> Pinta's 126 test images</h3><p>Expected outputs that ship with Pinta (MIT), a long-lived paint.net clone.</p></div>
+    <div class="card"><h3><span class="chip c-gpu">GPU</span> CPU twin</h3><p>Every GPU shader is compared against its CPU version on Apple's GPU, and also on Linux with a software GPU, so it can never drift.</p></div>
+  </div>
+  <h3>Three test levels</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Level</th><th>When</th><th>What runs</th><th>Time</th></tr></thead>
+    <tbody>
+      <tr><td>fast</td><td>every task</td><td>unit tests, reference images for the code that changed, Swift build</td><td class="num">&lt; 2 min</td></tr>
+      <tr><td>milestone</td><td>end of each milestone</td><td>all reference images, GPU match, scripted command runs, a UI smoke test with screenshots</td><td class="num">&lt; 10 min</td></tr>
+      <tr><td>checkpoint</td><td>every 5 milestones</td><td>everything, plus paint.net captures, file-reader fuzzing, the Linux run, speed and size bars, an outside review</td><td class="num">~1 h</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="checker" aria-hidden="true"></div>
+
+<section>
+  <h2>The bars it must hit</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Measure</th><th>Target</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Cold launch to a usable window</td><td class="num">&lt; 3 s</td><td>your bar; I aim for under 1 s</td></tr>
+      <tr><td>App size</td><td class="num">&lt; 75 MB</td><td>your bar; expected 22 to 30 MB</td></tr>
+      <tr><td>Accuracy vs reference</td><td class="num">±1/255</td><td>exceptions listed with a reason</td></tr>
+      <tr><td>Open a 24 MP JPEG</td><td class="num">&lt; 1.5 s</td><td></td></tr>
+      <tr><td>Gaussian blur r=10 on 24 MP</td><td class="num">&lt; 0.5 s</td><td>GPU</td></tr>
+      <tr><td>Pan and zoom</td><td class="num">≥ 60 fps</td><td>120 on ProMotion screens</td></tr>
+      <tr><td>Brush, pen to screen</td><td class="num">&lt; 16 ms</td><td></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="checker" aria-hidden="true"></div>
+
+<section>
+  <h2>Your decisions, and my defaults</h2>
+  <div class="grid2">
+    <div class="card"><h3>You decided</h3><ul>
+      <li>Name OpenPainter; MIT; free signed download on GitHub plus a yili.dev page</li>
+      <li>macOS 15 or later; Rust engine, Swift UI</li>
+      <li>GPU effects from the start; 8-bit pixels, float math</li>
+      <li>Full color management</li>
+      <li>PNG, JPEG, BMP, GIF, TIFF, HEIC, WebP, AVIF, Camera RAW</li>
+      <li>Crop with aspect ratios, healing, content-aware fill, remove background</li>
+      <li>Destructive edits like paint.net, every step undoable</li>
+      <li>paint.net look: floating panels, image thumbnail strip, original icons</li>
+      <li>Pen pressure; all effects in paint.net order</li>
+    </ul></div>
+    <div class="card"><h3>Choices to check</h3><ul>
+      <li>GPU path is wgpu (runs on Metal, Vulkan, DirectX), with a CPU twin for every op</li>
+      <li>Pixel math runs on the image's own color values, as paint.net does, not in linear light</li>
+      <li>The layered file is <code>.opaint</code>, a standard OpenRaster zip that Krita and GIMP can open</li>
+      <li>Text uses Apple's CoreText; Windows and Linux get their own shaper later</li>
+      <li>paint.net captures run on your Windows PC; if that fails, paint.net 3.36 source plus Pinta</li>
+      <li>This Mac has 8 GB of RAM, so I run 2 builders at a time, not 3</li>
+    </ul></div>
+  </div>
+</section>
+
+<footer>
+  Repo: github.com/wizdes/OpenPainter (private until release). Full detail: <code>docs/ARCHITECTURE.md</code>, <code>docs/MILESTONES.md</code>. Credits: paint.net 3.36 (MIT, dotPDN LLC), Pinta (MIT), libmypaint (ISC). OpenPainter is not affiliated with paint.net.
+</footer>
+</div>
