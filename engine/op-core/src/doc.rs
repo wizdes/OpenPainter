@@ -513,6 +513,20 @@ impl DocState {
         }
         Ok(next)
     }
+    /// Makes an empty image of the requested size while retaining layer identities and properties.
+    /// Image-wide operations write replacement pixels into this state before publishing it.
+    pub fn empty_image_like(&self, width: u32, height: u32) -> Result<Self> {
+        if width == 0 || height == 0 {
+            return Err(DocError::Dimensions);
+        }
+        let mut next = self.advanced();
+        next.width = width;
+        next.height = height;
+        for layer in &mut next.layers {
+            Arc::make_mut(layer).tiles = LayerTiles::new(self.store.clone());
+        }
+        Ok(next)
+    }
     /// Pins and loads every tile of every layer that touches the rectangle. The tiles stay
     /// pinned, so the budget cannot evict them, until the returned view is dropped.
     /// On error nothing stays pinned.

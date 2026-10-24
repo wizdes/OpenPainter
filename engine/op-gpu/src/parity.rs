@@ -123,6 +123,112 @@ impl GpuOp for ToolOp {
     }
 }
 pub struct BoxBlurOp;
+pub struct ResampleNearestOp;
+pub struct ResampleBicubicOp;
+pub struct ResampleBilinearOp;
+pub struct ResampleSuperSamplingOp;
+impl GpuOp for ResampleSuperSamplingOp {
+    fn id(&self) -> String {
+        "image.resize.super_sampling".into()
+    }
+    fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        op_ops::image::legacy::resize(
+            &inputs.bottom,
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            op_ops::image::Resampling::SuperSampling,
+        )
+    }
+    fn gpu(&self, ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<u8>> {
+        ctx.resample_super_sampling(
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            &inputs.bottom,
+        )
+    }
+    fn compare_hidden_color(&self) -> bool {
+        true
+    }
+}
+impl GpuOp for ResampleBilinearOp {
+    fn id(&self) -> String {
+        "image.resize.bilinear".into()
+    }
+    fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        op_ops::image::legacy::resize(
+            &inputs.bottom,
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            op_ops::image::Resampling::Bilinear,
+        )
+    }
+    fn gpu(&self, ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<u8>> {
+        ctx.resample_bilinear(
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            &inputs.bottom,
+        )
+    }
+}
+impl GpuOp for ResampleBicubicOp {
+    fn id(&self) -> String {
+        "image.resize.bicubic".into()
+    }
+    fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        op_ops::image::legacy::resize(
+            &inputs.bottom,
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            op_ops::image::Resampling::Bicubic,
+        )
+    }
+    fn gpu(&self, ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<u8>> {
+        ctx.resample_bicubic(
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            &inputs.bottom,
+        )
+    }
+}
+impl GpuOp for ResampleNearestOp {
+    fn id(&self) -> String {
+        "image.resize.nearest".into()
+    }
+    fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        op_ops::image::legacy::resize(
+            &inputs.bottom,
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            op_ops::image::Resampling::Nearest,
+        )
+    }
+    fn gpu(&self, ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<u8>> {
+        ctx.resample_nearest(
+            inputs.width,
+            inputs.height,
+            inputs.width,
+            inputs.height,
+            &inputs.bottom,
+        )
+    }
+    fn compare_hidden_color(&self) -> bool {
+        true
+    }
+}
 impl GpuOp for BoxBlurOp {
     fn id(&self) -> String {
         "box_blur".into()
@@ -166,6 +272,10 @@ pub fn registered() -> Vec<Box<dyn GpuOp>> {
         coverage: 128,
     }));
     ops.push(Box::new(BoxBlurOp));
+    ops.push(Box::new(ResampleNearestOp));
+    ops.push(Box::new(ResampleBicubicOp));
+    ops.push(Box::new(ResampleBilinearOp));
+    ops.push(Box::new(ResampleSuperSamplingOp));
     for effect in registered_effects() {
         if let Some(kernel) = effect.gpu {
             ops.push(Box::new(EffectOp {
@@ -182,6 +292,14 @@ pub fn run(ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<(String, 
         let before = ctx.dispatch_count();
         let expected = op.cpu(inputs);
         let actual = op.gpu(ctx, inputs)?;
+        if actual.len() != expected.len() {
+            return Err(GpuError::Map(format!(
+                "{} returned {} bytes, expected {}",
+                op.id(),
+                actual.len(),
+                expected.len()
+            )));
+        }
         let dispatches = ctx.dispatch_count() - before;
         if dispatches == 0 {
             return Err(GpuError::Map(format!("{} submitted no dispatch", op.id())));

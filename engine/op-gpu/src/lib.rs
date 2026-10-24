@@ -49,6 +49,117 @@ pub struct GpuContext {
     readback_ring: ReadbackRing,
 }
 impl GpuContext {
+    /// Exact nearest-neighbor FitSurface mapping, including RGB under zero alpha.
+    pub fn resample_nearest(
+        &mut self,
+        sw: u32,
+        sh: u32,
+        dw: u32,
+        dh: u32,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>> {
+        if dw == 0 || dh == 0 {
+            return Err(GpuError::InvalidImage);
+        }
+        let input = self.upload(sw, sh, bytes)?;
+        let output = self.texture(dw, dh);
+        let acc = self.accumulator(dw, dh);
+        let params = self.params(dw, dh, 0, 255, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("resample nearest"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(&module, "resample_nearest");
+        let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
+        self.dispatch(&pipeline, &bind, dw, dh)?;
+        self.readback(&output, dw, dh)
+    }
+    /// GPU twin of the legacy bicubic fit; one dispatch per destination image.
+    pub fn resample_bicubic(
+        &mut self,
+        sw: u32,
+        sh: u32,
+        dw: u32,
+        dh: u32,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>> {
+        if sw < 2 || sh < 2 || dw < 2 || dh < 2 {
+            return self.resample_nearest(sw, sh, dw, dh, bytes);
+        }
+        let input = self.upload(sw, sh, bytes)?;
+        let output = self.texture(dw, dh);
+        let acc = self.accumulator(dw, dh);
+        let params = self.params(dw, dh, 0, 255, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("resample bicubic"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(&module, "resample_bicubic");
+        let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
+        self.dispatch(&pipeline, &bind, dw, dh)?;
+        self.readback(&output, dw, dh)
+    }
+    /// GPU twin of the legacy bilinear fit, with one-byte RGB tolerance.
+    pub fn resample_bilinear(
+        &mut self,
+        sw: u32,
+        sh: u32,
+        dw: u32,
+        dh: u32,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>> {
+        if sw < 2 || sh < 2 || dw < 2 || dh < 2 {
+            return self.resample_nearest(sw, sh, dw, dh, bytes);
+        }
+        let input = self.upload(sw, sh, bytes)?;
+        let output = self.texture(dw, dh);
+        let acc = self.accumulator(dw, dh);
+        let params = self.params(dw, dh, 0, 255, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("resample bilinear"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(&module, "resample_bilinear");
+        let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
+        self.dispatch(&pipeline, &bind, dw, dh)?;
+        self.readback(&output, dw, dh)
+    }
+    /// Area averaging on the GPU for the legacy Super Sampling reduction path.
+    pub fn resample_super_sampling(
+        &mut self,
+        sw: u32,
+        sh: u32,
+        dw: u32,
+        dh: u32,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>> {
+        if sw == dw && sh == dh {
+            return self.resample_nearest(sw, sh, dw, dh, bytes);
+        }
+        if sw <= dw || sh <= dh {
+            return self.resample_bicubic(sw, sh, dw, dh, bytes);
+        }
+        let input = self.upload(sw, sh, bytes)?;
+        let output = self.texture(dw, dh);
+        let acc = self.accumulator(dw, dh);
+        let params = self.params(dw, dh, 0, 255, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("resample super sampling"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(&module, "resample_super_sampling");
+        let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
+        self.dispatch(&pipeline, &bind, dw, dh)?;
+        self.readback(&output, dw, dh)
+    }
     /// Runs a registered pointwise effect on straight RGBA8 bytes.
     pub fn effect_kernel(
         &mut self,
