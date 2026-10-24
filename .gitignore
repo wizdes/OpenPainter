@@ -17,3 +17,7 @@ tools/pdn-oracle/obj/
 __pycache__/
 .swift-cache/
 mac/**/.build/
+
+# SwiftPM build output (mac/PresenterSpike)
+.build/
+.swiftpm/

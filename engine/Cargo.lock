@@ -1061,6 +1061,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "op-present-spike"
+version = "0.1.0"
+dependencies = [
+ "core-graphics-types",
+ "lcms2",
+ "metal",
+ "objc",
+ "op-gpu",
+ "pollster",
+ "wgpu",
+]
+
+[[package]]
 name = "op-testkit"
 version = "0.1.0"
 dependencies = [

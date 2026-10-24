@@ -1,5 +1,5 @@
 [workspace]
-members = ["op-core", "op-ops", "op-gpu", "op-color", "op-formats", "op-tools", "op-engine", "op-ffi", "op-cli", "op-testkit", "xtask"]
+members = ["op-core", "op-ops", "op-gpu", "op-color", "op-formats", "op-tools", "op-engine", "op-ffi", "op-cli", "op-testkit", "op-present-spike", "xtask"]
 resolver = "3"
 
 [workspace.package]

@@ -1,0 +1,5 @@
+module COpPresentSpike [system] {
+    header "shim.h"
+    link "op_present_spike"
+    export *
+}
