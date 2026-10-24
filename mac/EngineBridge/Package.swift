@@ -28,6 +28,12 @@ let package = Package(
                 // Native libraries the Rust staticlib needs
                 // (cargo rustc -p op-ffi -- --print native-static-libs).
                 .linkedLibrary("iconv"),
+                // The canvas views (op_view_*) draw with wgpu on Metal.
+                .linkedFramework("Metal"),
+                .linkedFramework("QuartzCore"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreFoundation"),
+                .linkedLibrary("objc"),
             ]
         ),
         .testTarget(name: "EngineBridgeTests", dependencies: ["EngineBridge"]),

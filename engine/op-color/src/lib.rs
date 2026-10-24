@@ -445,3 +445,42 @@ impl DisplayLut {
         out
     }
 }
+/// lcms2 float transform of RGB colors (relative colorimetric, no black point
+/// compensation), clamped to 0..1. Both profiles must be RGB.
+pub fn convert_rgb_float(src: &Profile, dst: &Profile, rgb: &[[f32; 3]]) -> Result<Vec<[f32; 3]>> {
+    if src.space != ColorSpaceSignature::RgbData || dst.space != ColorSpaceSignature::RgbData {
+        return Err(Error::ColorSpace);
+    }
+    let t: Transform<[f32; 3], [f32; 3]> = Transform::new(
+        &src.open()?,
+        PixelFormat::RGB_FLT,
+        &dst.open()?,
+        PixelFormat::RGB_FLT,
+        Intent::RelativeColorimetric,
+    )
+    .map_err(|e| Error::Transform(e.to_string()))?;
+    let mut out = vec![[0f32; 3]; rgb.len()];
+    t.transform_pixels(rgb, &mut out);
+    Ok(out
+        .into_iter()
+        .map(|c| c.map(|v| v.clamp(0.0, 1.0)))
+        .collect())
+}
+/// The document -> display table the canvas presenter uses (M09 decision): an
+/// `n`-per-axis grid of float outputs from [`convert_rgb_float`]. Entry
+/// `r + g * n + b * n * n` holds the output for the input `(r, g, b) / (n - 1)`.
+pub fn display_table(src: &Profile, dst: &Profile, n: u32) -> Result<Vec<[f32; 3]>> {
+    if !(2..=129).contains(&n) {
+        return Err(Error::Pixels);
+    }
+    let step = 1.0 / (n - 1) as f32;
+    let mut input = Vec::with_capacity((n * n * n) as usize);
+    for b in 0..n {
+        for g in 0..n {
+            for r in 0..n {
+                input.push([r as f32 * step, g as f32 * step, b as f32 * step]);
+            }
+        }
+    }
+    convert_rgb_float(src, dst, &input)
+}

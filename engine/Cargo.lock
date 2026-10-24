@@ -1064,8 +1064,14 @@ name = "op-ffi"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
+ "objc",
+ "op-color",
  "op-engine",
+ "op-gpu",
+ "parking_lot",
+ "pollster",
  "serde_json",
+ "wgpu",
 ]
 
 [[package]]
@@ -1082,6 +1088,7 @@ name = "op-gpu"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "objc",
  "op-core",
  "op-ops",
  "op-testkit",
@@ -1111,6 +1118,7 @@ dependencies = [
  "lcms2",
  "metal",
  "objc",
+ "op-color",
  "op-gpu",
  "pollster",
  "wgpu",
