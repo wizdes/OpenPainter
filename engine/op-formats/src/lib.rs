@@ -1,4 +1,5 @@
 //! Image codecs and the native OpenPainter file format.
+pub mod opaint;
 pub mod png;
 
 mod bmp;
