@@ -4,6 +4,7 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use op_core::doc::{DocState, LayerId, PolygonSet, SelectionSource, SelectionState};
 use op_core::history::History;
 use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
+use op_tools::{BrushSettings, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
 use rayon::ThreadPool;
 use serde_json::{Value, json};
@@ -702,7 +703,16 @@ enum Message {
     Probe(Sender<(DocState, usize, usize, u64)>),
     View(Sender<Published>),
     Identity(Sender<JobIdentity>),
+    StrokeBegin(BrushSettings, u64, Sender<Result<u64>>),
+    StrokeAppend(Vec<StrokeSample>, Sender<Result<()>>),
+    StrokeCommit(Sender<Result<()>>),
+    StrokeCancel(Sender<Result<()>>),
     Stop(Sender<()>),
+}
+struct ActiveStroke {
+    session: StrokeSession,
+    revision: u64,
+    selection_revision: u64,
 }
 struct Actor {
     id: u64,
@@ -711,6 +721,7 @@ struct Actor {
     /// Counts changes of the current selection, including undo and redo.
     selection_revision: u64,
     preview: Option<PreviewSession>,
+    stroke: Option<ActiveStroke>,
     published: Arc<ArcSwap<Published>>,
     read_only: Arc<AtomicBool>,
     events: Sender<Event>,
@@ -771,9 +782,13 @@ impl Actor {
     fn mark_read_only(&mut self) {
         self.read_only.store(true, Ordering::Release);
         self.preview = None;
+        self.stroke = None;
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if self.stroke.is_some() {
+            return Err(Error::Busy);
+        }
         if self.read_only.load(Ordering::Acquire) {
             return Err(Error::ReadOnly);
         }
@@ -814,6 +829,9 @@ impl Actor {
         Ok(())
     }
     fn begin(&mut self, id: &str, params: Value, ticket: JobTicket) -> Result<u64> {
+        if self.stroke.is_some() {
+            return Err(Error::Busy);
+        }
         if self.read_only.load(Ordering::Acquire) {
             return Err(Error::ReadOnly);
         }
@@ -895,6 +913,63 @@ impl Actor {
         }
         result
     }
+    fn stroke_begin(&mut self, settings: BrushSettings, seed: u64) -> Result<u64> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        if self.preview.is_some() || self.stroke.is_some() {
+            return Err(Error::Busy);
+        }
+        let session = StrokeSession::new(
+            self.history.current_state().clone(),
+            self.history.current_state().active_layer,
+            settings,
+            seed,
+        )
+        .map_err(bad)?;
+        let id = self.next_session.fetch_add(1, Ordering::Relaxed);
+        self.stroke = Some(ActiveStroke {
+            session,
+            revision: self.revision,
+            selection_revision: self.selection_revision,
+        });
+        Ok(id)
+    }
+    fn stroke_append(&mut self, samples: &[StrokeSample]) -> Result<()> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        let stroke = self.stroke.as_mut().ok_or_else(|| bad("no stroke"))?;
+        if stroke.revision != self.revision || stroke.selection_revision != self.selection_revision
+        {
+            return Err(Error::Busy);
+        }
+        stroke.session.append(samples).map_err(bad)?;
+        let preview = stroke.session.preview().clone();
+        self.publish(Some(preview));
+        Ok(())
+    }
+    fn stroke_commit(&mut self) -> Result<()> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        let stroke = self.stroke.take().ok_or_else(|| bad("no stroke"))?;
+        if stroke.revision != self.revision
+            || stroke.selection_revision != self.selection_revision
+            || stroke.session.target_layer != self.active_id()
+        {
+            self.publish(None);
+            return Err(Error::Busy);
+        }
+        let label = stroke.session.settings.tool.label();
+        let state = stroke.session.finish().map_err(bad)?;
+        self.history.commit(label, label, state);
+        self.revision += 1;
+        self.publish(None);
+        self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+        self.event(EventKind::HistoryChanged, 0, json!({}));
+        Ok(())
+    }
     /// Handles a finished render. Every render ends with exactly one JobFinished.
     fn job(&mut self, identity: JobIdentity, ticket: JobTicket, result: Result<DocState>) {
         self.pending_jobs -= 1;
@@ -965,11 +1040,21 @@ impl Actor {
             match msg {
                 Message::Stop(reply) => {
                     self.preview = None;
+                    self.stroke = None;
                     self.publish(None);
                     stopping = Some(reply);
                 }
                 Message::Run(_, ticket, reply) if stopping.is_some() => {
                     self.finish_unrun(ticket, reply);
+                }
+                Message::StrokeBegin(_, _, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
+                Message::StrokeAppend(_, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
+                Message::StrokeCommit(r) | Message::StrokeCancel(r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
                 }
                 Message::Run(op, ticket, reply) => {
                     let (result, rendering) = self.run_op(op, &ticket);
@@ -1002,6 +1087,39 @@ impl Actor {
                 }
                 Message::Identity(r) => {
                     let _ = r.send(self.identity_now());
+                }
+                Message::StrokeBegin(settings, seed, r) => {
+                    let result =
+                        catch_unwind(AssertUnwindSafe(|| self.stroke_begin(settings, seed)))
+                            .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeAppend(samples, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| self.stroke_append(&samples)))
+                        .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeCommit(r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| self.stroke_commit()))
+                        .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeCancel(r) => {
+                    if self.stroke.take().is_some() {
+                        self.publish(None);
+                        let _ = r.send(Ok(()));
+                    } else {
+                        let _ = r.send(Err(bad("no stroke")));
+                    }
                 }
             }
             if stopping.is_some() && self.pending_jobs == 0 {
@@ -1130,6 +1248,7 @@ impl Engine {
             revision: 0,
             selection_revision: 0,
             preview: None,
+            stroke: None,
             published: published.clone(),
             read_only: read_only.clone(),
             events: self.events_tx.clone(),
@@ -1274,6 +1393,20 @@ impl Engine {
     pub fn preview_cancel(&self, id: u64) -> Result<()> {
         self.run_op(id, Op::PreviewCancel, &JobTicket::new(0))
             .map(|_| ())
+    }
+    /// Begins a brush preview on the active layer.
+    pub fn stroke_begin(&self, id: u64, settings: BrushSettings, seed: u64) -> Result<u64> {
+        self.call(id, |r| Message::StrokeBegin(settings, seed, r))?
+    }
+    /// Appends ordered input samples and publishes only tiles changed by the batch.
+    pub fn stroke_append(&self, id: u64, samples: &[StrokeSample]) -> Result<()> {
+        self.call(id, |r| Message::StrokeAppend(samples.to_vec(), r))?
+    }
+    pub fn stroke_commit(&self, id: u64) -> Result<()> {
+        self.call(id, Message::StrokeCommit)?
+    }
+    pub fn stroke_cancel(&self, id: u64) -> Result<()> {
+        self.call(id, Message::StrokeCancel)?
     }
     pub fn query(&self, id: u64, query: &str, params: Value) -> Result<Vec<u8>> {
         let d = self.doc(id)?;

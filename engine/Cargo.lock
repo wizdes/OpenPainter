@@ -1051,6 +1051,7 @@ dependencies = [
  "op-core",
  "op-formats",
  "op-ops",
+ "op-tools",
  "parking_lot",
  "rayon",
  "serde",
@@ -1129,6 +1130,11 @@ dependencies = [
 [[package]]
 name = "op-tools"
 version = "0.1.0"
+dependencies = [
+ "op-core",
+ "op-ops",
+ "png",
+]
 
 [[package]]
 name = "ordered-float"
