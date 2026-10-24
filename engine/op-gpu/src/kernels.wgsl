@@ -16,6 +16,77 @@ fn effect_invert_alpha(@builtin(global_invocation_id) id: vec3<u32>) {
   let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(src.r, src.g, src.b, 255u - src.a));
 }
+@compute @workgroup_size(16, 16)
+fn effect_black_and_white(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let value = (7471u * src.b + 38470u * src.g + 19595u * src.r) >> 16u;
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(value, value, value, src.a));
+}
+fn legacy_intensity(src: vec4<u32>) -> i32 {
+  return i32((7471u * src.b + 38470u * src.g + 19595u * src.r) >> 16u);
+}
+@compute @workgroup_size(16, 16)
+fn effect_brightness_contrast(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let brightness = bitcast<i32>(p.mode);
+  let contrast = bitcast<i32>(p.opacity);
+  let i = legacy_intensity(src);
+  var multiply = 1i;
+  var divide = 1i;
+  if contrast < 0i { multiply = contrast + 100i; divide = 100i; }
+  if contrast > 0i { multiply = 100i; divide = 100i - contrast; }
+  var rgb: vec3<u32>;
+  if divide == 0i {
+    let value = select(255u, 0u, i + brightness < 128i);
+    rgb = vec3<u32>(value);
+  } else {
+    var shift: i32;
+    if divide == 100i { shift = (i - 127i) * multiply / divide + 127i - i + brightness; }
+    else { shift = (i - 127i + brightness) * multiply / divide + 127i - i; }
+    rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + vec3<i32>(shift), vec3<i32>(0i), vec3<i32>(255i)));
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
+}
+fn posterize_channel(value: u32, count: u32) -> u32 {
+  if value == 0u { return 0u; }
+  let index = (value * count - 1u) / 255u;
+  return 255u * index / (count - 1u);
+}
+@compute @workgroup_size(16, 16)
+fn effect_posterize(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(
+    posterize_channel(src.r, p.mode), posterize_channel(src.g, p.opacity),
+    posterize_channel(src.b, p.masked), src.a));
+}
+fn sepia_level(value: u32, gamma: f32) -> u32 {
+  if value == 0u || value == 255u { return value; }
+  return u32(255.0 * pow(f32(value) / 255.0, gamma));
+}
+@compute @workgroup_size(16, 16)
+fn effect_sepia(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let gray = legacy_intensity(src);
+  let strength = f32(p.mode) / 100.0;
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(
+    sepia_level(u32(gray), 1.0 - 0.4 * strength), u32(gray),
+    sepia_level(u32(gray), 1.0 + 0.4 * strength), src.a));
+}
+@compute @workgroup_size(16, 16)
+fn effect_temperature_tint(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let temperature = bitcast<i32>(p.mode);
+  let tint = bitcast<i32>(p.opacity);
+  let shift = vec3<i32>(temperature / 2i + tint / 2i,
+    temperature / 2i - tint, -temperature + tint / 2i);
+  let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + shift, vec3<i32>(0i), vec3<i32>(255i)));
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
+}
 fn unit(x: u32) -> f32 { return f32(x) / 255.0; }
 fn byte(x: f32) -> u32 { return u32(floor(clamp(x, 0.0, 1.0) * 255.0 + 0.5)); }
 fn blend(mode: u32, b: f32, s: f32) -> f32 {

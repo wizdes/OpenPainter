@@ -131,6 +131,11 @@ pub enum PassKind {
 pub enum GpuKernel {
     InvertColors,
     InvertAlpha,
+    BlackAndWhite,
+    BrightnessContrast,
+    Posterize,
+    Sepia,
+    TemperatureTint,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -142,7 +147,9 @@ pub struct ArithmeticContract {
     pub target: &'static str,
 }
 #[derive(Clone, Debug, Default)]
-pub struct Prepared;
+pub struct Prepared {
+    pub channel_lut: Option<Box<[[u8; 256]; 3]>>,
+}
 pub type PixelReader<'a> = dyn Fn(i32, i32) -> [u8; 4] + 'a;
 pub struct TileInputs<'a> {
     pub output_rect: Rect,
@@ -161,6 +168,11 @@ pub struct EffectSpec {
     pub gpu: Option<GpuKernel>,
 }
 impl EffectSpec {
+    pub fn default_params(&self) -> Value {
+        self.schema
+            .validate(Value::Object(serde_json::Map::new()))
+            .expect("valid effect defaults")
+    }
     /// Produces a complete RGBA8 tile from the immutable input snapshot.
     /// Selection coverage is applied by the scheduler after this render.
     pub fn render_cpu(
@@ -183,15 +195,22 @@ impl EffectSpec {
     }
 }
 pub fn prepare_noop(_: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
-    Ok(Prepared)
+    Ok(Prepared::default())
 }
 pub fn pointwise_input(rect: Rect, _: &Prepared) -> Rect {
     rect
 }
 pub fn registered() -> Vec<EffectSpec> {
     vec![
-        crate::effects::invert_colors::spec(),
+        crate::effects::auto_level::spec(),
+        crate::effects::black_and_white::spec(),
+        crate::effects::brightness_contrast::spec(),
+        crate::effects::hue_saturation::spec(),
         crate::effects::invert_alpha::spec(),
+        crate::effects::invert_colors::spec(),
+        crate::effects::posterize::spec(),
+        crate::effects::sepia::spec(),
+        crate::effects::temperature_tint::spec(),
     ]
 }
 pub fn find(id: &str) -> Option<EffectSpec> {

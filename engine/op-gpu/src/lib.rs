@@ -57,10 +57,54 @@ impl GpuContext {
         height: u32,
         bytes: &[u8],
     ) -> Result<Vec<u8>> {
+        let values = match kernel {
+            op_ops::effect::GpuKernel::Posterize => [16, 16, 16],
+            op_ops::effect::GpuKernel::Sepia => [50, 0, 0],
+            _ => [0, 0, 0],
+        };
+        self.effect_kernel_with_params(kernel, width, height, bytes, values)
+    }
+
+    /// Runs a pointwise effect with its three validated integer parameters.
+    /// Signed values are passed as two's-complement bits to the WGSL uniform.
+    pub fn effect_kernel_with_params(
+        &mut self,
+        kernel: op_ops::effect::GpuKernel,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        values: [i32; 3],
+    ) -> Result<Vec<u8>> {
+        let valid = match kernel {
+            op_ops::effect::GpuKernel::BrightnessContrast
+            | op_ops::effect::GpuKernel::TemperatureTint => {
+                (-100..=100).contains(&values[0]) && (-100..=100).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::Posterize => {
+                values.iter().all(|value| (2..=64).contains(value))
+            }
+            op_ops::effect::GpuKernel::Sepia => (0..=100).contains(&values[0]),
+            _ => true,
+        };
+        if !valid {
+            return Err(GpuError::InvalidImage);
+        }
         let input = self.upload(width, height, bytes)?;
         let output = self.texture(width, height);
         let acc = self.accumulator(width, height);
-        let params = self.params(width, height, 0, 255, false);
+        let params = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("effect params"),
+                contents: bytemuck::cast_slice(&[
+                    width,
+                    height,
+                    values[0] as u32,
+                    values[1] as u32,
+                    values[2] as u32,
+                ]),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
         let module = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -70,6 +114,11 @@ impl GpuContext {
         let entry = match kernel {
             op_ops::effect::GpuKernel::InvertColors => "effect_invert_colors",
             op_ops::effect::GpuKernel::InvertAlpha => "effect_invert_alpha",
+            op_ops::effect::GpuKernel::BlackAndWhite => "effect_black_and_white",
+            op_ops::effect::GpuKernel::BrightnessContrast => "effect_brightness_contrast",
+            op_ops::effect::GpuKernel::Posterize => "effect_posterize",
+            op_ops::effect::GpuKernel::Sepia => "effect_sepia",
+            op_ops::effect::GpuKernel::TemperatureTint => "effect_temperature_tint",
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

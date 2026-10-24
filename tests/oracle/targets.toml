@@ -5,6 +5,48 @@ reference = "tests/oracle/legacy336/effects/Invert_Colors_default_*.png"
 tolerance = "exact"
 
 [[effect]]
+id = "effect.adjust.black_and_white"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Desaturate_*.png"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.auto_level"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Auto-Level_*.png"
+tolerance = "1/255"
+
+[[effect]]
+id = "effect.adjust.brightness_contrast"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Brightness_and_Contrast_*.png"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.posterize"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Posterize_*.png"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.hue_saturation"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Hue_and_Saturation_*.png"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.sepia"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Sepia_*.png"
+tolerance = "1/255"
+
+[[effect]]
+id = "effect.adjust.temperature_tint"
+target = "own"
+reference = "provisional encoded-channel contract; paint.net 5.1 capture pending"
+tolerance = "exact"
+
+[[effect]]
 id = "effect.adjust.invert_alpha"
 target = "own"
 reference = "own goldens"
