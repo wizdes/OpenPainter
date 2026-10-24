@@ -1,4 +1,5 @@
 //! Sparse, deterministic brush strokes over immutable document tiles.
+pub mod flood;
 use op_core::doc::{DocError, DocState, LayerId, SelectionState, ToolCompositeMode};
 use op_core::pixel::{Rgba8, round_unit_to_u8};
 use op_core::selection::RasterMode;
