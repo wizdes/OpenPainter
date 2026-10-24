@@ -96,6 +96,60 @@ fn cancel_stops_a_running_command_without_commit_and_releases_tiles() {
 }
 
 #[test]
+fn cancelling_registered_effect_after_first_tile_keeps_history() {
+    let (engine, rx) = engine_with_events();
+    let pixels = [12u8, 34, 56, 78].repeat(2048 * 2048);
+    let doc = engine.import_pixels(2048, 2048, &pixels, None).unwrap();
+    let ticket = JobTicket::new(711);
+    engine
+        .submit(
+            doc,
+            Op::Command("effect.adjust.invert_alpha".into(), json!({})),
+            ticket.clone(),
+        )
+        .unwrap();
+    loop {
+        let event = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        if event.ticket == 711 && matches!(event.kind, EventKind::Progress) {
+            assert_eq!(event.json["done"], 1);
+            ticket.cancel();
+            break;
+        }
+    }
+    let finished = wait_job(&rx, 711, Duration::from_secs(10));
+    assert_eq!(status(&finished), "cancelled");
+    assert_eq!(history_len(&engine, doc), 1);
+    assert_eq!(
+        engine
+            .actor_probe(doc)
+            .unwrap()
+            .0
+            .read_tile(0, TileCoord { x: 0, y: 0 })
+            .unwrap()[..4],
+        [12, 34, 56, 78]
+    );
+}
+
+#[test]
+fn stale_registered_effect_preview_generation_is_dropped() {
+    let (engine, rx) = engine_with_events();
+    let doc = small(&engine);
+    engine
+        .preview_begin(doc, "effect.adjust.invert_colors", json!({}))
+        .unwrap();
+    let stale = engine.current_identity(doc).unwrap();
+    engine.preview_update(doc, json!({})).unwrap();
+    let base = engine.actor_probe(doc).unwrap().0;
+    engine
+        .inject_job_result(doc, stale, base, JobTicket::new(712))
+        .unwrap();
+    let event = wait_job(&rx, 712, Duration::from_secs(5));
+    assert_eq!(status(&event), "dropped");
+    assert_eq!(mismatch(&event), vec!["generation"]);
+    assert_eq!(history_len(&engine, doc), 1);
+}
+
+#[test]
 fn cancel_stops_a_running_preview_render_and_publishes_nothing() {
     let (e, rx) = engine_with_events();
     let doc = big(&e);

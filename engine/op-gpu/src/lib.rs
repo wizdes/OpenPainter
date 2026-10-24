@@ -49,6 +49,33 @@ pub struct GpuContext {
     readback_ring: ReadbackRing,
 }
 impl GpuContext {
+    /// Runs a registered pointwise effect on straight RGBA8 bytes.
+    pub fn effect_kernel(
+        &mut self,
+        kernel: op_ops::effect::GpuKernel,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>> {
+        let input = self.upload(width, height, bytes)?;
+        let output = self.texture(width, height);
+        let acc = self.accumulator(width, height);
+        let params = self.params(width, height, 0, 255, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("effect kernels"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let entry = match kernel {
+            op_ops::effect::GpuKernel::InvertColors => "effect_invert_colors",
+            op_ops::effect::GpuKernel::InvertAlpha => "effect_invert_alpha",
+        };
+        let pipeline = self.pipeline(&module, entry);
+        let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
+        self.dispatch(&pipeline, &bind, width, height)?;
+        self.readback(&output, width, height)
+    }
     pub fn new() -> Result<Self> {
         let instance = wgpu::Instance::default();
         let adapter =

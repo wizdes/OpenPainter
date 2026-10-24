@@ -4,6 +4,8 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use op_core::doc::{DocState, LayerId, PolygonSet, SelectionSource, SelectionState};
 use op_core::history::History;
 use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
+use op_ops::effect::{self, Rect};
+pub use op_ops::effect::{Param, ParamKind, ParamSchema};
 use parking_lot::Mutex;
 use rayon::ThreadPool;
 use serde_json::{Value, json};
@@ -129,63 +131,6 @@ impl RunCtx {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ParamKind {
-    Int,
-    Float,
-    Bool,
-    Choice(&'static [&'static str]),
-    String,
-}
-#[derive(Clone, Debug)]
-pub struct Param {
-    pub key: &'static str,
-    pub kind: ParamKind,
-    pub min: Option<f64>,
-    pub max: Option<f64>,
-    pub default: Option<Value>,
-}
-#[derive(Clone, Debug, Default)]
-pub struct ParamSchema {
-    pub fields: Vec<Param>,
-}
-impl ParamSchema {
-    pub fn validate(&self, value: Value) -> Result<Value> {
-        let obj = value
-            .as_object()
-            .ok_or_else(|| bad("parameters must be a JSON object"))?;
-        for key in obj.keys() {
-            if !self.fields.iter().any(|f| f.key == key) {
-                return Err(bad(format!("unknown parameter {key}")));
-            }
-        }
-        let mut out = serde_json::Map::new();
-        for field in &self.fields {
-            let v = obj
-                .get(field.key)
-                .cloned()
-                .or_else(|| field.default.clone())
-                .ok_or_else(|| bad(format!("missing {}", field.key)))?;
-            let valid = match &field.kind {
-                ParamKind::Int => v.as_i64().is_some(),
-                ParamKind::Float => v.as_f64().is_some(),
-                ParamKind::Bool => v.is_boolean(),
-                ParamKind::String => v.is_string(),
-                ParamKind::Choice(choices) => v.as_str().is_some_and(|s| choices.contains(&s)),
-            };
-            if !valid {
-                return Err(bad(format!("invalid {}", field.key)));
-            }
-            if let Some(n) = v.as_f64()
-                && (field.min.is_some_and(|m| n < m) || field.max.is_some_and(|m| n > m))
-            {
-                return Err(bad(format!("{} out of range", field.key)));
-            }
-            out.insert(field.key.into(), v);
-        }
-        Ok(Value::Object(out))
-    }
-}
 pub struct CommandSpec {
     pub id: &'static str,
     pub params: ParamSchema,
@@ -243,8 +188,31 @@ fn invert_tiles(ctx: &RunCtx, s: &DocState, delay_ms: u64) -> Result<Outcome> {
     ctx.check()?;
     Ok(Outcome::State(next))
 }
-fn invert(ctx: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
-    invert_tiles(ctx, s, 0)
+fn run_effect(ctx: &RunCtx, s: &DocState, id: &str, params: &Value) -> Result<Outcome> {
+    let effect = effect::find(id).ok_or_else(|| bad(format!("unknown effect {id}")))?;
+    let rect = Rect::new(0, 0, s.width, s.height);
+    let coords = effect::tile_coords(rect);
+    let next = effect::render_tiles_checked(
+        s,
+        &effect,
+        rect,
+        &coords,
+        Some(params.clone()),
+        || ctx.check().map_err(|_| effect::EffectError::Cancelled),
+        |done, total| ctx.progress(done, total),
+    )
+    .map_err(|error| match error {
+        effect::EffectError::Cancelled => Error::Cancelled,
+        other => bad(other),
+    })?;
+    ctx.check()?;
+    Ok(Outcome::State(next))
+}
+fn run_invert_colors(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    run_effect(ctx, s, "effect.adjust.invert_colors", p)
+}
+fn run_invert_alpha(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    run_effect(ctx, s, "effect.adjust.invert_alpha", p)
 }
 fn slow_invert(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
     invert_tiles(ctx, s, p["delay_ms"].as_u64().unwrap())
@@ -383,7 +351,7 @@ fn convert_profile(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
 }
 fn specs() -> Vec<CommandSpec> {
     let empty = || ParamSchema::default();
-    vec![
+    let mut entries = vec![
         CommandSpec {
             id: "image.assign_profile",
             params: ParamSchema {
@@ -461,7 +429,7 @@ fn specs() -> Vec<CommandSpec> {
             id: "image.invert_colors",
             params: empty(),
             enabled: always,
-            run: invert,
+            run: run_invert_colors,
             previewable: true,
         },
         CommandSpec {
@@ -553,7 +521,22 @@ fn specs() -> Vec<CommandSpec> {
             run: toggle_selection,
             previewable: false,
         },
-    ]
+    ];
+    for effect in effect::registered() {
+        let run = match effect.id {
+            "effect.adjust.invert_colors" => run_invert_colors,
+            "effect.adjust.invert_alpha" => run_invert_alpha,
+            _ => continue,
+        };
+        entries.push(CommandSpec {
+            id: effect.id,
+            params: effect.schema,
+            enabled: always,
+            run,
+            previewable: true,
+        });
+    }
+    entries
 }
 fn spec(id: &str) -> Result<CommandSpec> {
     specs()
@@ -778,7 +761,7 @@ impl Actor {
             return Err(Error::ReadOnly);
         }
         let spec = spec(id)?;
-        let params = spec.params.validate(params)?;
+        let params = spec.params.validate(params).map_err(bad)?;
         if !(spec.enabled)(self.history.current_state()) {
             return Err(bad("command disabled"));
         }
@@ -788,7 +771,12 @@ impl Actor {
         let selection = self.history.current_state().selection.clone();
         let changed = match outcome {
             Outcome::State(state) => {
-                self.history.commit(id, id, state);
+                let label = match id {
+                    "effect.adjust.invert_colors" | "image.invert_colors" => "Invert Colors",
+                    "effect.adjust.invert_alpha" => "Invert Alpha",
+                    _ => id,
+                };
+                self.history.commit(label, id, state);
                 true
             }
             Outcome::HistoryUndo => self.history.undo(),
@@ -821,7 +809,7 @@ impl Actor {
             .into_iter()
             .find(|s| s.id == id && s.previewable)
             .ok_or_else(|| bad("command cannot preview"))?;
-        let params = spec.params.validate(params)?;
+        let params = spec.params.validate(params).map_err(bad)?;
         let session = self.next_session.fetch_add(1, Ordering::Relaxed);
         self.preview = Some(PreviewSession {
             id: session,
@@ -872,7 +860,7 @@ impl Actor {
             return Err(Error::ReadOnly);
         }
         let p = self.preview.as_mut().ok_or_else(|| bad("no preview"))?;
-        p.params = spec(p.command)?.params.validate(params)?;
+        p.params = spec(p.command)?.params.validate(params).map_err(bad)?;
         self.publish(None);
         self.render_preview(ticket);
         Ok(())
@@ -1216,14 +1204,14 @@ impl Engine {
     fn precheck(&self, op: &Op) -> Result<()> {
         match op {
             Op::Command(id, p) => {
-                spec(id)?.params.validate(p.clone())?;
+                spec(id)?.params.validate(p.clone()).map_err(bad)?;
             }
             Op::PreviewBegin(id, p) => {
                 let s = spec(id)?;
                 if !s.previewable {
                     return Err(bad("command cannot preview"));
                 }
-                s.params.validate(p.clone())?;
+                s.params.validate(p.clone()).map_err(bad)?;
             }
             _ => {}
         }

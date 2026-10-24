@@ -1,0 +1,11 @@
+[[effect]]
+id = "effect.adjust.invert_colors"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Invert_Colors_default_*.png"
+tolerance = "exact"
+
+[[effect]]
+id = "effect.adjust.invert_alpha"
+target = "own"
+reference = "own goldens"
+tolerance = "exact"

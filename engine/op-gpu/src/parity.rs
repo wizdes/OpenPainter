@@ -3,6 +3,7 @@ use crate::{GpuContext, GpuError, LayerInput, MODES};
 use op_core::doc::{LayerBlendMode, ToolCompositeMode};
 use op_core::pixel::Rgba8;
 use op_ops::composite::{composite_pixel, tool_composite};
+use op_ops::effect::{GpuKernel, registered as registered_effects};
 
 pub struct Inputs {
     pub width: u32,
@@ -14,6 +15,36 @@ pub trait GpuOp {
     fn id(&self) -> String;
     fn cpu(&self, inputs: &Inputs) -> Vec<u8>;
     fn gpu(&self, ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<u8>>;
+    fn compare_hidden_color(&self) -> bool {
+        false
+    }
+}
+pub struct EffectOp {
+    pub kernel: GpuKernel,
+    pub effect_id: &'static str,
+}
+impl GpuOp for EffectOp {
+    fn id(&self) -> String {
+        self.effect_id.into()
+    }
+    fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        let mut out = inputs.bottom.clone();
+        for pixel in out.chunks_exact_mut(4) {
+            match self.kernel {
+                GpuKernel::InvertColors => {
+                    pixel[..3].iter_mut().for_each(|byte| *byte = 255 - *byte)
+                }
+                GpuKernel::InvertAlpha => pixel[3] = 255 - pixel[3],
+            }
+        }
+        out
+    }
+    fn gpu(&self, ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<u8>> {
+        ctx.effect_kernel(self.kernel, inputs.width, inputs.height, &inputs.bottom)
+    }
+    fn compare_hidden_color(&self) -> bool {
+        true
+    }
 }
 pub struct CompositeOp {
     pub mode: LayerBlendMode,
@@ -135,6 +166,14 @@ pub fn registered() -> Vec<Box<dyn GpuOp>> {
         coverage: 128,
     }));
     ops.push(Box::new(BoxBlurOp));
+    for effect in registered_effects() {
+        if let Some(kernel) = effect.gpu {
+            ops.push(Box::new(EffectOp {
+                kernel,
+                effect_id: effect.id,
+            }));
+        }
+    }
     ops
 }
 pub fn run(ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<(String, u8, u64)>> {
@@ -149,7 +188,7 @@ pub fn run(ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<(String, 
         }
         let mut worst = 0;
         for (a, b) in expected.chunks_exact(4).zip(actual.chunks_exact(4)) {
-            if a[3] == 0 && b[3] == 0 {
+            if !op.compare_hidden_color() && a[3] == 0 && b[3] == 0 {
                 continue;
             }
             for i in 0..4 {
