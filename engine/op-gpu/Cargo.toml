@@ -6,3 +6,15 @@ rust-version.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+wgpu = "27"
+pollster = "0.4"
+bytemuck = "1"
+op-core = { path = "../op-core" }
+op-ops = { path = "../op-ops" }
+thiserror = "2"
+
+[dev-dependencies]
+op-testkit = { path = "../op-testkit" }
+proptest = "1"

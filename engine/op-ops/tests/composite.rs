@@ -320,9 +320,16 @@ fn legacy336_crosscheck_record() {
         }
     }
     assert_eq!(rows, 70);
-    std::fs::write(
-        root.join("tests/oracle/legacy336/blend_crosscheck.md"),
-        table,
-    )
-    .unwrap();
+    // The table is a committed record. Rewrite it only when asked (OP_BLESS=1),
+    // the same way golden images are blessed; otherwise it must match.
+    let path = root.join("tests/oracle/legacy336/blend_crosscheck.md");
+    if std::env::var("OP_BLESS").as_deref() == Ok("1") {
+        std::fs::write(&path, table).unwrap();
+    } else {
+        let committed = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            committed, table,
+            "blend cross-check changed; rerun with OP_BLESS=1 and review the diff"
+        );
+    }
 }
