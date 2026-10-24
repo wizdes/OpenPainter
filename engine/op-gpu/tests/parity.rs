@@ -120,7 +120,7 @@ fn registered_ops() {
         top: make(),
     };
     let results = op_gpu::parity::run(&mut gpu, &inputs).unwrap();
-    assert_eq!(results.len(), 28);
+    assert_eq!(results.len(), 32);
     assert!(
         results
             .iter()

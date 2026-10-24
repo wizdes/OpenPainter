@@ -170,6 +170,15 @@ impl GpuContext {
         height: u32,
         bytes: &[u8],
     ) -> Result<Vec<u8>> {
+        if matches!(
+            kernel,
+            op_ops::effect::GpuKernel::Curves
+                | op_ops::effect::GpuKernel::Levels
+                | op_ops::effect::GpuKernel::Exposure
+        ) {
+            let lut = std::array::from_fn(|_| std::array::from_fn(|value| value as u8));
+            return self.effect_kernel_with_lut(kernel, width, height, bytes, &lut, false);
+        }
         let values = match kernel {
             op_ops::effect::GpuKernel::Posterize => [16, 16, 16],
             op_ops::effect::GpuKernel::Sepia => [50, 0, 0],
@@ -190,7 +199,8 @@ impl GpuContext {
     ) -> Result<Vec<u8>> {
         let valid = match kernel {
             op_ops::effect::GpuKernel::BrightnessContrast
-            | op_ops::effect::GpuKernel::TemperatureTint => {
+            | op_ops::effect::GpuKernel::TemperatureTint
+            | op_ops::effect::GpuKernel::HighlightsShadows => {
                 (-100..=100).contains(&values[0]) && (-100..=100).contains(&values[1])
             }
             op_ops::effect::GpuKernel::Posterize => {
@@ -232,9 +242,65 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Posterize => "effect_posterize",
             op_ops::effect::GpuKernel::Sepia => "effect_sepia",
             op_ops::effect::GpuKernel::TemperatureTint => "effect_temperature_tint",
+            op_ops::effect::GpuKernel::HighlightsShadows => "effect_highlights_shadows",
+            op_ops::effect::GpuKernel::Curves
+            | op_ops::effect::GpuKernel::Levels
+            | op_ops::effect::GpuKernel::Exposure => return Err(GpuError::InvalidImage),
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
+        self.dispatch(&pipeline, &bind, width, height)?;
+        self.readback(&output, width, height)
+    }
+
+    /// Uploads three 256-entry byte tables through the storage buffer. For
+    /// luminosity Curves, the first table maps intensity to a common RGB shift.
+    pub fn effect_kernel_with_lut(
+        &mut self,
+        kernel: op_ops::effect::GpuKernel,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        lut: &[[u8; 256]; 3],
+        luminosity: bool,
+    ) -> Result<Vec<u8>> {
+        if !matches!(
+            kernel,
+            op_ops::effect::GpuKernel::Curves
+                | op_ops::effect::GpuKernel::Levels
+                | op_ops::effect::GpuKernel::Exposure
+        ) {
+            return Err(GpuError::InvalidImage);
+        }
+        let input = self.upload(width, height, bytes)?;
+        let output = self.texture(width, height);
+        let mut values = [0f32; 256 * 4];
+        for value in 0..256 {
+            for channel in 0..3 {
+                values[value * 4 + channel] = f32::from(lut[channel][value]);
+            }
+        }
+        let table = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("effect channel tables"),
+                contents: bytemuck::cast_slice(&values),
+                usage: wgpu::BufferUsages::STORAGE,
+            });
+        let params = self.params(width, height, 0, 0, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("effect kernels"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let entry = if luminosity {
+            "effect_lut_luminosity"
+        } else {
+            "effect_lut_rgb"
+        };
+        let pipeline = self.pipeline(&module, entry);
+        let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
         self.dispatch(&pipeline, &bind, width, height)?;
         self.readback(&output, width, height)
     }

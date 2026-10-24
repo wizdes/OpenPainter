@@ -180,6 +180,33 @@ fn effect_temperature_tint(@builtin(global_invocation_id) id: vec3<u32>) {
   let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + shift, vec3<i32>(0i), vec3<i32>(255i)));
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
 }
+@compute @workgroup_size(16, 16)
+fn effect_lut_rgb(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(
+    u32(acc[src.r].r), u32(acc[src.g].g), u32(acc[src.b].b), src.a));
+}
+@compute @workgroup_size(16, 16)
+fn effect_lut_luminosity(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let old = legacy_intensity(src);
+  let diff = i32(acc[u32(old)].r) - old;
+  let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + vec3<i32>(diff), vec3<i32>(0i), vec3<i32>(255i)));
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
+}
+@compute @workgroup_size(16, 16)
+fn effect_highlights_shadows(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let l = legacy_intensity(src);
+  let highlights = bitcast<i32>(p.mode);
+  let shadows = bitcast<i32>(p.opacity);
+  let shift = (shadows * (255 - l) * (255 - l) + highlights * l * l) / (100 * 255);
+  let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + vec3<i32>(shift), vec3<i32>(0i), vec3<i32>(255i)));
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
+}
 fn unit(x: u32) -> f32 { return f32(x) / 255.0; }
 fn byte(x: f32) -> u32 { return u32(floor(clamp(x, 0.0, 1.0) * 255.0 + 0.5)); }
 fn blend(mode: u32, b: f32, s: f32) -> f32 {

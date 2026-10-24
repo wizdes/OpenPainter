@@ -164,6 +164,12 @@ internal static class Program
                 foreach((string label,string settings) in new[]{("gamma_min","{\"gamma\":0.1}"),("gamma_max","{\"gamma\":10}"),("gamma_mid","{\"gamma\":2}")})
                     Effects(name,settings,false,label);
             }
+            if(name=="Curves")
+            {
+                Effects(name,"{\"mode\":\"Luminosity\",\"points\":[[[0,0],[64,130],[128,160],[255,255]]]}",false,"luminosity_points");
+                Effects(name,"{\"mode\":\"Rgb\",\"points\":[[[0,0],[96,150],[255,255]],[[0,0],[128,90],[255,255]],[[0,0],[192,120],[255,255]]]}",false,"rgb_points");
+                Effects(name,"{\"mode\":\"Rgb\",\"points\":[[[0,255],[255,0]],[[0,0],[255,255]],[[0,0],[255,255]]]}",false,"red_endpoints");
+            }
         }
         SaveManifest(Path.Combine(Oracle,"effects"));
     }
@@ -248,7 +254,7 @@ internal static class Program
                 "Desaturate"=>new UnaryPixelOps.Desaturate(),
                 "Hue and Saturation"=>HueOp(doc.RootElement),
                 "Levels"=>new UnaryPixelOps.Level(ColorBgra.Black,ColorBgra.White,new float[]{FloatParam(doc.RootElement,"gamma",1),FloatParam(doc.RootElement,"gamma",1),FloatParam(doc.RootElement,"gamma",1)},ColorBgra.Black,ColorBgra.White),
-                "Curves"=>new UnaryPixelOps.ChannelCurve(),
+                "Curves"=>CurveOp(doc.RootElement),
                 _=>new UnaryPixelOps.Identity()
             };
             if(name=="Auto-Level")
@@ -265,6 +271,26 @@ internal static class Program
             Write(dir,$"{name.Replace(' ','_')}_{variant}_{fixture}.png",dst,name,doc.RootElement.Clone(),input,"Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source.");
         }
         if(save)SaveManifest(dir);
+    }
+    private static UnaryPixelOp CurveOp(JsonElement parameters)
+    {
+        bool rgb=parameters.TryGetProperty("mode",out var mode)&&mode.GetString()=="Rgb";
+        JsonElement points;
+        if(!parameters.TryGetProperty("points",out points))
+        {
+            using var defaults=JsonDocument.Parse("[[[0,0],[255,255]]]");
+            points=defaults.RootElement.Clone();
+        }
+        var op=rgb?new UnaryPixelOps.ChannelCurve():null;
+        var lum=rgb?null:new UnaryPixelOps.LuminosityCurve();
+        for(int channel=0;channel<points.GetArrayLength();channel++)
+        {
+            var spline=new SplineInterpolator();
+            foreach(var pair in points[channel].EnumerateArray())spline.Add(pair[0].GetDouble(),pair[1].GetDouble());
+            byte[] table=rgb?(channel==0?op.CurveR:channel==1?op.CurveG:op.CurveB):lum.Curve;
+            for(int value=0;value<256;value++)table[value]=Utility.ClampToByte(spline.Interpolate(value));
+        }
+        return rgb?op:lum;
     }
     private static UnaryPixelOp HueOp(JsonElement p)
     {

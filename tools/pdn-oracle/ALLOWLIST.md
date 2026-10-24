@@ -19,6 +19,7 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Core/HsvColor.cs` | Hue adjustment support. |
 | `Core/Histogram.cs` | Full-surface histogram for Auto-Level. |
 | `Core/HistogramRGB.cs` | Original RGB histogram and Auto-Level setup. |
+| `Core/SplineInterpolator.cs` | Original natural cubic spline for Curves control points. |
 | `Core/RgbColor.cs` | HSV conversion support. |
 | `Core/Scanline.cs` | Unary operation region signatures. |
 | `Core/ResamplingAlgorithm.cs` | Surface resampling mode enum. |
