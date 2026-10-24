@@ -1,0 +1,92 @@
+[
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {},
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {},
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/ramp_256x16.png",
+    "output_sha256": "fe9a519f401d8661dfb470f8441492dd414756dd7881299211956c6f0865161b",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {},
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/alpha_edge_64.png",
+    "output_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {},
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {},
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/checker_600x300.png",
+    "output_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {
+      "seed": "0x51ed270b",
+      "alpha": false
+    },
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/plasma_512x384.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "fixture",
+    "parameters": {
+      "seed": "0x51ed270b",
+      "alpha": true
+    },
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/fixtures/plasma_alpha_512x384.png",
+    "output_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "status": "ok",
+    "notes": ""
+  }
+]

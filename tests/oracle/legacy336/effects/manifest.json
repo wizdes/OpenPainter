@@ -1,0 +1,3842 @@
+[
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Add Noise",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Add_Noise_default_impulse_64.png",
+    "output_sha256": "ea6bf347b2202a97f7507500da890f36d9c675488d951ebedf819253e2c8f59d",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Add Noise",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Add_Noise_default_partial_alpha_64.png",
+    "output_sha256": "58eafa362c64ff7fa71355637ce1fb810ee4f28b0c975bbc935914dfd43db059",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Add Noise",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Add_Noise_default_plasma_512x384.png",
+    "output_sha256": "2ad6d9dcd7732f140f22d9a3c04e12a5bd017bc4513d7cbab0095479e91e90ee",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Add Noise",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Add_Noise_default_plasma_alpha_512x384.png",
+    "output_sha256": "48a64876b20587d516a90d8d838b5ca913baaf2143583b947c8c440f78918973",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Auto-Level",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Auto-Level_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Auto-Level",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Auto-Level_default_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Auto-Level",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Auto-Level_default_plasma_512x384.png",
+    "output_sha256": "98978d4bbe044b7a1f23995bb925b7df80af8f8d9f108084a1e2b384e41e8134",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Auto-Level",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Auto-Level_default_plasma_alpha_512x384.png",
+    "output_sha256": "deef545bf8b60629abd2da2dae085cdf11339749d07d2a9fe44499a8e4c3617c",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Obsolete compatibility wrapper; the Gaussian Blur effect is rendered directly."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Obsolete compatibility wrapper; the Gaussian Blur effect is rendered directly."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Obsolete compatibility wrapper; the Gaussian Blur effect is rendered directly."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Obsolete compatibility wrapper; the Gaussian Blur effect is rendered directly."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_default_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_default_plasma_512x384.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_default_plasma_alpha_512x384.png",
+    "output_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": -100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_min_impulse_64.png",
+    "output_sha256": "733e803fb7a59c16f8e24aa2ec32d14cee9bf6c10fc697fe7d5684eff573b4cb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": -100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_min_partial_alpha_64.png",
+    "output_sha256": "ef0fefddd1b8660f85b6ba562018b9cbcbee951dc4eda8ca85cb4f7d12674350",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": -100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_min_plasma_512x384.png",
+    "output_sha256": "3274dd7ea97cb3fe747eb30386a133e738984788ec9666b71cfcde8d79430243",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": -100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_min_plasma_alpha_512x384.png",
+    "output_sha256": "ad1e63f46f994bf12f8e3ad43345d3640e95ecf1fcf6b8db281ae9997c85e466",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_max_impulse_64.png",
+    "output_sha256": "8b2a4a15fceb9d3d2c300144902b01813608faf2556b1cd4b152344f4181e7e9",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_max_partial_alpha_64.png",
+    "output_sha256": "b2b169a7fa1d044a14c236724bacdfa0efec19a40fbed93d255249803673634b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_max_plasma_512x384.png",
+    "output_sha256": "76bc2282f0810a29b0337acf1cf83a2a5c51483cd94ba194bccca9abe9bc288b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_max_plasma_alpha_512x384.png",
+    "output_sha256": "a2450a6872e98040077c33fb38b32b95fa609a5f74d9dafe37f69b7ff6d67eb4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 50
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_mid_impulse_64.png",
+    "output_sha256": "2ae8f53e90ba4e32dd28a264ef07d2ec6f3aaf98ac995c93e7d42407e27d6742",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 50
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_mid_partial_alpha_64.png",
+    "output_sha256": "6436a85bd98d0966c111bc174beda7dd0071b77d75efb65340c35b0b930e4b88",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 50
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_mid_plasma_512x384.png",
+    "output_sha256": "75310cffab8300c79fe87bfadd7f22610b75cab8b1a3aac062ff048a0f8d18fb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "brightness": 50
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_brightness_mid_plasma_alpha_512x384.png",
+    "output_sha256": "53f9d1c5b1c5ed49ed3232848405ee8988c455dbb5f813e9c861341bb22455d5",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": -100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_min_impulse_64.png",
+    "output_sha256": "3cbdb835eea29c7e585207ba7f8184d39c58cfb95bca48b4bab6450e7af44f36",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": -100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_min_partial_alpha_64.png",
+    "output_sha256": "063573cd8cbb56945e489dc93ba48044dbad5e19152d184f0ab120b58f3642dd",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": -100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_min_plasma_512x384.png",
+    "output_sha256": "19b3b585d43f55dfa4cce5d86a8b0a60161a557aef3ee69d4a5c27fe9346dd9d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": -100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_min_plasma_alpha_512x384.png",
+    "output_sha256": "e3c7e4f58baa551de0ba67017e9ab440f457fe39dfe48f84b6fc49e360d572ef",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_max_partial_alpha_64.png",
+    "output_sha256": "d2423d52d8f698c04ade90c3277d25667592c3eca628dae48d03c7ee8097d292",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_max_plasma_512x384.png",
+    "output_sha256": "25ee25f43260aec47225c2b0c097eeecb3d8fa723fcf6d83dd390ccdb9884ccc",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_max_plasma_alpha_512x384.png",
+    "output_sha256": "837be3de6fde37b82d8280e0262e30937545a1c3c4cb51c68b4cd77b1b85f8e7",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 50
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 50
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_mid_partial_alpha_64.png",
+    "output_sha256": "173ea647026cc923463938646e45684112cb4bfd86f48d7d0784708988bd5dd9",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 50
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_mid_plasma_512x384.png",
+    "output_sha256": "6fcea87ca2727ad9a5f69c51020669ed195517d4574c663dee075c9cad5db735",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Brightness and Contrast",
+    "parameters": {
+      "contrast": 50
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Brightness_and_Contrast_contrast_mid_plasma_alpha_512x384.png",
+    "output_sha256": "bd3d21e6b33053daed00b89a325953a3a54abf19b0022585811640392e148d90",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BulgeEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BulgeEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BulgeEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "BulgeEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Clouds",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Clouds_default_impulse_64.png",
+    "output_sha256": "388f00e13a02bf0e55a0e2f9a1afad7a8f7ebef49e23652ed5672e51b7cec6cb",
+    "status": "seed-patched",
+    "notes": "Instance seed fixed to 0x5a; primary black and secondary white; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Clouds",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Clouds_default_partial_alpha_64.png",
+    "output_sha256": "388f00e13a02bf0e55a0e2f9a1afad7a8f7ebef49e23652ed5672e51b7cec6cb",
+    "status": "seed-patched",
+    "notes": "Instance seed fixed to 0x5a; primary black and secondary white; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Clouds",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Clouds_default_plasma_512x384.png",
+    "output_sha256": "86f941f7314b22a6427438cece2afd546073687f214e7beed1ce371dd963a8bd",
+    "status": "seed-patched",
+    "notes": "Instance seed fixed to 0x5a; primary black and secondary white; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Clouds",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Clouds_default_plasma_alpha_512x384.png",
+    "output_sha256": "86f941f7314b22a6427438cece2afd546073687f214e7beed1ce371dd963a8bd",
+    "status": "seed-patched",
+    "notes": "Instance seed fixed to 0x5a; primary black and secondary white; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDifferenceEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDifferenceEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDifferenceEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDifferenceEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorFillEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source class is disabled by #if false."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorFillEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source class is disabled by #if false."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorFillEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source class is disabled by #if false."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorFillEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source class is disabled by #if false."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Curves_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Curves_default_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Curves_default_plasma_512x384.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Curves",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Curves_default_plasma_alpha_512x384.png",
+    "output_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "DentsEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "DentsEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "DentsEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "DentsEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Desaturate",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Desaturate_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Desaturate",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Desaturate_default_partial_alpha_64.png",
+    "output_sha256": "0a2ada0e937c5ee6370e7e9c0000fda6bd49a0256d55caa24c14451f2e8b2789",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Desaturate",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Desaturate_default_plasma_512x384.png",
+    "output_sha256": "3a0220a6feb81d2e8d3bac36e53892e2e922d1ab67524cb2eae1dc139c23649c",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Desaturate",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Desaturate_default_plasma_alpha_512x384.png",
+    "output_sha256": "e16f485091f7512a4efb86cdd923bf915f714ecfcd60161c5938e8cdd23c374f",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EdgeDetectEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EdgeDetectEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EdgeDetectEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EdgeDetectEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EmbossEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EmbossEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EmbossEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "EmbossEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "FragmentEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "FragmentEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "FragmentEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "FragmentEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Frosted Glass",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Frosted_Glass_default_impulse_64.png",
+    "output_sha256": "ac9043daac85c7c5e39b3bba5869fac61f56d122968b754f2686534d4fc6b4f8",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Frosted Glass",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Frosted_Glass_default_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Frosted Glass",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Frosted_Glass_default_plasma_512x384.png",
+    "output_sha256": "a7ceeefeb78224daa0f66ae2e260ac41067905944694ab1ca8fa02e0b7ce75e0",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Frosted Glass",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Frosted_Glass_default_plasma_alpha_512x384.png",
+    "output_sha256": "d2789f6467e5d1ed1b37c992d103e73d792e189749fdb25f94bb95562e4ee5d9",
+    "status": "seed-patched",
+    "notes": "Random seed fixed to 0x51ed270b; pixel math unchanged."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_default_impulse_64.png",
+    "output_sha256": "a60a5d4e2b235d9c42f9a24862c471e6afd62f005b6ee39baf78ccee0a06f025",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_default_partial_alpha_64.png",
+    "output_sha256": "25e9fe7d7a3e18399a04420a3167c0985069c6630164edc10775376e4f68efaf",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_default_plasma_512x384.png",
+    "output_sha256": "81630d570d7cf299cbb3dfec4264bf0c347d410bae24fa09a3d1eeb221831190",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_default_plasma_alpha_512x384.png",
+    "output_sha256": "f5f8cacdf382f62297f356f633c208772d8c5282ad8ac9bc4533c20d46806dcc",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_min_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_min_plasma_512x384.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_min_plasma_alpha_512x384.png",
+    "output_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 200
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_max_impulse_64.png",
+    "output_sha256": "774d02c24278eb5c0c9eb4f8d5f4eabb5891a6b9c01429492d43d5c89b7a3928",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 200
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_max_partial_alpha_64.png",
+    "output_sha256": "14eb63d35cb4a973a13896c414c48d296bea6c46a35fe60a3af86e91d0e62a15",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 200
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_max_plasma_512x384.png",
+    "output_sha256": "2fab565bbd326fe86612a0798c183ffe28c1ee6321975c7714cfe0d50c06845d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 200
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_max_plasma_alpha_512x384.png",
+    "output_sha256": "6902c07c899642a9b888a0a29fc0fb19ee9e3b8d8c53eced7e7c27618f2fc804",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_mid_impulse_64.png",
+    "output_sha256": "774d02c24278eb5c0c9eb4f8d5f4eabb5891a6b9c01429492d43d5c89b7a3928",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_mid_partial_alpha_64.png",
+    "output_sha256": "14eb63d35cb4a973a13896c414c48d296bea6c46a35fe60a3af86e91d0e62a15",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_mid_plasma_512x384.png",
+    "output_sha256": "d2ae2e0d29002fe6f5b1b328c8a254e4a9f115f5119eca6049b54ce689971485",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Gaussian Blur",
+    "parameters": {
+      "radius": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Gaussian_Blur_radius_mid_plasma_alpha_512x384.png",
+    "output_sha256": "93b8495c9ddc1f50a8802a2e91fccc50139ffad173a1b538b395d94fc612dd58",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "GlowEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "GlowEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "GlowEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "GlowEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_default_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_default_plasma_512x384.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_default_plasma_alpha_512x384.png",
+    "output_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": -180
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": -180
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_min_partial_alpha_64.png",
+    "output_sha256": "6f636ed4de94a4b2dfcfe0901e2a6f02b9ca5243988ec97fa73fc6d3bcad53b5",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": -180
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_min_plasma_512x384.png",
+    "output_sha256": "06183bdd1dbf20d3156be97feaba9ddab1fb9cbafed56997678a990bd57e0ebc",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": -180
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_min_plasma_alpha_512x384.png",
+    "output_sha256": "2ec2216cec1a66a53b4b71b3704fa0ed3656f0ebe5c8fe2ba639c6408a0b5d7a",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 180
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 180
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_max_partial_alpha_64.png",
+    "output_sha256": "6f636ed4de94a4b2dfcfe0901e2a6f02b9ca5243988ec97fa73fc6d3bcad53b5",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 180
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_max_plasma_512x384.png",
+    "output_sha256": "06183bdd1dbf20d3156be97feaba9ddab1fb9cbafed56997678a990bd57e0ebc",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 180
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_max_plasma_alpha_512x384.png",
+    "output_sha256": "2ec2216cec1a66a53b4b71b3704fa0ed3656f0ebe5c8fe2ba639c6408a0b5d7a",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 45
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 45
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_mid_partial_alpha_64.png",
+    "output_sha256": "7a4a9ae0e4ee70322a584c19acaf7c1764238ab2e7b011956a6a4dae3aca413b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 45
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_mid_plasma_512x384.png",
+    "output_sha256": "d5051d80b2e21412c5baf1e8e9a9b010afe5438072ea1ad69bbea950d06143ef",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "hue": 45
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_hue_mid_plasma_alpha_512x384.png",
+    "output_sha256": "8f62b1f590d27de8872059ceae030269c0e41115d2b1da35a32aba44945476f1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_min_partial_alpha_64.png",
+    "output_sha256": "32fb5163767922f61f93673b27fff00425af2c9ba69ed41321fe5017026ba79c",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_min_plasma_512x384.png",
+    "output_sha256": "8b9c737818d9063e4c8c8b95bdae243e61cae71c2f68f0febb4e996aa2f4594b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_min_plasma_alpha_512x384.png",
+    "output_sha256": "cdd8cfb403f920147e5a494b3f062705071e6efbe253f7614c538095cd015b03",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 200
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 200
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_max_partial_alpha_64.png",
+    "output_sha256": "3cc78252446c25268e3b177c0a670d04d367dd003937b95d734915da9748dc2e",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 200
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_max_plasma_512x384.png",
+    "output_sha256": "0b279bf10a788b5e6d843ad67c59b5340a575bc708a9c17b82559e6f4aadc7bc",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 200
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_max_plasma_alpha_512x384.png",
+    "output_sha256": "b9390de5075446839eccad946b081941788effa7bb3b9a7d933a649d876231b4",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 150
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 150
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_mid_partial_alpha_64.png",
+    "output_sha256": "d96ffb8ba5d6a96c4c915c8ffdef60322c4145166e001101bde3bc2f1d46aa68",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 150
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_mid_plasma_512x384.png",
+    "output_sha256": "4c8eddd0c72a80c4f59c5a9b91c82326681596fa9879f07b9db97f3b49b308c0",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "saturation": 150
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_saturation_mid_plasma_alpha_512x384.png",
+    "output_sha256": "1f0dd1a5e894125fd5e6f2756b6f5c8432e6a96aa543ec8f5cb99adf5a3d035f",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": -100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_min_impulse_64.png",
+    "output_sha256": "774d02c24278eb5c0c9eb4f8d5f4eabb5891a6b9c01429492d43d5c89b7a3928",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": -100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_min_partial_alpha_64.png",
+    "output_sha256": "5569bb23bed43920e61c766ba9333c48628c5a167edd3cd29623ea2dcbfe397b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": -100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_min_plasma_512x384.png",
+    "output_sha256": "71641056ab5fb27287ac50118850919923d630f98cdb189959e4489e4c033e26",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": -100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_min_plasma_alpha_512x384.png",
+    "output_sha256": "785884bb5a3ef8715908caf50dc4377e9a49ea0456dfbcd8671343b52f5ba26a",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_max_impulse_64.png",
+    "output_sha256": "bd22a72653cf564cb6e9f813e6601e8e878af852f214d01ab54c7285a4eda4d5",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_max_partial_alpha_64.png",
+    "output_sha256": "c4c29453796016978b0e9837e5f63fb3a2a5129a969612f39282aa042ef93d44",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_max_plasma_512x384.png",
+    "output_sha256": "7d5ffa6427a015c273653bcd3aa0806da95d2c58f1069808292a6e0ce476d7bb",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_max_plasma_alpha_512x384.png",
+    "output_sha256": "c8e6ca4169610962f0566e92b58e1fe114f810602e65bf980b23805285d5d11a",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 50
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_mid_impulse_64.png",
+    "output_sha256": "693813c5861da2f2388b6d9f5e8f51211870a89555994d83a8dccc160f55598b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 50
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_mid_partial_alpha_64.png",
+    "output_sha256": "8b83998ab75778555a28f22a85a808fdfd9dd9f6383830c62966fb2fff44c93b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 50
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_mid_plasma_512x384.png",
+    "output_sha256": "d1d6fd4b6bbf7690f6666a8a759591b4ebaf5111fe6af743ec77f4557b37e6a6",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Hue and Saturation",
+    "parameters": {
+      "lightness": 50
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Hue_and_Saturation_lightness_mid_plasma_alpha_512x384.png",
+    "output_sha256": "23917478c20e0eeef0a4103c2d8be2eb939b83798376135677a1789e94229d62",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "InkSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "InkSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "InkSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "InkSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Invert Colors",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Invert_Colors_default_impulse_64.png",
+    "output_sha256": "4349f8cc2d77c621b00c1354d9f6f726ee8d573bfe88bc23f3e24598dae00fcf",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Invert Colors",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Invert_Colors_default_partial_alpha_64.png",
+    "output_sha256": "39002b31bc42bdf214ea576265ca237da93339d66165dcad61218170982a84fc",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Invert Colors",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Invert_Colors_default_plasma_512x384.png",
+    "output_sha256": "06b07737a4c870d3725fb8c9c8a42b5bcb726bab98223ca0d7162a414c8c92c3",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Invert Colors",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Invert_Colors_default_plasma_alpha_512x384.png",
+    "output_sha256": "c5f6818c28fc928b4f24602ffb71125e90bcdafdcbb26f1e27d9b3145076e233",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "JuliaFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "JuliaFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "JuliaFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "JuliaFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Levels_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Levels_default_partial_alpha_64.png",
+    "output_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Levels_default_plasma_512x384.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Levels_default_plasma_alpha_512x384.png",
+    "output_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 0.1
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 0.1
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_min_partial_alpha_64.png",
+    "output_sha256": "e2dd3895d91838ae73aa1ed9902038c87bbc3ea7e94569328093ed8b30e5a7c6",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 0.1
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_min_plasma_512x384.png",
+    "output_sha256": "0d801e225a89949823f3008b6a352764e10941a66bac9ac6d15aa3c33a502e34",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 0.1
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_min_plasma_alpha_512x384.png",
+    "output_sha256": "8436cb445ffc54d47fa8cbcf7ed5521025424909355182e02620af01190d3aa7",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 10
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 10
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_max_partial_alpha_64.png",
+    "output_sha256": "896b70adf207b49e4bb98d0ac5812d7f82ded745144ac51e11b1309c1d64ecd6",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 10
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_max_plasma_512x384.png",
+    "output_sha256": "88055f6030636a788183c27e5c148f8da089eded747d9f5e18f7a93808f482ba",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 10
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_max_plasma_alpha_512x384.png",
+    "output_sha256": "ad26dcc7855c4577d7f02ec4194d4ce738afb84d05a1bc50b44e7a7ed73aea4b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 2
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 2
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_mid_partial_alpha_64.png",
+    "output_sha256": "19d3e80faad4b954e1ad897caa9b96e4cd6d7dc8d63ba80984cd274ce8318da5",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 2
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_mid_plasma_512x384.png",
+    "output_sha256": "239fe5bee51b275e51608cb68a9dcefed48afefccdbdaa90a253faf66c0f92dd",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Levels",
+    "parameters": {
+      "gamma": 2
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Levels_gamma_mid_plasma_alpha_512x384.png",
+    "output_sha256": "13bb4d9fcbeaa0965eeb51543c5d351b75a1ae1ed89b9009578b589cbeb0cd5b",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MandelbrotFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MandelbrotFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MandelbrotFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MandelbrotFractalEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MedianEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MedianEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MedianEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MedianEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MotionBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MotionBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MotionBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "MotionBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OilPaintingEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OilPaintingEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OilPaintingEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OilPaintingEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OutlineEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OutlineEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OutlineEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "OutlineEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PencilSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PencilSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PencilSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PencilSketchEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PixelateEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PixelateEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PixelateEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PixelateEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PolarInversionEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PolarInversionEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PolarInversionEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "PolarInversionEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_default_partial_alpha_64.png",
+    "output_sha256": "48dab83658d092ad031ba02ba82ef06c5aea3494952a26da2fe3444fe771132d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_default_plasma_512x384.png",
+    "output_sha256": "d8992dbaa58d2686e97aa4d08b15e006b4ee390e7c28a924faa8868ce2388d5f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_default_plasma_alpha_512x384.png",
+    "output_sha256": "ac7107874b8c5d4b79234640ff62ab5366c92910b3e5a09fa608bbddaa165764",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 2
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 2
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_min_partial_alpha_64.png",
+    "output_sha256": "c15078f9cb9601e197027599b867926fce21bcc8dbb5bc7a63b66ce7c5f4e7f5",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 2
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_min_plasma_512x384.png",
+    "output_sha256": "fc3272270a0e4ece9b701e16f61894513b466a7b66a8ceeb8814599da941d363",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 2
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_min_plasma_alpha_512x384.png",
+    "output_sha256": "452217139c0c5e525c7fbe7724f97af124fcedb93f269be3283068f64693ac90",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 64
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 64
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_max_partial_alpha_64.png",
+    "output_sha256": "73bdfca8203a5f9950d8ca5bd4fe5680277a7850a6a958767a9bb7e616a022e3",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 64
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_max_plasma_512x384.png",
+    "output_sha256": "7e7d38015812ca57c3d7d8da4069ebdb55378d92a16f7cbac3c04edc19c4e379",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 64
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_max_plasma_alpha_512x384.png",
+    "output_sha256": "360cccc96427e237430c442b95ff1486926c6fa9dde5a110935d08c0cc630af3",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 32
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 32
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_mid_partial_alpha_64.png",
+    "output_sha256": "162babfbd15d0849faa168bc2f6ec6ef21ff59d2211853207ba45014b46ca878",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 32
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_mid_plasma_512x384.png",
+    "output_sha256": "91fd2676dcfbb72fdff07629a90b8957e13d97d214273eb61956b86ead77e1f7",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "red": 32
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_red_mid_plasma_alpha_512x384.png",
+    "output_sha256": "5eb732307605330829f4abf79c788708001afc1e7f660173061ab815a94e1732",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 2
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 2
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_min_partial_alpha_64.png",
+    "output_sha256": "9cb024e2f4aa3fd27615dbed6fbdc915bbdc2e5b02d927b4069d018dea9b8b53",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 2
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_min_plasma_512x384.png",
+    "output_sha256": "56fef2e03cc7e38c1c23c14d2d562d1db161511ecb548c8a126b2b7f019022fc",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 2
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_min_plasma_alpha_512x384.png",
+    "output_sha256": "91b9f9363196890fa60e767e8076f0082fb9d83ae487fdabc504269fdd8f7165",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 64
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 64
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_max_partial_alpha_64.png",
+    "output_sha256": "48dab83658d092ad031ba02ba82ef06c5aea3494952a26da2fe3444fe771132d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 64
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_max_plasma_512x384.png",
+    "output_sha256": "0cf2ceb17182fbb83b57bb7419ad182ebec1e0dec63c11c64d045e05d9b7ffd7",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 64
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_max_plasma_alpha_512x384.png",
+    "output_sha256": "d0a605c708e5166f0f995f18cdec465bd5a06c2660d0db6d61f790ebc9f48555",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 32
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 32
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_mid_partial_alpha_64.png",
+    "output_sha256": "49fe9db105eabb2749eac0b7c60f9b48e3200dfaa1ab1505afca87d9b8acfcf8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 32
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_mid_plasma_512x384.png",
+    "output_sha256": "c0803a97e49cb2159693d5750f3839e2fb7b7762994b384f750b40e55f751ae8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "green": 32
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_green_mid_plasma_alpha_512x384.png",
+    "output_sha256": "6d4e4ce72dc8576e8e12344c601bcfcddf6dd6c8325346de74caf2149378f59c",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 2
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_min_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 2
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_min_partial_alpha_64.png",
+    "output_sha256": "afdbe7484a87ce70383e795bfad6d5f50049ec3d26cc0f183b395cc177e626b5",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 2
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_min_plasma_512x384.png",
+    "output_sha256": "b5b9e24195bdc148a8a528f3213ce4fa2cddcc4a8e9729f0335a2c0584b140c0",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 2
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_min_plasma_alpha_512x384.png",
+    "output_sha256": "3f25f5aaeaf9120dc2b76f07bc36d0df6c63b8f9fd78ff3b4dd9ac76694a6749",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 64
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_max_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 64
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_max_partial_alpha_64.png",
+    "output_sha256": "a2a40daa4e08fa32147ad2c94458dac775554281de5917bc49e864ca94055a5e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 64
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_max_plasma_512x384.png",
+    "output_sha256": "6947102843684d90c0556159990316e933f8eda5224ab38d59722920f8025cb8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 64
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_max_plasma_alpha_512x384.png",
+    "output_sha256": "73ba2fe1eb65cfb10c795a6fd430ac33136366c230d699d1cb49b93e86a799a7",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 32
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_mid_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 32
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_mid_partial_alpha_64.png",
+    "output_sha256": "c2952f02e403bd89e12f4c849a3d6a89f723cd266a96614d9470fd456059238c",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 32
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_mid_plasma_512x384.png",
+    "output_sha256": "609e3cfd87f6627d7c03aa39bfa17b058cd45902205215a2ffdd1cbc3a548803",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Posterize",
+    "parameters": {
+      "blue": 32
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Posterize_blue_mid_plasma_alpha_512x384.png",
+    "output_sha256": "91428246681fd23b6926878308c36b7edd29c773114efd8c228896931a0684a4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RadialBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RadialBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RadialBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RadialBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RedEyeRemoveEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RedEyeRemoveEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RedEyeRemoveEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RedEyeRemoveEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReduceNoiseEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReduceNoiseEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReduceNoiseEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReduceNoiseEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReliefEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReliefEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReliefEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ReliefEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RotateZoomEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RotateZoomEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RotateZoomEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "RotateZoomEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Sepia",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Sepia_default_impulse_64.png",
+    "output_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Sepia",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Sepia_default_partial_alpha_64.png",
+    "output_sha256": "ccc49c8130a1e3f7b78e6fba3bd1585d69f008cde4eb166f0c1533a765dda0e8",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Sepia",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Sepia_default_plasma_512x384.png",
+    "output_sha256": "2b473e888e3490a88372bb27c53676df9edcf08adda2ed92c7edeebc9f745b63",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Sepia",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Sepia_default_plasma_alpha_512x384.png",
+    "output_sha256": "cf2f62905919996153c87c87b1f038b68b6a88a660c610799d22eda0c543c57e",
+    "status": "ok",
+    "notes": "Original OpenPDN UnaryPixelOps and HistogramRgb; effect setup follows the 3.36 source."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SharpenEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SharpenEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SharpenEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SharpenEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SoftenPortraitEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SoftenPortraitEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SoftenPortraitEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SoftenPortraitEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SurfaceBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source file is excluded from the OpenPDN 3.36 Effects project."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SurfaceBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source file is excluded from the OpenPDN 3.36 Effects project."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SurfaceBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source file is excluded from the OpenPDN 3.36 Effects project."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SurfaceBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "Source file is excluded from the OpenPDN 3.36 Effects project."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TileEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TileEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TileEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TileEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TwistEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TwistEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TwistEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "TwistEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "UnfocusEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "UnfocusEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "UnfocusEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "UnfocusEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "VignetteEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "VignetteEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "VignetteEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "VignetteEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ZoomBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ZoomBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ZoomBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ZoomBlurEffect",
+    "parameters": {},
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "",
+    "output_sha256": "",
+    "status": "not-run",
+    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+  }
+]

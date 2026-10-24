@@ -1,0 +1,2102 @@
+[
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Additive_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Additive_64.png",
+    "output_sha256": "51841fe0c205917e508b275d0d20abde9813bfbde5743adffa2fba215bac793d",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Additive_128.png",
+    "output_sha256": "e1d085cbb3274660e0cdbaac216640b3c8ac67b250204e74912ac3f0c11451fa",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Additive_192.png",
+    "output_sha256": "b0e1867dca66bbf2ac6c89a512f46af1e3a67ec11556ee4fb49cf1cce1940e6d",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Additive_255.png",
+    "output_sha256": "f78198a8206e833f6242aa2acaef7b90c3cf6eb67e0ef8085e6c905cd76f630e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorBurn_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorBurn_64.png",
+    "output_sha256": "5f7d698a212bfbd9d19cf8e3d60ef7e26a3688c6ab0803d6c193683aa49a0ed3",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorBurn_128.png",
+    "output_sha256": "fcf2e5da1eac0ae31ca30e7b3c06482bf5133f4b28cd4968651fa50547f921ca",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorBurn_192.png",
+    "output_sha256": "dcd338f6cf29594728c5bdbb52616fc1573a63d6b5b4f0ad11616371f35dc1c7",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorBurn_255.png",
+    "output_sha256": "0efd65039651f194dacef5cad364d0210437bff9d7d1a355d262efe82fb3ec4b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorDodge_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorDodge_64.png",
+    "output_sha256": "59e5d74f1e7db0c016f044041128849dd26f1f14f7007099c8c0c00d6f0ae884",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorDodge_128.png",
+    "output_sha256": "c0ccc7fdee22fa87ed9470c2a335506d8c18b7b1bd3a58f7285304e5a0393b62",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorDodge_192.png",
+    "output_sha256": "78b23f80092fd921245dca62be5b94baa53ce0fde78ce5c8ad1b8049a748da31",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_ColorDodge_255.png",
+    "output_sha256": "1f4f8c56627e254062cefbb0f32b7d79010f522b305bef2c2cd3b2d06ae4e3d3",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Darken_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Darken_64.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Darken_128.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Darken_192.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Darken_255.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Difference_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Difference_64.png",
+    "output_sha256": "b278a8b0b47ef94742b6f2483d822e7d645255349cc68fa7b624b8ca949bbf96",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Difference_128.png",
+    "output_sha256": "94d7b4accce0b80a09b69bcbf7eb11752dc7a6bdedc0574da56fe0e902c3da19",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Difference_192.png",
+    "output_sha256": "12d7eb7f7e0dc209ec543a252b9fadf58178b62bd68fed4abde4cadef1146679",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Difference_255.png",
+    "output_sha256": "5990d6a74de1d57c758a77ac7b8a28794bfff33570db51d4910cbc8881f4d9a6",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Glow_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Glow_64.png",
+    "output_sha256": "ec3b6917e1267e52102f717d68e3f5d2c084308615d0ee56fa9146847b55d504",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Glow_128.png",
+    "output_sha256": "c5c33a4e7b8ed4ddd147e068a3274ced1a27e36034b9551ac1fa3f7574c8be00",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Glow_192.png",
+    "output_sha256": "1640d3c413d901c941e6e4c354eee8227035c67bed97e6d48a17e0f08a34ea24",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Glow_255.png",
+    "output_sha256": "b6e01415b53d454ee441db497f49778afa8350324e7ce7009296cfd61ce9eb9e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Lighten_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Lighten_64.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Lighten_128.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Lighten_192.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Lighten_255.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Multiply_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Multiply_64.png",
+    "output_sha256": "485514421233ff100c100b4a2868134a0caed69a96e96350ed1e5911ad2e0808",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Multiply_128.png",
+    "output_sha256": "a50c7997434ff2df69990ce7a6fa262a09724c92bf8101fca89237e7f81bf903",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Multiply_192.png",
+    "output_sha256": "a563fba38c36e4b5cb1288a3fc1830f397527ce6c449ff29ff85898059c69a45",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Multiply_255.png",
+    "output_sha256": "4cbc2ad374bdacf3fdac96a51051b60a9ade29cf975922089fa4a657eead5bab",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Negation_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Negation_64.png",
+    "output_sha256": "83e8e6aeff9370639732c26726ddbafb8d565c1a7b839e040660c093e5d892a7",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Negation_128.png",
+    "output_sha256": "653e0ecdf3fa2139dc4847d42b6cda728db82ebf0ed21bef1fcb6ffc87de0a0b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Negation_192.png",
+    "output_sha256": "886fa4a1c6d0b76f12477c80068eb7a79bb918416b87998e70c619a65784357f",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Negation_255.png",
+    "output_sha256": "f1128d6407046eed5863de7eb3b5717141b9acc06ca4455d62d5c0a9316888da",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Normal_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Normal_64.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Normal_128.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Normal_192.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Normal_255.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Overlay_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Overlay_64.png",
+    "output_sha256": "4275a339bfad1d87e3646bbb86f056f1028da816bf132aa80cdc5fa6a44c9b33",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Overlay_128.png",
+    "output_sha256": "bb8203060c97ce5850aff741b99178a3a8946d243718be5a1afd7d6769174a92",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Overlay_192.png",
+    "output_sha256": "f68e320270cfb128f052b7460633c14d52ea3262e87d0888f945165d6c75225c",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Overlay_255.png",
+    "output_sha256": "9b9be6b6258a3f4012ac5335747f9278a08e347dedbaca3759747b85a7460112",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Reflect_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Reflect_64.png",
+    "output_sha256": "ec3b6917e1267e52102f717d68e3f5d2c084308615d0ee56fa9146847b55d504",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Reflect_128.png",
+    "output_sha256": "c5c33a4e7b8ed4ddd147e068a3274ced1a27e36034b9551ac1fa3f7574c8be00",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Reflect_192.png",
+    "output_sha256": "1640d3c413d901c941e6e4c354eee8227035c67bed97e6d48a17e0f08a34ea24",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Reflect_255.png",
+    "output_sha256": "b6e01415b53d454ee441db497f49778afa8350324e7ce7009296cfd61ce9eb9e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Screen_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Screen_64.png",
+    "output_sha256": "59cf15ad0c83bfdc5aed8b6595cc3d9fc8b45c721c759b895d9eeeccb68b96a8",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Screen_128.png",
+    "output_sha256": "b00be6d9d29e3d17eee3fe8de6dfb420daa56dec95d79290af309e5d14ed5d8f",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Screen_192.png",
+    "output_sha256": "c47275b6a441c2d100957bca2dfbf0a8adbf76368891a843f2b51f3d408cecd5",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Screen_255.png",
+    "output_sha256": "6217f6e4a8a1a4d5cb503cacccbac3ccc80efec9e2f155310253c1d3152eedbb",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 0,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Xor_0.png",
+    "output_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 64,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Xor_64.png",
+    "output_sha256": "b278a8b0b47ef94742b6f2483d822e7d645255349cc68fa7b624b8ca949bbf96",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 128,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Xor_128.png",
+    "output_sha256": "94d7b4accce0b80a09b69bcbf7eb11752dc7a6bdedc0574da56fe0e902c3da19",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 192,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Xor_192.png",
+    "output_sha256": "12d7eb7f7e0dc209ec543a252b9fadf58178b62bd68fed4abde4cadef1146679",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 255,
+      "upper": "plasma_alpha_512x384"
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/blend/plasma_512x384_plasma_alpha_512x384_Xor_255.png",
+    "output_sha256": "5990d6a74de1d57c758a77ac7b8a28794bfff33570db51d4910cbc8881f4d9a6",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Additive_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Additive_64.png",
+    "output_sha256": "71ae3f97e04bbd0032eaab57977aa07938e1a408ca1b52aab28ab59f78431089",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Additive_128.png",
+    "output_sha256": "d352f7b9cc07f2e1c3348d1cc681c6e5b504dceccdb620b81c07fb899b5f6c8a",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Additive_192.png",
+    "output_sha256": "d20b795e395e396e14ad83a287bef3b209769f07ec87116e0310e698bd21d3ec",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Additive",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Additive_255.png",
+    "output_sha256": "c09e1e02a308f53bb6bf0b930d33631ce82b0a0eafc18f7b8b6873079c70ecb3",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorBurn_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorBurn_64.png",
+    "output_sha256": "200bd7f927560ce20eb145ce5adb05dec42f4f4e8708e6b3f3e7e5305fefa3fa",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorBurn_128.png",
+    "output_sha256": "668dbe9891b24da4b986f147d571d1f0fe17dc65247e5b8017db0eb2ec1f13c5",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorBurn_192.png",
+    "output_sha256": "94f4f96e004172fd0b6549968b675781ed31912291d182c61342c055aedb57b8",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBurn",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorBurn_255.png",
+    "output_sha256": "bc77f600351e4b8fc1b5afcccbf5ee6c7cd347d50e8a97c5ea321f0667fa28b1",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorDodge_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorDodge_64.png",
+    "output_sha256": "5dafb6f4da655f97c88adab17c586a8cc5d57c41e0d70ce6b1208bdb77b4fd8c",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorDodge_128.png",
+    "output_sha256": "7e742ad718d03d1bcba01dbc6f7907a434e359bd0d2696fa127ae631b96eff72",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorDodge_192.png",
+    "output_sha256": "ffdf017720c784dad172b64e8e3667c3fe1f4a20a9eca13d2361ce21b49adee6",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorDodge",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_ColorDodge_255.png",
+    "output_sha256": "47236cfd92b1cbbb25e0ea492706eaebea4cc50c403b1eeb7be740abf99c23d9",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Darken_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Darken_64.png",
+    "output_sha256": "9c74efbfde4fd5647bd23f5efc16cbf69b7b8726bded4580ba145b10f26c379e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Darken_128.png",
+    "output_sha256": "092b985b4536392b1a89e9407a5b67c63b9aa0b117664f706dfb4709e8f68962",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Darken_192.png",
+    "output_sha256": "351b91711261d8e59f7b4253cc38402c02de2bad538dd144aa45f6756f9da58c",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Darken",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Darken_255.png",
+    "output_sha256": "c37c04acef00af323412b27076b2d9b176daeb713e00f05b406bfa8a8298b202",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Difference_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Difference_64.png",
+    "output_sha256": "9efb884de8c21a06e46e0d6d4bc99a137d41c400f61a1e130d46328a5b90c14e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Difference_128.png",
+    "output_sha256": "fda189cb048f74604052fa6f87938c4b42adf604e9f05059050e7d48ceefd348",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Difference_192.png",
+    "output_sha256": "42391b9ef23e580115539fce5eb353bc67d67ded36ae5cee814e51b83582de9b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Difference",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Difference_255.png",
+    "output_sha256": "d1cbcd83b0330e52d66649814f769b1b2f73d309e953374ab12e973d60021875",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Glow_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Glow_64.png",
+    "output_sha256": "884fa4dd96e0bd3da42ceaa36dc6de12cac25ee9b44d6ba9301a35231e44812a",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Glow_128.png",
+    "output_sha256": "fda7caa7208c2931270a39df8ee8bb46a066cfb9dde71379e75e36bbd8ad1bce",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Glow_192.png",
+    "output_sha256": "e5e02cdc67a60afef8c64f6685fbbace5eb289621652241989567a6cda64ae34",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Glow",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Glow_255.png",
+    "output_sha256": "8ba928619ef1faf247baa0cb98ac1325a39616416093734a5c4f6480a1db8132",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Lighten_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Lighten_64.png",
+    "output_sha256": "3887e6316647f08b2aa4316a4a39c4b87d63caf5f1a03f88fb390b08723760bb",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Lighten_128.png",
+    "output_sha256": "e9807605dacb3fb1bcb4bc337511d975c2bffa70a5d98a1a9bf0c9e5e9b1de4e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Lighten_192.png",
+    "output_sha256": "c33575c83371a0ba1dea4b10d9c9fa96a1e5ad094e30936d51f8a7c2bd43804b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Lighten",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Lighten_255.png",
+    "output_sha256": "385f1154ed4a49c81178ed3bdf28c556fcfb317b41a92804be4b9fec0aa60b18",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Multiply_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Multiply_64.png",
+    "output_sha256": "6b8826b3863b01fc8a0a15eb5097ff2bd19e69a83231ee742aaec8a95b80bf7c",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Multiply_128.png",
+    "output_sha256": "00b3b4ca91e5334ac49b6796b9b312eae5e3dd69f9c3a03bbc598e5cc0a11c74",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Multiply_192.png",
+    "output_sha256": "8fb776fdc9f38c6989f8ebf6e98366c343e2d9ba65fb6f39ea37e734668490a6",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Multiply",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Multiply_255.png",
+    "output_sha256": "01c366b93dca67c330a631dfcc308a273017d77318e2c9a48142aba5d505e889",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Negation_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Negation_64.png",
+    "output_sha256": "899ca784958ab039145e179607a6dc2d074d883e32dfd661c1f501d209addada",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Negation_128.png",
+    "output_sha256": "f74b52f7ae813a8e5fe80c190f6937a19b9599374dac6914d43b39fb2ab6dc3d",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Negation_192.png",
+    "output_sha256": "4c554f5f2158ce01315c7fd1c0aad46246df1a3abd5f1f68606df82ab2fe1036",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Negation",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Negation_255.png",
+    "output_sha256": "216852cdbbc59030ce6f284788fc3d10feef45286cc8c1b62453b9aa6f5cc93b",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Normal_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Normal_64.png",
+    "output_sha256": "e85f6b9dfd76f4337044b9883ca92b511658efd05415b16a337f7a0e0cc33b4f",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Normal_128.png",
+    "output_sha256": "a2c7beebcdec5097e330c769dfc6b1fc5aa8bcca13d571650284e7bc237cce73",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Normal_192.png",
+    "output_sha256": "09029aab05f061c2774e27a7f816e1e0736627720a8bbf20249db31c28e406a7",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Normal",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Normal_255.png",
+    "output_sha256": "2d4f82369e66ae94c1ad5440319649164544f54b81e00af2d9ec5b77f10400d2",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Overlay_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Overlay_64.png",
+    "output_sha256": "4fabb12175e13b14629aa0cae664f7a63fa6ead23e79d3c1ea045f1f5080846a",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Overlay_128.png",
+    "output_sha256": "381fe86d1de73a090cce50622879e3773f890fa2a79e1fdfa2df5ccf3df57264",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Overlay_192.png",
+    "output_sha256": "1c611fec00f82813c74eddd09cea11b747961208a00467c7f66dd22a5c8b8aa5",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Overlay",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Overlay_255.png",
+    "output_sha256": "cca9b1bf2255a128a242fee7a4154a6dc22b07dcd0b6ae1d1385dd3b31466954",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Reflect_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Reflect_64.png",
+    "output_sha256": "13fd0fab76c860b4c934c6570a52f1b8de865180dbde47b0f4b18118ae22ccbc",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Reflect_128.png",
+    "output_sha256": "8fede0bffc98879454c7277a27b62abb741c6a952950cf59001adafb0044aa2e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Reflect_192.png",
+    "output_sha256": "fdf6cc7170bcf650120c80e516bef86489ccc1b7f6b59eb8c03783babc6faf9f",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Reflect",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Reflect_255.png",
+    "output_sha256": "2b592b5c4ed5023bd49a3163efa58c1d894b35daaf9d927dffe98224519f760e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Screen_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Screen_64.png",
+    "output_sha256": "255ccf9d3f9b4b3076a58cf7f6ccbaa3b6cbbb20b21fa8e31be59d37d7ff95d3",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Screen_128.png",
+    "output_sha256": "e5191a5447720d46ce30edfe8774930f1818731d1ff9904e2ebd423d36dac332",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Screen_192.png",
+    "output_sha256": "d52d18e8409f09be87b109eafc41e40dc24d754275de39004ad29b75497e4188",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Screen",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Screen_255.png",
+    "output_sha256": "b05842e7dc821401a09320c6cdb64d5859f2b2ae57596d32df46b69723f484d7",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 0,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Xor_0.png",
+    "output_sha256": "c715de022e7816c3a44cc0b58d73ddfe6690de433c89e5c23bda043e08bc6333",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 64,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Xor_64.png",
+    "output_sha256": "9c62df06fe860f687ea0d583940b8204e6748805443549a5a841303fe1dc4320",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 128,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Xor_128.png",
+    "output_sha256": "7f07840e0e8696394a7b95b9414ec412eff9d489486d43d0f68e3d81f49f4943",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 192,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Xor_192.png",
+    "output_sha256": "6b1087b16fb38ed08fdaed6f6d134224c94d441d468f225108e9f84929b501b6",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Xor",
+    "parameters": {
+      "opacity": 255,
+      "upper": "alpha_edge_64"
+    },
+    "input": "tests/fixtures/checker_600x300.png",
+    "input_sha256": "389abc159b456e9596ddc90368fda1a5f152b3f6ee04b1b88a1b47147fd43256",
+    "output": "tests/oracle/legacy336/blend/checker_600x300_alpha_edge_64_Xor_255.png",
+    "output_sha256": "255f83c549ed9593789ecafddb9b1030004711cf6cc3056fa44b62452a8d8c9e",
+    "status": "ok",
+    "notes": "Upper input SHA-256: 2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6"
+  }
+]

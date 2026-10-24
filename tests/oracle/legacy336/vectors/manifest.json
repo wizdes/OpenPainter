@@ -1,0 +1,72 @@
+[
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Utility.FastScaleByteByByte",
+    "parameters": {
+      "pairs": 65536
+    },
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/oracle/legacy336/vectors/fast_scale_byte_by_byte.json",
+    "output_sha256": "90690389abae019694d9358fa19c0406a97980df61073f4fe628803d8080dc49",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBgra.Lerp",
+    "parameters": {
+      "pairs": 65536,
+      "fractions": [
+        0,
+        64,
+        128,
+        192,
+        255
+      ]
+    },
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/oracle/legacy336/vectors/color_bgra_lerp.json",
+    "output_sha256": "deeec23add78b932f9ef2a64d72fc5a3c84e67a02dbd670dcb4fea6f9a2f8a83",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "ColorBgra.Blend",
+    "parameters": {
+      "pairs": 65536,
+      "alpha": [
+        0,
+        64,
+        128,
+        192,
+        255
+      ]
+    },
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/oracle/legacy336/vectors/color_bgra_blend.json",
+    "output_sha256": "55c3e615d9d818fedc456e5b75185d3483f2d2c35c9ad755a41ee2e13642a4cc",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "GaussianBlurEffect.CreateGaussianBlurRow",
+    "parameters": {
+      "radius": 2
+    },
+    "input": "",
+    "input_sha256": "",
+    "output": "tests/oracle/legacy336/vectors/gaussian_row.json",
+    "output_sha256": "2c77d1509893fb98a1fefffd42a5c1ff41f7579aa68e6fe8041e9b103d193ddd",
+    "status": "ok",
+    "notes": ""
+  }
+]

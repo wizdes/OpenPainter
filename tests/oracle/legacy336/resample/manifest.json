@@ -1,0 +1,258 @@
+[
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "NearestNeighbor",
+    "parameters": {
+      "scale": "0.5x",
+      "width": 256,
+      "height": 192
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/NearestNeighbor_0.5x.png",
+    "output_sha256": "73f7b7584fb9d716d3815163d5b2a04fe664fc438f82844dc2976e3b2f96d586",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bilinear",
+    "parameters": {
+      "scale": "0.5x",
+      "width": 256,
+      "height": 192
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bilinear_0.5x.png",
+    "output_sha256": "820565e5176b5dedf1c9d53d21c4ed87824b537f541e05e771bbb25f1615b643",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bicubic",
+    "parameters": {
+      "scale": "0.5x",
+      "width": 256,
+      "height": 192
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bicubic_0.5x.png",
+    "output_sha256": "465a841d68787b274499dbc297c2db92116b73fd7528898860a0e933dc8f5954",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SuperSampling",
+    "parameters": {
+      "scale": "0.5x",
+      "width": 256,
+      "height": 192
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/SuperSampling_0.5x.png",
+    "output_sha256": "e1f6982662d028b9ec2219b5f56cfab1203ae15ee1674c79f2050b2c70cd969b",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "NearestNeighbor",
+    "parameters": {
+      "scale": "0.37x",
+      "width": 189,
+      "height": 142
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/NearestNeighbor_0.37x.png",
+    "output_sha256": "7b62eb850d8e22229d587c7bf67bc80d8e056813f3582b2b3a32bcad85f3ed7e",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bilinear",
+    "parameters": {
+      "scale": "0.37x",
+      "width": 189,
+      "height": 142
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bilinear_0.37x.png",
+    "output_sha256": "2d507ab47685cf636e091c3aede7a6678dd6f416ff1e8cad37fa2ede7af0543d",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bicubic",
+    "parameters": {
+      "scale": "0.37x",
+      "width": 189,
+      "height": 142
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bicubic_0.37x.png",
+    "output_sha256": "57be18145c5fcf6bc8d9854571155b7aa9ad9dea107df747c14e14c24eb60ef1",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SuperSampling",
+    "parameters": {
+      "scale": "0.37x",
+      "width": 189,
+      "height": 142
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/SuperSampling_0.37x.png",
+    "output_sha256": "d41e2dfd497571595bc083f4f925502886513d6a6db2ba218d2a577c0d187b9a",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "NearestNeighbor",
+    "parameters": {
+      "scale": "1.6x",
+      "width": 819,
+      "height": 614
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/NearestNeighbor_1.6x.png",
+    "output_sha256": "d2defc05d88edb4496154d69a503d698d2af1ab9973b5b3e785426d46bb74047",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bilinear",
+    "parameters": {
+      "scale": "1.6x",
+      "width": 819,
+      "height": 614
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bilinear_1.6x.png",
+    "output_sha256": "5810b0bdc08b434d810d13f96fbb055cc290e0d4104c9ab8d6de5581a31a6123",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bicubic",
+    "parameters": {
+      "scale": "1.6x",
+      "width": 819,
+      "height": 614
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bicubic_1.6x.png",
+    "output_sha256": "020d864176de1cb8568ff52591e420b10b32c4da5b07e84ea6cdce28fef81871",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SuperSampling",
+    "parameters": {
+      "scale": "1.6x",
+      "width": 819,
+      "height": 614
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/SuperSampling_1.6x.png",
+    "output_sha256": "020d864176de1cb8568ff52591e420b10b32c4da5b07e84ea6cdce28fef81871",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "NearestNeighbor",
+    "parameters": {
+      "scale": "3x",
+      "width": 1536,
+      "height": 1152
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/NearestNeighbor_3x.png",
+    "output_sha256": "5e698d72855e7ff5aced6dc1702a16cebe2f6370b287a93e108f2fdbe04abd40",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bilinear",
+    "parameters": {
+      "scale": "3x",
+      "width": 1536,
+      "height": 1152
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bilinear_3x.png",
+    "output_sha256": "a7ed0b24d4098e2b7ab6e467b907dcd8da1148ca37851c6487d0622937f244da",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Bicubic",
+    "parameters": {
+      "scale": "3x",
+      "width": 1536,
+      "height": 1152
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/Bicubic_3x.png",
+    "output_sha256": "1982eeebe782dd380b27347293b4bcb869e00c2995a5c2ec17a0cf5114f63d7e",
+    "status": "ok",
+    "notes": ""
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "SuperSampling",
+    "parameters": {
+      "scale": "3x",
+      "width": 1536,
+      "height": 1152
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/resample/SuperSampling_3x.png",
+    "output_sha256": "1982eeebe782dd380b27347293b4bcb869e00c2995a5c2ec17a0cf5114f63d7e",
+    "status": "ok",
+    "notes": ""
+  }
+]

@@ -9,3 +9,9 @@ DerivedData/
 /tests/out/
 /.cargo-home/
 **/.cargo-home/
+/.pdn-src/
+/.dotnet-home/
+/.nuget/
+tools/pdn-oracle/bin/
+tools/pdn-oracle/obj/
+__pycache__/

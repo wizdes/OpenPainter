@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Nullable>disable</Nullable><LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Png.cs" />
+    <Compile Include="Stubs/*.cs" />
+    <Compile Include="Shims/*.cs" />
+    <Compile Include="../../.pdn-src/src/Core/ColorBgra.cs" />
+    <Compile Include="../../.pdn-src/src/Base/IDeferredSerializable.cs" />
+    <Compile Include="../../.pdn-src/src/Base/DeferredFormatter.cs" />
+    <Compile Include="../../.pdn-src/src/Core/Scanline.cs" />
+    <Compile Include="../../.pdn-src/src/Core/RgbColor.cs" />
+    <Compile Include="../../.pdn-src/src/Core/Surface.cs" />
+    <Compile Include="../../.pdn-src/src/Core/MemoryBlock.cs" />
+    <Compile Include="../../.pdn-src/src/Core/PixelOp.cs" />
+    <Compile Include="../../.pdn-src/src/Core/IPixelOp.cs" />
+    <Compile Include="../../.pdn-src/src/Core/UnaryPixelOp.cs" />
+    <Compile Include="../../.pdn-src/src/Core/BinaryPixelOp.cs" />
+    <Compile Include="../../.pdn-src/src/Core/UnaryPixelOps.cs" />
+    <Compile Include="../../.pdn-src/src/Core/BinaryPixelOps.cs" />
+    <Compile Include="../../.pdn-src/src/Core/HsvColor.cs" />
+    <Compile Include="../../.pdn-src/src/Core/Histogram.cs" />
+    <Compile Include="../../.pdn-src/src/Core/HistogramRGB.cs" />
+    <Compile Include="../../.pdn-src/src/Core/ResamplingAlgorithm.cs" />
+    <Compile Include="../../.pdn-src/src/Data/UserBlendOps.cs" />
+    <Compile Include="../../.pdn-src/src/Data/UserBlendOp.cs" />
+    <Compile Include="../../.pdn-src/src/Data/UserBlendOps.Generated.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/BrightnessAndContrastAdjustment.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/PosterizeAdjustment.cs" />
+    <Compile Include="../../.pdn-src/src/Effects/GaussianBlurEffect.cs" />
+  </ItemGroup>
+</Project>
