@@ -1,0 +1,9 @@
+/target/
+**/target/
+/worktrees/
+/build/
+DerivedData/
+*.xcodeproj/
+.DS_Store
+/perf/results/
+/tests/out/
