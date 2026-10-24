@@ -333,6 +333,12 @@ impl DocState {
             None => Ok(vec![0; TILE_BYTES]),
         }
     }
+    /// Makes sure later new layers get ids above `id`. Loaders call this for
+    /// every layer id they restore, so a new layer never reuses a saved id.
+    pub fn reserve_layer_id(&self, id: LayerId) {
+        self.next_layer_id
+            .fetch_max(id.0.saturating_add(1), Ordering::Relaxed);
+    }
     pub fn add_layer(&self, index: usize, name: impl Into<String>) -> Result<Self> {
         if index > self.layers.len() {
             return Err(DocError::LayerIndex);

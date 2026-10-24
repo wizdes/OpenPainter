@@ -424,6 +424,7 @@ pub fn load_opaint_with_notice(path: impl AsRef<Path>) -> Result<LoadedOpaint> {
             return Err(invalid("duplicate or zero layer id"));
         }
         Arc::make_mut(&mut doc.layers[i]).id = op_core::doc::LayerId(id);
+        doc.reserve_layer_id(op_core::doc::LayerId(id));
     }
     if let Some(profile_path) = root.get("op:profile") {
         check_path(profile_path)?;

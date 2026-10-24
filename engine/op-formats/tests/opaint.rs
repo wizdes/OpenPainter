@@ -436,3 +436,37 @@ fn full_state_round_trip() {
         }
     }
 }
+
+#[test]
+fn loaded_sparse_layer_ids_are_never_reused() {
+    // Layers with ids 1, 7 and 9 (others deleted). After loading, new layers
+    // must get ids above 9, never an id already in the document.
+    let dir = tempfile::tempdir().unwrap();
+    let (mut doc, path) = one_layer(&dir);
+    for i in 1..9 {
+        doc = doc.add_layer(i, format!("l{i}")).unwrap();
+    }
+    let keep = [1u64, 7, 9];
+    let mut i = 0;
+    while i < doc.layers.len() {
+        if keep.contains(&doc.layers[i].id.0) {
+            i += 1;
+        } else {
+            doc = doc.delete_layer(i).unwrap();
+        }
+    }
+    let ids: Vec<u64> = doc.layers.iter().map(|l| l.id.0).collect();
+    assert_eq!(ids, keep);
+    save_opaint(&doc, &path).unwrap();
+    let mut loaded = load_opaint(&path).unwrap();
+    for n in 0..4 {
+        loaded = loaded
+            .add_layer(loaded.layers.len(), format!("new{n}"))
+            .unwrap();
+        let new_id = loaded.layers.last().unwrap().id.0;
+        assert!(
+            new_id > 9,
+            "new layer reused or went below a loaded id: {new_id}"
+        );
+    }
+}
