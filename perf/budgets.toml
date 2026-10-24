@@ -1,0 +1,8 @@
+cold_launch_ms = 3000
+cold_launch_aim_ms = 1000
+app_bundle_mb = 75
+open_24mp_jpeg_ms = 1500
+gaussian_r10_24mp_gpu_ms = 500
+pan_fps_min = 60
+brush_latency_ms = 16
+regression_pct = 10

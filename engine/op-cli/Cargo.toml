@@ -1,0 +1,12 @@
+[package]
+name = "op-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "opcli"
+path = "src/main.rs"

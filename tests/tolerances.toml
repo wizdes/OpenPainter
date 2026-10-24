@@ -1,0 +1,3 @@
+# Each test starts with a ±1/255 channel limit and zero pixels over it.
+# Put exceptions under [tests."test.id"] with both bounds and a reason.
+[tests]

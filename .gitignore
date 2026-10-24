@@ -7,3 +7,5 @@ DerivedData/
 .DS_Store
 /perf/results/
 /tests/out/
+/.cargo-home/
+**/.cargo-home/
