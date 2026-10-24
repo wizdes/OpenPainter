@@ -60,6 +60,168 @@ fn document(width: u32, height: u32) -> DocState {
 }
 
 #[test]
+fn m25_adjustments_are_registered_in_menu_order() {
+    let ids: Vec<_> = effect::registered()
+        .into_iter()
+        .map(|spec| spec.id)
+        .collect();
+    let expected = [
+        "effect.adjust.auto_level",
+        "effect.adjust.black_and_white",
+        "effect.adjust.brightness_contrast",
+        "effect.adjust.hue_saturation",
+        "effect.adjust.posterize",
+        "effect.adjust.sepia",
+        "effect.adjust.temperature_tint",
+    ];
+    let positions: Vec<_> = expected
+        .iter()
+        .map(|id| ids.iter().position(|v| v == id).expect(id))
+        .collect();
+    assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
+#[test]
+fn m25_profile_and_hidden_colors_do_not_change_the_result() {
+    let doc = document(2, 1);
+    let with_profile = doc.set_profile(Some(Arc::from([1u8, 2, 3])));
+    for spec in effect::registered()
+        .into_iter()
+        .filter(|spec| spec.id != "effect.adjust.invert_alpha")
+    {
+        let rect = Rect::new(0, 0, 2, 1);
+        let original = effect::render(&doc, &spec, rect, None).unwrap();
+        let profiled = effect::render(&with_profile, &spec, rect, None).unwrap();
+        assert_eq!(
+            original.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap(),
+            profiled.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap(),
+            "{}",
+            spec.id
+        );
+        assert_eq!(
+            original.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[3],
+            0,
+            "{}",
+            spec.id
+        );
+    }
+}
+
+#[test]
+fn temperature_tint_identity_endpoints_and_soft_mask() {
+    let spec = effect::find("effect.adjust.temperature_tint").unwrap();
+    let doc = document(2, 1);
+    let rect = Rect::new(0, 0, 2, 1);
+    let identity = effect::render(&doc, &spec, rect, None).unwrap();
+    assert_eq!(
+        identity.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap(),
+        doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()
+    );
+    let warm = effect::render(
+        &doc,
+        &spec,
+        rect,
+        Some(serde_json::json!({"Temperature":100,"Tint":-100})),
+    )
+    .unwrap();
+    assert_eq!(
+        &warm.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[..4],
+        &[0, 150, 0, 0]
+    );
+    let selected = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+        MaskGrid {
+            width: 2,
+            height: 1,
+            bytes: Arc::from([0u8, 128]),
+        },
+    ))));
+    let tinted = effect::render(
+        &selected,
+        &spec,
+        rect,
+        Some(serde_json::json!({"Tint":100})),
+    )
+    .unwrap();
+    let output = tinted.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&output[..4], &[0, 0, 91, 0]);
+    assert_eq!(&output[4..8], &[26, 0, 116, 1]);
+}
+
+#[test]
+fn auto_level_histogram_uses_selected_pixels() {
+    let mut doc = document(3, 1);
+    let mut tile = doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    for (x, value) in [10u8, 20, 200].into_iter().enumerate() {
+        tile[x * 4..x * 4 + 4].copy_from_slice(&[value, value, value, 255]);
+    }
+    doc = doc
+        .write_tile(
+            0,
+            TileCoord { x: 0, y: 0 },
+            TileData::try_from(tile).unwrap(),
+        )
+        .unwrap();
+    let selected = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+        MaskGrid {
+            width: 3,
+            height: 1,
+            bytes: Arc::from([255u8, 128, 0]),
+        },
+    ))));
+    let spec = effect::find("effect.adjust.auto_level").unwrap();
+    let output = effect::render(&selected, &spec, Rect::new(0, 0, 3, 1), None).unwrap();
+    let result = output.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&result[0..4], &[0, 0, 0, 255]);
+    assert_eq!(&result[4..8], &[138, 138, 138, 255]);
+    assert_eq!(&result[8..12], &[200, 200, 200, 255]);
+}
+
+#[test]
+fn posterize_links_channels_and_preserves_hidden_alpha() {
+    let mut doc = document(1, 1);
+    let mut tile = doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    tile[..4].copy_from_slice(&[30, 100, 220, 0]);
+    doc = doc
+        .write_tile(
+            0,
+            TileCoord { x: 0, y: 0 },
+            TileData::try_from(tile).unwrap(),
+        )
+        .unwrap();
+    let spec = effect::find("effect.adjust.posterize").unwrap();
+    let rect = Rect::new(0, 0, 1, 1);
+    let linked = effect::render(
+        &doc,
+        &spec,
+        rect,
+        Some(serde_json::json!({"RedLevels": 2, "GreenLevels": 64, "BlueLevels": 64})),
+    )
+    .unwrap();
+    assert_eq!(
+        &linked.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[..4],
+        &[0, 0, 255, 0]
+    );
+    let separate = effect::render(&doc, &spec, rect, Some(serde_json::json!({"RedLevels": 2, "GreenLevels": 64, "BlueLevels": 64, "LinkLevels": false}))).unwrap();
+    assert_eq!(
+        &separate.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[..4],
+        &[0, 101, 222, 0]
+    );
+}
+
+#[test]
+fn black_and_white_obeys_geometry_selection() {
+    let doc =
+        document(2, 1).set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+            PolygonSet(vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]]),
+        ))));
+    let spec = effect::find("effect.adjust.black_and_white").unwrap();
+    let output = effect::render(&doc, &spec, Rect::new(0, 0, 2, 1), None).unwrap();
+    let result = output.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    assert_eq!(&result[..4], &[10, 10, 10, 0]);
+    assert_eq!(&result[4..8], &[1, 0, 91, 1]);
+}
+
+#[test]
 fn selection_coverage_and_empty() {
     let doc = document(3, 1);
     let selected = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
@@ -192,8 +354,10 @@ fn tile_order_and_parallel_match_whole_image() {
                     let original = [x as u8, y as u8, 91, ((x + y) % 256) as u8];
                     let expected = if spec.id == "effect.adjust.invert_colors" {
                         [255 - original[0], 255 - original[1], 164, original[3]]
-                    } else {
+                    } else if spec.id == "effect.adjust.invert_alpha" {
                         [original[0], original[1], original[2], 255 - original[3]]
+                    } else {
+                        continue;
                     };
                     let i = (py * TILE_SIZE + px) * 4;
                     assert_eq!(tile[i..i + 4], expected, "{} at {x},{y}", spec.id);
@@ -246,8 +410,12 @@ fn effect_render_cpu_accepts_tile_inputs_and_returns_tile_bytes() {
         output_rect: Rect::new(0, 0, TILE_SIZE as u32, TILE_SIZE as u32),
         sample: &sample,
     };
-    let bytes =
-        effect::EffectSpec::render_cpu(&spec, &input, &effect::Prepared, &serde_json::json!({}));
+    let bytes = effect::EffectSpec::render_cpu(
+        &spec,
+        &input,
+        &effect::Prepared::default(),
+        &serde_json::json!({}),
+    );
     assert_eq!(bytes.len(), TILE_BYTES);
     assert_eq!(&bytes[..4], &[17, 29, 41, 255]);
 }
@@ -346,5 +514,114 @@ fn invert_colors_matches_all_legacy_pngs() {
             }
         }
         assert_eq!(actual, expected.pixels, "{}", case["output"]);
+    }
+}
+
+#[test]
+fn m25_pointwise_effects_match_legacy_pngs() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/oracle/legacy336/effects/manifest.json")).unwrap(),
+    )
+    .unwrap();
+    for (name, id, count, tolerance) in [
+        ("Desaturate", "effect.adjust.black_and_white", 5, 0i16),
+        (
+            "Brightness and Contrast",
+            "effect.adjust.brightness_contrast",
+            35,
+            0,
+        ),
+        ("Posterize", "effect.adjust.posterize", 50, 0),
+        ("Sepia", "effect.adjust.sepia", 5, 1),
+        ("Hue and Saturation", "effect.adjust.hue_saturation", 50, 0),
+        ("Auto-Level", "effect.adjust.auto_level", 5, 1),
+    ] {
+        let cases: Vec<_> = manifest
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["op"] == name)
+            .collect();
+        assert_eq!(cases.len(), count, "{name}");
+        let spec = effect::find(id).unwrap();
+        for case in cases {
+            let input = op_formats::png::decode_png(
+                &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
+            )
+            .unwrap();
+            let expected = op_formats::png::decode_png(
+                &std::fs::read(root.join(case["output"].as_str().unwrap())).unwrap(),
+            )
+            .unwrap();
+            let mut doc = DocState::new(store(), input.width, input.height, 96.0).unwrap();
+            let rect = Rect::new(0, 0, input.width, input.height);
+            for coord in effect::tile_coords(rect) {
+                let mut tile = vec![0; TILE_BYTES];
+                for py in 0..TILE_SIZE {
+                    let y = coord.y as usize * TILE_SIZE + py;
+                    if y >= input.height as usize {
+                        break;
+                    }
+                    for px in 0..TILE_SIZE {
+                        let x = coord.x as usize * TILE_SIZE + px;
+                        if x >= input.width as usize {
+                            break;
+                        }
+                        let src = (y * input.width as usize + x) * 4;
+                        let dst = (py * TILE_SIZE + px) * 4;
+                        tile[dst..dst + 4].copy_from_slice(&input.pixels[src..src + 4]);
+                    }
+                }
+                doc = doc
+                    .write_tile(0, coord, TileData::try_from(tile).unwrap())
+                    .unwrap();
+            }
+            let mut params = serde_json::Map::new();
+            for (source, target) in [
+                ("brightness", "Brightness"),
+                ("contrast", "Contrast"),
+                ("red", "RedLevels"),
+                ("green", "GreenLevels"),
+                ("blue", "BlueLevels"),
+                ("hue", "Hue"),
+                ("saturation", "Saturation"),
+                ("lightness", "Lightness"),
+            ] {
+                if let Some(value) = case["parameters"].get(source) {
+                    params.insert(target.into(), value.clone());
+                }
+            }
+            if name == "Posterize" {
+                params.insert("LinkLevels".into(), serde_json::json!(false));
+            }
+            let output =
+                effect::render(&doc, &spec, rect, Some(serde_json::Value::Object(params))).unwrap();
+            let tiles: std::collections::HashMap<_, _> = effect::tile_coords(rect)
+                .into_iter()
+                .map(|coord| (coord, output.read_tile(0, coord).unwrap()))
+                .collect();
+            for y in 0..input.height as usize {
+                for x in 0..input.width as usize {
+                    let tile = &tiles[&TileCoord {
+                        x: (x / TILE_SIZE) as i32,
+                        y: (y / TILE_SIZE) as i32,
+                    }];
+                    let i = ((y % TILE_SIZE) * TILE_SIZE + x % TILE_SIZE) * 4;
+                    let j = (y * input.width as usize + x) * 4;
+                    for channel in 0..4 {
+                        let diff =
+                            i16::from(tile[i + channel]) - i16::from(expected.pixels[j + channel]);
+                        assert!(
+                            diff.abs() <= tolerance,
+                            "{} at {x},{y} channel {channel}: {} vs {}",
+                            case["output"],
+                            tile[i + channel],
+                            expected.pixels[j + channel]
+                        );
+                    }
+                }
+            }
+        }
     }
 }

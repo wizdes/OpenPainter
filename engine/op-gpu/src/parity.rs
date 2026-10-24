@@ -3,7 +3,7 @@ use crate::{GpuContext, GpuError, LayerInput, MODES};
 use op_core::doc::{LayerBlendMode, ToolCompositeMode};
 use op_core::pixel::Rgba8;
 use op_ops::composite::{composite_pixel, tool_composite};
-use op_ops::effect::{GpuKernel, registered as registered_effects};
+use op_ops::effect::{GpuKernel, Prepared, find as find_effect, registered as registered_effects};
 
 pub struct Inputs {
     pub width: u32,
@@ -28,14 +28,18 @@ impl GpuOp for EffectOp {
         self.effect_id.into()
     }
     fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        let spec = find_effect(self.effect_id).expect("registered effect");
+        let params = spec.default_params();
         let mut out = inputs.bottom.clone();
         for pixel in out.chunks_exact_mut(4) {
-            match self.kernel {
-                GpuKernel::InvertColors => {
-                    pixel[..3].iter_mut().for_each(|byte| *byte = 255 - *byte)
-                }
-                GpuKernel::InvertAlpha => pixel[3] = 255 - pixel[3],
-            }
+            let original = [pixel[0], pixel[1], pixel[2], pixel[3]];
+            pixel.copy_from_slice(&(spec.render_cpu)(
+                &|_, _| original,
+                0,
+                0,
+                &Prepared::default(),
+                &params,
+            ));
         }
         out
     }
