@@ -158,6 +158,7 @@ void      op_buffer_free(OpBuffer*);
 void      op_pixels_free(OpPixelBuffer*);
 ```
 
+- **Views (M12).** `OpViewState` carries the view size in points, the backing scale, the zoom (points per document pixel), the document origin in points, the display ICC (borrowed; length 0 keeps the last one) and flags (`OP_VIEW_PIXEL_GRID`, `OP_VIEW_SUSPENDED`). `op_view_set` only stores the newest state and wakes the engine's render thread; states that arrive between frames are merged. Read-only helpers for tests and the trace: `op_view_info`, `op_view_counters`, `op_view_take_frame_times`, `op_view_wait_frames`. `op_doc_close` detaches the document's views first; `op_engine_free` detaches all views first.
 - Documents and views are `u64` ids. A stale id returns `OP_ERR_NO_SUCH_DOC`. `OpEngine*` is the only pointer handle.
 - Pointer events are plain structs (`x, y, pressure, tilt_x, tilt_y, timestamp_ns, buttons, modifiers, phase`), batched, never JSON.
 - Events arrive on an engine thread as `OpEvent { kind, doc, ticket, json_ptr, json_len }`; the payload is valid only during the call. Kinds: DocChanged, HistoryChanged, LayersChanged, SelectionChanged, ToolStateChanged, Progress, JobFinished, ThumbnailReady, GpuFallback.

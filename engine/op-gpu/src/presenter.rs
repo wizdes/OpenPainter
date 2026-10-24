@@ -91,6 +91,48 @@ struct ParamsRaw {
     use_lut: u32,
     lut_n: u32,
     background: [f32; 4],
+    level: u32,
+    checker_px: u32,
+    grid: u32,
+    _pad: u32,
+}
+
+/// Canvas options on top of [`ViewParams`] (M12).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CanvasParams {
+    pub view: ViewParams,
+    /// Checkerboard square side in target pixels (8 points times the backing scale).
+    pub checker_px: u32,
+    /// Draw a one-target-pixel grid on document pixel edges, after the table.
+    pub pixel_grid: bool,
+    /// Below 100%, read a premultiplied 2x2 box mip pyramid (built on first use)
+    /// instead of a capped box filter on the full-size document.
+    pub use_mips: bool,
+}
+
+impl CanvasParams {
+    /// The pyramid level and box width per axis this view reads. With mips, the
+    /// level is the deepest one that is still at least as detailed as the target
+    /// (`zoom * 2^level` in (0.5, 1]), and the box is 1 or 2 texels wide.
+    pub fn level_and_taps(&self, levels: u32) -> (u32, u32) {
+        let zoom = self.view.zoom;
+        if !self.use_mips || zoom >= 1.0 || levels <= 1 {
+            return (0, self.view.taps());
+        }
+        let mut level = 0;
+        let mut z = zoom;
+        while z * 2.0 <= 1.0 && level + 1 < levels {
+            z *= 2.0;
+            level += 1;
+        }
+        let taps = ((1.0 / z).ceil() as u32).clamp(1, 4);
+        (level, taps)
+    }
+}
+
+/// Number of pyramid levels (including level 0) for a document size, stopping at 1x1.
+pub fn pyramid_levels(width: u32, height: u32) -> u32 {
+    32 - width.max(height).max(1).leading_zeros()
 }
 
 struct DocTexture {
@@ -108,6 +150,14 @@ pub struct ViewRenderer {
     lut_n: u32,
     doc: Option<DocTexture>,
     bind_group: Option<wgpu::BindGroup>,
+    /// Pyramid levels 1.. (premultiplied), built on first use below 100%.
+    mips: Option<wgpu::Texture>,
+    dummy_mips: wgpu::Texture,
+    mip_pipeline: wgpu::RenderPipeline,
+    mip_layout: wgpu::BindGroupLayout,
+    /// Uniforms for the mip pass: [source straight, source premultiplied].
+    mip_params: [wgpu::Buffer; 2],
+    mip_builds: u64,
 }
 
 impl ViewRenderer {
@@ -146,6 +196,16 @@ impl ViewRenderer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
                     count: None,
                 },
@@ -188,6 +248,32 @@ impl ViewRenderer {
             mapped_at_creation: false,
         });
         let lut = Self::lut_buffer(device, 16);
+        let (mip_pipeline, mip_layout) = Self::mip_pipeline(device);
+        let mip_params = [0u32, 1].map(|premul| {
+            let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("mip params"),
+                size: 16,
+                usage: wgpu::BufferUsages::UNIFORM,
+                mapped_at_creation: true,
+            });
+            buffer.slice(..).get_mapped_range_mut()[..4].copy_from_slice(&premul.to_le_bytes());
+            buffer.unmap();
+            buffer
+        });
+        let dummy_mips = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("no mips"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
         Self {
             format,
             layout,
@@ -197,7 +283,157 @@ impl ViewRenderer {
             lut_n: 0,
             doc: None,
             bind_group: None,
+            mips: None,
+            dummy_mips,
+            mip_pipeline,
+            mip_layout,
+            mip_params,
+            mip_builds: 0,
         }
+    }
+
+    fn mip_pipeline(device: &wgpu::Device) -> (wgpu::RenderPipeline, wgpu::BindGroupLayout) {
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("mip builder"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("presenter_mip.wgsl").into()),
+        });
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("mip builder bindings"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("mip builder layout"),
+            bind_group_layouts: &[&layout],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("mip builder"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("mip_fs"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba8Uint,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+        (pipeline, layout)
+    }
+
+    /// How many times a mip pyramid was built (for tests and stats).
+    pub fn mip_builds(&self) -> u64 {
+        self.mip_builds
+    }
+
+    /// Builds pyramid levels 1.. for the current document, once per document.
+    fn ensure_mips(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder) {
+        let Some(doc) = self.doc.as_ref() else { return };
+        if self.mips.is_some() {
+            return;
+        }
+        let levels = pyramid_levels(doc.width, doc.height);
+        if levels <= 1 {
+            return;
+        }
+        let mips = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("document mips"),
+            size: wgpu::Extent3d {
+                width: (doc.width / 2).max(1),
+                height: (doc.height / 2).max(1),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: levels - 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let single = |t: &wgpu::Texture, level: u32| {
+            t.create_view(&wgpu::TextureViewDescriptor {
+                base_mip_level: level,
+                mip_level_count: Some(1),
+                ..Default::default()
+            })
+        };
+        for k in 0..levels - 1 {
+            let src = if k == 0 {
+                single(&doc.texture, 0)
+            } else {
+                single(&mips, k - 1)
+            };
+            let dst = single(&mips, k);
+            let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("mip builder"),
+                layout: &self.mip_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&src),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.mip_params[(k > 0) as usize].as_entire_binding(),
+                    },
+                ],
+            });
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("mip level"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &dst,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            pass.set_pipeline(&self.mip_pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        self.mips = Some(mips);
+        self.mip_builds += 1;
+        self.bind_group = None;
     }
 
     fn lut_buffer(device: &wgpu::Device, size: u64) -> wgpu::Buffer {
@@ -265,6 +501,7 @@ impl ViewRenderer {
             width,
             height,
         });
+        self.mips = None;
         self.bind_group = None;
         Ok(())
     }
@@ -290,6 +527,7 @@ impl ViewRenderer {
     }
 
     /// Records one full-target draw into `encoder`. Fails if no document is set.
+    /// This is the M09 behavior: 8-pixel checkerboard, no grid, capped box filter.
     pub fn encode(
         &mut self,
         device: &wgpu::Device,
@@ -298,20 +536,59 @@ impl ViewRenderer {
         target: &wgpu::TextureView,
         params: &ViewParams,
     ) -> Result<()> {
-        let doc = self.doc.as_ref().ok_or(GpuError::InvalidImage)?;
+        let canvas = CanvasParams {
+            view: *params,
+            checker_px: 8,
+            pixel_grid: false,
+            use_mips: false,
+        };
+        self.encode_canvas(device, queue, encoder, target, &canvas)
+    }
+
+    /// Records one full-target canvas draw into `encoder`: mips below 100% when
+    /// asked, a checkerboard of `checker_px` squares, and the optional pixel grid.
+    pub fn encode_canvas(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target: &wgpu::TextureView,
+        canvas: &CanvasParams,
+    ) -> Result<()> {
+        let params = &canvas.view;
+        let (width, height) = self.document_size().ok_or(GpuError::InvalidImage)?;
+        if !(params.zoom.is_finite() && params.zoom > 0.0) || canvas.checker_px == 0 {
+            return Err(GpuError::InvalidImage);
+        }
+        let mut levels = 1;
+        if canvas.use_mips && params.zoom < 1.0 {
+            self.ensure_mips(device, encoder);
+            levels = pyramid_levels(width, height);
+        }
+        let (level, taps) = canvas.level_and_taps(levels);
         let raw = ParamsRaw {
             origin: [params.origin_x, params.origin_y],
             zoom: params.zoom,
-            taps: params.taps(),
-            doc_size: [doc.width, doc.height],
+            taps,
+            doc_size: [width, height],
             use_lut: (self.lut_n != 0) as u32,
             lut_n: self.lut_n.max(2),
             background: params.background,
+            level,
+            checker_px: canvas.checker_px,
+            grid: canvas.pixel_grid as u32,
+            _pad: 0,
         };
         queue.write_buffer(&self.params, 0, bytemuck::bytes_of(&raw));
         if self.bind_group.is_none() {
+            let doc = self.doc.as_ref().ok_or(GpuError::InvalidImage)?;
             let view = doc
                 .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            let mips = self
+                .mips
+                .as_ref()
+                .unwrap_or(&self.dummy_mips)
                 .create_view(&wgpu::TextureViewDescriptor::default());
             self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("view renderer"),
@@ -328,6 +605,10 @@ impl ViewRenderer {
                     wgpu::BindGroupEntry {
                         binding: 2,
                         resource: self.params.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::TextureView(&mips),
                     },
                 ],
             }));

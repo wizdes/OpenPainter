@@ -10,6 +10,8 @@ use std::ptr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+mod view;
+pub use view::*;
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -68,10 +70,6 @@ pub struct OpEvent {
 /// Runs on one engine thread, never re-entrantly. It must not call op_*; such a
 /// call returns OP_ERR_BUSY (op_engine_new returns NULL, the free calls do nothing).
 pub type OpEventFn = Option<unsafe extern "C" fn(*const OpEvent, *mut c_void)>;
-#[repr(C)]
-pub struct OpViewState {
-    pub zoom: f64,
-}
 #[repr(C)]
 pub struct OpPointerEvent {
     pub x: f64,
@@ -233,6 +231,8 @@ pub extern "C" fn op_engine_free(engine: *mut OpEngine) {
         return;
     }
     let _ = catch_unwind(AssertUnwindSafe(|| {
+        // Canvas views go first: their render thread reads the engine.
+        view::engine_freeing(engine);
         let mut e = unsafe { Box::from_raw(engine) };
         drop(e.engine.take());
         e.callback_tx.take();
@@ -457,6 +457,8 @@ pub extern "C" fn op_doc_close(p: *mut OpEngine, doc: u64) -> OpStatus {
             Ok(e) => e,
             Err(s) => return s,
         };
+        // The document's canvas views stop and release their layers first.
+        view::doc_closing(p, doc);
         status_result(e.core().close(doc))
     })
 }
@@ -494,27 +496,6 @@ pub extern "C" fn op_pixels_free(b: *mut OpPixelBuffer) {
             b.len = 0;
         }
     }));
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn op_view_attach(
-    _p: *mut OpEngine,
-    _doc: u64,
-    _layer: *mut c_void,
-    _out: *mut u64,
-) -> OpStatus {
-    guard(|| OpStatus::OP_ERR_UNSUPPORTED)
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn op_view_set(
-    _p: *mut OpEngine,
-    _view: u64,
-    _state: *const OpViewState,
-) -> OpStatus {
-    guard(|| OpStatus::OP_ERR_UNSUPPORTED)
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn op_view_detach(_p: *mut OpEngine, _view: u64) -> OpStatus {
-    guard(|| OpStatus::OP_ERR_UNSUPPORTED)
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn op_pointer(

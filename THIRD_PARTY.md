@@ -3,6 +3,7 @@
 OpenPainter ports algorithms from these MIT-licensed projects. Each ported file names its source in a header comment.
 
 - **Paint.NET 3.36.7** (OpenPDN mirror, https://github.com/rivy/OpenPDN), MIT License, Copyright (C) dotPDN LLC, Rick Brewster, Tom Jackson, and contributors. Effects, adjustments, blend operations, resampling. "Paint.NET" is a trademark of dotPDN LLC; OpenPainter is not affiliated with or endorsed by dotPDN LLC.
+  The zoom presets and step rules in `mac/OpenPainterKit/Sources/ZoomPresets.swift` come from `src/Core/ScaleFactor.cs` (OpenPDN commit cca476b0df2a2f70996e6b9486ec45327631568c); Zoom to Window, Zoom to Rectangle and the Zoom tool's click behavior follow `src/Data/DocumentView.cs`, `src/DocumentWorkspace.cs` and `src/tools/ZoomTool.cs`.
 - **Pinta** (https://github.com/PintaProject/Pinta), MIT License, Copyright (C) Jonathan Pobst and contributors. Reference test images in `tests/oracle/pinta/`.
 - **libmypaint** (https://github.com/mypaint/libmypaint), ISC License. Brush dab spacing and smoothing ideas.
 

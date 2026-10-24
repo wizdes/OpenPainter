@@ -10,6 +10,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/**
+ * `OpViewState::flags`: draw the pixel grid (shown only at 400% and above).
+ */
+#define OP_VIEW_PIXEL_GRID 1
+
+/**
+ * `OpViewState::flags`: the Mac is going to sleep. The engine drops the view's
+ * drawable surface and refuses frames until a state without this flag arrives.
+ */
+#define OP_VIEW_SUSPENDED 2
+
 typedef enum OpStatus {
   OP_OK = 0,
   OP_ERR_BAD_ARGUMENT = 1,
@@ -76,16 +87,110 @@ typedef struct OpPixelBuffer {
   uint32_t height;
 } OpPixelBuffer;
 
-typedef struct OpViewState {
-  double zoom;
-} OpViewState;
-
 typedef struct OpPointerEvent {
   double x;
   double y;
   float pressure;
   uint32_t phase;
 } OpPointerEvent;
+
+/**
+ * Where and how a view shows its document. Sizes and positions are in points;
+ * the drawable is `width_pt * scale` by `height_pt * scale` pixels.
+ */
+typedef struct OpViewState {
+  double width_pt;
+  double height_pt;
+  /**
+   * Backing scale factor of the window's screen (1 or 2 on current Macs).
+   */
+  double scale;
+  /**
+   * Points per document pixel: 1.0 is 100%. Allowed range 0.001 to 64.
+   */
+  double zoom;
+  /**
+   * Position of the document's top-left corner, in points from the view's
+   * top-left corner (y grows down).
+   */
+  double origin_x;
+  double origin_y;
+  /**
+   * ICC bytes of the window screen's color space, borrowed for the call.
+   * Length 0 keeps the profile sent before. Until one is sent, no display
+   * conversion happens and the layer keeps whatever tag it has.
+   */
+  const uint8_t *display_icc;
+  uintptr_t display_icc_len;
+  /**
+   * `OP_VIEW_PIXEL_GRID` | `OP_VIEW_SUSPENDED`.
+   */
+  uint32_t flags;
+} OpViewState;
+
+/**
+ * What a view holds now (for tests and diagnostics).
+ */
+typedef struct OpViewInfo {
+  uint64_t doc;
+  double width_pt;
+  double height_pt;
+  double scale;
+  double zoom;
+  double origin_x;
+  double origin_y;
+  uint32_t flags;
+  /**
+   * 1 when the layer's colorspace equals the display ICC sent last.
+   */
+  uint8_t layer_tag_is_display;
+  /**
+   * 1 when a document -> display table is in use.
+   */
+  uint8_t has_display_table;
+  uint8_t suspended;
+  uint8_t _pad;
+  uint64_t display_icc_len;
+  /**
+   * Frames presented since attach.
+   */
+  uint64_t frames;
+  uint32_t drawable_width;
+  uint32_t drawable_height;
+  uint64_t configures;
+  uint64_t tag_changed_by_configure;
+  uint64_t retags;
+  uint64_t table_builds;
+  uint64_t mip_builds;
+  uint64_t doc_uploads;
+  uint64_t doc_revision;
+  /**
+   * Frames that failed (surface, color or upload errors, panics).
+   */
+  uint64_t frame_errors;
+  /**
+   * OpStatus of the last failed frame, or OP_OK.
+   */
+  uint32_t last_error;
+} OpViewInfo;
+
+/**
+ * Engine-wide view counters, for leak checks. All zero before the first attach.
+ */
+typedef struct OpViewCounters {
+  uint64_t live_views;
+  /**
+   * CAMetalLayers the engine retains.
+   */
+  uint64_t live_layers;
+  uint64_t live_surfaces;
+  uint64_t wgpu_textures;
+  uint64_t wgpu_texture_views;
+  uint64_t wgpu_buffers;
+  uint64_t wgpu_bind_groups;
+  uint64_t validation_errors;
+  uint64_t frames_total;
+} OpViewCounters;
 
 struct OpEngine *op_engine_new(const struct OpConfig *_config, OpEventFn event_fn, void *user);
 
@@ -146,15 +251,65 @@ void op_buffer_free(struct OpBuffer *b);
 
 void op_pixels_free(struct OpPixelBuffer *b);
 
-enum OpStatus op_view_attach(struct OpEngine *_p, uint64_t _doc, void *_layer, uint64_t *_out);
-
-enum OpStatus op_view_set(struct OpEngine *_p, uint64_t _view, const struct OpViewState *_state);
-
-enum OpStatus op_view_detach(struct OpEngine *_p, uint64_t _view);
-
 enum OpStatus op_pointer(struct OpEngine *_p,
                          uint64_t _view,
                          const struct OpPointerEvent *_events,
                          uintptr_t _len);
+
+/**
+ * Attaches a view of `doc` to a `CAMetalLayer`. The engine retains the layer
+ * until the view is detached. Nothing is drawn until the first `op_view_set`.
+ * Returns OP_ERR_NO_SUCH_DOC for an unknown document, OP_ERR_BAD_ARGUMENT for a
+ * null pointer or an object that is not a CAMetalLayer, OP_ERR_INTERNAL when no
+ * GPU device can be made, and OP_ERR_UNSUPPORTED off macOS.
+ */
+enum OpStatus op_view_attach(struct OpEngine *p, uint64_t doc, void *layer, uint64_t *out_view);
+
+/**
+ * Stores the view's newest state and asks for a frame. Returns at once; the
+ * render thread draws the newest state it finds. A bad field returns
+ * OP_ERR_BAD_ARGUMENT and changes nothing. A stale view id returns
+ * OP_ERR_NO_SUCH_DOC.
+ */
+enum OpStatus op_view_set(struct OpEngine *p, uint64_t view, const struct OpViewState *state);
+
+/**
+ * Detaches a view: waits for its in-flight frame, drops its surface and
+ * releases the layer. A stale id returns OP_ERR_NO_SUCH_DOC.
+ */
+enum OpStatus op_view_detach(struct OpEngine *p, uint64_t view);
+
+/**
+ * Reads a view's current state and statistics.
+ */
+enum OpStatus op_view_info(struct OpEngine *p, uint64_t view, struct OpViewInfo *out);
+
+/**
+ * Reads the engine-wide view counters (live views, retained layers, surfaces,
+ * wgpu objects, validation errors, frames).
+ */
+enum OpStatus op_view_counters(struct OpEngine *p, struct OpViewCounters *out);
+
+/**
+ * Moves up to `cap` present timestamps (milliseconds since attach, oldest
+ * first) out of the view's log into `out` and writes how many to `out_len`.
+ * The log keeps the newest 16384 frames until read.
+ */
+enum OpStatus op_view_take_frame_times(struct OpEngine *p,
+                                       uint64_t view,
+                                       double *out,
+                                       uintptr_t cap,
+                                       uintptr_t *out_len);
+
+/**
+ * Waits until the view has presented at least `min_frames` frames, or until
+ * `timeout_ms` passes (then OP_ERR_BUSY). Writes the frame count to `out_frames`
+ * when it is not null. Returns OP_ERR_NO_SUCH_DOC if the view is detached.
+ */
+enum OpStatus op_view_wait_frames(struct OpEngine *p,
+                                  uint64_t view,
+                                  uint64_t min_frames,
+                                  uint32_t timeout_ms,
+                                  uint64_t *out_frames);
 
 #endif  /* OPENPAINTER_H */

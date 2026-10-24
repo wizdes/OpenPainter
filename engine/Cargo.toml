@@ -21,6 +21,12 @@ panic = "unwind"
 
 # Debug builds keep overflow checks and debug assertions, but optimize so the
 # random-case pixel tests finish inside the fast tier's 2-minute budget.
+
+# Proc macros and build scripts run at build time; stripping their symbols
+# breaks proc-macro dylibs on macOS ("can't find crate for zerocopy_derive").
+[profile.release.build-override]
+strip = false
+
 [profile.dev]
 opt-level = 1
 

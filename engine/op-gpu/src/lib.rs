@@ -1,4 +1,6 @@
 //! Integer-addressed GPU image operations. RGBA8 stays encoded and straight in storage.
+#[cfg(target_os = "macos")]
+pub mod layer;
 pub mod presenter;
 use std::sync::{
     Arc,

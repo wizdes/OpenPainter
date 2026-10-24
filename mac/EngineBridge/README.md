@@ -8,6 +8,10 @@ A thin Swift wrapper over the OpenPainter engine's C interface
 - `Document` is one open document. `dispatch` queues a command and returns a ticket.
   `run` dispatches and waits for that ticket's `JobFinished` event.
   `info()` and `pixels()` read the latest published snapshot.
+- `EngineView` (in `View.swift`) is one canvas view: the engine draws a document into a
+  `CAMetalLayer` on its render thread. `set` sends the view state and the display ICC,
+  `info` reads it back, `detach` waits for the in-flight frame and releases the layer.
+  `Engine.viewCounters()` returns the live view, layer, surface and wgpu counters.
 - `Engine.close()` frees the engine. Queued work and running jobs finish first.
   No event arrives after it returns.
 
@@ -31,6 +35,7 @@ The package links the Rust static library `libop_ffi.a`, so build that first.
      --scratch-path "$PWD/.swift-cache/scratch" --cache-path "$PWD/.swift-cache/cache"
    ```
 
+The app (`mac/project.yml`) runs step 1 itself through `mac/scripts/build-engine.sh`.
 Rebuild step 1 after any Rust change. SwiftPM does not know that the library depends on the Rust sources.
 
 ## Tests

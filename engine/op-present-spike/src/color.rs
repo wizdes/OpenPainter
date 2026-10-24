@@ -3,6 +3,7 @@ use std::ffi::{c_char, c_void};
 
 use objc::runtime::Object;
 use objc::{msg_send, sel, sel_impl};
+use op_color::Profile;
 use op_gpu::presenter::Lut3d;
 
 type CFTypeRef = *const c_void;
@@ -110,64 +111,29 @@ pub unsafe fn set_layer_tag(layer: *mut Object, space: &ColorSpace) {
     }
 }
 
-fn transform(
-    doc_icc: &[u8],
-    display_icc: &[u8],
-) -> Result<lcms2::Transform<[f32; 3], [f32; 3]>, String> {
-    use lcms2::{Intent, PixelFormat, Profile, Transform};
-    let src = Profile::new_icc(doc_icc).map_err(|e| format!("document ICC: {e}"))?;
-    let dst = Profile::new_icc(display_icc).map_err(|e| format!("display ICC: {e}"))?;
-    Transform::new(
-        &src,
-        PixelFormat::RGB_FLT,
-        &dst,
-        PixelFormat::RGB_FLT,
-        Intent::RelativeColorimetric,
-    )
-    .map_err(|e| format!("transform: {e}"))
+fn profiles(doc_icc: &[u8], display_icc: &[u8]) -> Result<(Profile, Profile), String> {
+    let src = Profile::from_icc(doc_icc).map_err(|e| format!("document ICC: {e}"))?;
+    let dst = Profile::from_icc(display_icc).map_err(|e| format!("display ICC: {e}"))?;
+    Ok((src, dst))
 }
 
-/// lcms2 float transform of each color, clamped to 0..1.
+/// lcms2 float transform of each color, clamped to 0..1 (op-color's transform).
 pub fn convert_exact(
     doc_icc: &[u8],
     display_icc: &[u8],
     rgb: &[[f32; 3]],
 ) -> Result<Vec<[f32; 3]>, String> {
-    let t = transform(doc_icc, display_icc)?;
-    let mut out = vec![[0f32; 3]; rgb.len()];
-    t.transform_pixels(rgb, &mut out);
-    Ok(out
-        .iter()
-        .map(|c| {
-            [
-                c[0].clamp(0.0, 1.0),
-                c[1].clamp(0.0, 1.0),
-                c[2].clamp(0.0, 1.0),
-            ]
-        })
-        .collect())
+    let (src, dst) = profiles(doc_icc, display_icc)?;
+    op_color::convert_rgb_float(&src, &dst, rgb).map_err(|e| format!("transform: {e}"))
 }
 
-/// Document -> display table built with lcms2 (float transform, relative colorimetric,
-/// no black point compensation), clamped to the display gamut.
+/// Document -> display table built by op-color (float transform, relative
+/// colorimetric, no black point compensation), clamped to the display gamut.
 pub fn build_lut(doc_icc: &[u8], display_icc: &[u8], n: u32) -> Result<Lut3d, String> {
-    let t = transform(doc_icc, display_icc)?;
-    let identity = Lut3d::identity(n);
-    let input: Vec<[f32; 3]> = identity.data.iter().map(|c| [c[0], c[1], c[2]]).collect();
-    let mut out = vec![[0f32; 3]; input.len()];
-    t.transform_pixels(&input, &mut out);
+    let (src, dst) = profiles(doc_icc, display_icc)?;
+    let table = op_color::display_table(&src, &dst, n).map_err(|e| format!("transform: {e}"))?;
     Ok(Lut3d {
         n,
-        data: out
-            .iter()
-            .map(|c| {
-                [
-                    c[0].clamp(0.0, 1.0),
-                    c[1].clamp(0.0, 1.0),
-                    c[2].clamp(0.0, 1.0),
-                    1.0,
-                ]
-            })
-            .collect(),
+        data: table.into_iter().map(|c| [c[0], c[1], c[2], 1.0]).collect(),
     })
 }
