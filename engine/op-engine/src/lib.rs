@@ -1,1 +1,1162 @@
-//! Commands, document jobs, rendering schedules, and platform services.
+//! Ordered document commands, immutable published views, and cancellable preview jobs.
+use arc_swap::ArcSwap;
+use crossbeam_channel::{Receiver, Sender, unbounded};
+use op_core::doc::{DocState, LayerId, PolygonSet, SelectionSource, SelectionState};
+use op_core::history::History;
+use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
+use parking_lot::Mutex;
+use rayon::ThreadPool;
+use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+use thiserror::Error;
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum Error {
+    #[error("bad argument: {0}")]
+    BadArgument(String),
+    #[error("no such document")]
+    NoSuchDoc,
+    #[error("document is read only after a panic")]
+    ReadOnly,
+    #[error("command or job panicked")]
+    Panic,
+    #[error("operation is busy")]
+    Busy,
+    #[error("internal error: {0}")]
+    Internal(String),
+    #[error("job was cancelled")]
+    Cancelled,
+}
+impl Error {
+    /// The short name used as `status` in JobFinished payloads.
+    pub fn status_name(&self) -> &'static str {
+        match self {
+            Error::BadArgument(_) => "bad_argument",
+            Error::NoSuchDoc => "no_such_doc",
+            Error::ReadOnly => "read_only",
+            Error::Panic => "panic",
+            Error::Busy => "busy",
+            Error::Internal(_) => "internal",
+            Error::Cancelled => "cancelled",
+        }
+    }
+}
+pub type Result<T> = std::result::Result<T, Error>;
+fn internal(e: impl std::fmt::Display) -> Error {
+    Error::Internal(e.to_string())
+}
+fn bad(e: impl std::fmt::Display) -> Error {
+    Error::BadArgument(e.to_string())
+}
+/// The JobFinished payload for a finished operation: `{"status":"ok"}` or
+/// `{"status":<error name>,"error":<text>}`.
+pub fn finished_json<T>(result: &Result<T>) -> Value {
+    match result {
+        Ok(_) => json!({"status":"ok"}),
+        Err(e) => json!({"status":e.status_name(),"error":e.to_string()}),
+    }
+}
+
+/// A caller's handle on one dispatched operation. Cancelling it stops queued work
+/// before it starts and running work at its next check (between tiles and inside
+/// long loops). Cancelled work never commits.
+#[derive(Clone, Debug)]
+pub struct JobTicket {
+    id: u64,
+    cancel: Arc<AtomicBool>,
+}
+impl JobTicket {
+    /// Ticket 0 means "no caller ticket"; JobFinished is still sent for preview renders.
+    pub fn new(id: u64) -> Self {
+        Self {
+            id,
+            cancel: Arc::new(AtomicBool::new(false)),
+        }
+    }
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::Release);
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Acquire)
+    }
+}
+/// What a running command can see besides the document: its cancel flag and a
+/// progress reporter.
+pub struct RunCtx {
+    ticket: JobTicket,
+    doc: u64,
+    events: Sender<Event>,
+}
+impl RunCtx {
+    /// Returns `Err(Cancelled)` once the ticket is cancelled.
+    pub fn check(&self) -> Result<()> {
+        if self.ticket.is_cancelled() {
+            Err(Error::Cancelled)
+        } else {
+            Ok(())
+        }
+    }
+    /// Sleeps in 5 ms steps and stops early on cancel.
+    pub fn sleep(&self, ms: u64) -> Result<()> {
+        let end = Instant::now() + Duration::from_millis(ms);
+        loop {
+            self.check()?;
+            let left = end.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Ok(());
+            }
+            std::thread::sleep(left.min(Duration::from_millis(5)));
+        }
+    }
+    /// Sends a Progress event for caller tickets.
+    pub fn progress(&self, done: usize, total: usize) {
+        if self.ticket.id != 0 {
+            let _ = self.events.send(Event {
+                kind: EventKind::Progress,
+                doc: self.doc,
+                ticket: self.ticket.id,
+                json: json!({"done":done,"total":total}),
+            });
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ParamKind {
+    Int,
+    Float,
+    Bool,
+    Choice(&'static [&'static str]),
+    String,
+}
+#[derive(Clone, Debug)]
+pub struct Param {
+    pub key: &'static str,
+    pub kind: ParamKind,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub default: Option<Value>,
+}
+#[derive(Clone, Debug, Default)]
+pub struct ParamSchema {
+    pub fields: Vec<Param>,
+}
+impl ParamSchema {
+    pub fn validate(&self, value: Value) -> Result<Value> {
+        let obj = value
+            .as_object()
+            .ok_or_else(|| bad("parameters must be a JSON object"))?;
+        for key in obj.keys() {
+            if !self.fields.iter().any(|f| f.key == key) {
+                return Err(bad(format!("unknown parameter {key}")));
+            }
+        }
+        let mut out = serde_json::Map::new();
+        for field in &self.fields {
+            let v = obj
+                .get(field.key)
+                .cloned()
+                .or_else(|| field.default.clone())
+                .ok_or_else(|| bad(format!("missing {}", field.key)))?;
+            let valid = match &field.kind {
+                ParamKind::Int => v.as_i64().is_some(),
+                ParamKind::Float => v.as_f64().is_some(),
+                ParamKind::Bool => v.is_boolean(),
+                ParamKind::String => v.is_string(),
+                ParamKind::Choice(choices) => v.as_str().is_some_and(|s| choices.contains(&s)),
+            };
+            if !valid {
+                return Err(bad(format!("invalid {}", field.key)));
+            }
+            if let Some(n) = v.as_f64()
+                && (field.min.is_some_and(|m| n < m) || field.max.is_some_and(|m| n > m))
+            {
+                return Err(bad(format!("{} out of range", field.key)));
+            }
+            out.insert(field.key.into(), v);
+        }
+        Ok(Value::Object(out))
+    }
+}
+pub struct CommandSpec {
+    pub id: &'static str,
+    pub params: ParamSchema,
+    pub enabled: fn(&DocState) -> bool,
+    pub run: fn(&RunCtx, &DocState, &Value) -> Result<Outcome>,
+    pub previewable: bool,
+}
+pub enum Outcome {
+    State(DocState),
+    HistoryUndo,
+    HistoryRedo,
+    HistoryJump(usize),
+}
+fn always(_: &DocState) -> bool {
+    true
+}
+fn can_delete(s: &DocState) -> bool {
+    s.layers.len() > 1
+}
+fn add(_: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    Ok(Outcome::State(
+        s.add_layer(s.layers.len(), p["name"].as_str().unwrap())
+            .map_err(internal)?,
+    ))
+}
+fn delete(_: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
+    Ok(Outcome::State(
+        s.delete_layer(s.active_layer).map_err(internal)?,
+    ))
+}
+/// Inverts RGB and keeps alpha on every stored tile of the active layer, checking
+/// for cancel before each tile. `delay_ms` slows each tile for tests.
+fn invert_tiles(ctx: &RunCtx, s: &DocState, delay_ms: u64) -> Result<Outcome> {
+    let mut next = s.clone();
+    let layer = &s.layers[s.active_layer];
+    let coords: Vec<TileCoord> = layer.tiles.iter().map(|(c, _)| c).collect();
+    for (done, coord) in coords.iter().enumerate() {
+        ctx.check()?;
+        ctx.sleep(delay_ms)?;
+        let mut tile = s.read_tile(s.active_layer, *coord).map_err(internal)?;
+        for px in tile.chunks_exact_mut(4) {
+            for c in &mut px[..3] {
+                *c = 255 - *c;
+            }
+        }
+        next = next
+            .write_tile(
+                s.active_layer,
+                *coord,
+                TileData::try_from(tile).map_err(internal)?,
+            )
+            .map_err(internal)?;
+        ctx.progress(done + 1, coords.len());
+    }
+    ctx.check()?;
+    Ok(Outcome::State(next))
+}
+fn invert(ctx: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
+    invert_tiles(ctx, s, 0)
+}
+fn slow_invert(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    invert_tiles(ctx, s, p["delay_ms"].as_u64().unwrap())
+}
+fn preview_fill(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    ctx.sleep(p["delay_ms"].as_u64().unwrap())?;
+    let mut tile = s
+        .read_tile(s.active_layer, TileCoord { x: 0, y: 0 })
+        .map_err(internal)?;
+    tile[0] = p["value"].as_u64().unwrap() as u8;
+    let next = s
+        .write_tile(
+            s.active_layer,
+            TileCoord { x: 0, y: 0 },
+            TileData::try_from(tile).map_err(internal)?,
+        )
+        .map_err(internal)?;
+    Ok(Outcome::State(next))
+}
+/// Test-only: toggles between no selection and a small triangle.
+fn toggle_selection(_: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
+    let next = match s.selection {
+        SelectionState::None => {
+            SelectionState::Active(SelectionSource::Geometry(Arc::new(PolygonSet(vec![vec![
+                (0.0, 0.0),
+                (1.0, 0.0),
+                (1.0, 1.0),
+            ]]))))
+        }
+        SelectionState::Active(_) => SelectionState::None,
+    };
+    Ok(Outcome::State(s.set_selection(next)))
+}
+fn panic_preview(_: &RunCtx, _: &DocState, _: &Value) -> Result<Outcome> {
+    panic!("test worker panic")
+}
+fn undo(_: &RunCtx, _: &DocState, _: &Value) -> Result<Outcome> {
+    Ok(Outcome::HistoryUndo)
+}
+fn redo(_: &RunCtx, _: &DocState, _: &Value) -> Result<Outcome> {
+    Ok(Outcome::HistoryRedo)
+}
+fn jump(_: &RunCtx, _: &DocState, p: &Value) -> Result<Outcome> {
+    Ok(Outcome::HistoryJump(p["index"].as_u64().unwrap() as usize))
+}
+fn panic_run(_: &RunCtx, _: &DocState, _: &Value) -> Result<Outcome> {
+    panic!("test command panic")
+}
+fn specs() -> Vec<CommandSpec> {
+    let empty = || ParamSchema::default();
+    vec![
+        CommandSpec {
+            id: "layer.add",
+            params: ParamSchema {
+                fields: vec![Param {
+                    key: "name",
+                    kind: ParamKind::String,
+                    min: None,
+                    max: None,
+                    default: Some(json!("Layer")),
+                }],
+            },
+            enabled: always,
+            run: add,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "layer.delete",
+            params: empty(),
+            enabled: can_delete,
+            run: delete,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "image.invert_colors",
+            params: empty(),
+            enabled: always,
+            run: invert,
+            previewable: true,
+        },
+        CommandSpec {
+            id: "edit.undo",
+            params: empty(),
+            enabled: always,
+            run: undo,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "edit.redo",
+            params: empty(),
+            enabled: always,
+            run: redo,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "history.jump",
+            params: ParamSchema {
+                fields: vec![Param {
+                    key: "index",
+                    kind: ParamKind::Int,
+                    min: Some(0.0),
+                    max: None,
+                    default: None,
+                }],
+            },
+            enabled: always,
+            run: jump,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "test.panic",
+            params: empty(),
+            enabled: always,
+            run: panic_run,
+            previewable: false,
+        },
+        CommandSpec {
+            id: "test.panic_preview",
+            params: empty(),
+            enabled: always,
+            run: panic_preview,
+            previewable: true,
+        },
+        CommandSpec {
+            id: "test.preview_fill",
+            params: ParamSchema {
+                fields: vec![
+                    Param {
+                        key: "value",
+                        kind: ParamKind::Int,
+                        min: Some(0.0),
+                        max: Some(255.0),
+                        default: None,
+                    },
+                    Param {
+                        key: "delay_ms",
+                        kind: ParamKind::Int,
+                        min: Some(0.0),
+                        max: Some(1000.0),
+                        default: Some(json!(0)),
+                    },
+                ],
+            },
+            enabled: always,
+            run: preview_fill,
+            previewable: true,
+        },
+        CommandSpec {
+            id: "test.slow_invert",
+            params: ParamSchema {
+                fields: vec![Param {
+                    key: "delay_ms",
+                    kind: ParamKind::Int,
+                    min: Some(0.0),
+                    max: Some(1000.0),
+                    default: Some(json!(0)),
+                }],
+            },
+            enabled: always,
+            run: slow_invert,
+            previewable: true,
+        },
+        CommandSpec {
+            id: "test.set_selection",
+            params: empty(),
+            enabled: always,
+            run: toggle_selection,
+            previewable: false,
+        },
+    ]
+}
+fn spec(id: &str) -> Result<CommandSpec> {
+    specs()
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| bad(format!("unknown command {id}")))
+}
+#[derive(Clone)]
+pub struct HistorySummary {
+    pub labels: Vec<String>,
+    pub index: usize,
+    pub dirty: bool,
+}
+#[derive(Clone)]
+pub struct Published {
+    pub state: DocState,
+    pub history: HistorySummary,
+    pub revision: u64,
+    pub preview: Option<DocState>,
+}
+impl Published {
+    pub fn info(&self) -> Value {
+        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision})
+    }
+    pub fn pixels(&self, preview: bool) -> Result<Vec<u8>> {
+        let state = if preview {
+            self.preview.as_ref().unwrap_or(&self.state)
+        } else {
+            &self.state
+        };
+        let len = (state.width as usize)
+            .checked_mul(state.height as usize)
+            .and_then(|n| n.checked_mul(4))
+            .ok_or_else(|| bad("image too large"))?;
+        if len > 1024 * 1024 * 1024 {
+            return Err(bad("image too large"));
+        }
+        let mut out = vec![0; len];
+        for ty in 0..state.height.div_ceil(TILE_SIZE as u32) {
+            for tx in 0..state.width.div_ceil(TILE_SIZE as u32) {
+                let tile = op_ops::composite::composite_tile(
+                    state,
+                    TileCoord {
+                        x: tx as i32,
+                        y: ty as i32,
+                    },
+                )
+                .map_err(internal)?;
+                for y in 0..(state.height - ty * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize {
+                    let n =
+                        (state.width - tx * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize * 4;
+                    let dst = ((ty as usize * TILE_SIZE + y) * state.width as usize
+                        + tx as usize * TILE_SIZE)
+                        * 4;
+                    out[dst..dst + n].copy_from_slice(
+                        &tile.as_bytes()[y * TILE_SIZE * 4..y * TILE_SIZE * 4 + n],
+                    );
+                }
+            }
+        }
+        Ok(out)
+    }
+}
+#[derive(Clone, Debug)]
+pub enum EventKind {
+    DocChanged,
+    HistoryChanged,
+    LayersChanged,
+    JobFinished,
+    Progress,
+}
+#[derive(Clone, Debug)]
+pub struct Event {
+    pub kind: EventKind,
+    pub doc: u64,
+    pub ticket: u64,
+    pub json: Value,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct JobIdentity {
+    pub doc: u64,
+    pub base_revision: u64,
+    pub target_layer: LayerId,
+    pub selection_revision: u64,
+    pub preview_session: u64,
+    pub generation: u64,
+}
+impl JobIdentity {
+    /// Names of the fields that differ from `current`, in declaration order.
+    pub fn mismatches(&self, current: &JobIdentity) -> Vec<&'static str> {
+        [
+            ("doc", self.doc == current.doc),
+            ("base_revision", self.base_revision == current.base_revision),
+            ("target_layer", self.target_layer == current.target_layer),
+            (
+                "selection_revision",
+                self.selection_revision == current.selection_revision,
+            ),
+            (
+                "preview_session",
+                self.preview_session == current.preview_session,
+            ),
+            ("generation", self.generation == current.generation),
+        ]
+        .into_iter()
+        .filter(|(_, same)| !same)
+        .map(|(name, _)| name)
+        .collect()
+    }
+}
+/// One mutating operation. `Engine::submit` queues it on the document's actor.
+#[derive(Clone, Debug)]
+pub enum Op {
+    Command(String, Value),
+    PreviewBegin(String, Value),
+    PreviewUpdate(Value),
+    PreviewCommit,
+    PreviewCancel,
+}
+struct PreviewSession {
+    id: u64,
+    command: &'static str,
+    base_revision: u64,
+    target: LayerId,
+    selection_revision: u64,
+    params: Value,
+    generation: u64,
+}
+struct Document {
+    tx: Sender<Message>,
+    published: Arc<ArcSwap<Published>>,
+    read_only: Arc<AtomicBool>,
+    join: Mutex<Option<JoinHandle<()>>>,
+    store: Arc<TileStore>,
+}
+enum Message {
+    Run(Op, JobTicket, Option<Sender<Result<Option<u64>>>>),
+    Job(JobIdentity, JobTicket, Result<DocState>),
+    Inject(JobIdentity, JobTicket, DocState),
+    Probe(Sender<(DocState, usize, usize, u64)>),
+    View(Sender<Published>),
+    Identity(Sender<JobIdentity>),
+    Stop(Sender<()>),
+}
+struct Actor {
+    id: u64,
+    history: History,
+    revision: u64,
+    /// Counts changes of the current selection, including undo and redo.
+    selection_revision: u64,
+    preview: Option<PreviewSession>,
+    published: Arc<ArcSwap<Published>>,
+    read_only: Arc<AtomicBool>,
+    events: Sender<Event>,
+    tx: Sender<Message>,
+    pool: Arc<ThreadPool>,
+    next_session: Arc<AtomicU64>,
+    pending_jobs: usize,
+}
+impl Actor {
+    fn view(&self, preview: Option<DocState>) -> Published {
+        let h = &self.history;
+        Published {
+            state: h.current_state().clone(),
+            history: HistorySummary {
+                labels: (0..h.len())
+                    .map(|i| h.label(i).unwrap().to_owned())
+                    .collect(),
+                index: h.current_index(),
+                dirty: h.is_dirty(),
+            },
+            revision: self.revision,
+            preview,
+        }
+    }
+    fn publish(&self, preview: Option<DocState>) {
+        self.published.store(Arc::new(self.view(preview)));
+    }
+    fn event(&self, kind: EventKind, ticket: u64, json: Value) {
+        let _ = self.events.send(Event {
+            kind,
+            doc: self.id,
+            ticket,
+            json,
+        });
+    }
+    fn ctx(&self, ticket: &JobTicket) -> RunCtx {
+        RunCtx {
+            ticket: ticket.clone(),
+            doc: self.id,
+            events: self.events.clone(),
+        }
+    }
+    fn active_id(&self) -> LayerId {
+        let s = self.history.current_state();
+        s.layers[s.active_layer].id
+    }
+    /// The identity a job started now would carry.
+    fn identity_now(&self) -> JobIdentity {
+        JobIdentity {
+            doc: self.id,
+            base_revision: self.revision,
+            target_layer: self.active_id(),
+            selection_revision: self.selection_revision,
+            preview_session: self.preview.as_ref().map_or(0, |p| p.id),
+            generation: self.preview.as_ref().map_or(0, |p| p.generation),
+        }
+    }
+    fn mark_read_only(&mut self) {
+        self.read_only.store(true, Ordering::Release);
+        self.preview = None;
+        self.publish(None);
+    }
+    fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        let spec = spec(id)?;
+        let params = spec.params.validate(params)?;
+        if !(spec.enabled)(self.history.current_state()) {
+            return Err(bad("command disabled"));
+        }
+        let outcome = (spec.run)(&self.ctx(ticket), self.history.current_state(), &params)?;
+        // A cancel that lands after the last check still wins: nothing commits.
+        self.ctx(ticket).check()?;
+        let selection = self.history.current_state().selection.clone();
+        let changed = match outcome {
+            Outcome::State(state) => {
+                self.history.commit(id, id, state);
+                true
+            }
+            Outcome::HistoryUndo => self.history.undo(),
+            Outcome::HistoryRedo => self.history.redo(),
+            Outcome::HistoryJump(index) => {
+                self.history.jump(index).map_err(bad)?;
+                true
+            }
+        };
+        if changed {
+            if self.history.current_state().selection != selection {
+                self.selection_revision += 1;
+            }
+            self.revision += 1;
+            self.preview = None;
+            self.publish(None);
+            self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+            self.event(EventKind::HistoryChanged, 0, json!({}));
+            if id.starts_with("layer.") {
+                self.event(EventKind::LayersChanged, 0, json!({}));
+            }
+        }
+        Ok(())
+    }
+    fn begin(&mut self, id: &str, params: Value, ticket: JobTicket) -> Result<u64> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        let spec = specs()
+            .into_iter()
+            .find(|s| s.id == id && s.previewable)
+            .ok_or_else(|| bad("command cannot preview"))?;
+        let params = spec.params.validate(params)?;
+        let session = self.next_session.fetch_add(1, Ordering::Relaxed);
+        self.preview = Some(PreviewSession {
+            id: session,
+            command: spec.id,
+            base_revision: self.revision,
+            target: self.active_id(),
+            selection_revision: self.selection_revision,
+            params,
+            generation: 0,
+        });
+        self.publish(None);
+        self.render_preview(ticket);
+        Ok(session)
+    }
+    /// Starts a render of the current session on the pool. Its result comes back as
+    /// `Message::Job` and is shown only if its identity still matches.
+    fn render_preview(&mut self, ticket: JobTicket) {
+        let Some(p) = &mut self.preview else { return };
+        p.generation += 1;
+        let identity = JobIdentity {
+            doc: self.id,
+            base_revision: p.base_revision,
+            target_layer: p.target,
+            selection_revision: p.selection_revision,
+            preview_session: p.id,
+            generation: p.generation,
+        };
+        let state = self.history.current_state().clone();
+        let params = p.params.clone();
+        let id = p.command;
+        let tx = self.tx.clone();
+        let ctx = self.ctx(&ticket);
+        self.pending_jobs += 1;
+        self.pool.spawn(move || {
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                ctx.check()?;
+                match (spec(id)?.run)(&ctx, &state, &params)? {
+                    Outcome::State(s) => Ok(s),
+                    _ => Err(bad("preview command did not return pixels")),
+                }
+            }))
+            .unwrap_or(Err(Error::Panic));
+            let _ = tx.send(Message::Job(identity, ticket, result));
+        });
+    }
+    fn update(&mut self, params: Value, ticket: JobTicket) -> Result<()> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        let p = self.preview.as_mut().ok_or_else(|| bad("no preview"))?;
+        p.params = spec(p.command)?.params.validate(params)?;
+        self.publish(None);
+        self.render_preview(ticket);
+        Ok(())
+    }
+    fn commit(&mut self, ticket: &JobTicket) -> Result<()> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        let p = self.preview.take().ok_or_else(|| bad("no preview"))?;
+        if p.base_revision != self.revision
+            || p.target != self.active_id()
+            || p.selection_revision != self.selection_revision
+        {
+            return Err(Error::Busy);
+        }
+        let result = self.command(p.command, p.params, ticket);
+        if result.is_err() {
+            // Nothing committed: show the plain document again.
+            self.publish(None);
+        }
+        result
+    }
+    /// Handles a finished render. Every render ends with exactly one JobFinished.
+    fn job(&mut self, identity: JobIdentity, ticket: JobTicket, result: Result<DocState>) {
+        self.pending_jobs -= 1;
+        let state = match result {
+            Ok(state) => state,
+            Err(e) => {
+                if e == Error::Panic {
+                    self.mark_read_only();
+                }
+                self.event(
+                    EventKind::JobFinished,
+                    ticket.id,
+                    finished_json::<()>(&Err(e)),
+                );
+                return;
+            }
+        };
+        if ticket.is_cancelled() {
+            let cancelled = finished_json::<()>(&Err(Error::Cancelled));
+            self.event(EventKind::JobFinished, ticket.id, cancelled);
+            return;
+        }
+        let mismatch = identity.mismatches(&self.identity_now());
+        if !mismatch.is_empty() {
+            self.event(
+                EventKind::JobFinished,
+                ticket.id,
+                json!({"status":"dropped","mismatch":mismatch}),
+            );
+            return;
+        }
+        self.publish(Some(state));
+        self.event(
+            EventKind::Progress,
+            ticket.id,
+            json!({"generation":identity.generation,"fraction":1.0}),
+        );
+        self.event(EventKind::JobFinished, ticket.id, json!({"status":"ok"}));
+    }
+    /// Runs one operation. Returns the result and whether a render now owns the
+    /// ticket's JobFinished.
+    fn run_op(&mut self, op: Op, ticket: &JobTicket) -> (Result<Option<u64>>, bool) {
+        if ticket.is_cancelled() {
+            return (Err(Error::Cancelled), false);
+        }
+        let render = matches!(op, Op::PreviewBegin(..) | Op::PreviewUpdate(_));
+        let result = catch_unwind(AssertUnwindSafe(|| match op {
+            Op::Command(id, p) => self.command(&id, p, ticket).map(|_| None),
+            Op::PreviewBegin(id, p) => self.begin(&id, p, ticket.clone()).map(Some),
+            Op::PreviewUpdate(p) => self.update(p, ticket.clone()).map(|_| None),
+            Op::PreviewCommit => self.commit(ticket).map(|_| None),
+            Op::PreviewCancel => {
+                self.preview = None;
+                self.publish(None);
+                Ok(None)
+            }
+        }))
+        .unwrap_or(Err(Error::Panic));
+        if result == Err(Error::Panic) {
+            self.mark_read_only();
+        }
+        let rendering = render && result.is_ok();
+        (result, rendering)
+    }
+    fn run(mut self, rx: Receiver<Message>) {
+        let mut stopping: Option<Sender<()>> = None;
+        while let Ok(msg) = rx.recv() {
+            match msg {
+                Message::Stop(reply) => {
+                    self.preview = None;
+                    self.publish(None);
+                    stopping = Some(reply);
+                }
+                Message::Run(_, ticket, reply) if stopping.is_some() => {
+                    self.finish_unrun(ticket, reply);
+                }
+                Message::Run(op, ticket, reply) => {
+                    let (result, rendering) = self.run_op(op, &ticket);
+                    if !rendering && ticket.id != 0 {
+                        self.event(EventKind::JobFinished, ticket.id, finished_json(&result));
+                    }
+                    if let Some(r) = reply {
+                        let _ = r.send(result);
+                    }
+                }
+                Message::Job(id, ticket, res) => {
+                    if catch_unwind(AssertUnwindSafe(|| self.job(id, ticket, res))).is_err() {
+                        self.mark_read_only();
+                    }
+                }
+                Message::Inject(id, ticket, state) => {
+                    self.pending_jobs += 1;
+                    self.job(id, ticket, Ok(state));
+                }
+                Message::Probe(r) => {
+                    let _ = r.send((
+                        self.history.current_state().clone(),
+                        self.history.current_index(),
+                        self.history.len(),
+                        self.revision,
+                    ));
+                }
+                Message::View(r) => {
+                    let _ = r.send(self.view(None));
+                }
+                Message::Identity(r) => {
+                    let _ = r.send(self.identity_now());
+                }
+            }
+            if stopping.is_some() && self.pending_jobs == 0 {
+                break;
+            }
+        }
+        // Operations that raced with close still get their one JobFinished.
+        while let Ok(msg) = rx.try_recv() {
+            if let Message::Run(_, ticket, reply) = msg {
+                self.finish_unrun(ticket, reply);
+            }
+        }
+        if let Some(r) = stopping {
+            let _ = r.send(());
+        }
+    }
+    fn finish_unrun(&self, ticket: JobTicket, reply: Option<Sender<Result<Option<u64>>>>) {
+        let result: Result<Option<u64>> = Err(Error::NoSuchDoc);
+        if ticket.id != 0 {
+            self.event(EventKind::JobFinished, ticket.id, finished_json(&result));
+        }
+        if let Some(r) = reply {
+            let _ = r.send(result);
+        }
+    }
+}
+pub struct Engine {
+    docs: Mutex<HashMap<u64, Arc<Document>>>,
+    next_doc: AtomicU64,
+    next_session: Arc<AtomicU64>,
+    pool: Arc<ThreadPool>,
+    events_tx: Sender<Event>,
+    event_join: Mutex<Option<JoinHandle<()>>>,
+}
+impl Engine {
+    pub fn new(callback: Option<Arc<dyn Fn(Event) + Send + Sync>>) -> Result<Self> {
+        let pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(2)
+                .build()
+                .map_err(internal)?,
+        );
+        let (tx, rx) = unbounded();
+        let join = std::thread::spawn(move || {
+            while let Ok(e) = rx.recv() {
+                if let Some(cb) = &callback {
+                    let _ = catch_unwind(AssertUnwindSafe(|| cb(e)));
+                }
+            }
+        });
+        Ok(Self {
+            docs: Mutex::new(HashMap::new()),
+            next_doc: AtomicU64::new(1),
+            next_session: Arc::new(AtomicU64::new(1)),
+            pool,
+            events_tx: tx,
+            event_join: Mutex::new(Some(join)),
+        })
+    }
+    pub fn import_pixels(
+        &self,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+        icc: Option<&[u8]>,
+    ) -> Result<u64> {
+        let len = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|n| n.checked_mul(4))
+            .ok_or_else(|| bad("dimensions overflow"))?;
+        if width == 0 || height == 0 || rgba.len() != len || len > 1024 * 1024 * 1024 {
+            return Err(bad("invalid pixel dimensions or length"));
+        }
+        let store =
+            Arc::new(TileStore::new(std::env::temp_dir(), 64 * 1024 * 1024).map_err(internal)?);
+        let mut state = DocState::new(store.clone(), width, height, 96.0).map_err(internal)?;
+        for ty in 0..height.div_ceil(TILE_SIZE as u32) {
+            for tx in 0..width.div_ceil(TILE_SIZE as u32) {
+                let mut tile = vec![0; TILE_BYTES];
+                for y in 0..(height - ty * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize {
+                    let n = (width - tx * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize * 4;
+                    let src = ((ty as usize * TILE_SIZE + y) * width as usize
+                        + tx as usize * TILE_SIZE)
+                        * 4;
+                    tile[y * TILE_SIZE * 4..y * TILE_SIZE * 4 + n]
+                        .copy_from_slice(&rgba[src..src + n]);
+                }
+                state = state
+                    .write_tile(
+                        0,
+                        TileCoord {
+                            x: tx as i32,
+                            y: ty as i32,
+                        },
+                        TileData::try_from(tile).map_err(internal)?,
+                    )
+                    .map_err(internal)?;
+            }
+        }
+        if let Some(icc) = icc {
+            state = state.set_profile(Some(Arc::from(icc)));
+        }
+        let history = History::new(state.clone());
+        let id = self.next_doc.fetch_add(1, Ordering::Relaxed);
+        let published = Arc::new(ArcSwap::from_pointee(Published {
+            state,
+            history: HistorySummary {
+                labels: vec!["Open".into()],
+                index: 0,
+                dirty: false,
+            },
+            revision: 0,
+            preview: None,
+        }));
+        let read_only = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = unbounded();
+        let actor = Actor {
+            id,
+            history,
+            revision: 0,
+            selection_revision: 0,
+            preview: None,
+            published: published.clone(),
+            read_only: read_only.clone(),
+            events: self.events_tx.clone(),
+            tx: tx.clone(),
+            pool: self.pool.clone(),
+            next_session: self.next_session.clone(),
+            pending_jobs: 0,
+        };
+        let join = std::thread::spawn(move || actor.run(rx));
+        self.docs.lock().insert(
+            id,
+            Arc::new(Document {
+                tx,
+                published,
+                read_only,
+                join: Mutex::new(Some(join)),
+                store,
+            }),
+        );
+        Ok(id)
+    }
+    pub fn open_png(&self, bytes: &[u8]) -> Result<u64> {
+        let d = op_formats::png::decode_png(bytes).map_err(bad)?;
+        self.import_pixels(d.width, d.height, &d.pixels, d.icc.as_deref())
+    }
+    fn doc(&self, id: u64) -> Result<Arc<Document>> {
+        self.docs.lock().get(&id).cloned().ok_or(Error::NoSuchDoc)
+    }
+    pub fn snapshot(&self, id: u64) -> Result<Arc<Published>> {
+        Ok(self.doc(id)?.published.load_full())
+    }
+    pub fn is_read_only(&self, id: u64) -> Result<bool> {
+        Ok(self.doc(id)?.read_only.load(Ordering::Acquire))
+    }
+    fn call<T>(&self, id: u64, make: impl FnOnce(Sender<T>) -> Message) -> Result<T> {
+        let d = self.doc(id)?;
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        d.tx.send(make(tx)).map_err(internal)?;
+        rx.recv().map_err(internal)
+    }
+    /// Checks what can be checked without the actor: the document, the command id
+    /// and, for commands and preview.begin, the parameters.
+    fn precheck(&self, op: &Op) -> Result<()> {
+        match op {
+            Op::Command(id, p) => {
+                spec(id)?.params.validate(p.clone())?;
+            }
+            Op::PreviewBegin(id, p) => {
+                let s = spec(id)?;
+                if !s.previewable {
+                    return Err(bad("command cannot preview"));
+                }
+                s.params.validate(p.clone())?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    /// Queues `op` on the document's actor and returns at once. Operations on one
+    /// document run in submit order. The ticket gets exactly one JobFinished event:
+    /// from the actor, or from the render that preview.begin / preview.update starts.
+    pub fn submit(&self, id: u64, op: Op, ticket: JobTicket) -> Result<()> {
+        let d = self.doc(id)?;
+        self.precheck(&op)?;
+        d.tx.send(Message::Run(op, ticket, None))
+            .map_err(|_| Error::NoSuchDoc)
+    }
+    /// Runs `op` and waits for the actor's answer (not for a preview render).
+    pub fn run_op(&self, id: u64, op: Op, ticket: &JobTicket) -> Result<Option<u64>> {
+        self.call(id, |r| Message::Run(op, ticket.clone(), Some(r)))?
+    }
+    pub fn dispatch_with(
+        &self,
+        id: u64,
+        command: &str,
+        params: Value,
+        ticket: &JobTicket,
+    ) -> Result<()> {
+        self.run_op(id, Op::Command(command.to_owned(), params), ticket)
+            .map(|_| ())
+    }
+    pub fn dispatch(&self, id: u64, command: &str, params: Value) -> Result<()> {
+        self.dispatch_with(id, command, params, &JobTicket::new(0))
+    }
+    pub fn preview_begin(&self, id: u64, command: &str, params: Value) -> Result<u64> {
+        self.run_op(
+            id,
+            Op::PreviewBegin(command.to_owned(), params),
+            &JobTicket::new(0),
+        )?
+        .ok_or_else(|| internal("preview.begin returned no session"))
+    }
+    pub fn preview_update(&self, id: u64, params: Value) -> Result<()> {
+        self.run_op(id, Op::PreviewUpdate(params), &JobTicket::new(0))
+            .map(|_| ())
+    }
+    pub fn preview_commit(&self, id: u64) -> Result<()> {
+        self.run_op(id, Op::PreviewCommit, &JobTicket::new(0))
+            .map(|_| ())
+    }
+    pub fn preview_cancel(&self, id: u64) -> Result<()> {
+        self.run_op(id, Op::PreviewCancel, &JobTicket::new(0))
+            .map(|_| ())
+    }
+    pub fn query(&self, id: u64, query: &str, params: Value) -> Result<Vec<u8>> {
+        let d = self.doc(id)?;
+        let s = d.published.load_full();
+        match query {
+            "doc.info" => {
+                let mut info = s.info();
+                info["read_only"] = json!(d.read_only.load(Ordering::Acquire));
+                serde_json::to_vec(&info).map_err(internal)
+            }
+            "doc.pixels" => s.pixels(
+                params
+                    .get("preview")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            ),
+            _ => Err(bad("unknown query")),
+        }
+    }
+    pub fn close(&self, id: u64) -> Result<()> {
+        let d = self.docs.lock().remove(&id).ok_or(Error::NoSuchDoc)?;
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        d.tx.send(Message::Stop(tx)).map_err(internal)?;
+        rx.recv().map_err(internal)?;
+        if let Some(join) = d.join.lock().take() {
+            join.join().map_err(|_| Error::Panic)?;
+        }
+        Ok(())
+    }
+    pub fn tile_count(&self, id: u64) -> Result<usize> {
+        Ok(self.doc(id)?.store.stats().tile_count)
+    }
+    #[doc(hidden)]
+    pub fn actor_probe(&self, id: u64) -> Result<(DocState, usize, usize, u64)> {
+        self.call(id, Message::Probe)
+    }
+    /// Test hook: the actor's own state, built the same way as a published snapshot.
+    #[doc(hidden)]
+    pub fn actor_view(&self, id: u64) -> Result<Published> {
+        self.call(id, Message::View)
+    }
+    /// Test hook: the identity a job started now would carry.
+    #[doc(hidden)]
+    pub fn current_identity(&self, id: u64) -> Result<JobIdentity> {
+        self.call(id, Message::Identity)
+    }
+    /// Test hook: hands the actor a finished render result with any identity.
+    #[doc(hidden)]
+    pub fn inject_job_result(
+        &self,
+        id: u64,
+        identity: JobIdentity,
+        state: DocState,
+        ticket: JobTicket,
+    ) -> Result<()> {
+        self.doc(id)?
+            .tx
+            .send(Message::Inject(identity, ticket, state))
+            .map_err(internal)
+    }
+    pub fn tile_store(&self, id: u64) -> Result<Arc<TileStore>> {
+        Ok(self.doc(id)?.store.clone())
+    }
+}
+impl Drop for Engine {
+    fn drop(&mut self) {
+        let ids: Vec<_> = self.docs.lock().keys().copied().collect();
+        for id in ids {
+            let _ = self.close(id);
+        }
+        let (replacement, _) = unbounded();
+        let tx = std::mem::replace(&mut self.events_tx, replacement);
+        drop(tx);
+        if let Some(join) = self.event_join.lock().take() {
+            let _ = join.join();
+        }
+    }
+}

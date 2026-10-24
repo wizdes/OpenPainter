@@ -1,0 +1,5 @@
+module COpenPainter [system] {
+    header "../../../../engine/op-ffi/include/openpainter.h"
+    link "op_ffi"
+    export *
+}

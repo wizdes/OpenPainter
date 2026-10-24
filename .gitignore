@@ -15,3 +15,5 @@ DerivedData/
 tools/pdn-oracle/bin/
 tools/pdn-oracle/obj/
 __pycache__/
+.swift-cache/
+mac/**/.build/
