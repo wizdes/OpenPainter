@@ -1,0 +1,24 @@
+[package]
+name = "op-present-spike"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "M09 presenter go/no-go spike: path A (wgpu on CAMetalLayer) and path B (IOSurface ring)."
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+op-gpu = { path = "../op-gpu" }
+wgpu = { version = "27", features = ["counters"] }
+pollster = "0.4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+lcms2 = { version = "6.2", features = ["static"] }
+metal = "0.32"
+objc = "0.2.7"
+core-graphics-types = "0.2"

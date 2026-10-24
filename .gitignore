@@ -15,3 +15,7 @@ DerivedData/
 tools/pdn-oracle/bin/
 tools/pdn-oracle/obj/
 __pycache__/
+
+# SwiftPM build output (mac/PresenterSpike)
+.build/
+.swiftpm/

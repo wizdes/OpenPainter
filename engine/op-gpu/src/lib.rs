@@ -1,4 +1,5 @@
 //! Integer-addressed GPU image operations. RGBA8 stays encoded and straight in storage.
+pub mod presenter;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
