@@ -1,5 +1,7 @@
 # Plan: OpenPainter, a paint.net successor for Mac (engine ready for Windows and Linux)
 
+> Revision 2 (2026-10-24): after the Step 0 reviews, the milestone list is now 60 milestones and about 620 agent hours. `docs/MILESTONES.md` and `docs/reviews/step0-decisions.md` replace the milestone section below.
+
 ## Context
 The user wants a simple, fast, exact photo editor that does 80 to 90% of what paint.net does, with good UI. Mac first; Windows and Linux later. It will be a public, MIT-licensed, free download. Research (below) found MIT paint.net 3.36 source (OpenPDN) and Pinta's 126 reference images to port and test against. The user answered 24 scope questions (table below). After approval, I build all 50 milestones without asking again. At every 5 milestones I publish an update page.
 

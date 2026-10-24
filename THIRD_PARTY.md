@@ -7,3 +7,10 @@ OpenPainter ports algorithms from these MIT-licensed projects. Each ported file 
 - **libmypaint** (https://github.com/mypaint/libmypaint), ISC License. Brush dab spacing and smoothing ideas.
 
 GPL projects (LazPaint, KolourPaint) were studied for behavior only. No code was copied from them.
+
+## Rules for porting (from the Step 0 review)
+
+- OpenPDN's MIT grant covers its source code only. Its `.resx` and `.resources` files (menu and status text) and its `.png` artwork are CC BY-NC-ND. Never copy those strings or images.
+- Never port the GPC polygon clipper (`SystemLayer/GpcWrapper`, used by `PdnGraphicsPath` and `PdnRegion`). It forbids commercial use. OpenPainter uses `i_overlay` for polygon booleans.
+- PatchMatch (content-aware fill) is implemented from the paper (Barnes et al., SIGGRAPH 2009). The project's downloadable sample code is research-only and is never used.
+- `tests/oracle/ALLOWLIST.md` lists every OpenPDN and Pinta file that may be ported or used as an oracle. A file not on the list is not used.

@@ -65,65 +65,75 @@ tools/codegen/          Catalog to Swift generator
 
 ## 3. Data model
 
-### Pixels
-- Stored as **8-bit RGBA, straight alpha** (not premultiplied), like paint.net. Reason: ported paint.net code expects straight color, file formats are straight, and premultiplied 8-bit loses color at low alpha.
-- Every kernel loads to **premultiplied f32**, computes, and stores back. One shared rounding helper: `u8 = floor(clamp(v, 0, 1) * 255 + 0.5)`. CPU and GPU use the same rule.
-- Where a ported paint.net integer algorithm exists, the port matches its integer math first; the f32 path must agree within ±1/255.
+(Revised after the Step 0 review; see `docs/reviews/step0-decisions.md`.)
 
-### Tiles
-- 256×256 tiles (256 KB at RGBA8). `TileGrid` is a dense `Vec<Option<Arc<Tile>>>`; `None` is fully transparent.
-- Copy-on-write through `Arc::make_mut`.
-- `TileStore` keeps each tile Resident, Compressed (LZ4) or Spilled (offset in a per-session temp file). Tiles reachable only from history move Resident → Compressed → Spilled by LRU. Budget: 25% of RAM for history-only tiles by default. Tiles of the current state always stay resident.
+### Pixels and arithmetic contracts
+- Stored as **8-bit RGBA, straight alpha**. Straight color is kept everywhere it has meaning: storage, history, persistence, color adjustments, Invert Alpha, and the wand's Straight tolerance mode. Colors under zero alpha are preserved bytes.
+- There is no single blanket kernel rule. Every operation declares an **arithmetic contract** in its spec:
+  - input alpha form (straight or premultiplied) and where it converts
+  - working space: `Encoded` (the document's encoded values), `Linear` (linear light via the document profile's curve), or an operation-specific space
+  - precision of each stage and every quantization point (where 8-bit rounding happens mid-way)
+  - rounding rule at each quantization point (default `floor(clamp(v,0,1)*255 + 0.5)`)
+  - border rule (clamp, wrap, mirror, transparent)
+  - target behavior and reference version (`legacy-3.36` or `pdn-5.1`), from `tests/oracle/targets.toml`
+- **Layer compositing** uses float math (the user's decision, matching paint.net 5.2's FP32 compositor): premultiplied f32, one rounding at the end. Its oracle is an f64 spec of the paint.net blend formulas. The paint.net 3.36 integer blend is a cross-check with a documented tolerance, not the gate.
+- **Ops whose target is `legacy-3.36`** reproduce the legacy integer stages exactly on the CPU. Their GPU twin uses integer math (`u32`, with 64-bit emulation where sums overflow) on `rgba8uint` data.
+
+### Tiles and memory
+- 256×256 tiles. A layer is a persistent map from tile coordinate to `TileId`. A missing entry means exactly transparent black `(0,0,0,0)`. Any other zero-alpha color is an allocated tile.
+- `TileId` names immutable pixel content. The **storage manager** owns every tile record: `Resident | Compressed (LZ4) | Spilled (offset in a session file)`, plus pin count, byte count, checksum, codec version and last-use counter. A spill location is published only after its write succeeds.
+- Writing creates a new `TileId`. Old ids stay alive while any history state, snapshot or job pins them. Reference ownership is tracked by the manager, never by `Arc::strong_count`.
+- **Current-state tiles page too.** Only pinned tiles (visible, in use by a job, under the cursor) must be resident. One global memory budget covers document pixels, history, preview overlays, CPU scratch, GPU caches and upload/readback buffers. On this 8 GB Mac the default budget is 2 GB.
 
 ### Document
-- `Document { id, width, height, dpi, profile: Arc<Profile>, layers: Vec<Layer>, active_layer: LayerId, selection: Selection, metadata }`.
-- `Layer { id: u64 (stable), name, visible, opacity: u8, blend: BlendMode, tiles: TileGrid }`.
-- `DocState` is immutable and cheap to clone because tiles are shared.
+- `DocState { width, height, dpi, profile, layers: Vec<LayerState>, active_layer, selection: SelectionState, metadata, revision }`. `LayerState { id (stable u64), name, visible, opacity: u8, blend: LayerBlendMode, tiles }`.
+- `LayerBlendMode` has the 14 paint.net layer modes. Tool composite modes (Normal, Overwrite, and per-tool modes) are a separate `ToolCompositeMode`; Overwrite is not a layer mode.
+- A saved revision is stored separately so undoing back to the saved state clears the "unsaved" mark.
 
 ### Selection
-- The source of truth is an f64 polygon set (like paint.net's geometry). Combine modes Replace, Add (union), Subtract (exclude), Intersect, Invert (xor) use polygon booleans (`i_overlay`).
-- A cached antialiased 8-bit coverage mask is built from the path in the same tiled form. Pixelated mode snaps to pixel centers.
-- Magic Wand and Remove Background make a bitmap first, which is traced to a path (marching squares plus simplification).
-- Marching ants draw the path.
+- `SelectionState = None | Active(SelectionSource)`. `SelectionSource = Geometry(Arc<PolygonSet>) | Coverage(Arc<MaskGrid>)`.
+  - No selection: tools and effects affect the whole layer.
+  - Active empty selection: edits affect nothing.
+  - Select All: an active rectangle covering the canvas.
+- Geometry inputs (rectangle, ellipse, lasso) combine with polygon booleans (`i_overlay`, f64) before rasterization. Coverage inputs (wand with antialiasing, remove background) keep their original bytes. Mixed combines follow documented rules (union = max, intersect = min, subtract = saturating subtract, xor = absolute difference) with behavior tests.
+- Contours are derived only for marching ants and cached separately.
+- Antialiasing references use exact analytic area coverage in f64. Never a supersampled estimate.
+- OpenPDN's GPC-based geometry is not ported (non-commercial license).
 
 ### History
-- `History = Vec<HistoryStep { label, icon, command_id, state: DocState }>` plus a current index.
-- Each step is a full persistent snapshot with structural sharing. It costs only the tiles it changed.
-- Undo, redo and "click a History row" all swap the current state. Selection, active layer, profile and metadata come back for free.
-- A new action after undo drops the redo branch, as in paint.net.
-- Memory accounting counts tiles owned only by history. Huge ops (resize, rotate) create new grids; the old ones become history-only and spill first.
+- `History = Vec<HistoryStep { label, icon, command_id, state: DocState }>` plus a current index. Each step shares tiles with its neighbors.
+- Undo, redo and "click a History row" swap the current state atomically. This restores selection, active layer, profile and metadata too.
+- A new action after undo drops the redo branch.
+- A failed operation leaves the current state and the history index unchanged.
 
 ### Commands
 - `CommandSpec { id: "image.flip_horizontal", label_key, params: ParamSchema, enabled(&DocState) -> bool, run(ctx, params) -> Result<Outcome> }`.
-- Ids are stable strings: `layer.add`, `edit.undo`, `effect.blur.gaussian`, `tool.select`, `history.jump`.
-- Params are JSON validated against the schema.
+- Ids are stable strings: `layer.add`, `edit.undo`, `effect.blur.gaussian`, `tool.select`, `history.jump`. Params are JSON validated against the schema.
 
 ### Effects
-- `Effect { id, category, schema(), halo(params) -> u32, render_cpu(params, src, dst_rect), gpu: Option<GpuKernel> }`. `halo` is how many pixels around a tile the effect reads.
-- `ParamSchema` is a list of `Param { key, label, kind, enabled_when }`. Kinds: Int, Float (range, step, default), Bool, Choice, Angle, Point, Color, Seed (with Reseed), Text, Curve, Levels.
-- Swift builds dialogs from the schema, like paint.net's IndirectUI.
+- `EffectSpec { id, category, schema, contract, working_space, prepare(snapshot, selection, params) -> Prepared, required_input(output_rect, &Prepared) -> Rect, passes: [Pointwise | Neighborhood | Reduction | Warp | Iterative], render_cpu(...), gpu: Option<GpuKernel> }`.
+- `prepare` runs once per job for whole-image analysis (histograms for Auto-Level and Levels Auto, palettes for Quantize). Effects may read pixels outside the selection; the selection limits only where output is written. Selection coverage is applied once, at the end.
+- Tile results must equal whole-image results for every effect (tested).
+- `ParamSchema` is a list of `Param { key, label, kind, enabled_when }`. Kinds: Int, Float (range, step, default), Bool, Choice, Angle, Point, Color, Seed (with Reseed), Text, Curve, Levels. Swift builds dialogs from the schema.
 
-## 4. Rendering
+## 4. Rendering, jobs and previews
 
-- **Compositing:** bottom to top. Each visible layer is converted to premultiplied f32, the blend op is applied with layer opacity, the result is stored. The checkerboard is drawn under the image at display time only.
-- **Dirty flow:** a command or tool reports dirty rects in document space; the scheduler marks composite tiles dirty at level 0 and their mip parents; visible tiles re-composite first; the presenter redraws. Canvas dirtiness never crosses the FFI.
-- **Mips:** the composite cache is a GPU tile pyramid. Levels below 100% are built lazily with a 2×2 box filter. The presenter samples the level just above the target scale with trilinear filtering; above 100% zoom it uses nearest sampling.
-- **Canvas on Mac:** Swift creates a CAMetalLayer and passes the pointer. The engine creates the wgpu surface from it and draws image, checkerboard, pixel grid, marching ants and tool overlays in one pass. Fallback if the M06 spike fails: the engine renders into an IOSurface texture and Swift presents it on the same MTLDevice.
-- **Live previews** never touch history. Each frame the compositor takes a `PreviewStack`:
-  - Override: sparse temporary tiles that replace the active layer's tiles in a region (effect dialogs, strokes in progress, gradients, shapes, text).
-  - Floating layer: pixels plus an affine transform (Move Selected Pixels while dragging), baked on Finish.
-  - Overlays: vector primitives for nubs, handles, crop guides and ants.
-- **Edit until Finish:** shapes, line/curve, gradient, text and move keep their parameters in tool state and re-rasterize the override on each change. Finish (Enter, a click outside, or a tool switch) commits exactly one history step.
-- **Threading:** the UI thread only posts work and reads published snapshots; it never blocks. Each document has one actor thread that runs commands in order and publishes an immutable `DocSnapshot` through `arc-swap`. A rayon pool does CPU tile work. One render thread owns the GPU queue. Effects run as cancellable jobs that render tiles in a spiral from the view center and stream progress. Changing a dialog parameter cancels and restarts the job; OK reuses finished tiles.
+- **Compositing:** bottom to top, per the compositing contract. The checkerboard is drawn under the image at display time only.
+- **Dirty flow:** commands and tools report dirty rects in document space. Composite tiles at level 0 and their mip parents are marked dirty. Visible tiles re-composite first. Canvas dirtiness never crosses the FFI.
+- **Mips:** a GPU tile pyramid of the composite, built lazily with a 2×2 box filter below 100% zoom. Trilinear below 100%, nearest above.
+- **Presenter:** chosen by the M09 go/no-go spike. Option A: wgpu renders to a CAMetalLayer and converts document → display profile with a 33³ LUT (the layer is tagged with the display space, so nothing converts twice). Option B: the engine renders into an IOSurface ring, and a Swift-owned CAMetalLayer presents it with explicit completion signals. Both must survive 200 resizes, document switches, sleep and wake, and screen moves with correct color.
+- **Preview sessions** are one generic mechanism used by Layer Properties, effect dialogs, the wand, the bucket, move, gradient, line/curve, shapes and text. A session holds its base revision, the original pixels it needs, its parameters and a generation counter. It renders into a `PreviewStack` (override tiles, a floating layer with an affine transform, vector overlays) that never touches history. Accept commits exactly one history step through the document actor. Cancel restores everything.
+- **Job identity:** every job carries document id, base revision, target layer id, selection revision, preview session id and parameter generation. Results whose identity no longer matches are dropped and never committed. Never mix generations.
+- **Threading:** the UI thread only posts work and reads published snapshots. Each document has one actor thread that runs commands in order and publishes an immutable snapshot through `arc-swap`. A rayon pool does CPU tile work. One render thread owns the GPU queue. Jobs render tiles in a spiral from the view center and stream progress. Panics are caught at the FFI entry, at each job boundary and at each frame; a panic marks the document read-only and keeps its last committed snapshot.
 
 ## 5. GPU and CPU
 
-- GPU: compositing, mips, presentation; effect previews and final renders for effects with a WGSL kernel (blurs, adjustments, distortions, stylize, noise with a seeded hash); move and rotate preview; resampling.
-- CPU only: brush dabs, flood fill and wand, selection raster, text raster, heal and PatchMatch (v1), file I/O, history.
-- **CPU reference contract:** every op has a CPU f32 implementation. It is the oracle, the fallback, and the CLI default. Blend modes and color math also get an f64 spec function in `op-ops/src/spec/`. CPU kernels are deterministic: no fast-math, fixed reduction order, seeded PCG random numbers hashed from document coordinates.
-- **GPU rules:** WGSL kernels use `textureLoad` only (no hardware filtering), the same rounding helper and the same PRNG.
-- **Parity tests:** for each GPU op, proptest builds tiles weighted to 0, 1, 127, 128, 254, 255 plus fixture images. Max per-channel difference ≤ 1, color ignored where alpha = 0. They run on Metal and on Linux with Mesa lavapipe (software Vulkan).
-- **No usable GPU or device lost:** switch to the CPU backend for everything and log it. Display falls back to a CPU compositor into an IOSurface shown as CALayer contents.
+- GPU: compositing, mips, presentation; effect previews and final renders for effects with a WGSL kernel; move and rotate preview; resampling.
+- CPU only: brush dabs, flood fill and wand, selection raster, text raster, heal and PatchMatch in v1, file I/O, history.
+- **CPU reference:** every op has a CPU implementation that follows its contract exactly. It is the oracle for the GPU, the fallback, and the CLI default. CPU code is deterministic: no fast-math, fixed reduction order, seeded PCG random numbers hashed from document coordinates.
+- **GPU rules:** request the adapter's real limits (not wgpu defaults). `textureLoad` only, no hardware filtering. Thresholds, ranks and comparisons in integer math. Weights, curves and trig precomputed on the CPU as lookup tables. Store through `rgba8uint` with the shared rounding helper. Images wider than 16384 use tiled sources.
+- **Parity:** separate tests for (a) reference compatibility, (b) CPU vs GPU, (c) tiles vs whole image, (d) preview vs commit, (e) determinism under reordered tile scheduling. CPU vs GPU is ±1/255 per channel for continuous ops; discrete ops use the "at most N differing pixels" rule from the target table. Runs on Metal and on Linux lavapipe. A parity test fails if the GPU backend did not actually run (no silent CPU fallback); it logs adapter, backend, driver and dispatch counts.
+- **No usable GPU or device lost:** switch to the CPU backend for everything, log it, and show it in the status bar.
 
 ## 6. The C interface
 
@@ -141,6 +151,8 @@ OpStatus  op_import_pixels(OpEngine*, const OpPixelImport*, uint64_t* out_doc);
 OpStatus  op_export_flat(OpEngine*, uint64_t doc, OpPixelBuffer* out);
 OpStatus  op_view_attach(OpEngine*, uint64_t doc, void* ca_metal_layer, uint64_t* out_view);
 OpStatus  op_view_set(OpEngine*, uint64_t view, const OpViewState*);
+OpStatus  op_view_detach(OpEngine*, uint64_t view);
+OpStatus  op_doc_close(OpEngine*, uint64_t doc);
 OpStatus  op_pointer(OpEngine*, uint64_t view, const OpPointerEvent*, size_t n);
 void      op_buffer_free(OpBuffer*);
 void      op_pixels_free(OpPixelBuffer*);
@@ -149,17 +161,20 @@ void      op_pixels_free(OpPixelBuffer*);
 - Documents and views are `u64` ids. A stale id returns `OP_ERR_NO_SUCH_DOC`. `OpEngine*` is the only pointer handle.
 - Pointer events are plain structs (`x, y, pressure, tilt_x, tilt_y, timestamp_ns, buttons, modifiers, phase`), batched, never JSON.
 - Events arrive on an engine thread as `OpEvent { kind, doc, ticket, json_ptr, json_len }`; the payload is valid only during the call. Kinds: DocChanged, HistoryChanged, LayersChanged, SelectionChanged, ToolStateChanged, Progress, JobFinished, ThumbnailReady, GpuFallback.
-- Errors: sync calls return `OpStatus`; async failures arrive in JobFinished. Every exported function is wrapped in `catch_unwind`; a panic returns `OP_ERR_PANIC` and marks the document read-only with a prompt to save a copy.
+- Errors: sync calls return `OpStatus`; async failures arrive in JobFinished. Every exported function, every job and every render frame is wrapped in `catch_unwind`; a panic returns or reports `OP_ERR_PANIC` and marks the document read-only with a prompt to save a copy. A wgpu uncaptured-error handler turns GPU validation errors into events instead of panics.
+- Callbacks must not call back into the engine (no `op_*` call from inside `OpEventFn`); Swift copies the payload and hops to its own queue. `op_view_detach` and `op_doc_close` return only after their in-flight frames and jobs stop. `op_engine_free` stops all threads first; after it returns, no callback ever runs again.
+- `op_query` never blocks on work: it reads the published snapshot only. Expensive answers (histograms, thumbnails) are jobs that report through events.
 - Memory: inputs are borrowed for the call; outputs are owned by Rust and freed with `op_*_free`. The engine retains the CAMetalLayer on attach.
 - Platform services: Swift registers `decode_image`, `encode_image`, `subject_mask`, `shape_text`, `display_profile_changed`. A command that needs a missing service is disabled.
 - Decoding split: the engine decodes PNG, JPEG, BMP, GIF, TIFF, WebP and .opaint itself (fuzzable, identical on Linux). Swift decodes HEIC, AVIF and RAW through ImageIO and hands pixels plus ICC over `op_import_pixels`. HEIC export goes through ImageIO; AVIF export only where the OS can encode it.
 
 ## 7. Color management
 
-- Each document carries one ICC profile: the embedded one, or sRGB. Pixels stay encoded in it. Blending and effects run on the encoded values, as paint.net does.
+- Each document carries one ICC profile: the embedded one, or sRGB. Pixels stay encoded in it. Each operation's contract says whether it works on encoded values or in linear light (paint.net 5.1 effects default to a linear working space for many effects, and Resize has a gamma option). The M02 catalog records this per effect.
 - Open: keep the embedded profile by default (a setting can convert to sRGB). Gray expands to RGB. CMYK converts to sRGB (perceptual, black-point compensation) with a notice.
 - `image.assign_profile` changes metadata only; `image.convert_profile` transforms pixels with lcms2 (alpha copied, intent selectable). Both are history steps. Pasting or importing from another profile converts into the document profile.
-- Display on Mac: `CAMetalLayer.colorspace = CGColorSpace(iccData:)`, so ColorSync follows the window across screens. Portable path: a 33³ 3D LUT (document → display) built by lcms2, applied in the present shader; tested on Linux.
+- Display: wgpu re-sets `CAMetalLayer.colorspace` to a fixed named space on every configure, so the document profile cannot simply be tagged on the layer. The M09 spike picks the path (see section 4): a document → display LUT with the layer tagged as the display space, or a Swift-owned IOSurface presenter tagged with the document profile. The display profile comes from the window's screen and is updated when the window moves. LUT accuracy is measured against direct lcms2 transforms (ΔE00), not assumed.
+- lcms2 links statically; the release check runs `otool -L` and fails on any `/opt/homebrew` or `/usr/local` dependency.
 - Export embeds the profile; "convert to sRGB on export" is an option.
 
 ## 8. Tests
@@ -168,13 +183,20 @@ void      op_pixels_free(OpPixelBuffer*);
   - fast (< 2 min): unit tests, proptest at 64 cases, CPU goldens for touched crates, Swift build and unit tests.
   - milestone (< 10 min): all CPU goldens, Metal parity, opcli scenarios, XCUITest smoke with screenshots.
   - checkpoint: proptest at 10k cases, the paint.net capture suite, 10 min fuzzing per reader on Linux, the Linux run with lavapipe, benchmarks, size gate, full XCUITest.
-- Oracle order when sources disagree: paint.net 5.1 capture, then the OpenPDN port, then Pinta. Logged in `tests/tolerances.toml`.
-- Brushes, shapes, text: our own goldens, reviewed once by eye; brushes replay recorded pointer logs.
+- **Oracles:** `tests/oracle/targets.toml` (made in M02) lists every operation with its target behavior (`legacy-3.36` or `pdn-5.1`), its oracle, its tolerance rule and its working space.
+  - `legacy-3.36` rows: the OpenPDN oracle harness (M03), which runs the real 3.36 pixel code under .NET 8 in the Linux VM. Exact or ±1/255.
+  - `pdn-5.1` rows: captures from the pinned paint.net 5.1.12 on the Windows PC, with a tolerance and metric written per row.
+  - Layer compositing: the f64 spec (float math, user decision), with the 3.36 integer blend as a documented cross-check.
+  - Pinta's images: a weak cross-check (±2) only for effects Pinta did not change.
+  - Tools (brush, gradient, line, shapes, text): our own reviewed goldens plus geometry tests. Never capture pixels.
+  - Clock-seeded legacy effects: seeded own goldens plus mean and variance checks.
+- Brushes replay recorded pointer logs with different event batching; results must not depend on batching.
+- Every required test reports a nonzero case count. A checkpoint commits its capability list first: required capabilities must run and pass; later ones are listed as absent, never silently skipped.
 - Heal and PatchMatch: metrics (no hole pixels left, boundary gradient error, SSIM against a reviewed result), fixed seed.
 - History: proptest state machine; undo all equals the start, redo all equals the end, jumps equal a replay.
 - Formats: round-trip property tests plus a real-file corpus (camera and phone JPEGs, CMYK and gray JPEGs, 16-bit and palette PNGs, multi-page and LZW TIFFs, animated GIF and WebP first frame).
 - Fuzz targets: PNG, JPEG, BMP, GIF, TIFF, WebP, .opaint, ICC parse, command JSON.
-- Tolerance: ±1/255 per channel, color ignored where alpha = 0. Exceptions only in `tests/tolerances.toml` with a reason and a bound.
+- Tolerance: appearance comparisons are ±1/255 per channel with color ignored where alpha = 0, or compared premultiplied where the target row says so. Persistence, undo and history tests compare every byte, including colors under zero alpha. Exceptions only in `tests/tolerances.toml` with a reason and a bound.
 - Goldens are 256² and 512² PNGs; budget 60 MB in the repo. Failures write expected / actual / diff×16 triptychs. Captured references are immutable; our own goldens change only with `cargo xtask goldens --update <id>` and a reviewed diff.
 
 ## 9. Speed and size
