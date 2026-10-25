@@ -488,6 +488,17 @@ fn plan(spec: &EffectSpec, kernel: GpuKernel, p: &Value) -> std::result::Result<
             let radius = int(p, "radius");
             Plan::new(params([radius, 0, 0]), radius as u32)
         }
+        "effect.distort.morphology" => {
+            let width = int(p, "width");
+            let height = if p["linked"] == true {
+                width
+            } else {
+                int(p, "height")
+            };
+            let dilate = i32::from(p["mode"] == "dilate");
+            // The CPU twin declares the whole image as its input.
+            Plan::whole(params([width, height, dilate]))
+        }
         "effect.render.turbulence" => {
             // Same packing as op-gpu's effect_turbulence: octaves, period, size,
             // noise kind and blend in one word; the noise uses absolute positions.

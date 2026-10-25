@@ -9,6 +9,7 @@ fn prepare(doc: &DocState, _: &SelectionState, p: &Value) -> Result<Prepared> {
         halo: p["distance"].as_i64().unwrap_or(8) as i32,
         gaussian: None,
         noise: None,
+        palette: None,
         channel_lut: None,
     })
 }

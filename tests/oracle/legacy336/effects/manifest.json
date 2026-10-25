@@ -1652,62 +1652,902 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "DentsEffect",
+    "op": "Dents",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Dents_default_impulse_64.png",
+    "output_sha256": "b8271e5a3e99269db183c0734529b022eb74741998a56997e8bdbf4813a6734f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "DentsEffect",
+    "op": "Dents",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Dents_default_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "DentsEffect",
+    "op": "Dents",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Dents_default_plasma_512x384.png",
+    "output_sha256": "0e7809d2967d283fa55328294391d50b0ea88d8a42d4fde6f4a074faedf53949",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "DentsEffect",
+    "op": "Dents",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Dents_default_plasma_alpha_512x384.png",
+    "output_sha256": "571d19f551ccf6f85d50a4f69efaf7cf259cce1e3178a9ffff81aef09ad42160",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "DentsEffect",
+    "op": "Dents",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Dents_default_alpha_edge_64.png",
+    "output_sha256": "5a9eaabea1efde496fc2bc76ae14c3b384ad55e05f35ed1e76773d2b8cb873ed",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 1
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_min_impulse_64.png",
+    "output_sha256": "96dcbb384974ced8807b1a1ac93a3662454a26282d4390fa0d84b4c65bd6ff4d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 1
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 1
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_min_plasma_512x384.png",
+    "output_sha256": "8df5c55f92b18f20725b6fb2b04d70d3d6291ad5cfa893d0f46ee505916f57b6",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 1
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_min_plasma_alpha_512x384.png",
+    "output_sha256": "65d0748b01c9142dd657170761ab62bd48e3ae3aeff26ecc15035d21511879d2",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 1
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_min_alpha_edge_64.png",
+    "output_sha256": "0850c400ffd662fb15d876fcaa5ed8c8e918b0517292cbad4f4ed0a4754d418a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 200
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_max_impulse_64.png",
+    "output_sha256": "f147e1bcfd605b574bc0e282e0aee34f8dff6b5b7629b12ee2231453de56206a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 200
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 200
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_max_plasma_512x384.png",
+    "output_sha256": "5be5500025faf6c508a17df7336d7ee450958e3234f0d72be639a2f4d2ffd6a1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 200
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_max_plasma_alpha_512x384.png",
+    "output_sha256": "070c24abc0ea6e3c3932b67509b0eeb56247d2ac6817a64580cfcd0dc57b9b46",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "scale": 200
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_scale_max_alpha_edge_64.png",
+    "output_sha256": "5f9fee74ba384553fda375985fad0f8064b0fd045bff82ed8455fc039df3e02e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_min_impulse_64.png",
+    "output_sha256": "c3f4e4f1f9a2d3a48ee6815420f240fe0d0b2f90e71eab99fcc450b450ccbcac",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_min_plasma_512x384.png",
+    "output_sha256": "fd70814e96c42e22ae8fa7eed57e0354f278835e382fc9460125d24043f295cb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_min_plasma_alpha_512x384.png",
+    "output_sha256": "7a1e2154d7b5a4653b4ef1b1a3f9c1347d842cc4aa172e854c3f59fd7939044d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_min_alpha_edge_64.png",
+    "output_sha256": "4c4d3d8cc184cca1c36481e33f7ca19a9e71d436ab1e517f5726413a87d4ceb4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 200
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_max_impulse_64.png",
+    "output_sha256": "c018e44d9cb7d08d7609d015044cc3550b118f401018b88f39a0b1fe750db319",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 200
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 200
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_max_plasma_512x384.png",
+    "output_sha256": "5224d8aeb961ce337c8c9b8ba95ceff9ab8b4e9f496d0a0694f1671e56933b46",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 200
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_max_plasma_alpha_512x384.png",
+    "output_sha256": "c2024cc0443b548b094dc9e157387ff27ac239b7e5c75c2e7c1653fc1cb38e99",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "refraction": 200
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_refraction_max_alpha_edge_64.png",
+    "output_sha256": "21c36eaf7d31550c0f03de0b3d05fcff13048480aa22ea8a98d6feaedc4fdc06",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_min_impulse_64.png",
+    "output_sha256": "b8271e5a3e99269db183c0734529b022eb74741998a56997e8bdbf4813a6734f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_min_plasma_512x384.png",
+    "output_sha256": "e662e19d6ef3310b1f957ee9af952c11db890462a1b28b70b24a3f26c84fb13a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_min_plasma_alpha_512x384.png",
+    "output_sha256": "77a6aa01774a534ef42a74405ff6811cef3fa84b9a9a9eeeaa9b3511451c1285",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_min_alpha_edge_64.png",
+    "output_sha256": "5a9eaabea1efde496fc2bc76ae14c3b384ad55e05f35ed1e76773d2b8cb873ed",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_max_impulse_64.png",
+    "output_sha256": "b8271e5a3e99269db183c0734529b022eb74741998a56997e8bdbf4813a6734f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_max_plasma_512x384.png",
+    "output_sha256": "b90a3eae418037446d428d06382896c33a6177369dd51989c43053c060ea5c9a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_max_plasma_alpha_512x384.png",
+    "output_sha256": "a61fe08859c0696230d25ebf1c6377b9b935f0e01bec8a5e987623721e61382d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "roughness": 100
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_roughness_max_alpha_edge_64.png",
+    "output_sha256": "5a9eaabea1efde496fc2bc76ae14c3b384ad55e05f35ed1e76773d2b8cb873ed",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_min_impulse_64.png",
+    "output_sha256": "0451aeb4a1dbab1720535ce8379bfc773a4034771649bdbd3ea849d39dbc93d6",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_min_plasma_512x384.png",
+    "output_sha256": "052402b57287038cbfca4cfc26e241ae9e96986713ee96c81b864546181c02ad",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_min_plasma_alpha_512x384.png",
+    "output_sha256": "2051b7bdb9cbfd640f2651e9f366e7aacf72b13ded740661091e946c360aab0f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_min_alpha_edge_64.png",
+    "output_sha256": "3a3eb8edfc091ccbff94e21f004b5c59d3306ea53b813d4388df2cf4cd4cde86",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_max_impulse_64.png",
+    "output_sha256": "678dc359d5e4884c41fa4181e1aecb183132d6abf04b469c7581b2a23ad41190",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_max_plasma_512x384.png",
+    "output_sha256": "bbce619509d2ff5c4353be63ac890ec752a48d8428e3e6c02412284562132789",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_max_plasma_alpha_512x384.png",
+    "output_sha256": "a1b052eb077f4c6b078534c444d50671cdc3850c3ace9ddef97ae0689642158d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "tension": 100
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_tension_max_alpha_edge_64.png",
+    "output_sha256": "dd33bdc4cf2413cd9720653569b6371ee67dbcf1def2ff26641f405b6bf60517",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_min_impulse_64.png",
+    "output_sha256": "e56fd72ad6437b8d5b6bc009b80b2c1579e41e02da3d1b933f71e8277fbbb9fd",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_min_plasma_512x384.png",
+    "output_sha256": "15e2acbab2151f1d1c7ba41c96b9de0f490a906bf3e963ffc3eb44bc072e8944",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_min_plasma_alpha_512x384.png",
+    "output_sha256": "a4fb77fe475bd96932234b7548b60c0b4a53af16dd4dbd9685c92571e857e311",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_min_alpha_edge_64.png",
+    "output_sha256": "19fe5fd66ece9bdff707e10e5f1fd102db737a42f257ec22f95668a8f1381532",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 5
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_max_impulse_64.png",
+    "output_sha256": "92b9c1cfe8d70487c10a5fd64fcc3c9461888549b045ea8b25eeceee923d422f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 5
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 5
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_max_plasma_512x384.png",
+    "output_sha256": "45021153ebf7b28beb9ae5c0be974d1140db9344fb48b64fd886cc454b0f8510",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 5
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_max_plasma_alpha_512x384.png",
+    "output_sha256": "5d22b74145c21b2535827042e38b15b15521daf20cb9230de22550b64c6eaba3",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "quality": 5
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_quality_max_alpha_edge_64.png",
+    "output_sha256": "f6f4091ebfc730d31336a96ea2d067c995f724d9ea6d86c35ca18a41df3c1204",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_min_impulse_64.png",
+    "output_sha256": "b8271e5a3e99269db183c0734529b022eb74741998a56997e8bdbf4813a6734f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_min_plasma_512x384.png",
+    "output_sha256": "0e7809d2967d283fa55328294391d50b0ea88d8a42d4fde6f4a074faedf53949",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_min_plasma_alpha_512x384.png",
+    "output_sha256": "571d19f551ccf6f85d50a4f69efaf7cf259cce1e3178a9ffff81aef09ad42160",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_min_alpha_edge_64.png",
+    "output_sha256": "5a9eaabea1efde496fc2bc76ae14c3b384ad55e05f35ed1e76773d2b8cb873ed",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 255
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_max_impulse_64.png",
+    "output_sha256": "a688cf97586da71ec2d05582427ec323c587d83d379e6cf62f9dd5948085db21",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 255
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 255
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_max_plasma_512x384.png",
+    "output_sha256": "731e4e3666411f181dc8ba775f10c175566f7e69c515cd59b54d26d32f377a28",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 255
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_max_plasma_alpha_512x384.png",
+    "output_sha256": "828bfa91924f0bdbf9d2a5ad5c677d46b64fcea87a29c7e8c4328be2cc2b925b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Dents",
+    "parameters": {
+      "seed": 255
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Dents_seed_max_alpha_edge_64.png",
+    "output_sha256": "5172e6717c0942fd8093c79e52dcb9c95f6d6296d6d3bb10e4ea9c282756c9b4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",

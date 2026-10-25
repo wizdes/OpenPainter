@@ -136,8 +136,12 @@ fn registry_follows_paint_net_menu_order() {
             ("Blurs", "effect.blur.square"),
             ("Blurs", "effect.blur.surface"),
             ("Blurs", "effect.blur.unfocus"),
+            ("Color", "effect.color.quantize"),
             ("Distort", "effect.distort.bulge"),
+            ("Distort", "effect.distort.crystalize"),
+            ("Distort", "effect.distort.dents"),
             ("Distort", "effect.distort.frosted_glass"),
+            ("Distort", "effect.distort.morphology"),
             ("Distort", "effect.distort.pixelate"),
             ("Distort", "effect.distort.polar_inversion"),
             ("Distort", "effect.distort.tile_reflection"),
@@ -145,6 +149,7 @@ fn registry_follows_paint_net_menu_order() {
             ("Noise", "effect.noise.add"),
             ("Noise", "effect.blur.median"),
             ("Noise", "effect.noise.reduce"),
+            ("Object", "effect.object.drop_shadow"),
             ("Photo", "effect.photo.glow"),
             ("Photo", "effect.photo.red_eye_removal"),
             ("Photo", "effect.photo.sharpen"),
@@ -159,6 +164,7 @@ fn registry_follows_paint_net_menu_order() {
             ("Stylize", "effect.stylize.outline"),
             ("Stylize", "effect.stylize.relief"),
             ("Edit", "effect.fill.content_aware"),
+            ("Layers", "effect.layers.rotate_zoom"),
         ]
     );
 }

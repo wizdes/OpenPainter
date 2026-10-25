@@ -86,7 +86,7 @@ Layers > ---
 Layers > Flip Horizontal (off)
 Layers > Flip Vertical (off)
 Layers > Rotate 180° (off)
-Layers > Rotate / Zoom… (off)
+Layers > Rotate / Zoom…
 Layers > ---
 Layers > Go to Top Layer [⌥Home]
 Layers > Go to Layer Above [⌥PageUp]
@@ -132,24 +132,23 @@ Effects > Blurs > Square Blur
 Effects > Blurs > Surface Blur
 Effects > Blurs > Unfocus
 Effects > Color
-Effects > Color > Quantize (off)
+Effects > Color > Quantize
 Effects > Distort
 Effects > Distort > Bulge
+Effects > Distort > Crystalize
+Effects > Distort > Dents
 Effects > Distort > Frosted Glass
+Effects > Distort > Morphology
 Effects > Distort > Pixelate
 Effects > Distort > Polar Inversion
 Effects > Distort > Tile Reflection
 Effects > Distort > Twist
-Effects > Distort > ---
-Effects > Distort > Crystalize (off)
-Effects > Distort > Dents (off)
-Effects > Distort > Morphology (off)
 Effects > Noise
 Effects > Noise > Add Noise
 Effects > Noise > Median
 Effects > Noise > Reduce Noise
 Effects > Object
-Effects > Object > Drop Shadow (off)
+Effects > Object > Drop Shadow
 Effects > Photo
 Effects > Photo > Glow
 Effects > Photo > Red Eye Removal

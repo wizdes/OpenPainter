@@ -228,6 +228,7 @@ impl GpuContext {
             op_ops::effect::GpuKernel::EdgeDetect | op_ops::effect::GpuKernel::Relief => [45, 0, 0],
             op_ops::effect::GpuKernel::Pixelate => [2, 0, 0],
             op_ops::effect::GpuKernel::Bulge => [45, 0, 0],
+            op_ops::effect::GpuKernel::Morphology => [3, 3, 0],
             op_ops::effect::GpuKernel::RedEyeRemoval => [70, 90, 0],
             op_ops::effect::GpuKernel::Vignette => [0, 0, (50 << 16) | 50],
             op_ops::effect::GpuKernel::Sharpen => [2, 0, 0],
@@ -475,6 +476,11 @@ impl GpuContext {
             | op_ops::effect::GpuKernel::Relief => (-180..=180).contains(&values[0]),
             op_ops::effect::GpuKernel::Pixelate => (1..=100).contains(&values[0]),
             op_ops::effect::GpuKernel::Bulge => (-200..=100).contains(&values[0]),
+            op_ops::effect::GpuKernel::Morphology => {
+                (1..=101).contains(&values[0])
+                    && (1..=101).contains(&values[1])
+                    && (0..=1).contains(&values[2])
+            }
             op_ops::effect::GpuKernel::RedEyeRemoval => {
                 (0..=100).contains(&values[0]) && (0..=100).contains(&values[1])
             }
@@ -611,6 +617,7 @@ impl GpuContext {
             op_ops::effect::GpuKernel::PencilSketch => "effect_pencil_sketch",
             op_ops::effect::GpuKernel::Pixelate => "effect_pixelate",
             op_ops::effect::GpuKernel::Bulge => "effect_bulge",
+            op_ops::effect::GpuKernel::Morphology => "effect_morphology",
             op_ops::effect::GpuKernel::Twist => "effect_twist",
             op_ops::effect::GpuKernel::RedEyeRemoval => "effect_red_eye_removal",
             op_ops::effect::GpuKernel::Vignette => "effect_vignette",

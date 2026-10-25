@@ -194,6 +194,7 @@ pub enum GpuKernel {
     PencilSketch,
     Pixelate,
     Bulge,
+    Morphology,
     Twist,
     RedEyeRemoval,
     Vignette,
@@ -224,6 +225,8 @@ pub struct Prepared {
     pub halo: i32,
     pub gaussian: Option<std::sync::Arc<Vec<crate::effects::gaussian_blur::GaussianColumn>>>,
     pub noise: Option<std::sync::Arc<Vec<[i32; 3]>>>,
+    /// Whole-layer palette for Quantize; built before tile work starts.
+    pub palette: Option<std::sync::Arc<Vec<[u8; 3]>>>,
 }
 pub type PixelReader<'a> = dyn Fn(i32, i32) -> [u8; 4] + 'a;
 pub struct TileInputs<'a> {
@@ -343,8 +346,12 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::square_blur::spec(),
         crate::effects::surface_blur::spec(),
         crate::effects::unfocus::spec(),
+        crate::effects::quantize::spec(),
         crate::effects::bulge::spec(),
+        crate::effects::crystalize::spec(),
+        crate::effects::dents::spec(),
         crate::effects::frosted_glass::spec(),
+        crate::effects::morphology::spec(),
         crate::effects::pixelate::spec(),
         crate::effects::polar_inversion::spec(),
         crate::effects::tile_reflection::spec(),
@@ -352,6 +359,7 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::add_noise::spec(),
         crate::effects::median_blur::spec(),
         crate::effects::reduce_noise::spec(),
+        crate::effects::drop_shadow::spec(),
         crate::effects::glow::spec(),
         crate::effects::red_eye_removal::spec(),
         crate::effects::sharpen::spec(),
@@ -366,6 +374,7 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::outline::spec(),
         crate::effects::relief::spec(),
         crate::effects::content_aware::spec(),
+        crate::effects::rotate_zoom::spec(),
     ]
 }
 pub fn find(id: &str) -> Option<EffectSpec> {

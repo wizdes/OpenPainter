@@ -79,6 +79,7 @@ impl GpuOp for EffectOp {
                 | GpuKernel::PencilSketch
                 | GpuKernel::Pixelate
                 | GpuKernel::Bulge
+                | GpuKernel::Morphology
                 | GpuKernel::Twist
                 | GpuKernel::Vignette
                 | GpuKernel::Sharpen

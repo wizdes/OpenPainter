@@ -357,6 +357,7 @@ pub fn effect_label(e: &effect::EffectSpec) -> String {
         "effect.adjust.highlights_shadows" => "Highlights / Shadows",
         "effect.adjust.levels" => "Levels",
         "effect.blur.bokeh" => "Bokeh Blur",
+        "effect.layers.rotate_zoom" => "Rotate / Zoom…",
         "effect.blur.fragment" => "Fragment Blur",
         "effect.blur.sketch" => "Sketch Blur",
         "effect.blur.square" => "Square Blur",

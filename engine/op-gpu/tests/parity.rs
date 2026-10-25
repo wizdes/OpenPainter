@@ -120,15 +120,15 @@ fn registered_ops() {
         top: make(),
     };
     let results = op_gpu::parity::run(&mut gpu, &inputs).unwrap();
-    // 51 composite, tool, resample, adjustment, artistic, distort, noise, photo, render and stylize ops, plus 11 blur kernels.
+    // 52 composite, tool, resample, adjustment, artistic, distort, noise, photo, render and stylize ops, plus 11 blur kernels.
     assert_eq!(
         results
             .iter()
             .filter(|(id, _, _)| !id.starts_with("effect.blur."))
             .count(),
-        51
+        52
     );
-    assert_eq!(results.len(), 62);
+    assert_eq!(results.len(), 63);
     assert!(
         results
             .iter()
@@ -404,4 +404,44 @@ fn hundred_layer_cpu_f32_tile() {
     let expected = op_ops::composite::composite_tile(&doc, coord).unwrap();
     check(256, 256, expected.as_bytes().to_vec(), actual);
     assert!(gpu.dispatch_count() >= 101);
+}
+
+#[test]
+fn morphology_parameter_parity() {
+    use op_ops::effect::{GpuKernel, Prepared, find};
+    let Some(mut gpu) = gpu() else {
+        return;
+    };
+    let width = 7u32;
+    let height = 5u32;
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| [i as u8 * 7, (i * 3) as u8, 180, (i * 5) as u8])
+        .collect();
+    let spec = find("effect.distort.morphology").unwrap();
+    let prep = Prepared {
+        width: width as i32,
+        height: height as i32,
+        ..Default::default()
+    };
+    for (w, h, mode) in [(1, 1, 0), (3, 3, 0), (2, 4, 1)] {
+        let params = spec.schema.validate(serde_json::json!({"width":w,"height":h,"linked":false,"mode":if mode==0 {"erode"} else {"dilate"}})).unwrap();
+        let sample = |x: i32, y: i32| {
+            let x = x.clamp(0, width as i32 - 1) as usize;
+            let y = y.clamp(0, height as i32 - 1) as usize;
+            let i = (y * width as usize + x) * 4;
+            bytes[i..i + 4].try_into().unwrap()
+        };
+        let mut expected = Vec::with_capacity(bytes.len());
+        for y in 0..height as i32 {
+            for x in 0..width as i32 {
+                expected.extend_from_slice(&(spec.render_cpu)(&sample, x, y, &prep, &params));
+            }
+        }
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_kernel_with_params(GpuKernel::Morphology, width, height, &bytes, [w, h, mode])
+            .unwrap();
+        assert_eq!(expected, actual, "{w}x{h} mode {mode}");
+        assert!(gpu.dispatch_count() > before);
+    }
 }

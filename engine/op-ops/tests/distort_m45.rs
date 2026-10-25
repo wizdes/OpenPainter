@@ -13,7 +13,7 @@ const IDS: [&str; 6] = [
 fn m45_registry_and_case_catalog() {
     let registered: Vec<_> = effect::registered()
         .into_iter()
-        .filter(|s| s.category == "Distort")
+        .filter(|s| IDS.contains(&s.id))
         .collect();
     assert_eq!(registered.iter().map(|s| s.id).collect::<Vec<_>>(), IDS);
     for id in IDS {

@@ -118,7 +118,7 @@ public enum MenuSkeleton {
         func submenu(_ e: Engine.EffectInfo) -> String {
             e.category.hasPrefix("Effects/") ? String(e.category.dropFirst("Effects/".count)) : e.category
         }
-        let registered = effects.filter { $0.category != "Adjustments" && $0.category != "Edit" }
+        let registered = effects.filter { !["Adjustments", "Edit", "Layers"].contains($0.category) }
         var names = paintNetEffects.map(\.0)
         for e in registered where !names.contains(submenu(e)) {
             names.append(submenu(e))
@@ -137,6 +137,14 @@ public enum MenuSkeleton {
 
     static func entries(effects: [Engine.EffectInfo]) -> [Entry] {
         let editEffects: [Entry] = effects.filter { $0.category == "Edit" }.map { .item($0.label, "", [], .effect($0.id)) }
+        // Layer transforms the engine registers as effects (category "Layers") fill
+        // their Layers-menu item; until then the item stays a disabled placeholder.
+        func layerItem(_ title: String) -> Entry {
+            if let e = effects.first(where: { $0.category == "Layers" && $0.label == title }) {
+                return .item(title, "", [], .effect(e.id))
+            }
+            return i(title)
+        }
         return [
             .submenu("OpenPainter", [
                 .item("About OpenPainter", "", [], .selector(#selector(NSApplication.orderFrontStandardAboutPanel(_:)))),
@@ -226,7 +234,7 @@ public enum MenuSkeleton {
                 i("Flip Horizontal"),
                 i("Flip Vertical"),
                 i("Rotate 180°"),
-                i("Rotate / Zoom…"),
+                layerItem("Rotate / Zoom…"),
                 .separator,
                 .item("Go to Top Layer", key(NSHomeFunctionKey), opt, .selector(#selector(EditorMenuActions.goToLayer(_:)))),
                 .item("Go to Layer Above", key(NSPageUpFunctionKey), opt, .selector(#selector(EditorMenuActions.goToLayer(_:)))),
