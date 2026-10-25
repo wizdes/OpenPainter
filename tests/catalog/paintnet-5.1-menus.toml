@@ -1137,6 +1137,39 @@ note = "No Mac key: Shift-Cmd-Z is Redo"
 source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
 
 [[item]]
+pdn = ""
+win = ""
+mac = "Layers > Remove Background"
+key = ""
+command = ""
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M53): Apple Vision foreground mask; paint.net 5.1 has no such command"
+source = "docs/MILESTONES.md M53"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Layers > Remove Background > Select Foreground"
+key = ""
+command = "selectForeground:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M53)"
+source = "docs/MILESTONES.md M53"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Layers > Remove Background > Remove Background"
+key = ""
+command = "removeBackground:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M53)"
+source = "docs/MILESTONES.md M53"
+
+[[item]]
 pdn = "Layers > Go to Top Layer"
 win = "Ctrl+Alt+PgUp"
 mac = "Layers > Go to Top Layer"

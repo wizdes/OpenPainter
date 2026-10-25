@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crash recovery records</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 16px;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 0.5rem;
+    }
+    .lede { color: var(--color-muted); font-size: 0.92rem; line-height: 1.5; max-width: 62ch; margin-bottom: 1.5rem; }
+    .scroll { overflow-x: auto; }
+    svg { width: 100%; min-width: 880px; display: block; }
+    .cards { display: grid; grid-template-columns: 1.1fr 1fr 0.9fr; gap: 12px; margin-top: 1.5rem; }
+    .card { background: #fff; border: 1px solid rgba(45,49,66,0.14); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+    .card h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 6px; }
+    .card p { font-size: 0.86rem; line-height: 1.5; }
+    @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">OpenPainter · M57 · crash recovery</p>
+    <h1>How an edit becomes a recovery record</h1>
+    <p class="lede">A new writer thread copies each open image to a recovery folder after edits stop for 30 seconds (never more than 2 minutes behind). Each file is written to a temp name, synced, then renamed, so a crash at any point leaves the last complete record. After a crash, the next launch finds the record and offers to recover it.</p>
+
+    <div class="scroll">
+    <svg viewBox="0 56 880 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="m57-title m57-desc">
+      <title id="m57-title">Crash recovery records sequence</title>
+      <desc id="m57-desc">The app sends an edit to the document actor, which publishes a snapshot to the recovery writer. After 30 quiet seconds the writer writes the snapshot file, then the manifest, deletes the old snapshot and reports the saved revision. If a write fails, the error reaches the app and the last good record stays. After a crash, the app scans the record folders and opens a record as an unsaved image.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        <marker id="arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#4f5d75" stroke-width="1.2"/></marker>
+      </defs>
+
+      <!-- Lifelines -->
+      <g stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3">
+        <line x1="120" y1="124" x2="120" y2="688"/>
+        <line x1="340" y1="124" x2="340" y2="688"/>
+        <line x1="560" y1="124" x2="560" y2="688"/>
+        <line x1="780" y1="124" x2="780" y2="688"/>
+      </g>
+
+      <!-- Actors -->
+      <g font-family="'Geist', sans-serif">
+        <rect x="40" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/>
+        <rect x="40" y="80" width="160" height="44" rx="6" fill="#fff" stroke="#2d3142" stroke-width="1"/>
+        <text x="120" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Mac app</text>
+        <text x="120" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">ImageDocument</text>
+
+        <rect x="260" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/>
+        <rect x="260" y="80" width="160" height="44" rx="6" fill="#fff" stroke="#2d3142" stroke-width="1"/>
+        <text x="340" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Document actor</text>
+        <text x="340" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">op-engine</text>
+
+        <rect x="480" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/>
+        <rect x="480" y="80" width="160" height="44" rx="6" fill="rgba(191,69,32,0.06)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="560" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Recovery writer</text>
+        <text x="560" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">recovery.rs · new</text>
+
+        <rect x="700" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/>
+        <rect x="700" y="80" width="160" height="44" rx="6" fill="rgba(45,49,66,0.04)" stroke="#2d3142" stroke-width="1"/>
+        <text x="780" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Record folder</text>
+        <text x="780" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">Recovery/&lt;uuid&gt;/</text>
+      </g>
+
+      <!-- Activation bar on the writer during a write -->
+      <rect x="556" y="196" width="8" height="196" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+
+      <g font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.06em" fill="#4f5d75">
+        <!-- 1 edit -->
+        <line x1="120" y1="160" x2="336" y2="160" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="190" y="142" width="76" height="12" fill="#f5f5f5"/><text x="228" y="151" text-anchor="middle">EDIT COMMAND</text>
+
+        <!-- 2 snapshot (async) -->
+        <line x1="340" y1="196" x2="552" y2="196" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-open)"/>
+        <rect x="414" y="178" width="60" height="12" fill="#f5f5f5"/><text x="444" y="187" text-anchor="middle">SNAPSHOT</text>
+
+        <!-- 3 wait (self) -->
+        <path d="M564,224 H604 V248 H568" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="612" y="230" width="64" height="12" fill="#f5f5f5"/><text x="614" y="239">WAIT 30 S</text>
+
+        <!-- 4 snapshot file -->
+        <line x1="564" y1="280" x2="776" y2="280" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="628" y="262" width="88" height="12" fill="#f5f5f5"/><text x="672" y="271" text-anchor="middle">SNAPSHOT FILE</text>
+
+        <!-- 5 manifest -->
+        <line x1="564" y1="316" x2="776" y2="316" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="640" y="298" width="64" height="12" fill="#f5f5f5"/><text x="672" y="307" text-anchor="middle">MANIFEST</text>
+
+        <!-- 6 delete old -->
+        <line x1="564" y1="352" x2="776" y2="352" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="636" y="334" width="72" height="12" fill="#f5f5f5"/><text x="672" y="343" text-anchor="middle">DELETE OLD</text>
+
+        <!-- 7 ack revision (headline) -->
+        <line x1="556" y1="388" x2="124" y2="388" stroke="#bf4520" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <rect x="412" y="370" width="80" height="12" fill="#f5f5f5"/><text x="452" y="379" text-anchor="middle" fill="#bf4520">ACK REVISION</text>
+      </g>
+
+      <!-- ALT: write fails -->
+      <rect x="100" y="412" width="700" height="112" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+      <rect x="100" y="412" width="40" height="16" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+      <g font-family="'Geist Mono', monospace" font-size="8" fill="#4f5d75">
+        <text x="120" y="424" text-anchor="middle" letter-spacing="0.12em">OPT</text>
+        <text x="152" y="424" letter-spacing="0.04em">[a write fails: disk full or I/O error]</text>
+      </g>
+      <g font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.06em" fill="#4f5d75">
+        <line x1="780" y1="452" x2="564" y2="452" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <rect x="644" y="434" width="56" height="12" fill="#f5f5f5"/><text x="672" y="443" text-anchor="middle">IO ERROR</text>
+
+        <line x1="556" y1="488" x2="124" y2="488" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-open)"/>
+        <rect x="414" y="470" width="76" height="12" fill="#f5f5f5"/><text x="452" y="479" text-anchor="middle">ERROR SHEET</text>
+        <text x="132" y="512" fill="#4f5d75" font-family="'Instrument Serif', serif" font-style="italic" font-size="12" letter-spacing="0">The last good record stays; nothing in memory is lost.</text>
+      </g>
+
+      <!-- After a crash -->
+      <line x1="40" y1="548" x2="860" y2="548" stroke="rgba(45,49,66,0.30)" stroke-width="1" stroke-dasharray="2,4"/>
+      <rect x="40" y="540" width="112" height="16" fill="#f5f5f5"/>
+      <text x="44" y="552" font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.14em" fill="#4f5d75">AFTER A CRASH</text>
+
+      <g font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.06em" fill="#4f5d75">
+        <line x1="120" y1="588" x2="776" y2="588" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="412" y="570" width="80" height="12" fill="#f5f5f5"/><text x="452" y="579" text-anchor="middle">SCAN RECORDS</text>
+
+        <line x1="780" y1="624" x2="124" y2="624" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <rect x="416" y="606" width="72" height="12" fill="#f5f5f5"/><text x="452" y="615" text-anchor="middle">RECORD LIST</text>
+
+        <line x1="120" y1="660" x2="336" y2="660" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="190" y="642" width="76" height="12" fill="#f5f5f5"/><text x="228" y="651" text-anchor="middle">OPEN UNSAVED</text>
+      </g>
+    </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card"><h2>Write order</h2><p>Snapshot temp file, sync, rename, sync the folder. Then the manifest the same way. Only then is the old snapshot deleted and the revision reported. The manifest holds the snapshot's checksum, so a half-written snapshot is never chosen.</p></div>
+      <div class="card"><h2>When a write fails</h2><p>The error shows in the status bar and in a sheet. The previous saved file and the previous record stay readable. A failed save leaves the image marked unsaved.</p></div>
+      <div class="card"><h2>Also in M57</h2><p>Random-input testing of 10 file readers (one WebP crash found and fixed), a 200 MP image under 1.3 GB, and a 1,000-step undo stress test.</p></div>
+    </div>
+  </div>
+</body>
+</html>
