@@ -1,9 +1,14 @@
 //! Sparse, deterministic brush strokes over immutable document tiles.
 pub mod flood;
+// Clone and recolor arithmetic is ported from OpenPDN 3.36
+// src/tools/CloneStampTool.cs and src/tools/RecoloringTool.cs (MIT).
+// Copyright dotPDN LLC, Rick Brewster, Tom Jackson, and contributors.
+use flood::{AlphaMode, tolerance_distance};
 use op_core::doc::{DocError, DocState, LayerId, SelectionState, ToolCompositeMode};
 use op_core::pixel::{Rgba8, round_unit_to_u8};
 use op_core::selection::RasterMode;
 use op_core::tiles::{TILE_SIZE, TileCoord, TileData};
+use op_ops::composite::composite_tile;
 use op_ops::composite::tool_composite;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
@@ -13,6 +18,8 @@ pub enum Tool {
     Paintbrush,
     Eraser,
     Pencil,
+    CloneStamp,
+    Recolor,
 }
 impl Tool {
     pub fn label(self) -> &'static str {
@@ -20,8 +27,32 @@ impl Tool {
             Self::Paintbrush => "Paintbrush",
             Self::Eraser => "Eraser",
             Self::Pencil => "Pencil",
+            Self::CloneStamp => "Clone Stamp",
+            Self::Recolor => "Recolor",
         }
     }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CloneSource {
+    Layer(usize),
+    Image,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct RecolorOptions {
+    pub primary: [u8; 4],
+    pub secondary: [u8; 4],
+    pub tolerance: f64,
+    pub alpha: AlphaMode,
+}
+#[derive(Clone, Copy, Debug)]
+enum StrokeEffect {
+    Paint,
+    Clone {
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    },
+    Recolor(RecolorOptions),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PressureMode {
@@ -107,9 +138,69 @@ pub struct StrokeSession {
     selection: Option<Arc<op_core::selection::MaskGrid>>,
     dirty: BTreeSet<(i32, i32)>,
     pencil_visited: HashSet<(i32, i32)>,
+    effect: StrokeEffect,
 }
 impl StrokeSession {
     pub fn new(base: DocState, layer: usize, settings: BrushSettings, seed: u64) -> Result<Self> {
+        if matches!(settings.tool, Tool::CloneStamp | Tool::Recolor) {
+            return Err(StrokeError::BadInput(
+                "tool needs clone or recolor options".into(),
+            ));
+        }
+        Self::with_effect(base, layer, settings, seed, StrokeEffect::Paint)
+    }
+    pub fn new_clone(
+        base: DocState,
+        layer: usize,
+        settings: BrushSettings,
+        seed: u64,
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    ) -> Result<Self> {
+        if settings.tool != Tool::CloneStamp
+            || matches!(source, CloneSource::Layer(i) if i >= base.layers.len())
+        {
+            return Err(StrokeError::BadInput(
+                "invalid clone tool or source layer".into(),
+            ));
+        }
+        Self::with_effect(
+            base,
+            layer,
+            settings,
+            seed,
+            StrokeEffect::Clone {
+                source,
+                point,
+                offset,
+            },
+        )
+    }
+    pub fn new_recolor(
+        base: DocState,
+        layer: usize,
+        settings: BrushSettings,
+        seed: u64,
+        options: RecolorOptions,
+    ) -> Result<Self> {
+        if settings.tool != Tool::Recolor
+            || !options.tolerance.is_finite()
+            || !(0.0..=1.0).contains(&options.tolerance)
+        {
+            return Err(StrokeError::BadInput(
+                "invalid recolor tool or tolerance".into(),
+            ));
+        }
+        Self::with_effect(base, layer, settings, seed, StrokeEffect::Recolor(options))
+    }
+    fn with_effect(
+        base: DocState,
+        layer: usize,
+        settings: BrushSettings,
+        seed: u64,
+        effect: StrokeEffect,
+    ) -> Result<Self> {
         settings.validate().map_err(StrokeError::BadInput)?;
         let target_layer = base
             .layers
@@ -134,7 +225,14 @@ impl StrokeSession {
             selection,
             dirty: BTreeSet::new(),
             pencil_visited: HashSet::new(),
+            effect,
         })
+    }
+    pub fn clone_offset(&self) -> Option<(i32, i32)> {
+        match self.effect {
+            StrokeEffect::Clone { offset, .. } => offset,
+            _ => None,
+        }
     }
     pub fn append(&mut self, samples: &[StrokeSample]) -> Result<&BTreeSet<(i32, i32)>> {
         let mut previous = self.last;
@@ -160,6 +258,17 @@ impl StrokeSession {
         }
         self.dirty.clear();
         for &s in samples {
+            if self.last.is_none()
+                && let StrokeEffect::Clone { point, offset, .. } = &mut self.effect
+                && offset.is_none()
+            {
+                let x = (s.x.floor() as i32).checked_sub(point.0);
+                let y = (s.y.floor() as i32).checked_sub(point.1);
+                *offset = Some((
+                    x.ok_or_else(|| StrokeError::BadInput("clone offset overflow".into()))?,
+                    y.ok_or_else(|| StrokeError::BadInput("clone offset overflow".into()))?,
+                ));
+            }
             if let Some(prev) = self.last {
                 if self.settings.tool == Tool::Pencil {
                     self.pencil_segment(prev, s);
@@ -189,6 +298,7 @@ impl StrokeSession {
             }
             self.last = Some(s);
         }
+        let mut source_cache: BTreeMap<(i32, i32), Vec<u8>> = BTreeMap::new();
         for &(tx, ty) in &self.dirty {
             let coord = TileCoord { x: tx, y: ty };
             let mut tile = self.base.read_tile(self.layer_index()?, coord)?;
@@ -218,6 +328,68 @@ impl StrokeSession {
                             * (1.0 - cov as f32 / 255.0 * self.settings.color[3] as f32 / 255.0),
                     );
                     p
+                } else if let StrokeEffect::Clone {
+                    source,
+                    offset: Some((dx, dy)),
+                    ..
+                } = self.effect
+                {
+                    let sx = x as i64 - dx as i64;
+                    let sy = y as i64 - dy as i64;
+                    let sampled = if sx < 0
+                        || sy < 0
+                        || sx >= self.base.width as i64
+                        || sy >= self.base.height as i64
+                    {
+                        [0; 4]
+                    } else {
+                        let coord = TileCoord {
+                            x: sx as i32 / TILE_SIZE as i32,
+                            y: sy as i32 / TILE_SIZE as i32,
+                        };
+                        if let std::collections::btree_map::Entry::Vacant(entry) =
+                            source_cache.entry((coord.x, coord.y))
+                        {
+                            let src = match source {
+                                CloneSource::Layer(layer) => self.base.read_tile(layer, coord)?,
+                                CloneSource::Image => {
+                                    composite_tile(&self.base, coord)?.as_bytes().to_vec()
+                                }
+                            };
+                            entry.insert(src);
+                        }
+                        let src = &source_cache[&(coord.x, coord.y)];
+                        let k =
+                            ((sy as usize % TILE_SIZE) * TILE_SIZE + sx as usize % TILE_SIZE) * 4;
+                        src[k..k + 4].try_into().expect("source pixel")
+                    };
+                    let mut src = sampled;
+                    src[3] = ((src[3] as u16 * self.settings.color[3] as u16 + 127) / 255) as u8;
+                    tool_composite(old, Rgba8::from(src), self.settings.blend, cov)
+                } else if let StrokeEffect::Recolor(options) = self.effect {
+                    let threshold = (options.tolerance * options.tolerance * 256.0).trunc() as i32;
+                    if tolerance_distance(options.secondary, old.into(), options.alpha)
+                        > 4 * threshold * threshold
+                    {
+                        old
+                    } else {
+                        let mut shifted = [0; 4];
+                        let old_bytes: [u8; 4] = old.into();
+                        for c in 0..4 {
+                            shifted[c] = (old_bytes[c] as i32 + options.primary[c] as i32
+                                - options.secondary[c] as i32)
+                                .clamp(0, 255) as u8;
+                        }
+                        // OpenPDN shifts each channel, including alpha, by the primary-secondary difference.
+                        let strength =
+                            ((cov as u16 * self.settings.color[3] as u16 + 127) / 255) as u8;
+                        tool_composite(
+                            old,
+                            Rgba8::from(shifted),
+                            ToolCompositeMode::Overwrite,
+                            strength,
+                        )
+                    }
                 } else {
                     tool_composite(
                         old,
