@@ -861,6 +861,15 @@ enum Message {
         Sender<Result<u64>>,
     ),
     StrokeBeginRecolor(BrushSettings, u64, RecolorOptions, Sender<Result<u64>>),
+    StrokeBeginHeal(
+        BrushSettings,
+        u64,
+        CloneSource,
+        (i32, i32),
+        Option<(i32, i32)>,
+        Sender<Result<u64>>,
+    ),
+    StrokeBeginSpotHeal(BrushSettings, u64, Sender<Result<u64>>),
     StrokeCloneOffset(Sender<Result<Option<(i32, i32)>>>),
     StrokeAppend(Vec<StrokeSample>, Sender<Result<()>>),
     StrokeCommit(Sender<Result<()>>),
@@ -1129,6 +1138,38 @@ impl Actor {
         .map_err(bad)?;
         self.begin_stroke_session(session)
     }
+    fn stroke_begin_heal(
+        &mut self,
+        settings: BrushSettings,
+        seed: u64,
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    ) -> Result<u64> {
+        self.check_stroke_begin()?;
+        let session = StrokeSession::new_heal(
+            self.history.current_state().clone(),
+            self.history.current_state().active_layer,
+            settings,
+            seed,
+            source,
+            point,
+            offset,
+        )
+        .map_err(bad)?;
+        self.begin_stroke_session(session)
+    }
+    fn stroke_begin_spot_heal(&mut self, settings: BrushSettings, seed: u64) -> Result<u64> {
+        self.check_stroke_begin()?;
+        let session = StrokeSession::new_spot_heal(
+            self.history.current_state().clone(),
+            self.history.current_state().active_layer,
+            settings,
+            seed,
+        )
+        .map_err(bad)?;
+        self.begin_stroke_session(session)
+    }
     fn stroke_begin_recolor(
         &mut self,
         settings: BrushSettings,
@@ -1336,6 +1377,12 @@ impl Actor {
                 Message::StrokeBegin(_, _, r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
+                Message::StrokeBeginHeal(_, _, _, _, _, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
+                Message::StrokeBeginSpotHeal(_, _, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
                 Message::StrokeAppend(_, r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
@@ -1394,6 +1441,26 @@ impl Actor {
                 Message::StrokeBeginClone(settings, seed, source, point, offset, r) => {
                     let result = catch_unwind(AssertUnwindSafe(|| {
                         self.stroke_begin_clone(settings, seed, source, point, offset)
+                    }))
+                    .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeBeginHeal(settings, seed, source, point, offset, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        self.stroke_begin_heal(settings, seed, source, point, offset)
+                    }))
+                    .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeBeginSpotHeal(settings, seed, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        self.stroke_begin_spot_heal(settings, seed)
                     }))
                     .unwrap_or(Err(Error::Panic));
                     if result == Err(Error::Panic) {
@@ -1752,6 +1819,27 @@ impl Engine {
         self.call(id, |r| {
             Message::StrokeBeginClone(settings, seed, source, point, offset, r)
         })?
+    }
+    pub fn stroke_begin_heal(
+        &self,
+        id: u64,
+        settings: BrushSettings,
+        seed: u64,
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    ) -> Result<u64> {
+        self.call(id, |r| {
+            Message::StrokeBeginHeal(settings, seed, source, point, offset, r)
+        })?
+    }
+    pub fn stroke_begin_spot_heal(
+        &self,
+        id: u64,
+        settings: BrushSettings,
+        seed: u64,
+    ) -> Result<u64> {
+        self.call(id, |r| Message::StrokeBeginSpotHeal(settings, seed, r))?
     }
     pub fn stroke_begin_recolor(
         &self,
