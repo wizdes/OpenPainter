@@ -110,7 +110,6 @@ fn effect_invert_alpha(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(src.r, src.g, src.b, 255u - src.a));
 }
 @compute @workgroup_size(16, 16)
-<<<<<<< HEAD
 fn effect_black_and_white(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }
   let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
@@ -207,7 +206,8 @@ fn effect_highlights_shadows(@builtin(global_invocation_id) id: vec3<u32>) {
   let shift = (shadows * (255 - l) * (255 - l) + highlights * l * l) / (100 * 255);
   let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + vec3<i32>(shift), vec3<i32>(0i), vec3<i32>(255i)));
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
-=======
+}
+@compute @workgroup_size(16, 16)
 fn effect_gaussian(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }
   let radius = i32(p.mode);
@@ -241,7 +241,6 @@ fn effect_gaussian(@builtin(global_invocation_id) id: vec3<u32>) {
     result = vec4<u32>(sums.r / wc_sum, sums.g / wc_sum, sums.b / wc_sum, sums.a / wa_sum);
   }
   textureStore(output_tex, vec2<i32>(id.xy), result);
->>>>>>> m35
 }
 fn unit(x: u32) -> f32 { return f32(x) / 255.0; }
 fn byte(x: f32) -> u32 { return u32(floor(clamp(x, 0.0, 1.0) * 255.0 + 0.5)); }

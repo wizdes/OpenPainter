@@ -8,6 +8,7 @@ fn prepare(doc: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
         height: doc.height as i32,
         halo: 0,
         gaussian: None,
+        channel_lut: None,
     })
 }
 fn rotate(fx: &mut i32, fy: &mut i32, fr: i32) {

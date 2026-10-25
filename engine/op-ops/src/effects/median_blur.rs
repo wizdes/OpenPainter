@@ -8,6 +8,7 @@ fn prepare(doc: &DocState, _: &SelectionState, p: &Value) -> Result<Prepared> {
         height: doc.height as i32,
         halo: p["radius"].as_i64().unwrap_or(10) as i32,
         gaussian: None,
+        channel_lut: None,
     })
 }
 fn percentile(hist: &[u32; 256], area: u32, rank: u32) -> u8 {

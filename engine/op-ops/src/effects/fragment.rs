@@ -8,6 +8,7 @@ fn prepare(doc: &DocState, _: &SelectionState, p: &Value) -> Result<Prepared> {
         height: doc.height as i32,
         halo: p["distance"].as_i64().unwrap_or(8) as i32,
         gaussian: None,
+        channel_lut: None,
     })
 }
 fn render(sample: &PixelReader<'_>, x: i32, y: i32, prep: &Prepared, p: &Value) -> [u8; 4] {

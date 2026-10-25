@@ -8,6 +8,7 @@ fn prepare(doc: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
         height: doc.height as i32,
         halo: 0,
         gaussian: None,
+        channel_lut: None,
     })
 }
 fn render(sample: &PixelReader<'_>, x: i32, y: i32, prep: &Prepared, p: &Value) -> [u8; 4] {

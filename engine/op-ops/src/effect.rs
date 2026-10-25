@@ -164,7 +164,6 @@ pub enum PassKind {
 pub enum GpuKernel {
     InvertColors,
     InvertAlpha,
-<<<<<<< HEAD
     BlackAndWhite,
     BrightnessContrast,
     Posterize,
@@ -174,14 +173,12 @@ pub enum GpuKernel {
     Levels,
     Exposure,
     HighlightsShadows,
-=======
     Gaussian,
     Fragment,
     Median,
     Motion,
     Radial,
     Zoom,
->>>>>>> m35
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -194,14 +191,13 @@ pub struct ArithmeticContract {
 }
 #[derive(Clone, Debug, Default)]
 pub struct Prepared {
-<<<<<<< HEAD
+    /// Per-channel lookup tables (Auto-Level, Levels, Curves, Exposure).
     pub channel_lut: Option<Box<[[u8; 256]; 3]>>,
-=======
+    /// Document size; zero means "unbounded", so every tile pixel renders.
     pub width: i32,
     pub height: i32,
     pub halo: i32,
     pub gaussian: Option<std::sync::Arc<Vec<crate::effects::gaussian_blur::GaussianColumn>>>,
->>>>>>> m35
 }
 pub type PixelReader<'a> = dyn Fn(i32, i32) -> [u8; 4] + 'a;
 pub struct TileInputs<'a> {
@@ -252,18 +248,12 @@ impl EffectSpec {
         output
     }
 }
-<<<<<<< HEAD
-pub fn prepare_noop(_: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
-    Ok(Prepared::default())
-=======
 pub fn prepare_noop(doc: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
     Ok(Prepared {
         width: doc.width as i32,
         height: doc.height as i32,
-        halo: 0,
-        gaussian: None,
+        ..Prepared::default()
     })
->>>>>>> m35
 }
 pub fn pointwise_input(rect: Rect, _: &Prepared) -> Rect {
     rect
@@ -307,23 +297,20 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::curves::spec(),
         crate::effects::exposure::spec(),
         crate::effects::highlights_shadows::spec(),
-        crate::effects::content_aware::spec(),
         crate::effects::hue_saturation::spec(),
         crate::effects::invert_alpha::spec(),
-<<<<<<< HEAD
         crate::effects::invert_colors::spec(),
         crate::effects::levels::spec(),
         crate::effects::posterize::spec(),
         crate::effects::sepia::spec(),
         crate::effects::temperature_tint::spec(),
-=======
         crate::effects::fragment::spec(),
         crate::effects::gaussian_blur::spec(),
         crate::effects::median_blur::spec(),
         crate::effects::motion_blur::spec(),
         crate::effects::radial_blur::spec(),
         crate::effects::zoom_blur::spec(),
->>>>>>> m35
+        crate::effects::content_aware::spec(),
     ]
 }
 pub fn find(id: &str) -> Option<EffectSpec> {
@@ -339,8 +326,7 @@ pub fn reference_rgba8(id: &str, width: u32, height: u32, bytes: &[u8]) -> Resul
     let prepared = Prepared {
         width: width as i32,
         height: height as i32,
-        halo: 0,
-        gaussian: None,
+        ..Prepared::default()
     };
     let sample = |x: i32, y: i32| {
         if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {

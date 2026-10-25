@@ -85,6 +85,7 @@ fn prepare(
     }
     Ok(Prepared {
         channel_lut: Some(tables),
+        ..Prepared::default()
     })
 }
 

@@ -101,6 +101,40 @@ fn m26_adjustments_are_registered_in_menu_order() {
 }
 
 #[test]
+fn registry_follows_paint_net_menu_order() {
+    // paint.net 5.1: Adjustments, then Effects by submenu, then Edit commands.
+    let ids: Vec<_> = effect::registered()
+        .into_iter()
+        .map(|spec| (spec.category, spec.id))
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            ("Adjustments", "effect.adjust.auto_level"),
+            ("Adjustments", "effect.adjust.black_and_white"),
+            ("Adjustments", "effect.adjust.brightness_contrast"),
+            ("Adjustments", "effect.adjust.curves"),
+            ("Adjustments", "effect.adjust.exposure"),
+            ("Adjustments", "effect.adjust.highlights_shadows"),
+            ("Adjustments", "effect.adjust.hue_saturation"),
+            ("Adjustments", "effect.adjust.invert_alpha"),
+            ("Adjustments", "effect.adjust.invert_colors"),
+            ("Adjustments", "effect.adjust.levels"),
+            ("Adjustments", "effect.adjust.posterize"),
+            ("Adjustments", "effect.adjust.sepia"),
+            ("Adjustments", "effect.adjust.temperature_tint"),
+            ("Blurs", "effect.blur.fragment"),
+            ("Blurs", "effect.blur.gaussian"),
+            ("Blurs", "effect.blur.median"),
+            ("Blurs", "effect.blur.motion"),
+            ("Blurs", "effect.blur.radial"),
+            ("Blurs", "effect.blur.zoom"),
+            ("Edit", "effect.fill.content_aware"),
+        ]
+    );
+}
+
+#[test]
 fn m26_levels_auto_matches_auto_level_and_tile_order() {
     let doc = document(257, 3);
     let rect = Rect::new(0, 0, 257, 3);
@@ -395,6 +429,10 @@ fn m25_profile_and_hidden_colors_do_not_change_the_result() {
             "{}",
             spec.id
         );
+        // Pointwise adjustments keep a zero alpha; blurs mix in neighbor alpha.
+        if spec.category != "Adjustments" {
+            continue;
+        }
         assert_eq!(
             original.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[3],
             0,
@@ -637,11 +675,7 @@ fn tile_order_and_parallel_match_whole_image() {
     let rect = Rect::new(0, 0, 1000, 700);
     for spec in effect::registered()
         .into_iter()
-<<<<<<< HEAD
-        .filter(|spec| spec.id != "effect.fill.content_aware")
-=======
-        .filter(|spec| spec.category == "Adjustments")
->>>>>>> m35
+        .filter(|spec| spec.id != "effect.fill.content_aware" && spec.category == "Adjustments")
     {
         let baseline = effect::render(&doc, &spec, rect, None).unwrap();
         // This whole-image reference computes from canvas coordinates, without
@@ -842,17 +876,12 @@ fn invert_colors_matches_all_legacy_pngs() {
 }
 
 #[test]
-<<<<<<< HEAD
 fn m25_pointwise_effects_match_legacy_pngs() {
-=======
-fn blur_effects_match_legacy_oracles() {
->>>>>>> m35
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
     let manifest: serde_json::Value = serde_json::from_slice(
         &std::fs::read(root.join("tests/oracle/legacy336/effects/manifest.json")).unwrap(),
     )
     .unwrap();
-<<<<<<< HEAD
     for (name, id, count, tolerance) in [
         ("Desaturate", "effect.adjust.black_and_white", 5, 0i16),
         (
@@ -867,31 +896,14 @@ fn blur_effects_match_legacy_oracles() {
         ("Auto-Level", "effect.adjust.auto_level", 5, 1),
         ("Levels", "effect.adjust.levels", 20, 1),
         ("Curves", "effect.adjust.curves", 20, 0),
-=======
-    for (name, id) in [
-        ("Fragment Blur", "effect.blur.fragment"),
-        ("Gaussian Blur", "effect.blur.gaussian"),
-        ("Median Blur", "effect.blur.median"),
-        ("Motion Blur", "effect.blur.motion"),
-        ("Radial Blur", "effect.blur.radial"),
-        ("Zoom Blur", "effect.blur.zoom"),
->>>>>>> m35
     ] {
         let cases: Vec<_> = manifest
             .as_array()
             .unwrap()
             .iter()
-<<<<<<< HEAD
             .filter(|entry| entry["op"] == name)
             .collect();
         assert_eq!(cases.len(), count, "{name}");
-=======
-            .filter(|entry| {
-                entry["op"] == name && entry["output"].as_str().is_some_and(|s| !s.is_empty())
-            })
-            .collect();
-        assert!(cases.len() >= 5, "{name}");
->>>>>>> m35
         let spec = effect::find(id).unwrap();
         for case in cases {
             let input = op_formats::png::decode_png(
@@ -902,13 +914,8 @@ fn blur_effects_match_legacy_oracles() {
                 &std::fs::read(root.join(case["output"].as_str().unwrap())).unwrap(),
             )
             .unwrap();
-<<<<<<< HEAD
             let mut doc = DocState::new(store(), input.width, input.height, 96.0).unwrap();
             let rect = Rect::new(0, 0, input.width, input.height);
-=======
-            let rect = Rect::new(0, 0, input.width, input.height);
-            let mut doc = DocState::new(store(), input.width, input.height, 96.0).unwrap();
->>>>>>> m35
             for coord in effect::tile_coords(rect) {
                 let mut tile = vec![0; TILE_BYTES];
                 for py in 0..TILE_SIZE {
@@ -930,7 +937,6 @@ fn blur_effects_match_legacy_oracles() {
                     .write_tile(0, coord, TileData::try_from(tile).unwrap())
                     .unwrap();
             }
-<<<<<<< HEAD
             let mut params = serde_json::Map::new();
             for (source, target) in [
                 ("brightness", "Brightness"),
@@ -982,7 +988,74 @@ fn blur_effects_match_legacy_oracles() {
                         assert!(
                             diff.abs() <= tolerance,
                             "{} at {x},{y} channel {channel}: {} vs {}",
-=======
+                            case["output"],
+                            tile[i + channel],
+                            expected.pixels[j + channel]
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn blur_effects_match_legacy_oracles() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/oracle/legacy336/effects/manifest.json")).unwrap(),
+    )
+    .unwrap();
+    for (name, id) in [
+        ("Fragment Blur", "effect.blur.fragment"),
+        ("Gaussian Blur", "effect.blur.gaussian"),
+        ("Median Blur", "effect.blur.median"),
+        ("Motion Blur", "effect.blur.motion"),
+        ("Radial Blur", "effect.blur.radial"),
+        ("Zoom Blur", "effect.blur.zoom"),
+    ] {
+        let cases: Vec<_> = manifest
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| {
+                entry["op"] == name && entry["output"].as_str().is_some_and(|s| !s.is_empty())
+            })
+            .collect();
+        assert!(cases.len() >= 5, "{name}");
+        let spec = effect::find(id).unwrap();
+        for case in cases {
+            let input = op_formats::png::decode_png(
+                &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
+            )
+            .unwrap();
+            let expected = op_formats::png::decode_png(
+                &std::fs::read(root.join(case["output"].as_str().unwrap())).unwrap(),
+            )
+            .unwrap();
+            let rect = Rect::new(0, 0, input.width, input.height);
+            let mut doc = DocState::new(store(), input.width, input.height, 96.0).unwrap();
+            for coord in effect::tile_coords(rect) {
+                let mut tile = vec![0; TILE_BYTES];
+                for py in 0..TILE_SIZE {
+                    let y = coord.y as usize * TILE_SIZE + py;
+                    if y >= input.height as usize {
+                        break;
+                    }
+                    for px in 0..TILE_SIZE {
+                        let x = coord.x as usize * TILE_SIZE + px;
+                        if x >= input.width as usize {
+                            break;
+                        }
+                        let src = (y * input.width as usize + x) * 4;
+                        let dst = (py * TILE_SIZE + px) * 4;
+                        tile[dst..dst + 4].copy_from_slice(&input.pixels[src..src + 4]);
+                    }
+                }
+                doc = doc
+                    .write_tile(0, coord, TileData::try_from(tile).unwrap())
+                    .unwrap();
+            }
             let output =
                 effect::render(&doc, &spec, rect, Some(case["parameters"].clone())).unwrap();
             for y in 0..input.height as usize {
@@ -999,7 +1072,6 @@ fn blur_effects_match_legacy_oracles() {
                         assert!(
                             tile[i + channel].abs_diff(expected.pixels[j + channel]) <= tolerance,
                             "{name} {} {x},{y} channel {channel}: {} vs {}",
->>>>>>> m35
                             case["output"],
                             tile[i + channel],
                             expected.pixels[j + channel]
@@ -1010,8 +1082,6 @@ fn blur_effects_match_legacy_oracles() {
         }
     }
 }
-<<<<<<< HEAD
-=======
 
 #[test]
 fn blur_tiles_and_soft_selection_are_stable() {
@@ -1265,4 +1335,3 @@ fn blur_identity_parameters_keep_opaque_pixels() {
         );
     }
 }
->>>>>>> m35

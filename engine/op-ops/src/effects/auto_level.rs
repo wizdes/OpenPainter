@@ -135,5 +135,6 @@ pub(crate) fn prepare(
     }
     Ok(Prepared {
         channel_lut: Some(lut),
+        ..Prepared::default()
     })
 }

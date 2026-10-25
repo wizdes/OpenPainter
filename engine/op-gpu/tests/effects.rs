@@ -24,16 +24,8 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
             (seed >> 24) as u8
         })
         .collect();
-<<<<<<< HEAD
     for spec in effect::registered() {
         let Some(kernel) = spec.gpu else { continue };
-=======
-    for spec in effect::registered()
-        .into_iter()
-        .filter(|spec| spec.gpu.is_some())
-    {
-        let kernel = spec.gpu.expect("registered effect needs GPU kernel");
->>>>>>> m35
         let before = gpu.dispatch_count();
         let actual = gpu.effect_kernel(kernel, width, height, &bytes).unwrap();
         if kernel == GpuKernel::Gaussian {
@@ -51,12 +43,20 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 spec.id
             );
         }
+        let blur = matches!(
+            kernel,
+            GpuKernel::Gaussian
+                | GpuKernel::Fragment
+                | GpuKernel::Median
+                | GpuKernel::Motion
+                | GpuKernel::Radial
+                | GpuKernel::Zoom
+        );
         let mut expected = bytes.clone();
         for pixel in expected.chunks_exact_mut(4) {
             match kernel {
                 GpuKernel::InvertColors => pixel[..3].iter_mut().for_each(|v| *v = 255 - *v),
                 GpuKernel::InvertAlpha => pixel[3] = 255 - pixel[3],
-<<<<<<< HEAD
                 GpuKernel::BlackAndWhite => {
                     let value = ((7471 * u32::from(pixel[2])
                         + 38470 * u32::from(pixel[1])
@@ -90,18 +90,6 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                     pixel[1] = gray;
                     pixel[2] = (255.0 * (f64::from(gray) / 255.0).powf(1.2)) as u8;
                 }
-            }
-        }
-        if kernel == GpuKernel::Sepia {
-            assert!(
-                actual
-                    .iter()
-                    .zip(&expected)
-                    .all(|(a, b)| (i16::from(*a) - i16::from(*b)).abs() <= 1),
-                "{}",
-                spec.id
-            );
-=======
                 GpuKernel::Gaussian => break,
                 GpuKernel::Fragment
                 | GpuKernel::Median
@@ -110,10 +98,10 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Zoom => break,
             }
         }
-        if !matches!(kernel, GpuKernel::InvertColors | GpuKernel::InvertAlpha) {
+        if blur {
             expected = op_ops::effect::reference_rgba8(spec.id, width, height, &bytes).unwrap();
         }
-        if !matches!(kernel, GpuKernel::InvertColors | GpuKernel::InvertAlpha) {
+        if blur {
             let tolerance = if matches!(kernel, GpuKernel::Gaussian | GpuKernel::Motion) {
                 1
             } else {
@@ -122,7 +110,15 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
             for (a, b) in actual.iter().zip(&expected) {
                 assert!(a.abs_diff(*b) <= tolerance, "{}: {} vs {}", spec.id, a, b);
             }
->>>>>>> m35
+        } else if kernel == GpuKernel::Sepia {
+            assert!(
+                actual
+                    .iter()
+                    .zip(&expected)
+                    .all(|(a, b)| (i16::from(*a) - i16::from(*b)).abs() <= 1),
+                "{}",
+                spec.id
+            );
         } else {
             assert_eq!(actual, expected, "{}", spec.id);
         }
@@ -130,7 +126,6 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
 }
 
 #[test]
-<<<<<<< HEAD
 fn configurable_adjustment_endpoints_run_on_metal() {
     let mut gpu = GpuContext::new().expect("GPU adapter");
     #[cfg(target_os = "macos")]
@@ -178,21 +173,11 @@ fn configurable_adjustments_match_cpu_on_random_pixels() {
     let (width, height) = (73, 17);
     let mut seed = 0x7182_9147u32;
     let source: Vec<u8> = (0..width * height * 4)
-=======
-fn gaussian_radius_50_gpu_matches_cpu_within_one_level() {
-    let mut gpu = GpuContext::new().expect("GPU adapter");
-    #[cfg(target_os = "macos")]
-    assert_eq!(format!("{:?}", gpu.info().backend), "Metal");
-    let (width, height) = (65, 67);
-    let mut seed = 0x8472_1293u32;
-    let bytes: Vec<u8> = (0..width * height * 4)
->>>>>>> m35
         .map(|_| {
             seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
             (seed >> 24) as u8
         })
         .collect();
-<<<<<<< HEAD
     type Case = (&'static str, GpuKernel, [(&'static str, i64); 3], [i32; 3]);
     let cases: [Case; 6] = [
         (
@@ -478,7 +463,22 @@ fn m26_prepared_tables_match_cpu_on_metal() {
             })
             .collect();
         assert_eq!(actual, expected, "{id} {variant}");
-=======
+    }
+}
+
+#[test]
+fn gaussian_radius_50_gpu_matches_cpu_within_one_level() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    #[cfg(target_os = "macos")]
+    assert_eq!(format!("{:?}", gpu.info().backend), "Metal");
+    let (width, height) = (65, 67);
+    let mut seed = 0x8472_1293u32;
+    let bytes: Vec<u8> = (0..width * height * 4)
+        .map(|_| {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            (seed >> 24) as u8
+        })
+        .collect();
     let expected =
         op_ops::effects::gaussian_blur::reference_rgba8_with_radius(width, height, &bytes, 50);
     let before = gpu.dispatch_count();
@@ -547,6 +547,5 @@ fn gaussian_gpu_radius_endpoints_match_cpu() {
         op_ops::effects::gaussian_blur::reference_rgba8_with_radius(width, height, &bytes, 200);
     for (a, b) in actual.iter().zip(&expected) {
         assert!(a.abs_diff(*b) <= 1, "{a} vs {b}");
->>>>>>> m35
     }
 }

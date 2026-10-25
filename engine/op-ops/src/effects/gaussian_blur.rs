@@ -36,6 +36,7 @@ fn prepare(doc: &DocState, _: &SelectionState, params: &Value) -> Result<Prepare
             height: height as i32,
             halo: 0,
             gaussian: None,
+            channel_lut: None,
         });
     }
     let mut pixels = vec![[0u8; 4]; width * height];
@@ -93,6 +94,7 @@ fn prepare(doc: &DocState, _: &SelectionState, params: &Value) -> Result<Prepare
         height: height as i32,
         halo: radius,
         gaussian: Some(std::sync::Arc::new(columns)),
+        channel_lut: None,
     })
 }
 fn render(sample: &PixelReader<'_>, x: i32, y: i32, prep: &Prepared, params: &Value) -> [u8; 4] {
@@ -252,6 +254,7 @@ pub fn reference_rgba8_with_radius(width: u32, height: u32, bytes: &[u8], radius
         height: height as i32,
         halo: radius as i32,
         gaussian: None,
+        channel_lut: None,
     };
     let params = json!({"radius":radius,"gamma":"linear","gamma_exponent":2.2,"quality":4});
     let sample = |x: i32, y: i32| {

@@ -28,7 +28,25 @@ impl GpuOp for EffectOp {
         self.effect_id.into()
     }
     fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
-<<<<<<< HEAD
+        if self.kernel == GpuKernel::Gaussian {
+            return gaussian_reference(inputs.width, inputs.height, &inputs.bottom);
+        }
+        if matches!(
+            self.kernel,
+            GpuKernel::Fragment
+                | GpuKernel::Median
+                | GpuKernel::Motion
+                | GpuKernel::Radial
+                | GpuKernel::Zoom
+        ) {
+            return op_ops::effect::reference_rgba8(
+                self.effect_id,
+                inputs.width,
+                inputs.height,
+                &inputs.bottom,
+            )
+            .unwrap();
+        }
         let spec = find_effect(self.effect_id).expect("registered effect");
         let params = spec.default_params();
         let mut out = inputs.bottom.clone();
@@ -41,37 +59,6 @@ impl GpuOp for EffectOp {
                 &Prepared::default(),
                 &params,
             ));
-=======
-        if self.kernel == GpuKernel::Gaussian {
-            return gaussian_reference(inputs.width, inputs.height, &inputs.bottom);
-        }
-        if !matches!(
-            self.kernel,
-            GpuKernel::InvertColors | GpuKernel::InvertAlpha
-        ) {
-            return op_ops::effect::reference_rgba8(
-                self.effect_id,
-                inputs.width,
-                inputs.height,
-                &inputs.bottom,
-            )
-            .unwrap();
-        }
-        let mut out = inputs.bottom.clone();
-        for pixel in out.chunks_exact_mut(4) {
-            match self.kernel {
-                GpuKernel::InvertColors => {
-                    pixel[..3].iter_mut().for_each(|byte| *byte = 255 - *byte)
-                }
-                GpuKernel::InvertAlpha => pixel[3] = 255 - pixel[3],
-                GpuKernel::Gaussian => unreachable!(),
-                GpuKernel::Fragment
-                | GpuKernel::Median
-                | GpuKernel::Motion
-                | GpuKernel::Radial
-                | GpuKernel::Zoom => unreachable!(),
-            }
->>>>>>> m35
         }
         out
     }
