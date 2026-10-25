@@ -34,6 +34,10 @@ public struct DocInfo: Equatable, Sendable {
     public var historyIndex = 0
     public var dirty = false
     public var revision: Int = 0
+    /// The document profile's description ("sRGB" when it has none).
+    public var profileDescription = "sRGB"
+    /// False when the document has no profile and is treated as sRGB.
+    public var profileEmbedded = false
 
     public init() {}
 
@@ -51,6 +55,8 @@ public struct DocInfo: Equatable, Sendable {
         historyIndex = (json["history_index"] as? NSNumber)?.intValue ?? 0
         dirty = json["dirty"] as? Bool ?? false
         revision = (json["revision"] as? NSNumber)?.intValue ?? 0
+        profileDescription = json["profile_description"] as? String ?? "sRGB"
+        profileEmbedded = json["profile_embedded"] as? Bool ?? false
     }
 }
 

@@ -73,7 +73,7 @@ Image > Rotate 90° Clockwise
 Image > Rotate 90° Counter-Clockwise [⌘G]
 Image > Rotate 180° [⌘J]
 Image > ---
-Image > Color Profile… (off)
+Image > Color Profile…
 Image > ---
 Image > Flatten [⇧⌘F]
 Layers

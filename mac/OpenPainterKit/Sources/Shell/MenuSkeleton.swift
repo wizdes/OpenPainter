@@ -222,7 +222,7 @@ public enum MenuSkeleton {
                 .item("Rotate 90° Counter-Clockwise", "g", cmd, .command("image.rotate_90_ccw")),
                 .item("Rotate 180°", "j", cmd, .command("image.rotate_180")),
                 .separator,
-                i("Color Profile…"),
+                .item("Color Profile…", "", [], .selector(#selector(ColorProfileMenuActions.showColorProfile(_:)))),
                 .separator,
                 .item("Flatten", "f", shiftCmd, .command("image.flatten")),
             ]),

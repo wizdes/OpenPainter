@@ -34,6 +34,7 @@ mod layer_commands;
 mod layer_menu_commands;
 mod line_commands;
 pub mod live_stroke;
+mod profile_query;
 mod select_crop_commands;
 mod shape_commands;
 mod shell_commands;
@@ -823,7 +824,7 @@ impl Published {
                 .unwrap_or_else(|e| format!("Invalid ICC profile: {e}")),
             None => "sRGB".into(),
         };
-        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible,"opacity":l.opacity,"blend":blend_name(l.blend),"revision":content_key(l)})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_commands":self.history.commands,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision,"profile_description":profile_description})
+        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible,"opacity":l.opacity,"blend":blend_name(l.blend),"revision":content_key(l)})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_commands":self.history.commands,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision,"profile_description":profile_description,"profile_embedded":self.state.profile.is_some()})
     }
     pub fn pixels(&self, preview: bool) -> Result<Vec<u8>> {
         let state = if preview {
@@ -2510,6 +2511,10 @@ impl Engine {
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
             ),
+            "doc.profile" => {
+                serde_json::to_vec(&profile_query::profile_info(&s.state)).map_err(internal)
+            }
+            "doc.profile_icc" => Ok(profile_query::profile_icc(&s.state)),
             "doc.selection" => {
                 serde_json::to_vec(&shell_commands::selection_info(&s.state)).map_err(internal)
             }

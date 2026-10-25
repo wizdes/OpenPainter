@@ -9,6 +9,8 @@ public final class StatusBarView: FilledView {
     public let selectionValue = Labels.label("", color: Theme.ink)
     public let cursorValue = Labels.label("", color: Theme.ink)
     public let imageValue = Labels.label("", color: Theme.ink)
+    /// The document's color profile, short (M27).
+    public let profileValue = Labels.label("sRGB", color: Theme.ink)
     public let units = NSPopUpButton(frame: .zero, pullsDown: false)
     public let zoomField = Labels.field("100%", width: 56, height: 24)
     public private(set) var fitButton: NSButton!
@@ -46,7 +48,7 @@ public final class StatusBarView: FilledView {
         right.orientation = .horizontal
         right.alignment = .centerY
         right.spacing = 10
-        for (label, value) in [("Selection", selectionValue), ("Cursor", cursorValue), ("Image", imageValue)] {
+        for (label, value) in [("Selection", selectionValue), ("Cursor", cursorValue), ("Image", imageValue), ("Profile", profileValue)] {
             let l = Labels.label(label)
             right.addArrangedSubview(l)
             right.addArrangedSubview(value)
@@ -100,6 +102,12 @@ public final class StatusBarView: FilledView {
         if zoomField.currentEditor() == nil { zoomField.stringValue = ZoomPresets.label(zoom) }
         slider.doubleValue = log(zoom)
         hint.stringValue = text
+    }
+
+    /// Shows the document profile: the short name, the full one as a tooltip.
+    public func setProfile(short: String, full: String) {
+        if profileValue.stringValue != short { profileValue.stringValue = short }
+        profileValue.toolTip = full
     }
 
     @objc private func fit(_ sender: Any?) { onZoom?(nil) }
