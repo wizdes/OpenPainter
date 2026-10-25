@@ -45,6 +45,8 @@ public enum DocumentLoader {
             throw DocumentLoaderError.unsupported(name)
         case .engine:
             do { doc = try engine.openPNG(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
+            // M50: the engine reads the pixels and pHYs; EXIF and XMP come from ImageIO.
+            metadata = ImageIOImporter.metadata(url: url)
         case .native:
             do { doc = try engine.openOpaint(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
             type = ImageFormats.opaintIdentifier
@@ -52,7 +54,8 @@ public enum DocumentLoader {
             let image = try ImageIOImporter.decode(url: url)
             do {
                 doc = try engine.importPixels(
-                    width: UInt32(image.width), height: UInt32(image.height), rgba: image.rgba, icc: [UInt8](image.icc))
+                    width: UInt32(image.width), height: UInt32(image.height), rgba: image.rgba, icc: [UInt8](image.icc),
+                    dpi: ImageIOImporter.resolution(url: url) ?? 96)
             } catch {
                 throw DocumentLoaderError.engine(name, "\(error)")
             }

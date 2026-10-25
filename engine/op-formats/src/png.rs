@@ -142,3 +142,41 @@ pub fn encode_png(image: &DecodedImage) -> Result<Vec<u8>> {
     writer.finish().map_err(err)?;
     Ok(out)
 }
+
+/// The resolution in pixels per inch from a PNG's pHYs chunk (M50), when the
+/// chunk gives meters as its unit. Pixels per meter × 0.0254 = pixels per
+/// inch. The writer stores round(dpi / 0.0254), so when a whole number of dpi
+/// gives exactly this pixels-per-meter value that whole number is returned
+/// (72 dpi is 2835 px/m, which is 72.009 dpi); otherwise the value is rounded
+/// to 2 decimals. A pHYs with no unit (aspect ratio only) gives None.
+pub fn png_dpi(bytes: &[u8]) -> Option<f64> {
+    let mut p = 8usize;
+    if bytes.get(..8)? != b"\x89PNG\r\n\x1a\n" {
+        return None;
+    }
+    while p.checked_add(12)? <= bytes.len() {
+        let n = u32::from_be_bytes(bytes[p..p + 4].try_into().ok()?) as usize;
+        let kind = &bytes[p + 4..p + 8];
+        let data = bytes.get(p + 8..p.checked_add(8)?.checked_add(n)?)?;
+        if kind == b"pHYs" {
+            if n != 9 || data[8] != 1 {
+                return None;
+            }
+            let x = u32::from_be_bytes(data[0..4].try_into().ok()?);
+            if x == 0 {
+                return None;
+            }
+            let exact = x as f64 * 0.0254;
+            let whole = exact.round();
+            if (whole / 0.0254).round() == x as f64 {
+                return Some(whole);
+            }
+            return Some((exact * 100.0).round() / 100.0);
+        }
+        if kind == b"IDAT" {
+            return None;
+        }
+        p = p.checked_add(12)?.checked_add(n)?;
+    }
+    None
+}

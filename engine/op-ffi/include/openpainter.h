@@ -352,6 +352,40 @@ enum OpStatus op_doc_mark_saved(struct OpEngine *p, uint64_t doc, uint64_t revis
 enum OpStatus op_doc_replace(struct OpEngine *p, uint64_t doc, uint64_t source);
 
 /**
+ * Encodes `rgba` (`width` × `height` straight RGBA8, top row first) into
+ * `out` (free with op_buffer_free). `json` holds the options, such as
+ * `{"format":"jpeg","jpeg_quality":95,"jpeg_subsampling":"422","dpi":300}`;
+ * see op_engine::save_export. `icc`, `exif` (a raw TIFF-structure EXIF block)
+ * and `xmp` (an XMP packet) may be empty. Needs no engine or document.
+ */
+enum OpStatus op_encode_image(const uint8_t *json,
+                              uintptr_t json_len,
+                              uint32_t width,
+                              uint32_t height,
+                              const uint8_t *rgba,
+                              uintptr_t rgba_len,
+                              const uint8_t *icc,
+                              uintptr_t icc_len,
+                              const uint8_t *exif,
+                              uintptr_t exif_len,
+                              const uint8_t *xmp,
+                              uintptr_t xmp_len,
+                              struct OpBuffer *out);
+
+/**
+ * `op_import_pixels` at `dpi` pixels per inch (1 to 100000).
+ */
+enum OpStatus op_import_pixels_at(struct OpEngine *p,
+                                  uint32_t width,
+                                  uint32_t height,
+                                  const uint8_t *rgba,
+                                  uintptr_t len,
+                                  const uint8_t *icc,
+                                  uintptr_t icc_len,
+                                  double dpi,
+                                  uint64_t *out_doc);
+
+/**
  * Starts a move session on the active layer. `json`: `{"kind":"pixels" |
  * "selection", "transform", "resampling", "copy"}` (see `op_move_update`).
  * With no selection, "pixels" moves the whole layer. Returns OP_ERR_BUSY while

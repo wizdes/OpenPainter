@@ -37,6 +37,7 @@ mod layer_menu_commands;
 mod line_commands;
 pub mod live_stroke;
 mod profile_query;
+pub mod save_export;
 mod select_crop_commands;
 mod selection_commands;
 mod shape_commands;
@@ -2201,6 +2202,20 @@ impl Engine {
         rgba: &[u8],
         icc: Option<&[u8]>,
     ) -> Result<u64> {
+        self.import_pixels_at(width, height, rgba, icc, 96.0)
+    }
+    /// `import_pixels` at `dpi` pixels per inch (M50: the file's resolution).
+    pub fn import_pixels_at(
+        &self,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+        icc: Option<&[u8]>,
+        dpi: f64,
+    ) -> Result<u64> {
+        if !dpi.is_finite() || !(1.0..=100_000.0).contains(&dpi) {
+            return Err(bad("resolution out of range"));
+        }
         let len = (width as usize)
             .checked_mul(height as usize)
             .and_then(|n| n.checked_mul(4))
@@ -2216,7 +2231,7 @@ impl Engine {
         }
         let store =
             Arc::new(TileStore::new(std::env::temp_dir(), 64 * 1024 * 1024).map_err(internal)?);
-        let mut state = DocState::new(store.clone(), width, height, 96.0).map_err(internal)?;
+        let mut state = DocState::new(store.clone(), width, height, dpi).map_err(internal)?;
         for ty in 0..height.div_ceil(TILE_SIZE as u32) {
             for tx in 0..width.div_ceil(TILE_SIZE as u32) {
                 let mut tile = vec![0; TILE_BYTES];
@@ -2300,7 +2315,11 @@ impl Engine {
     }
     pub fn open_png(&self, bytes: &[u8]) -> Result<u64> {
         let d = op_formats::png::decode_png(bytes).map_err(bad)?;
-        self.import_pixels(d.width, d.height, &d.pixels, d.icc.as_deref())
+        // M50: a pHYs resolution in range becomes the document's.
+        let dpi = op_formats::png::png_dpi(bytes)
+            .filter(|d| (1.0..=100_000.0).contains(d))
+            .unwrap_or(96.0);
+        self.import_pixels_at(d.width, d.height, &d.pixels, d.icc.as_deref(), dpi)
     }
     pub fn import_gray_pixels(
         &self,
