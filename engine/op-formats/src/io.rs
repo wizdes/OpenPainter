@@ -804,11 +804,38 @@ fn encode_tiff(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     let _ = enc;
     Ok(out.into_inner())
 }
-/// Every RIFF chunk must fit inside the file, and every chunk nested in an
-/// animation frame (ANMF: a 16-byte frame header, then chunks) must fit inside
-/// its frame. image-webp allocates a chunk's claimed size before reading it,
-/// so a tiny file claiming gigabytes would abort the process (M57 fuzzing).
-fn check_webp_chunks(bytes: &[u8]) -> Result<()> {
+/// The most working memory one WebP decode may take (M58 fuzzing): the same
+/// 1 GiB that `checked_len` lets a decoded image take. `webp_decode_cost`
+/// counts it from the headers before any pixel buffer exists. With it, the
+/// largest WebP that opens is about 174 MP lossy (for example 16383 x 10600),
+/// 119 MP lossless without alpha and 71 MP for an animation whose first
+/// frame fills its canvas. The limit keeps one decode inside half of the
+/// app's 2 GB budget (ARCHITECTURE.md), so the document it becomes still
+/// fits beside it.
+const WEBP_DECODE_BUDGET: u64 = 1 << 30;
+/// What image-webp allocates for VP8 partitions before it reads them: the
+/// first partition (a 19-bit size) and up to 7 more (24-bit sizes).
+const VP8_PARTITIONS: u64 = (1 << 19) + 7 * (1 << 24);
+
+/// One RIFF chunk: its FourCC, where its data starts, its claimed size, and
+/// the ANMF frame size (width, height) when it sits inside an ANMF chunk.
+struct WebpChunk {
+    id: [u8; 4],
+    at: usize,
+    len: usize,
+    frame: Option<(u32, u32)>,
+}
+
+/// Lists the RIFF chunks image-webp will look at. Every chunk must fit
+/// inside the file, and every chunk nested in an animation frame (ANMF: a
+/// 16-byte frame header, then chunks) must fit inside its frame. image-webp
+/// allocates a chunk's claimed size before reading it, so a tiny file
+/// claiming gigabytes would abort the process (M57 fuzzing). Chunks inside
+/// the RIFF size must end inside it. image-webp also reads the first chunk
+/// whatever the RIFF size says, and in a VP8X file it walks up to 10 bytes
+/// past the RIFF end, so those chunks are listed too and must end inside
+/// the file (M58).
+fn webp_chunks(bytes: &[u8]) -> Result<Vec<WebpChunk>> {
     const TOO_BIG: Error = Error::Invalid("WebP chunk is larger than the file");
     let u32at = |p: usize| -> Option<usize> {
         Some(u32::from_le_bytes(bytes.get(p..p + 4)?.try_into().ok()?) as usize)
@@ -817,40 +844,192 @@ fn check_webp_chunks(bytes: &[u8]) -> Result<()> {
     if riff > bytes.len() - 8 {
         return Err(TOO_BIG);
     }
-    // (start, end) of chunk lists still to check.
-    let mut lists = vec![(12_usize, 8 + riff)];
-    while let Some((mut p, end)) = lists.pop() {
-        while p + 8 <= end {
-            let size = u32at(p + 4).ok_or(Error::Invalid("WebP header"))?;
-            let data = p + 8;
-            let stop = data.checked_add(size).ok_or(TOO_BIG)?;
-            if stop > end {
+    let riff_end = 8 + riff;
+    // image-webp's VP8X walk stops at (end of the VP8X chunk) + riff - 12.
+    let decoder_end = match (bytes.get(12..16), u32at(16)) {
+        (Some(b"VP8X"), Some(size)) => 20 + size + (size & 1) + riff.saturating_sub(12),
+        _ => 0,
+    };
+    let mut out = Vec::new();
+    let mut p = 12;
+    while p + 8 <= bytes.len() {
+        let in_riff = p + 8 <= riff_end;
+        if !(in_riff || p == 12 || p < decoder_end) {
+            break;
+        }
+        let end = if in_riff { riff_end } else { bytes.len() };
+        let size = u32at(p + 4).ok_or(Error::Invalid("WebP header"))?;
+        let stop = (p + 8).checked_add(size).ok_or(TOO_BIG)?;
+        if stop > end {
+            return Err(TOO_BIG);
+        }
+        let id: [u8; 4] = bytes[p..p + 4].try_into().expect("4 bytes");
+        out.push(WebpChunk {
+            id,
+            at: p + 8,
+            len: size,
+            frame: None,
+        });
+        p = stop.checked_add(size & 1).ok_or(TOO_BIG)?;
+    }
+    // Chunks nested in each ANMF frame.
+    for i in 0..out.len() {
+        let (at, len) = (out[i].at, out[i].len);
+        if &out[i].id != b"ANMF" || len < 16 {
+            continue;
+        }
+        let frame = Some((u24at(bytes, at + 6) + 1, u24at(bytes, at + 9) + 1));
+        let mut q = at + 16;
+        while q + 8 <= at + len {
+            let size = u32at(q + 4).ok_or(Error::Invalid("WebP header"))?;
+            let stop = (q + 8).checked_add(size).ok_or(TOO_BIG)?;
+            if stop > at + len {
                 return Err(TOO_BIG);
             }
-            if &bytes[p..p + 4] == b"ANMF" && size >= 16 {
-                lists.push((data + 16, stop));
-            }
-            p = stop.checked_add(size & 1).ok_or(TOO_BIG)?;
+            let id: [u8; 4] = bytes[q..q + 4].try_into().expect("4 bytes");
+            out.push(WebpChunk {
+                id,
+                at: q + 8,
+                len: size,
+                frame,
+            });
+            q = stop.checked_add(size & 1).ok_or(TOO_BIG)?;
         }
     }
-    Ok(())
+    Ok(out)
 }
+
+fn u24at(bytes: &[u8], p: usize) -> u32 {
+    let b = |i: usize| u32::from(bytes[p + i]);
+    b(0) | (b(1) << 8) | (b(2) << 16)
+}
+
+/// The width and height a VP8 key frame or a VP8L header claims (None when
+/// the chunk is too short or not a key frame; image-webp then fails before
+/// it allocates pixels).
+fn webp_bitstream_size(chunk: &WebpChunk, bytes: &[u8]) -> Option<(u32, u32)> {
+    let d = &bytes[chunk.at..chunk.at + chunk.len];
+    let u16at = |i: usize| u32::from(u16::from_le_bytes([d[i], d[i + 1]])) & 0x3FFF;
+    match &chunk.id {
+        b"VP8 " if d.len() >= 10 && d[0] & 1 == 0 => Some((u16at(6), u16at(8))),
+        b"VP8L" if d.len() >= 5 => {
+            let v = u32::from_le_bytes(d[1..5].try_into().ok()?);
+            Some(((v & 0x3FFF) + 1, ((v >> 14) & 0x3FFF) + 1))
+        }
+        _ => None,
+    }
+}
+
+/// The most memory image-webp and `decode_webp` will hold at once while
+/// reading the image (the first frame of an animation), in bytes, from the
+/// headers alone. Per pixel: our RGBA output 4; a lossy frame's YUV planes
+/// 1.5 (whole 16 x 16 macroblocks) plus its partitions; a lossless frame's
+/// transform and entropy images at most 1, plus 4 more when image-webp
+/// decodes RGBA to copy it to RGB; an alpha plane 1, or 6 when it is
+/// lossless coded; an animation's canvas 4 and its frame buffer 4.
+/// Every VP8 and VP8L header must claim the size of the canvas or of its
+/// animation frame: image-webp sizes its buffers from those headers before
+/// it compares them.
+fn webp_decode_cost(
+    bytes: &[u8],
+    chunks: &[WebpChunk],
+    (w, h): (u32, u32),
+    alpha: bool,
+    animated: bool,
+) -> Result<u64> {
+    const MISMATCH: Error = Error::Invalid("WebP image data does not match its declared size");
+    let px = |w: u32, h: u32| u64::from(w) * u64::from(h);
+    let lossy = |w: u32, h: u32| {
+        u64::from(w.div_ceil(16)) * u64::from(h.div_ceil(16)) * 384 + VP8_PARTITIONS
+    };
+    let lossless = |w: u32, h: u32, alpha: bool| px(w, h) * if alpha { 1 } else { 5 };
+    let alpha_plane = |c: &WebpChunk, w: u32, h: u32| {
+        let lossless_coded = c.len > 0 && bytes[c.at] & 3 == 1;
+        px(w, h) * if lossless_coded { 6 } else { 1 }
+    };
+    let out = px(w, h) * 4;
+    // A simple file (no VP8X): image-webp reads only the first chunk, and
+    // took the size from its header.
+    match chunks.first().map(|c| &c.id) {
+        Some(b"VP8 ") => return Ok(out + lossy(w, h)),
+        Some(b"VP8L") => return Ok(out + lossless(w, h, alpha)),
+        _ => {}
+    }
+    for c in chunks {
+        let Some(size) = webp_bitstream_size(c, bytes) else {
+            continue;
+        };
+        let want = c.frame.unwrap_or((w, h));
+        if size != want || want.0 > w || want.1 > h {
+            return Err(MISMATCH);
+        }
+    }
+    let first = |id: &[u8; 4], frame: bool| {
+        chunks
+            .iter()
+            .find(|c| &c.id == id && c.frame.is_some() == frame)
+    };
+    let anmf = first(b"ANMF", false).filter(|_| animated);
+    let cost = if let Some(anmf) = anmf {
+        // image-webp reads the first frame only: its image chunk follows an
+        // optional ALPH chunk inside the first ANMF.
+        let in_first = |id: &[u8; 4]| {
+            chunks
+                .iter()
+                .find(|c| &c.id == id && c.at > anmf.at && c.at < anmf.at + anmf.len)
+        };
+        let frame = match anmf.len {
+            16.. => (u24at(bytes, anmf.at + 6) + 1, u24at(bytes, anmf.at + 9) + 1),
+            _ => (1, 1),
+        };
+        if frame.0 > w || frame.1 > h {
+            return Err(MISMATCH);
+        }
+        let (fw, fh) = frame;
+        let image = if in_first(b"VP8L").is_some() {
+            lossless(fw, fh, true)
+        } else {
+            lossy(fw, fh) + in_first(b"ALPH").map_or(0, |a| alpha_plane(a, fw, fh))
+        };
+        out + px(w, h) * 4 + px(fw, fh) * 4 + image
+    } else if first(b"VP8L", false).is_some() {
+        out + lossless(w, h, alpha)
+    } else {
+        out + lossy(w, h) + first(b"ALPH", false).map_or(0, |a| alpha_plane(a, w, h))
+    };
+    Ok(cost)
+}
+
 fn decode_webp(bytes: &[u8]) -> Result<Decoded> {
-    check_webp_chunks(bytes)?;
+    let chunks = webp_chunks(bytes)?;
     let mut dec = image_webp::WebPDecoder::new(Cursor::new(bytes)).map_err(codec)?;
+    dec.set_memory_limit(WEBP_DECODE_BUDGET as usize);
     let (w, h) = dec.dimensions();
-    checked_len(w, h)?;
+    let len = checked_len(w, h)?;
     let alpha = dec.has_alpha();
+    let cost = webp_decode_cost(bytes, &chunks, (w, h), alpha, dec.is_animated())?;
+    if cost > WEBP_DECODE_BUDGET {
+        return Err(Error::Invalid("WebP needs more than 1 GiB to decode"));
+    }
     let icc = dec.icc_profile().map_err(codec)?;
     let exif = dec.exif_metadata().map_err(codec)?;
     let xmp = dec.xmp_metadata().map_err(codec)?;
-    let mut raw = vec![
-        0;
-        dec.output_buffer_size()
-            .ok_or(Error::Invalid("WebP size"))?
-    ];
-    dec.read_image(&mut raw).map_err(codec)?;
-    let mut out = Decoded::new(w, h, expand(&raw, if alpha { 4 } else { 3 }))?;
+    // One RGBA buffer: image-webp writes RGB into its first 3/4 when the
+    // image has no alpha, and the pixels are spread out in place.
+    let raw_len = dec
+        .output_buffer_size()
+        .filter(|&n| n <= len)
+        .ok_or(Error::Invalid("WebP size"))?;
+    let mut rgba = vec![0; len];
+    dec.read_image(&mut rgba[..raw_len]).map_err(codec)?;
+    if !alpha {
+        // Back to front, so no pixel is overwritten before it is read.
+        for i in (0..len / 4).rev() {
+            let [r, g, b] = [rgba[i * 3], rgba[i * 3 + 1], rgba[i * 3 + 2]];
+            rgba[i * 4..i * 4 + 4].copy_from_slice(&[r, g, b, 255]);
+        }
+    }
+    let mut out = Decoded::new(w, h, rgba)?;
     out.icc = icc;
     out.metadata.exif = exif;
     out.metadata.xmp = xmp;

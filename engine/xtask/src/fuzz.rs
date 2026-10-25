@@ -241,10 +241,24 @@ fn frames(bytes: &[u8]) -> Vec<Vec<u8>> {
     out
 }
 
+/// The worker's command line. macOS's allocator keeps freed large blocks in
+/// a cache, and a cached block it hands out again for a zeroed allocation is
+/// written over, so it then counts in the footprint even after it is freed.
+/// After many inputs that each took up to 900 MB and freed it (live heap 0),
+/// one worker's footprint reached 2.6 GiB and the watchdog blamed whichever
+/// input was running (M58: 199 such kills in 300 s of WebP). With the cache
+/// off, the same 199 inputs left the footprint at 2 MiB. The heap cap and
+/// the 2 GiB watchdog stay as they are, so an input that really uses more
+/// still fails.
+fn worker_command(worker: &Path, target: &str) -> Command {
+    let mut command = Command::new(worker);
+    command.args(["run", target]).env("MallocLargeCache", "0");
+    command
+}
+
 fn spawn(worker: &Path, target: &str, log: &Path) -> std::io::Result<Worker> {
     let log = fs::OpenOptions::new().create(true).append(true).open(log)?;
-    let mut child = Command::new(worker)
-        .args(["run", target])
+    let mut child = worker_command(worker, target)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::from(log))
@@ -511,6 +525,18 @@ mod tests {
         assert!(!status.success());
         assert!(flag.load(Ordering::SeqCst));
         assert_eq!(rss_kib(child.id()), None);
+    }
+
+    #[test]
+    fn the_worker_runs_without_the_macos_large_block_cache() {
+        let command = worker_command(Path::new("fuzz_worker"), "webp");
+        let env: Vec<_> = command.get_envs().collect();
+        assert!(env.contains(&(
+            std::ffi::OsStr::new("MallocLargeCache"),
+            Some(std::ffi::OsStr::new("0"))
+        )));
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args, ["run", "webp"]);
     }
 
     #[test]
