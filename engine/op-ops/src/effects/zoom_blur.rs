@@ -8,6 +8,7 @@ fn prepare(doc: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
         height: doc.height as i32,
         halo: 0,
         gaussian: None,
+        noise: None,
         channel_lut: None,
     })
 }

@@ -96,7 +96,7 @@ id = "effect.blur.median"
 target = "legacy-3.36"
 reference = "tests/oracle/legacy336/effects/Median_Blur_*.png"
 tolerance = "exact"
-docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+docs = "https://paint.net/doc/latest/EffectsNoiseMenu.html"
 
 [[effect]]
 id = "effect.blur.motion"
@@ -154,3 +154,52 @@ id = "effect.adjust.highlights_shadows"
 target = "own"
 reference = "provisional tone weighted shift; https://paint.net/doc/latest/AdjustmentsMenu.html; 5.1 capture pending"
 tolerance = "exact"
+
+[[effect]]
+id = "effect.noise.add"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Add_Noise_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsNoiseMenu.html"
+
+[[effect]]
+id = "effect.noise.reduce"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Reduce_Noise_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsNoiseMenu.html"
+
+[[effect]]
+id = "effect.photo.glow"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Glow_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[effect]]
+id = "effect.photo.red_eye_removal"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Red_Eye_Removal_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[effect]]
+id = "effect.photo.sharpen"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Sharpen_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[effect]]
+id = "effect.photo.soften_portrait"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Soften_Portrait_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[effect]]
+id = "effect.photo.vignette"
+target = "own"
+reference = "provisional elliptical darkening; paint.net 5.1 capture pending"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsPhotoMenu.html"

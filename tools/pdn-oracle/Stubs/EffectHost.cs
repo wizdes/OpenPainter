@@ -19,12 +19,12 @@ namespace PaintDotNet.IndirectUI {
     }
 }
 namespace PaintDotNet.PropertySystem {
-    public abstract class Property { public object Name { get; } protected Property(object name) { Name=name; } }
-    public sealed class Int32Property : Property { public int Value { get; set; } public Int32Property(object name,int value,int min,int max):base(name){Value=value;} }
-    public sealed class DoubleProperty : Property { public double Value {get;set;} public DoubleProperty(object name,double value,double min,double max):base(name){Value=value;} }
-    public sealed class StaticListChoiceProperty : Property { public object Value {get;set;} public StaticListChoiceProperty(object name,Type[] values,int index,bool allowCustom):base(name){Value=values[index];} }
-    public sealed class BooleanProperty : Property { public bool Value { get; set; } public BooleanProperty(object name,bool value):base(name){Value=value;} }
-    public sealed class DoubleVectorProperty : Property { public double ValueX {get;set;} public double ValueY {get;set;} public PaintDotNet.Pair<double,double> Value {get=>PaintDotNet.Pair.Create(ValueX,ValueY);set{ValueX=value.First;ValueY=value.Second;}} public DoubleVectorProperty(object name,PaintDotNet.Pair<double,double> value,PaintDotNet.Pair<double,double> min,PaintDotNet.Pair<double,double> max):base(name){Value=value;} }
+    public abstract class Property { public object Name { get; } protected Property(object name) { Name=name; } public object Value { get=>GetType().GetProperty("Value",System.Reflection.BindingFlags.DeclaredOnly|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Instance)!.GetValue(this); set=>GetType().GetProperty("Value",System.Reflection.BindingFlags.DeclaredOnly|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Instance)!.SetValue(this,value); } }
+    public sealed class Int32Property : Property { public new int Value { get; set; } public Int32Property(object name,int value,int min,int max):base(name){Value=value;} }
+    public sealed class DoubleProperty : Property { public new double Value {get;set;} public DoubleProperty(object name,double value,double min,double max):base(name){Value=value;} }
+    public sealed class StaticListChoiceProperty : Property { public new object Value {get;set;} public StaticListChoiceProperty(object name,Type[] values,int index,bool allowCustom):base(name){Value=values[index];} }
+    public sealed class BooleanProperty : Property { public new bool Value { get; set; } public BooleanProperty(object name,bool value):base(name){Value=value;} }
+    public sealed class DoubleVectorProperty : Property { public double ValueX {get;set;} public double ValueY {get;set;} public new PaintDotNet.Pair<double,double> Value {get=>PaintDotNet.Pair.Create(ValueX,ValueY);set{ValueX=value.First;ValueY=value.Second;}} public DoubleVectorProperty(object name,PaintDotNet.Pair<double,double> value,PaintDotNet.Pair<double,double> min,PaintDotNet.Pair<double,double> max):base(name){Value=value;} }
     public abstract class PropertyCollectionRule { }
     public sealed class SoftMutuallyBoundMinMaxRule<TValue,TProperty> : PropertyCollectionRule { public SoftMutuallyBoundMinMaxRule(object min,object max) { } }
     public sealed class LinkValuesBasedOnBooleanRule<TValue,TProperty> : PropertyCollectionRule {
@@ -32,6 +32,8 @@ namespace PaintDotNet.PropertySystem {
     }
     public sealed class PropertyCollection {
         public readonly Dictionary<object,Property> Values=new();
+        public Property this[object name]=>Values[name];
+        public PropertyCollection Clone()=>this;
         public PropertyCollection(IEnumerable<Property> values) { foreach(var p in values)Values[p.Name]=p; }
         public PropertyCollection(IEnumerable<Property> values,IEnumerable<PropertyCollectionRule> rules):this(values) { }
         public static PropertyCollection CreateEmpty()=>new(Array.Empty<Property>());
@@ -50,7 +52,7 @@ namespace PaintDotNet.Effects {
     using PaintDotNet.IndirectUI;
     using PaintDotNet.PropertySystem;
     [Flags] public enum EffectFlags { None=0, Configurable=1 }
-    public static class SubmenuNames { public const string Blurs="Blurs"; public const string Distort="Distort"; public const string Render="Render"; public const string Noise="Noise"; }
+    public static class SubmenuNames { public const string Blurs="Blurs"; public const string Distort="Distort"; public const string Render="Render"; public const string Noise="Noise"; public const string Photo="Photo"; }
     public enum EffectCategory { Adjustment }
     [AttributeUsage(AttributeTargets.Class)] public sealed class EffectCategoryAttribute : Attribute {
         public EffectCategoryAttribute(EffectCategory category) { }
@@ -59,6 +61,7 @@ namespace PaintDotNet.Effects {
         private readonly PropertyCollection properties;
         public PropertyBasedEffectConfigToken(PropertyCollection properties){this.properties=properties;}
         public T GetProperty<T>(object name) where T:Property=>(T)properties.Values[name];
+        public void SetPropertyValue(object name,object value)=>properties.Values[name].Value=value;
     }
     public abstract class PropertyBasedEffect {
         public static ControlInfo CreateDefaultConfigUI(PropertyCollection properties)=>new();
@@ -74,6 +77,9 @@ namespace PaintDotNet.Effects {
         protected virtual void OnSetRenderInfo(PropertyBasedEffectConfigToken token,RenderArgs dst,RenderArgs src){DstArgs=dst;SrcArgs=src;}
         protected abstract void OnRender(Rectangle[] rois,int startIndex,int length);
         public PropertyBasedEffectConfigToken CreateToken()=>new(OnCreatePropertyCollection());
+        public PropertyCollection CreatePropertyCollection()=>OnCreatePropertyCollection();
+        public void SetRenderInfo(PropertyBasedEffectConfigToken token,RenderArgs dst,RenderArgs src)=>OnSetRenderInfo(token,dst,src);
+        public void Render(Rectangle[] rois,int startIndex,int length)=>OnRender(rois,startIndex,length);
         public void Render(PropertyBasedEffectConfigToken token,Surface dst,Surface src){OnSetRenderInfo(token,new(dst),new(src));OnRender(new[]{dst.Bounds},0,1);}
     }
 }

@@ -110,6 +110,89 @@ fn effect_invert_alpha(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(src.r, src.g, src.b, 255u - src.a));
 }
 @compute @workgroup_size(16, 16)
+fn effect_red_eye_removal(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let hi = max(src.r, max(src.g, src.b));
+  let lo = min(src.r, min(src.g, src.b));
+  let saturation = select(0u, (hi - lo) * 255u / max(hi, 1u), hi > 0u);
+  var red = src.r;
+  if i32(src.r) - i32(max(src.g, src.b)) > i32(p.mode) && saturation > 100u {
+    red = (299u * src.r + 587u * src.g + 114u * src.b) * p.opacity / 100000u;
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(red, src.g, src.b, src.a));
+}
+@compute @workgroup_size(16, 16)
+fn effect_add_noise(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let delta = vec3<i32>(acc[id.y * p.width + id.x].rgb);
+  let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + delta, vec3<i32>(0), vec3<i32>(255)));
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
+}
+fn photo_scale(a: i32, b: i32) -> i32 {
+  let value = a * b + 128;
+  return (value + (value >> 8)) >> 8;
+}
+fn photo_blend(lhs: vec4<u32>, rhs: vec4<u32>, overlay: bool) -> vec4<u32> {
+  let lhs_a = i32(lhs.a);
+  let rhs_a = i32(rhs.a);
+  let y = photo_scale(lhs_a, 255 - rhs_a);
+  let total_a = y + rhs_a;
+  if total_a == 0 { return vec4<u32>(0u); }
+  let x = photo_scale(lhs_a, rhs_a);
+  let z = rhs_a - x;
+  var out = vec4<u32>(0u);
+  for (var channel = 0u; channel < 3u; channel++) {
+    let a = i32(lhs[channel]);
+    let b = i32(rhs[channel]);
+    var blended = a + b - photo_scale(a, b);
+    if overlay {
+      if a < 128 { blended = photo_scale(2 * a, b); }
+      else { blended = 255 - photo_scale(2 * (255 - a), 255 - b); }
+    }
+    out[channel] = u32((a * y + b * z + blended * x) / total_a);
+  }
+  out.a = u32(total_a);
+  return out;
+}
+@compute @workgroup_size(16, 16)
+fn effect_photo_glow_blend(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let adjusted = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let original = vec4<u32>(acc[id.y * p.width + id.x]);
+  textureStore(output_tex, vec2<i32>(id.xy), photo_blend(adjusted, original, false));
+}
+@compute @workgroup_size(16, 16)
+fn effect_photo_soften_blend(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let adjusted = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let original = vec4<u32>(acc[id.y * p.width + id.x]);
+  let gray = u32(legacy_intensity(original));
+  let warm = f32(p.mode) / 100.0;
+  let lit = vec4<u32>(u32(clamp(f32(gray) * (1.0 + warm), 0.0, 255.0)), gray,
+    u32(clamp(f32(gray) * (1.0 - warm), 0.0, 255.0)), original.a);
+  textureStore(output_tex, vec2<i32>(id.xy), photo_blend(lit, adjusted, true));
+}
+@compute @workgroup_size(16, 16)
+fn effect_vignette(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let strength = f32(p.masked & 65535u) / 100.0;
+  if strength == 0.0 { textureStore(output_tex, vec2<i32>(id.xy), src); return; }
+  let radius = f32((p.masked >> 16u) & 65535u) / 100.0;
+  let cx = (f32(bitcast<i32>(p.mode)) / 1000.0 + 1.0) * 0.5;
+  let cy = (f32(bitcast<i32>(p.opacity)) / 1000.0 + 1.0) * 0.5;
+  let nx = ((f32(id.x) + 0.5) / f32(p.width) - cx) * 2.0;
+  let ny = ((f32(id.y) + 0.5) / f32(p.height) - cy) * 2.0;
+  let distance = sqrt(nx * nx + ny * ny);
+  let edge = clamp((distance - radius) / max(1.0 - radius, 0.001), 0.0, 1.0);
+  let falloff = edge * edge * (3.0 - 2.0 * edge);
+  let factor = 1.0 - falloff * strength;
+  let rgb = vec3<u32>(round(vec3<f32>(src.rgb) * factor));
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
+}
+@compute @workgroup_size(16, 16)
 fn effect_black_and_white(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }
   let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
@@ -435,6 +518,64 @@ fn effect_median(@builtin(global_invocation_id) id: vec3<u32>) {
     result[channel] = value;
   }
   textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+@compute @workgroup_size(16, 16)
+fn effect_sharpen(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let radius = i32(p.mode);
+  let diameter = 2 * radius + 1;
+  let cutoff = (diameter * diameter + 2) / 4;
+  var hist: array<vec4<u32>, 256>;
+  var area = 0u;
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      let uv = vec2<i32>(id.xy) + vec2<i32>(dx,dy);
+      if uv.x < 0 || uv.y < 0 || uv.x >= i32(p.width) || uv.y >= i32(p.height) || dx*dx+dy*dy > cutoff { continue; }
+      let c = textureLoad(input_tex, uv, 0);
+      hist[c.r].r += 1u;
+      hist[c.g].g += 1u;
+      hist[c.b].b += 1u;
+      hist[c.a].a += 1u;
+      area += 1u;
+    }
+  }
+  let rank = area / 2u;
+  var median = vec4<u32>(0u);
+  for (var channel = 0u; channel < 4u; channel++) {
+    var value = 0u;
+    while value < 255u && hist[value][channel] == 0u { value += 1u; }
+    var count = 0u;
+    while value < 255u && count < rank { count += hist[value][channel]; value += 1u; }
+    median[channel] = value;
+  }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let result = vec4<u32>(clamp((3 * vec4<i32>(src) - vec4<i32>(median)) / 2, vec4<i32>(0), vec4<i32>(255)));
+  textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+@compute @workgroup_size(16, 16)
+fn effect_reduce_noise(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let src = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  let radius = i32(p.mode);
+  let diameter = 2 * radius + 1;
+  let cutoff = (diameter * diameter + 2) / 4;
+  var counts = vec3<u32>(0u);
+  var area = 0u;
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      let uv = vec2<i32>(id.xy) + vec2<i32>(dx, dy);
+      if uv.x < 0 || uv.y < 0 || uv.x >= i32(p.width) || uv.y >= i32(p.height) || dx*dx+dy*dy > cutoff { continue; }
+      let neighbor = textureLoad(input_tex, uv, 0);
+      counts += vec3<u32>(neighbor.rgb < src.rgb);
+      area += 1u;
+    }
+  }
+  let normalized = counts * 255u / area;
+  let intensity = (0.299 * f32(src.r) + 0.587 * f32(src.g) + 0.114 * f32(src.b)) / 255.0;
+  let lerp = -0.2 * (f32(p.opacity) / 1000.0) * (1.0 - 0.75 * intensity);
+  let rgb = vec3<u32>(clamp(vec3<f32>(src.rgb) + (vec3<f32>(normalized) - vec3<f32>(src.rgb)) * lerp, vec3<f32>(0.0), vec3<f32>(255.0)));
+  let alpha = u32(clamp(f32(src.a) + (255.0 - f32(src.a)) * lerp, 0.0, 255.0));
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, alpha));
 }
 
 fn motion_bilinear(pt: vec2<f32>) -> vec4<u32> {

@@ -28,6 +28,33 @@ impl GpuOp for EffectOp {
         self.effect_id.into()
     }
     fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        if self.kernel == GpuKernel::AddNoise {
+            return op_ops::effects::add_noise::reference_rgba8(
+                inputs.width,
+                inputs.height,
+                &inputs.bottom,
+            );
+        }
+        if self.kernel == GpuKernel::Glow {
+            return op_ops::effects::glow::reference_rgba8(
+                inputs.width,
+                inputs.height,
+                &inputs.bottom,
+                6,
+                10,
+                10,
+            );
+        }
+        if self.kernel == GpuKernel::SoftenPortrait {
+            return op_ops::effects::soften_portrait::reference_rgba8(
+                inputs.width,
+                inputs.height,
+                &inputs.bottom,
+                5,
+                0,
+                10,
+            );
+        }
         if self.kernel == GpuKernel::Gaussian {
             return gaussian_reference(inputs.width, inputs.height, &inputs.bottom);
         }
@@ -38,6 +65,9 @@ impl GpuOp for EffectOp {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom
+                | GpuKernel::Vignette
+                | GpuKernel::Sharpen
+                | GpuKernel::ReduceNoise
         ) {
             return op_ops::effect::reference_rgba8(
                 self.effect_id,

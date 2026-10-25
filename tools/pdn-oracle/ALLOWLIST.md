@@ -35,6 +35,11 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/MotionBlurEffect.cs` | Original linear samples and bilinear interpolation. |
 | `Effects/RadialBlurEffect.cs` | Original fixed-point rotation blur. |
 | `Effects/ZoomBlurEffect.cs` | Original fixed-point zoom blur. |
+| `Effects/ReduceNoiseEffect.cs` | Original local-histogram noise reduction. |
+| `Effects/GlowEffect.cs` | Original Gaussian, brightness, and screen effect. |
+| `Effects/RedEyeRemoveEffect.cs` | Original red-eye pixel operation. |
+| `Effects/SharpenEffect.cs` | Original median-based sharpening. |
+| `Effects/SoftenPortraitEffect.cs` | Original Gaussian and overlay portrait effect. |
 
 `Shims/Utility.cs` contains verbatim numeric methods from `Core/Utility.cs` with the Windows UI methods removed. Its header records the source revision and changes.
 `Shims/AddNoiseEffect.cs`, `Shims/FrostedGlassEffect.cs`, and `Shims/CloudsEffect.cs` copy their named effect files. Each replaces only a clock-derived random seed with a fixed value. Their headers name the source and exact change.

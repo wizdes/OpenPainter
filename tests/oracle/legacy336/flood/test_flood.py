@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import unittest
 
@@ -22,7 +23,8 @@ class FloodOracleTests(unittest.TestCase):
             self.assertLessEqual(set(output.read_bytes()), {0, 255})
 
     def test_extracted_legacy_methods_have_no_edits(self):
-        source = (ROOT / '.pdn-src/src/tools/FloodToolBase.cs').read_text()
+        source_root = Path(os.environ.get('PDN_SOURCE', ROOT / '.pdn-src'))
+        source = (source_root / 'src/tools/FloodToolBase.cs').read_text()
         start = source.index('        private static bool CheckColor(')
         end = source.index('        protected abstract void OnFillRegionComputed', start)
         generated = (ROOT / 'tools/pdn-oracle/Generated/FloodExtract.cs').read_text()

@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Nullable>disable</Nullable><LangVersion>latest</LangVersion>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PdnSource Condition="'$(PdnSource)' == ''">../../.pdn-src</PdnSource>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
@@ -10,36 +11,41 @@
     <Compile Include="Stubs/*.cs" />
     <Compile Include="Shims/*.cs" />
     <Compile Include="Generated/FloodExtract.cs" />
-    <Compile Include="../../.pdn-src/src/Core/ColorBgra.cs" />
-    <Compile Include="../../.pdn-src/src/Base/IDeferredSerializable.cs" />
-    <Compile Include="../../.pdn-src/src/Base/DeferredFormatter.cs" />
-    <Compile Include="../../.pdn-src/src/Core/Scanline.cs" />
-    <Compile Include="../../.pdn-src/src/Core/RgbColor.cs" />
-    <Compile Include="../../.pdn-src/src/Core/Surface.cs" />
-    <Compile Include="../../.pdn-src/src/Core/MemoryBlock.cs" />
-    <Compile Include="../../.pdn-src/src/Core/PixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/IPixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/UnaryPixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/BinaryPixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/UnaryPixelOps.cs" />
-    <Compile Include="../../.pdn-src/src/Core/BinaryPixelOps.cs" />
-    <Compile Include="../../.pdn-src/src/Core/HsvColor.cs" />
-    <Compile Include="../../.pdn-src/src/Core/Histogram.cs" />
-    <Compile Include="../../.pdn-src/src/Core/HistogramRGB.cs" />
-    <Compile Include="../../.pdn-src/src/Core/SplineInterpolator.cs" />
-    <Compile Include="../../.pdn-src/src/Core/ResamplingAlgorithm.cs" />
-    <Compile Include="../../.pdn-src/src/Data/UserBlendOps.cs" />
-    <Compile Include="../../.pdn-src/src/Data/UserBlendOp.cs" />
-    <Compile Include="../../.pdn-src/src/Data/UserBlendOps.Generated.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/BrightnessAndContrastAdjustment.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/PosterizeAdjustment.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/GaussianBlurEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/FragmentEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/LocalHistogramEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/MedianEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/MotionBlurEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/RadialBlurEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/ZoomBlurEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Core/ColorBgra.cs" />
+    <Compile Include="$(PdnSource)/src/Base/IDeferredSerializable.cs" />
+    <Compile Include="$(PdnSource)/src/Base/DeferredFormatter.cs" />
+    <Compile Include="$(PdnSource)/src/Core/Scanline.cs" />
+    <Compile Include="$(PdnSource)/src/Core/RgbColor.cs" />
+    <Compile Include="$(PdnSource)/src/Core/Surface.cs" />
+    <Compile Include="$(PdnSource)/src/Core/MemoryBlock.cs" />
+    <Compile Include="$(PdnSource)/src/Core/PixelOp.cs" />
+    <Compile Include="$(PdnSource)/src/Core/IPixelOp.cs" />
+    <Compile Include="$(PdnSource)/src/Core/UnaryPixelOp.cs" />
+    <Compile Include="$(PdnSource)/src/Core/BinaryPixelOp.cs" />
+    <Compile Include="$(PdnSource)/src/Core/UnaryPixelOps.cs" />
+    <Compile Include="$(PdnSource)/src/Core/BinaryPixelOps.cs" />
+    <Compile Include="$(PdnSource)/src/Core/HsvColor.cs" />
+    <Compile Include="$(PdnSource)/src/Core/Histogram.cs" />
+    <Compile Include="$(PdnSource)/src/Core/HistogramRGB.cs" />
+    <Compile Include="$(PdnSource)/src/Core/SplineInterpolator.cs" />
+    <Compile Include="$(PdnSource)/src/Core/ResamplingAlgorithm.cs" />
+    <Compile Include="$(PdnSource)/src/Data/UserBlendOps.cs" />
+    <Compile Include="$(PdnSource)/src/Data/UserBlendOp.cs" />
+    <Compile Include="$(PdnSource)/src/Data/UserBlendOps.Generated.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/BrightnessAndContrastAdjustment.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/PosterizeAdjustment.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/GaussianBlurEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/FragmentEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/LocalHistogramEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/MedianEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/MotionBlurEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/RadialBlurEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/ZoomBlurEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/ReduceNoiseEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/GlowEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/RedEyeRemoveEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/SharpenEffect.cs" />
+    <Compile Include="$(PdnSource)/src/Effects/SoftenPortraitEffect.cs" />
   </ItemGroup>
   <Target Name="ExtractLegacyFlood" BeforeTargets="CoreCompile">
     <Exec Command="python3 &quot;$(MSBuildProjectDirectory)/extract-flood.py&quot;" />

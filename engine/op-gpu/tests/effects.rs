@@ -1,4 +1,4 @@
-use op_gpu::GpuContext;
+use op_gpu::{GpuContext, NoiseParams};
 use op_ops::effect::{self, GpuKernel};
 
 struct NoSpill;
@@ -35,6 +35,13 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 "{} dispatch count",
                 spec.id
             );
+        } else if matches!(kernel, GpuKernel::Glow | GpuKernel::SoftenPortrait) {
+            assert_eq!(
+                gpu.dispatch_count() - before,
+                4,
+                "{} dispatch count",
+                spec.id
+            );
         } else {
             assert_eq!(
                 gpu.dispatch_count() - before,
@@ -51,6 +58,12 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom
+                | GpuKernel::Vignette
+                | GpuKernel::Sharpen
+                | GpuKernel::ReduceNoise
+                | GpuKernel::AddNoise
+                | GpuKernel::Glow
+                | GpuKernel::SoftenPortrait
         );
         let mut expected = bytes.clone();
         for pixel in expected.chunks_exact_mut(4) {
@@ -90,19 +103,54 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                     pixel[1] = gray;
                     pixel[2] = (255.0 * (f64::from(gray) / 255.0).powf(1.2)) as u8;
                 }
+                GpuKernel::RedEyeRemoval => {
+                    let hi = *pixel[..3].iter().max().unwrap();
+                    let lo = *pixel[..3].iter().min().unwrap();
+                    if hi > 0
+                        && u32::from(hi - lo) * 255 / u32::from(hi) > 100
+                        && i32::from(pixel[0]) - i32::from(pixel[1].max(pixel[2])) > 70
+                    {
+                        pixel[0] = ((299 * u32::from(pixel[0])
+                            + 587 * u32::from(pixel[1])
+                            + 114 * u32::from(pixel[2]))
+                            * 90
+                            / 100000) as u8;
+                    }
+                }
                 GpuKernel::Gaussian => break,
                 GpuKernel::Fragment
                 | GpuKernel::Median
                 | GpuKernel::Motion
                 | GpuKernel::Radial
-                | GpuKernel::Zoom => break,
+                | GpuKernel::Zoom
+                | GpuKernel::Vignette => break,
+                GpuKernel::Sharpen => break,
+                GpuKernel::ReduceNoise => break,
+                GpuKernel::AddNoise => break,
+                GpuKernel::Glow | GpuKernel::SoftenPortrait => break,
             }
         }
         if blur {
-            expected = op_ops::effect::reference_rgba8(spec.id, width, height, &bytes).unwrap();
+            expected = if kernel == GpuKernel::AddNoise {
+                op_ops::effects::add_noise::reference_rgba8(width, height, &bytes)
+            } else if kernel == GpuKernel::Glow {
+                op_ops::effects::glow::reference_rgba8(width, height, &bytes, 6, 10, 10)
+            } else if kernel == GpuKernel::SoftenPortrait {
+                op_ops::effects::soften_portrait::reference_rgba8(width, height, &bytes, 5, 0, 10)
+            } else {
+                op_ops::effect::reference_rgba8(spec.id, width, height, &bytes).unwrap()
+            };
         }
         if blur {
-            let tolerance = if matches!(kernel, GpuKernel::Gaussian | GpuKernel::Motion) {
+            let tolerance = if matches!(
+                kernel,
+                GpuKernel::Gaussian
+                    | GpuKernel::Motion
+                    | GpuKernel::Vignette
+                    | GpuKernel::ReduceNoise
+                    | GpuKernel::Glow
+                    | GpuKernel::SoftenPortrait
+            ) {
                 1
             } else {
                 0
@@ -121,6 +169,171 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
             );
         } else {
             assert_eq!(actual, expected, "{}", spec.id);
+        }
+    }
+}
+
+#[test]
+fn m41_gpu_photo_parameter_endpoints_match_cpu() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (3u32, 3u32);
+    let bytes = vec![
+        240, 30, 10, 117, 80, 60, 55, 0, 12, 90, 200, 255, 255, 26, 13, 0, 21, 40, 68, 128, 210,
+        50, 8, 255, 99, 22, 10, 34, 40, 150, 30, 200, 4, 5, 6, 0,
+    ];
+    let sample = |x: i32, y: i32| {
+        let i = (y as usize * width as usize + x as usize) * 4;
+        bytes[i..i + 4].try_into().unwrap()
+    };
+    let prep = op_ops::effect::Prepared {
+        width: width as i32,
+        height: height as i32,
+        ..Default::default()
+    };
+    for (kernel, id, values, params) in [
+        (
+            GpuKernel::RedEyeRemoval,
+            "effect.photo.red_eye_removal",
+            [0, 0, 0],
+            serde_json::json!({"tolerance":0,"saturation":0}),
+        ),
+        (
+            GpuKernel::RedEyeRemoval,
+            "effect.photo.red_eye_removal",
+            [100, 100, 0],
+            serde_json::json!({"tolerance":100,"saturation":100}),
+        ),
+        (
+            GpuKernel::Vignette,
+            "effect.photo.vignette",
+            [0, 0, 0],
+            serde_json::json!({"strength":0,"radius":0}),
+        ),
+        (
+            GpuKernel::Vignette,
+            "effect.photo.vignette",
+            [1000, -1000, (100 << 16) | 100],
+            serde_json::json!({"center_x":1.0,"center_y":-1.0,"radius":100,"strength":100}),
+        ),
+        (
+            GpuKernel::Sharpen,
+            "effect.photo.sharpen",
+            [1, 0, 0],
+            serde_json::json!({"amount":1}),
+        ),
+        (
+            GpuKernel::Sharpen,
+            "effect.photo.sharpen",
+            [20, 0, 0],
+            serde_json::json!({"amount":20}),
+        ),
+        (
+            GpuKernel::ReduceNoise,
+            "effect.noise.reduce",
+            [0, 0, 0],
+            serde_json::json!({"radius":0,"strength":0.0}),
+        ),
+        (
+            GpuKernel::ReduceNoise,
+            "effect.noise.reduce",
+            [200, 1000, 0],
+            serde_json::json!({"radius":200,"strength":1.0}),
+        ),
+    ] {
+        let spec = effect::find(id).unwrap();
+        let params = spec.schema.validate(params).unwrap();
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_kernel_with_params(kernel, width, height, &bytes, values)
+            .unwrap();
+        assert!(gpu.dispatch_count() > before);
+        for y in 0..height as i32 {
+            for x in 0..width as i32 {
+                let expected = (spec.render_cpu)(&sample, x, y, &prep, &params);
+                let i = (y as usize * width as usize + x as usize) * 4;
+                for channel in 0..4 {
+                    assert!(
+                        actual[i + channel].abs_diff(expected[channel]) <= 1,
+                        "{id} {x},{y} channel {channel}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn m41_gpu_seeded_noise_matches_cpu_for_endpoints_and_hidden_color() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (8u32, 8u32);
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| [i as u8 * 3, i as u8 * 2, 91, (i * 4) as u8])
+        .collect();
+    for (intensity, saturation, coverage, seed) in [
+        (0, 0, 0.0, 0),
+        (64, 100, 100.0, 0x51ed270b),
+        (100, 400, 100.0, 17),
+    ] {
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_add_noise(
+                width,
+                height,
+                &bytes,
+                NoiseParams {
+                    intensity,
+                    saturation,
+                    coverage,
+                    seed,
+                },
+            )
+            .unwrap();
+        assert!(gpu.dispatch_count() > before);
+        let deltas = op_ops::effects::add_noise::delta_map(
+            width, height, intensity, saturation, coverage, seed,
+        );
+        let mut expected = bytes.clone();
+        for (pixel, delta) in expected.chunks_exact_mut(4).zip(deltas) {
+            for channel in 0..3 {
+                pixel[channel] = (i32::from(pixel[channel]) + delta[channel]).clamp(0, 255) as u8;
+            }
+        }
+        assert_eq!(actual, expected);
+    }
+}
+
+#[test]
+fn m41_gpu_composed_photo_endpoints_match_cpu() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (3u32, 3u32);
+    let bytes = vec![
+        240, 30, 10, 117, 80, 60, 55, 0, 12, 90, 200, 255, 255, 26, 13, 0, 21, 40, 68, 128, 210,
+        50, 8, 255, 99, 22, 10, 34, 40, 150, 30, 200, 4, 5, 6, 0,
+    ];
+    for (radius, brightness, contrast) in [(1, -100, -100), (20, 100, 100)] {
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_photo_glow(width, height, &bytes, radius, brightness, contrast)
+            .unwrap();
+        assert!(gpu.dispatch_count() > before);
+        let expected = op_ops::effects::glow::reference_rgba8(
+            width, height, &bytes, radius, brightness, contrast,
+        );
+        for (a, b) in actual.iter().zip(expected) {
+            assert!(a.abs_diff(b) <= 1, "Glow {radius}: {a} vs {b}");
+        }
+    }
+    for (softness, lighting, warmth) in [(0, -20, 0), (10, 20, 20)] {
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_photo_soften(width, height, &bytes, softness, lighting, warmth)
+            .unwrap();
+        assert!(gpu.dispatch_count() > before);
+        let expected = op_ops::effects::soften_portrait::reference_rgba8(
+            width, height, &bytes, softness, lighting, warmth,
+        );
+        for (a, b) in actual.iter().zip(expected) {
+            assert!(a.abs_diff(b) <= 1, "Soften Portrait {softness}: {a} vs {b}");
         }
     }
 }

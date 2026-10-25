@@ -41,6 +41,14 @@ pub struct CompositeTimings {
     pub readback_ms: f64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct NoiseParams {
+    pub intensity: i32,
+    pub saturation: i32,
+    pub coverage: f64,
+    pub seed: i32,
+}
+
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -171,6 +179,25 @@ impl GpuContext {
         height: u32,
         bytes: &[u8],
     ) -> Result<Vec<u8>> {
+        if kernel == op_ops::effect::GpuKernel::AddNoise {
+            return self.effect_add_noise(
+                width,
+                height,
+                bytes,
+                NoiseParams {
+                    intensity: 64,
+                    saturation: 100,
+                    coverage: 100.0,
+                    seed: 0x51ed270b,
+                },
+            );
+        }
+        if kernel == op_ops::effect::GpuKernel::Glow {
+            return self.effect_photo_glow(width, height, bytes, 6, 10, 10);
+        }
+        if kernel == op_ops::effect::GpuKernel::SoftenPortrait {
+            return self.effect_photo_soften(width, height, bytes, 5, 0, 10);
+        }
         if kernel == op_ops::effect::GpuKernel::Gaussian {
             return self
                 .gaussian_timed(width, height, bytes, 2)
@@ -188,9 +215,152 @@ impl GpuContext {
         let values = match kernel {
             op_ops::effect::GpuKernel::Posterize => [16, 16, 16],
             op_ops::effect::GpuKernel::Sepia => [50, 0, 0],
+            op_ops::effect::GpuKernel::RedEyeRemoval => [70, 90, 0],
+            op_ops::effect::GpuKernel::Vignette => [0, 0, (50 << 16) | 50],
+            op_ops::effect::GpuKernel::Sharpen => [2, 0, 0],
+            op_ops::effect::GpuKernel::ReduceNoise => [10, 400, 0],
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
+    }
+
+    /// Applies OpenPDN's seeded noise offsets in an rgba8uint compute kernel.
+    pub fn effect_add_noise(
+        &mut self,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        params: NoiseParams,
+    ) -> Result<Vec<u8>> {
+        if !(0..=100).contains(&params.intensity)
+            || !(0..=400).contains(&params.saturation)
+            || !(0.0..=100.0).contains(&params.coverage)
+            || params.seed < 0
+        {
+            return Err(GpuError::InvalidImage);
+        }
+        let input = self.upload(width, height, bytes)?;
+        let output = self.texture(width, height);
+        let deltas = op_ops::effects::add_noise::delta_map(
+            width,
+            height,
+            params.intensity,
+            params.saturation,
+            params.coverage,
+            params.seed,
+        );
+        let mut values = Vec::with_capacity(deltas.len() * 4);
+        for delta in deltas {
+            values.extend([delta[0] as f32, delta[1] as f32, delta[2] as f32, 0.0]);
+        }
+        let table = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("seeded noise offsets"),
+                contents: bytemuck::cast_slice(&values),
+                usage: wgpu::BufferUsages::STORAGE,
+            });
+        let params = self.params(width, height, 0, 0, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("effect kernels"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(&module, "effect_add_noise");
+        let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
+        self.dispatch(&pipeline, &bind, width, height)?;
+        self.readback(&output, width, height)
+    }
+
+    fn photo_blend(
+        &mut self,
+        width: u32,
+        height: u32,
+        adjusted: &[u8],
+        original: &[u8],
+        soften: bool,
+        warmth: i32,
+    ) -> Result<Vec<u8>> {
+        let input = self.upload(width, height, adjusted)?;
+        Self::checked_len(width, height, original)?;
+        let output = self.texture(width, height);
+        let mut source = Vec::with_capacity(original.len());
+        for pixel in original.chunks_exact(4) {
+            source.extend(pixel.iter().map(|value| f32::from(*value)));
+        }
+        let table = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("photo source pixels"),
+                contents: bytemuck::cast_slice(&source),
+                usage: wgpu::BufferUsages::STORAGE,
+            });
+        let params = self.params(width, height, warmth as u32, 0, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("photo effect kernels"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(
+            &module,
+            if soften {
+                "effect_photo_soften_blend"
+            } else {
+                "effect_photo_glow_blend"
+            },
+        );
+        let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
+        self.dispatch(&pipeline, &bind, width, height)?;
+        self.readback(&output, width, height)
+    }
+    pub fn effect_photo_glow(
+        &mut self,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        radius: u32,
+        brightness: i32,
+        contrast: i32,
+    ) -> Result<Vec<u8>> {
+        if !(1..=20).contains(&radius)
+            || !(-100..=100).contains(&brightness)
+            || !(-100..=100).contains(&contrast)
+        {
+            return Err(GpuError::InvalidImage);
+        }
+        let blur = self.gaussian_timed(width, height, bytes, radius)?.0;
+        let adjusted = self.effect_kernel_with_params(
+            op_ops::effect::GpuKernel::BrightnessContrast,
+            width,
+            height,
+            &blur,
+            [brightness, contrast, 0],
+        )?;
+        self.photo_blend(width, height, &adjusted, bytes, false, 0)
+    }
+    pub fn effect_photo_soften(
+        &mut self,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        softness: u32,
+        lighting: i32,
+        warmth: i32,
+    ) -> Result<Vec<u8>> {
+        if softness > 10 || !(-20..=20).contains(&lighting) || !(0..=20).contains(&warmth) {
+            return Err(GpuError::InvalidImage);
+        }
+        let blur = self.gaussian_timed(width, height, bytes, softness * 3)?.0;
+        let adjusted = self.effect_kernel_with_params(
+            op_ops::effect::GpuKernel::BrightnessContrast,
+            width,
+            height,
+            &blur,
+            [lighting, -lighting / 2, 0],
+        )?;
+        self.photo_blend(width, height, &adjusted, bytes, true, warmth)
     }
 
     /// Runs a pointwise effect with its three validated integer parameters.
@@ -213,6 +383,19 @@ impl GpuContext {
                 values.iter().all(|value| (2..=64).contains(value))
             }
             op_ops::effect::GpuKernel::Sepia => (0..=100).contains(&values[0]),
+            op_ops::effect::GpuKernel::RedEyeRemoval => {
+                (0..=100).contains(&values[0]) && (0..=100).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::Vignette => {
+                (-1000..=1000).contains(&values[0])
+                    && (-1000..=1000).contains(&values[1])
+                    && (values[2] & 0xffff) <= 100
+                    && ((values[2] >> 16) & 0xffff) <= 100
+            }
+            op_ops::effect::GpuKernel::Sharpen => (1..=20).contains(&values[0]),
+            op_ops::effect::GpuKernel::ReduceNoise => {
+                (0..=200).contains(&values[0]) && (0..=1000).contains(&values[1])
+            }
             _ => true,
         };
         if !valid {
@@ -258,6 +441,14 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Motion => "effect_motion",
             op_ops::effect::GpuKernel::Radial => "effect_radial",
             op_ops::effect::GpuKernel::Zoom => "effect_zoom",
+            op_ops::effect::GpuKernel::RedEyeRemoval => "effect_red_eye_removal",
+            op_ops::effect::GpuKernel::Vignette => "effect_vignette",
+            op_ops::effect::GpuKernel::Sharpen => "effect_sharpen",
+            op_ops::effect::GpuKernel::ReduceNoise => "effect_reduce_noise",
+            op_ops::effect::GpuKernel::AddNoise => return Err(GpuError::InvalidImage),
+            op_ops::effect::GpuKernel::Glow | op_ops::effect::GpuKernel::SoftenPortrait => {
+                return Err(GpuError::InvalidImage);
+            }
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

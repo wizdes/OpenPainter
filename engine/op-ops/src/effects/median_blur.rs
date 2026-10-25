@@ -8,6 +8,7 @@ fn prepare(doc: &DocState, _: &SelectionState, p: &Value) -> Result<Prepared> {
         height: doc.height as i32,
         halo: p["radius"].as_i64().unwrap_or(10) as i32,
         gaussian: None,
+        noise: None,
         channel_lut: None,
     })
 }
@@ -57,7 +58,7 @@ fn render(sample: &PixelReader<'_>, x: i32, y: i32, prep: &Prepared, p: &Value) 
 pub fn spec() -> EffectSpec {
     EffectSpec {
         id: "effect.blur.median",
-        category: "Blurs",
+        category: "Noise",
         label_key: "effect.median_blur",
         schema: ParamSchema {
             fields: vec![
