@@ -113,15 +113,18 @@ public enum MenuSkeleton {
 
     static func effectsMenu(_ effects: [Engine.EffectInfo]) -> [Entry] {
         var out: [Entry] = [i("Repeat Effect", "f"), .separator]
-        // A registered effect's category is "Effects/<Submenu>" (or "Effects").
-        let registered = effects.filter { $0.category.hasPrefix("Effects") }
+        // Every category other than Adjustments and Edit names an Effects submenu
+        // ("Blurs"); an "Effects/<Submenu>" form is accepted too.
+        func submenu(_ e: Engine.EffectInfo) -> String {
+            e.category.hasPrefix("Effects/") ? String(e.category.dropFirst("Effects/".count)) : e.category
+        }
+        let registered = effects.filter { $0.category != "Adjustments" && $0.category != "Edit" }
         var names = paintNetEffects.map(\.0)
-        for e in registered {
-            let sub = e.category.split(separator: "/").dropFirst().first.map(String.init) ?? "Other"
-            if !names.contains(sub) { names.append(sub) }
+        for e in registered where !names.contains(submenu(e)) {
+            names.append(submenu(e))
         }
         for name in names {
-            let mine = registered.filter { ($0.category.split(separator: "/").dropFirst().first.map(String.init) ?? "Other") == name }
+            let mine = registered.filter { submenu($0) == name }
             var entries: [Entry] = mine.map { .item($0.label, "", [], .effect($0.id)) }
             let pdn = paintNetEffects.first { $0.0 == name }?.1 ?? []
             let missing = pdn.filter { l in !mine.contains { $0.label == l } }

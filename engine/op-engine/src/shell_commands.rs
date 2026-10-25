@@ -272,6 +272,16 @@ pub fn effect_label(e: &effect::EffectSpec) -> String {
         "effect.adjust.auto_level" => "Auto-Level",
         "effect.adjust.black_and_white" => "Black and White",
         "effect.adjust.brightness_contrast" => "Brightness / Contrast",
+        "effect.adjust.curves" => "Curves",
+        "effect.adjust.exposure" => "Exposure",
+        "effect.adjust.highlights_shadows" => "Highlights / Shadows",
+        "effect.adjust.levels" => "Levels",
+        "effect.blur.fragment" => "Fragment Blur",
+        "effect.blur.gaussian" => "Gaussian Blur",
+        "effect.blur.median" => "Median Blur",
+        "effect.blur.motion" => "Motion Blur",
+        "effect.blur.radial" => "Radial Blur",
+        "effect.blur.zoom" => "Zoom Blur",
         "effect.adjust.hue_saturation" => "Hue / Saturation",
         "effect.adjust.invert_alpha" => "Invert Alpha",
         "effect.adjust.invert_colors" => "Invert Colors",
@@ -311,6 +321,9 @@ fn schema_json(schema: &ParamSchema) -> Value {
                     ParamKind::Bool => json!("bool"),
                     ParamKind::String => json!("string"),
                     ParamKind::Choice(c) => json!({"choice": c}),
+                    ParamKind::Curve => json!("curve"),
+                    ParamKind::RgbBytes => json!("rgb_bytes"),
+                    ParamKind::RgbGamma => json!("rgb_gamma"),
                 };
                 json!({"key":f.key,"kind":kind,"min":f.min,"max":f.max,"default":f.default})
             })

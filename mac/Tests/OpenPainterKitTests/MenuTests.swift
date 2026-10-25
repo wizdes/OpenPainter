@@ -52,21 +52,31 @@ final class MenuTests: XCTestCase {
         // Every registered effect appears exactly once across the menu bar.
         let all = effectItems(menu).compactMap { $0.representedObject as? String }
         XCTAssertEqual(all.sorted(), registry.map(\.id).sorted())
+        // No submenu lists the same name twice (a registered effect and its disabled placeholder).
+        func checkUnique(_ m: NSMenu) {
+            let titles = m.items.filter { !$0.isSeparatorItem }.map(\.title)
+            XCTAssertEqual(titles.count, Set(titles).count, "duplicate items in \(m.title)")
+            m.items.compactMap(\.submenu).forEach(checkUnique)
+        }
+        checkUnique(menu)
         // paint.net adjustments the engine does not have yet are present and disabled.
-        for title in ["Curves", "Levels", "Exposure", "Highlights / Shadows"] {
+        let missing = MenuSkeleton.paintNetAdjustments.map(\.0).filter { t in !registeredAdjustments.contains { $0.label == t } }
+        for title in missing {
             let item = try XCTUnwrap(adjustments.item(withTitle: title), title)
             XCTAssertNil(item.action, "\(title) is disabled")
         }
         XCTAssertEqual(adjustments.item(withTitle: "Invert Colors")?.keyEquivalent, "i")
         XCTAssertEqual(adjustments.item(withTitle: "Invert Colors")?.keyEquivalentModifierMask, [.command, .shift])
         // A registry with an added effect gets a menu item for it, in its submenu.
-        let extra = registry + [Engine.EffectInfo(id: "effect.blur.gaussian", label: "Gaussian Blur", category: "Effects/Blurs")]
+        // (Square Blur stands in for an effect the engine does not have yet.)
+        XCTAssertFalse(registry.contains { $0.label == "Square Blur" })
+        let extra = registry + [Engine.EffectInfo(id: "effect.blur.square", label: "Square Blur", category: "Blurs")]
         let blurs = MenuSkeleton.build(effects: extra, panelTarget: nil).item(withTitle: "Effects")?.submenu?
             .item(withTitle: "Blurs")?.submenu
-        let gaussian = try XCTUnwrap(blurs?.items.first)
-        XCTAssertEqual(gaussian.title, "Gaussian Blur")
-        XCTAssertEqual(gaussian.representedObject as? String, "effect.blur.gaussian")
-        XCTAssertEqual(blurs?.items.filter { $0.title == "Gaussian Blur" }.count, 1, "no disabled twin")
+        let square = try XCTUnwrap(blurs?.item(withTitle: "Square Blur"))
+        XCTAssertEqual(square.representedObject as? String, "effect.blur.square")
+        XCTAssertEqual(square.action, #selector(EditorMenuActions.runEffect(_:)))
+        XCTAssertEqual(blurs?.items.filter { $0.title == "Square Blur" }.count, 1, "no disabled twin")
     }
 
     func testEveryAdjustmentRunsWithDefaultsFromItsMenuItem() throws {

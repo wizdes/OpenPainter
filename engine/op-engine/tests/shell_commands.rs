@@ -170,3 +170,25 @@ fn commands_list_reports_enabled_state() {
             .any(|c| c["id"].as_str().unwrap().starts_with("test."))
     );
 }
+
+#[test]
+fn effects_list_names_curve_and_level_parameter_kinds() {
+    let e = Engine::new(None).unwrap();
+    let list = query(&e, 0, "effects.list");
+    let kinds = |id: &str| -> Vec<Value> {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["id"] == json!(id))
+            .unwrap_or_else(|| panic!("{id} missing"))["schema"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["kind"].clone())
+            .collect()
+    };
+    assert!(kinds("effect.adjust.curves").contains(&json!("curve")));
+    let levels = kinds("effect.adjust.levels");
+    assert!(levels.contains(&json!("rgb_bytes")));
+    assert!(levels.contains(&json!("rgb_gamma")));
+}

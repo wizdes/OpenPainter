@@ -103,17 +103,16 @@ Adjustments
 Adjustments > Auto-Level [⇧⌘L]
 Adjustments > Black and White [⇧⌘G]
 Adjustments > Brightness / Contrast
+Adjustments > Curves [⇧⌘M]
+Adjustments > Exposure
+Adjustments > Highlights / Shadows
 Adjustments > Hue / Saturation [⇧⌘U]
 Adjustments > Invert Alpha
 Adjustments > Invert Colors [⇧⌘I]
+Adjustments > Levels [⌘L]
 Adjustments > Posterize [⇧⌘P]
 Adjustments > Sepia [⇧⌘E]
 Adjustments > Temperature and Tint
-Adjustments > ---
-Adjustments > Curves [⇧⌘M] (off)
-Adjustments > Exposure (off)
-Adjustments > Highlights / Shadows (off)
-Adjustments > Levels [⌘L] (off)
 Effects
 Effects > Repeat Effect [⌘F] (off)
 Effects > ---
@@ -122,17 +121,18 @@ Effects > Artistic > Ink Sketch (off)
 Effects > Artistic > Oil Painting (off)
 Effects > Artistic > Pencil Sketch (off)
 Effects > Blurs
+Effects > Blurs > Fragment Blur
+Effects > Blurs > Gaussian Blur
+Effects > Blurs > Median Blur
+Effects > Blurs > Motion Blur
+Effects > Blurs > Radial Blur
+Effects > Blurs > Zoom Blur
+Effects > Blurs > ---
 Effects > Blurs > Bokeh Blur (off)
-Effects > Blurs > Fragment Blur (off)
-Effects > Blurs > Gaussian Blur (off)
-Effects > Blurs > Median Blur (off)
-Effects > Blurs > Motion Blur (off)
-Effects > Blurs > Radial Blur (off)
 Effects > Blurs > Sketch Blur (off)
 Effects > Blurs > Square Blur (off)
 Effects > Blurs > Surface Blur (off)
 Effects > Blurs > Unfocus (off)
-Effects > Blurs > Zoom Blur (off)
 Effects > Color
 Effects > Color > Quantize (off)
 Effects > Distort
