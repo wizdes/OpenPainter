@@ -10,6 +10,51 @@ pub use io::{
     encode,
 };
 
+/// Where a save really writes, and the permissions it keeps.
+pub struct SaveTarget {
+    /// `path` with symlinks followed: a save through a symlink replaces the
+    /// file it points to and leaves the link (release review item 10).
+    pub path: std::path::PathBuf,
+    /// The replaced file's permissions, given to the new file before it is
+    /// renamed into place. None for a new file.
+    pub permissions: Option<std::fs::Permissions>,
+}
+
+/// The file a save of `path` replaces (see `SaveTarget`). A link to a file
+/// that does not exist yet saves to the place the link names.
+pub fn save_target(path: &std::path::Path) -> std::io::Result<SaveTarget> {
+    let mut target = path.to_path_buf();
+    // At most 40 links, as the system allows.
+    for _ in 0..40 {
+        match std::fs::symlink_metadata(&target) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let link = std::fs::read_link(&target)?;
+                target = match target.parent() {
+                    Some(parent) if link.is_relative() => parent.join(link),
+                    _ => link,
+                };
+            }
+            Ok(meta) => {
+                return Ok(SaveTarget {
+                    path: target,
+                    permissions: Some(meta.permissions()),
+                });
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(SaveTarget {
+                    path: target,
+                    permissions: None,
+                });
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(std::io::Error::other(format!(
+        "too many symbolic links at {}",
+        path.display()
+    )))
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("invalid image: {0}")]

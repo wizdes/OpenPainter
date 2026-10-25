@@ -91,8 +91,8 @@ Window (StandardWindow) "plasma_alpha_512x384.png"
 ## Actions
 
 - Tools panel: press "Magic Wand". The tool is now Magic Wand. Canvas value: 512 by 384 pixels, zoom 100%, tool Magic Wand
-- Layers panel: press "Add New Layer". Layers: Background, Layer 2; active: Background.
-- Layers panel: press the row "Layer 2" (value visible). Active layer: Layer 2.
+- Layers panel: press "Add New Layer". Layers: Background, Layer 2; active: Layer 2.
+- Layers panel: press the row "Background" (value visible). Active layer: Background.
 - History panel: press "Open". Rows now: Open = current; Add New Layer = undone.
 - Colors panel: press "Primary and secondary colors". The active slot is now secondary.
 - Colors panel: press "Palette color 1, #000000". Primary #CF684D, secondary #000000.

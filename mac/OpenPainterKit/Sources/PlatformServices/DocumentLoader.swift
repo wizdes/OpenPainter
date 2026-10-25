@@ -50,6 +50,8 @@ public enum DocumentLoader {
         case .native:
             do { doc = try engine.openOpaint(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
             type = ImageFormats.opaintIdentifier
+            // Release review item 5: the metadata the file kept.
+            metadata = keptMetadata(doc)
         case .imageIO:
             let image = try ImageIOImporter.decode(url: url)
             do {
@@ -63,6 +65,14 @@ public enum DocumentLoader {
             notes = image.notes
             type = image.sourceType
         }
+        if type != ImageFormats.opaintIdentifier, !metadata.isEmpty {
+            // Release review item 5: .opaint saves and recovery records keep it.
+            do {
+                try doc.setImageMetadata(try metadata.archived())
+            } catch {
+                notes.append("The image's metadata cannot be kept in OpenPainter files (\(error)).")
+            }
+        }
         let info = try doc.info()
         let w = (info["width"] as? NSNumber)?.doubleValue ?? 0
         let h = (info["height"] as? NSNumber)?.doubleValue ?? 0
@@ -72,6 +82,22 @@ public enum DocumentLoader {
         }
         return LoadedImage(document: doc, pixelSize: CGSize(width: w, height: h), metadata: metadata, notes: notes,
                            sourceType: type)
+    }
+
+    /// The metadata an engine document keeps (from an .opaint file or a
+    /// recovery record); empty when it has none.
+    public static func keptMetadata(_ doc: Document) -> ImageMetadata {
+        do {
+            guard let text = try doc.imageMetadata() else { return ImageMetadata() }
+            guard let m = ImageMetadata(archived: text) else {
+                FileHandle.standardError.write(Data("OpenPainter: the kept image metadata cannot be read; it is left out\n".utf8))
+                return ImageMetadata()
+            }
+            return m
+        } catch {
+            FileHandle.standardError.write(Data("OpenPainter: cannot read the kept image metadata: \(error)\n".utf8))
+            return ImageMetadata()
+        }
     }
 
     /// Encodes the flattened image as HEIC or AVIF with the document profile

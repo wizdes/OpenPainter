@@ -115,10 +115,11 @@ fn layer_and_image_sampling_differ() {
         .unwrap();
     let bottom = sample(&e, id, json!({"x":40,"y":40,"size":1,"sampling":"layer"}));
     assert_eq!(bottom["color"], hex([40, 40, 7, 255]));
-    // Sampling an empty layer gives transparent.
+    // Sampling an empty layer gives transparent. Added from layer 0, it lands
+    // just above it, at index 1 (item 13, paint.net placement).
     e.dispatch(id, "layer.add", json!({"name":"Empty"}))
         .unwrap();
-    e.dispatch(id, "layer.set_active", json!({"index":2}))
+    e.dispatch(id, "layer.set_active", json!({"index":1}))
         .unwrap();
     let empty = sample(&e, id, json!({"x":40,"y":40,"size":5,"sampling":"layer"}));
     assert_eq!(empty["color"], json!("00000000"));

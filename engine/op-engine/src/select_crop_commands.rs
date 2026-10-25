@@ -92,7 +92,9 @@ pub(super) fn history_label(id: &str) -> Option<&'static str> {
 /// For an amend of the current Rectangle Select (or, M29, Ellipse Select)
 /// step: the state to combine against (the current state with the selection
 /// from before that step). When the current step is not a step of the same
-/// command, `amend` becomes false and the command adds a new step.
+/// command, `amend` becomes false and the command adds a new step. Release
+/// review item 12b: so does an amend of the saved step (right after a save),
+/// so the image becomes edited instead of changing the saved step in place.
 pub(super) fn amend_base(id: &str, mut params: Value, h: &History) -> (Option<DocState>, Value) {
     let amendable = id == "selection.rectangle" || id == "selection.ellipse";
     if !amendable || params["amend"].as_bool() != Some(true) {
@@ -100,6 +102,7 @@ pub(super) fn amend_base(id: &str, mut params: Value, h: &History) -> (Option<Do
     }
     let i = h.current_index();
     if i > 0
+        && h.is_dirty()
         && h.command_id(i) == Some(id)
         && let Some(before) = h.state(i - 1)
     {

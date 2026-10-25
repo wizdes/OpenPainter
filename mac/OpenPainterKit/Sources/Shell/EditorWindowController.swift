@@ -78,6 +78,17 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// Release review item 1: finishes the open text, move or paste, and
+    /// Magic Wand or Paint Bucket, each as its own history step (empty text
+    /// is dropped). Save, Close, Quit and Revert call it through the document.
+    /// An empty text box and a move that has not moved stay open, as in the
+    /// engine (they change nothing).
+    public func finishToolSessions() {
+        if textTool.isEditing, !textTool.model.text.isEmpty { textTool.finish() }
+        if moveTool.hasChanges { moveTool.finish() }
+        flood.finish()
+    }
+
     /// Shows the window, the panels, and fits the image into the clear area.
     public func present() {
         guard let window else { return }

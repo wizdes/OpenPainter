@@ -189,9 +189,14 @@ fn always(_: &DocState) -> bool {
 fn can_delete(s: &DocState) -> bool {
     s.layers.len() > 1
 }
+/// Add New Layer: just above the active layer, and it becomes the active one
+/// (paint.net; release review item 13), as Import from File does.
 fn add(_: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    let index = s.active_layer + 1;
     Ok(Outcome::State(
-        s.add_layer(s.layers.len(), p["name"].as_str().unwrap())
+        s.add_layer(index, p["name"].as_str().unwrap())
+            .map_err(internal)?
+            .set_active_layer(index)
             .map_err(internal)?,
     ))
 }
@@ -826,6 +831,12 @@ pub struct Published {
     /// Changes whenever a different preview is shown; 0 with no preview. Views
     /// redraw when `(revision, preview_serial)` changes.
     pub preview_serial: u64,
+    /// Release review item 1: a tool session that changes the image is open
+    /// (text, paste or move, line/curve, shape, gradient, a live Magic Wand
+    /// or Paint Bucket). It adds no history step until Finish, so the
+    /// document counts as edited (`history.dirty`) while it is open, and the
+    /// recovery writer records `preview` (what the screen shows).
+    pub session: bool,
 }
 impl Published {
     pub fn info(&self) -> Value {
@@ -835,7 +846,15 @@ impl Published {
                 .unwrap_or_else(|e| format!("Invalid ICC profile: {e}")),
             None => "sRGB".into(),
         };
-        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible,"opacity":l.opacity,"blend":blend_name(l.blend),"revision":content_key(l)})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_commands":self.history.commands,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision,"profile_description":profile_description,"profile_embedded":self.state.profile.is_some()})
+        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible,"opacity":l.opacity,"blend":blend_name(l.blend),"revision":content_key(l)})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_commands":self.history.commands,"history_index":self.history.index,"dirty":self.history.dirty,"session_open":self.session,"revision":self.revision,"profile_description":profile_description,"profile_embedded":self.state.profile.is_some()})
+    }
+    /// The state the screen shows: an open edit session's preview, else the
+    /// current history step (release review item 1).
+    pub fn shown_state(&self) -> &DocState {
+        match (&self.preview, self.session) {
+            (Some(p), true) => p,
+            _ => &self.state,
+        }
     }
     pub fn pixels(&self, preview: bool) -> Result<Vec<u8>> {
         let state = if preview {
@@ -845,6 +864,24 @@ impl Published {
         };
         flatten(state)
     }
+}
+/// Release review item 11: a selection outline with a point that is not a
+/// finite number (from huge sizes or a transform) would make a file that
+/// cannot be opened again, so no step may hold one.
+pub(crate) fn check_selection(state: &DocState) -> Result<()> {
+    use op_core::doc::{SelectionSource, SelectionState};
+    if let SelectionState::Active(SelectionSource::Geometry(poly)) = &state.selection
+        && poly
+            .0
+            .iter()
+            .flatten()
+            .any(|(x, y)| !x.is_finite() || !y.is_finite())
+    {
+        return Err(bad(
+            "the selection outline would have a point that is not a finite number",
+        ));
+    }
+    Ok(())
 }
 /// The flattened composite of `state` as straight RGBA8, row by row.
 pub(crate) fn flatten(state: &DocState) -> Result<Vec<u8>> {
@@ -1024,8 +1061,64 @@ struct Actor {
     gpu: Arc<gpu_effects::GpuShared>,
 }
 impl Actor {
+    /// Release review item 1: an open tool session whose Finish would change
+    /// the image or the selection. An empty text box and a move that has not
+    /// moved yet do not count.
+    fn edit_session_open(&self) -> bool {
+        self.text_session
+            .as_ref()
+            .is_some_and(|(_, s)| !s.runs().is_empty())
+            || self
+                .move_session
+                .as_ref()
+                .is_some_and(|(_, s)| s.has_changes())
+            || self.line_session.is_some()
+            || self.shape_session.is_some()
+            || self.gradient_session.is_some()
+            || self
+                .preview
+                .as_ref()
+                .is_some_and(|p| flood_commands::is_flood(p.command))
+    }
+    /// Release review item 1: finishes every open session that counts as an
+    /// edit, each as its own history step, so a save writes what the screen
+    /// shows. Empty sessions stay open.
+    fn finish_edit_sessions(&mut self) -> Result<()> {
+        if self
+            .preview
+            .as_ref()
+            .is_some_and(|p| flood_commands::is_flood(p.command))
+        {
+            self.commit(&JobTicket::new(0))?;
+        }
+        if self
+            .text_session
+            .as_ref()
+            .is_some_and(|(_, s)| !s.runs().is_empty())
+        {
+            self.text_finish()?;
+        }
+        if self.line_session.is_some() {
+            self.line_finish()?;
+        }
+        if self.shape_session.is_some() {
+            self.shape_finish()?;
+        }
+        if self.gradient_session.is_some() {
+            self.gradient_finish()?;
+        }
+        if self
+            .move_session
+            .as_ref()
+            .is_some_and(|(_, s)| s.has_changes())
+        {
+            self.move_finish()?;
+        }
+        Ok(())
+    }
     fn view(&self, preview: Option<DocState>) -> Published {
         let h = &self.history;
+        let session = self.edit_session_open();
         Published {
             state: h.current_state().clone(),
             history: HistorySummary {
@@ -1036,8 +1129,9 @@ impl Actor {
                     .map(|i| h.command_id(i).unwrap().to_owned())
                     .collect(),
                 index: h.current_index(),
-                dirty: h.is_dirty(),
+                dirty: h.is_dirty() || session,
             },
+            session,
             revision: self.revision,
             preview_serial: if preview.is_some() {
                 self.preview_serial.fetch_add(1, Ordering::Relaxed) + 1
@@ -1048,7 +1142,15 @@ impl Actor {
         }
     }
     fn publish(&self, preview: Option<DocState>) {
-        self.published.store(Arc::new(self.view(preview)));
+        let view = self.view(preview);
+        let was = self.published.load().session;
+        let now = view.session;
+        self.published.store(Arc::new(view));
+        // An edit session opened or closed without a new step: the app's
+        // edited mark follows (release review item 1).
+        if was != now {
+            self.event(EventKind::HistoryChanged, 0, json!({"session":now}));
+        }
     }
     fn event(&self, kind: EventKind, ticket: u64, json: Value) {
         let _ = self.events.send(Event {
@@ -1205,6 +1307,9 @@ impl Actor {
         // A cancel that lands after the last check still wins: nothing commits.
         self.ctx(ticket).check()?;
         let selection = self.history.current_state().selection.clone();
+        if let Outcome::State(state) | Outcome::Replace(state) = &outcome {
+            check_selection(state)?;
+        }
         let changed = match outcome {
             Outcome::State(state) => {
                 let label = match id {
@@ -1391,24 +1496,10 @@ impl Actor {
                 if self.read_only.load(Ordering::Acquire) {
                     return Err(Error::ReadOnly);
                 }
-                let (_, session) = self
-                    .gradient_session
-                    .take()
-                    .ok_or_else(|| bad("no gradient session"))?;
-                if session.base_revision != self.history.current_state().revision
-                    || session.target_layer != self.active_id()
-                {
-                    self.publish(None);
-                    return Err(Error::Busy);
+                if self.gradient_session.is_none() {
+                    return Err(bad("no gradient session"));
                 }
-                let state = session.finish().map_err(bad)?;
-                self.history
-                    .commit("Gradient", "tool.gradient.finish", state);
-                self.revision += 1;
-                self.publish(None);
-                self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
-                self.event(EventKind::HistoryChanged, 0, json!({}));
-                Ok(())
+                self.gradient_finish()
             }
             "tool.gradient.cancel" => {
                 if self.gradient_session.take().is_none() {
@@ -1419,6 +1510,25 @@ impl Actor {
             }
             _ => Err(bad("unknown gradient command")),
         }
+    }
+    fn gradient_finish(&mut self) -> Result<()> {
+        let Some((_, session)) = self.gradient_session.take() else {
+            return Ok(());
+        };
+        if session.base_revision != self.history.current_state().revision
+            || session.target_layer != self.active_id()
+        {
+            self.publish(None);
+            return Err(Error::Busy);
+        }
+        let state = session.finish().map_err(bad)?;
+        self.history
+            .commit("Gradient", "tool.gradient.finish", state);
+        self.revision += 1;
+        self.publish(None);
+        self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+        self.event(EventKind::HistoryChanged, 0, json!({}));
+        Ok(())
     }
     fn shape_finish(&mut self) -> Result<()> {
         let Some((_, session)) = self.shape_session.take() else {
@@ -1809,8 +1919,15 @@ impl Actor {
             .move_session
             .as_mut()
             .ok_or_else(|| bad("no move session"))?;
+        let before = session.options();
         session.update(options).map_err(bad)?;
         let state = session.preview().map_err(bad)?;
+        // Release review item 11: a transform that would put the selection
+        // outline at a point that is not finite is refused; the move stays.
+        if let Err(e) = check_selection(&state) {
+            session.update(before).map_err(bad)?;
+            return Err(e);
+        }
         self.publish(Some(state));
         Ok(())
     }
@@ -1827,6 +1944,10 @@ impl Actor {
         let kind = session.kind;
         let paste = session.label().map(str::to_owned);
         let state = session.finish().map_err(bad)?;
+        if let Err(e) = check_selection(&state) {
+            self.publish(None);
+            return Err(e);
+        }
         let label = match kind {
             MoveKind::Pixels => "Move Selected Pixels",
             MoveKind::Selection => "Move Selection",
@@ -2307,6 +2428,7 @@ impl Engine {
             revision: 0,
             preview: None,
             preview_serial: 0,
+            session: false,
         }));
         let read_only = Arc::new(AtomicBool::new(false));
         let (tx, rx) = unbounded();
@@ -2617,6 +2739,11 @@ impl Engine {
                 serde_json::to_vec(&profile_query::profile_info(&s.state)).map_err(internal)
             }
             "doc.profile_icc" => Ok(profile_query::profile_icc(&s.state)),
+            // Release review item 5: the app's kept image metadata, or null.
+            "doc.image_metadata" => serde_json::to_vec(&json!({
+                "text": s.state.metadata.get(op_formats::opaint::IMAGE_METADATA_KEY)
+            }))
+            .map_err(internal),
             "clipboard.copy" => clipboard_commands::copy_pixels(
                 &s.state,
                 params.get("merged").and_then(Value::as_bool) == Some(true),

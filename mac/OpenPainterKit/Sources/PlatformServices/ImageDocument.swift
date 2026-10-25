@@ -116,11 +116,20 @@ open class ImageDocument: NSDocument, EditorHost {
 
     /// Edit > Paste into New Image (M34): an untitled image made from an engine
     /// document that already holds the pasted pixels; it saves as .opaint.
+    /// Release review item 4: it starts edited (no file holds it yet) and
+    /// with recovery on, like any new image.
     public func startPasted(_ doc: Document, size: CGSize, notes: [String] = []) {
         engineDocument = doc
         pixelSize = size
         importNotes = notes
         fileType = ImageFormats.opaintIdentifier
+        do {
+            try doc.markUnsaved()
+        } catch {
+            importNotes.append("The image could not be marked as unsaved (\(error)).")
+        }
+        updateChangeCount(.changeDone)
+        startRecovery(originalURL: nil)
     }
 
     /// Open, and Revert (a second read): Revert gives the open engine document
@@ -152,6 +161,9 @@ open class ImageDocument: NSDocument, EditorHost {
     /// Revert to Saved: reads the file into the open engine document, then
     /// refreshes the window, panels and marks at once.
     override open func revert(toContentsOf url: URL, ofType typeName: String) throws {
+        // Release review item 1: open tools end first, so none is left
+        // pointing at a session the reverted image no longer has.
+        MainActor.assumeIsolated { finishOpenSessions() }
         try super.revert(toContentsOf: url, ofType: typeName)
         MainActor.assumeIsolated {
             if let editor { editor.name = displayName }
@@ -161,7 +173,9 @@ open class ImageDocument: NSDocument, EditorHost {
 
     // MARK: Unsaved state
 
-    /// The engine's saved-revision marker.
+    /// The engine's saved-revision marker. Release review item 1: the
+    /// engine also reports dirty while a tool session that changes the image
+    /// is open (text, paste or move, a live Magic Wand or Paint Bucket).
     /// A closed document (no engine document) has nothing left to save.
     override open var isDocumentEdited: Bool {
         guard let doc = engineDocument else { return false }
@@ -175,6 +189,22 @@ open class ImageDocument: NSDocument, EditorHost {
         editor?.refresh()
         updateChangeCount(isDocumentEdited ? .changeDone : .changeCleared)
         for wc in windowControllers { wc.window?.isDocumentEdited = isDocumentEdited }
+    }
+
+    /// Release review item 1: finishes every open tool session (each as its
+    /// own history step) so a save writes what the screen shows. The tools
+    /// end first; then the engine finishes any session they do not own
+    /// (line, shape, gradient) and waits for the commands they sent.
+    @MainActor
+    public func finishOpenSessions() {
+        editor?.windowController?.finishToolSessions()
+        guard let doc = engineDocument else { return }
+        do {
+            try doc.finishSessions()
+        } catch {
+            editor?.report("The open tool could not be finished: \(error).")
+        }
+        syncEditedState()
     }
 
     // MARK: Save, Save As, Save a Copy
@@ -262,6 +292,9 @@ open class ImageDocument: NSDocument, EditorHost {
             }
             completionHandler(error)
         }
+        // Release review item 1: Save, Save As, Save a Copy and the Save of
+        // Close and Quit write what the screen shows.
+        MainActor.assumeIsolated { finishOpenSessions() }
         let type = ImageFormats.saveTypes().contains(typeName)
             ? typeName : (ImageFormats.saveType(forExtension: url.pathExtension) ?? typeName)
         let fromUI = saveFromUI
@@ -486,9 +519,15 @@ open class ImageDocument: NSDocument, EditorHost {
         let info = (try? opened.info()) ?? [:]
         pixelSize = CGSize(width: (info["width"] as? NSNumber)?.doubleValue ?? Double(record.width ?? 0),
                            height: (info["height"] as? NSNumber)?.doubleValue ?? Double(record.height ?? 0))
+        // Release review item 5: the metadata the record kept.
+        metadata = DocumentLoader.keptMetadata(opened)
         if !untitled, let url = record.originalURL, url.isFileURL {
             fileURL = url
-            fileType = ImageFormats.saveType(forExtension: url.pathExtension) ?? ImageFormats.opaintIdentifier
+            // Release review item 2: a file OpenPainter cannot write (Camera
+            // RAW, HEIF, PSD, ...) keeps its own type, as when it is opened,
+            // so Save becomes Save As and the original is never written.
+            fileType = ImageFormats.saveType(forExtension: url.pathExtension)
+                ?? UTType(filenameExtension: url.pathExtension)?.identifier ?? "public.data"
         } else {
             fileType = ImageFormats.opaintIdentifier
         }
@@ -547,7 +586,8 @@ open class ImageDocument: NSDocument, EditorHost {
             save(to: url, ofType: type, for: .saveOperation) { [weak self] error in
                 MainActor.assumeIsolated {
                     if let error, !Self.isUserCancelled(error) { self?.showError(error) }
-                    done(error == nil)
+                    guard error == nil, let self else { return done(false) }
+                    self.closeAfterSave(done)
                 }
             }
         } else {
@@ -561,7 +601,22 @@ open class ImageDocument: NSDocument, EditorHost {
         MainActor.assumeIsolated {
             let done = pendingSaveDone
             pendingSaveDone = nil
-            done?(didSave)
+            guard let done else { return }
+            guard didSave else { return done(false) }
+            closeAfterSave(done)
+        }
+    }
+
+    /// Release review item 9: after Close's save, an edit that landed after
+    /// the save read the image (so the file holds an older step) keeps the
+    /// image edited, and Close asks again instead of dropping it.
+    @MainActor
+    private func closeAfterSave(_ done: @escaping @MainActor (Bool) -> Void) {
+        if isDocumentEdited {
+            editor?.report("The image changed while it was being saved.")
+            reviewUnsaved(done)
+        } else {
+            done(true)
         }
     }
 

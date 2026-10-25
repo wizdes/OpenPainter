@@ -23,6 +23,24 @@ pub enum DocError {
     Dimensions,
     #[error("tile storage failed: {0}")]
     Tile(#[from] TileError),
+    #[error("an image can have at most {MAX_LAYERS} layers")]
+    TooManyLayers,
+}
+
+/// The most layers an image can have. The `.opaint` reader refuses files with
+/// more, so the engine never makes such an image (release review item 12a).
+pub const MAX_LAYERS: usize = 1000;
+/// The most characters in a layer name. Longer names are cut to this length
+/// when a layer is made, renamed, duplicated or loaded, so a name can never
+/// make a file's `stack.xml` too large to read (release review item 3).
+pub const MAX_LAYER_NAME_CHARS: usize = 1024;
+
+/// `name` cut to `MAX_LAYER_NAME_CHARS` characters.
+pub fn cap_layer_name(name: String) -> String {
+    match name.char_indices().nth(MAX_LAYER_NAME_CHARS) {
+        Some((end, _)) => name[..end].to_owned(),
+        None => name,
+    }
 }
 pub type Result<T> = std::result::Result<T, DocError>;
 
@@ -343,6 +361,9 @@ impl DocState {
         if index > self.layers.len() {
             return Err(DocError::LayerIndex);
         }
+        if self.layers.len() >= MAX_LAYERS {
+            return Err(DocError::TooManyLayers);
+        }
         let mut next = self.advanced();
         let id = LayerId(
             self.next_layer_id
@@ -351,7 +372,11 @@ impl DocState {
         );
         next.layers.insert(
             index,
-            Arc::new(LayerState::blank(id, name.into(), self.store.clone())),
+            Arc::new(LayerState::blank(
+                id,
+                cap_layer_name(name.into()),
+                self.store.clone(),
+            )),
         );
         if index <= next.active_layer {
             next.active_layer += 1;
@@ -384,6 +409,9 @@ impl DocState {
     }
     pub fn duplicate_layer(&self, index: usize) -> Result<Self> {
         let mut layer = (**self.layer(index)?).clone();
+        if self.layers.len() >= MAX_LAYERS {
+            return Err(DocError::TooManyLayers);
+        }
         let mut next = self.advanced();
         layer.id = LayerId(
             self.next_layer_id
@@ -391,12 +419,13 @@ impl DocState {
                 .map_err(|_| TileError::Overflow)?,
         );
         layer.name.push_str(" copy");
+        layer.name = cap_layer_name(std::mem::take(&mut layer.name));
         next.layers.insert(index + 1, Arc::new(layer));
         Ok(next)
     }
     pub fn set_layer_name(&self, index: usize, name: impl Into<String>) -> Result<Self> {
         self.update_layer(index, |l| {
-            l.name = name.into();
+            l.name = cap_layer_name(name.into());
             Ok(())
         })
     }

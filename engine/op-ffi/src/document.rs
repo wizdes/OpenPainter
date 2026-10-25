@@ -169,3 +169,51 @@ pub extern "C" fn op_doc_mark_unsaved(p: *mut OpEngine, doc: u64) -> OpStatus {
         }
     })
 }
+
+/// Release review item 1: finishes every open tool session that changes the
+/// image (text, paste or move, line/curve, shape, gradient, a live Magic Wand
+/// or Paint Bucket), each as its own history step, after the commands queued
+/// before it. Save, Close and Quit call it first.
+#[unsafe(no_mangle)]
+pub extern "C" fn op_doc_finish_sessions(p: *mut OpEngine, doc: u64) -> OpStatus {
+    guard(|| {
+        let e = match engine(p) {
+            Ok(e) => e,
+            Err(s) => return s,
+        };
+        match e.core().finish_sessions(doc) {
+            Ok(()) => OpStatus::OP_OK,
+            Err(x) => status(x),
+        }
+    })
+}
+
+/// Release review item 5: keeps the app's image metadata (UTF-8 text; empty
+/// removes it) with the document, on every history step, adding none. `.opaint`
+/// saves and recovery records hold it; `doc.image_metadata` reads it back.
+#[unsafe(no_mangle)]
+pub extern "C" fn op_doc_set_image_metadata(
+    p: *mut OpEngine,
+    doc: u64,
+    text: *const u8,
+    len: usize,
+) -> OpStatus {
+    guard(|| {
+        let e = match engine(p) {
+            Ok(e) => e,
+            Err(s) => return s,
+        };
+        let text = if len == 0 {
+            String::new()
+        } else {
+            match bytes(text, len).map(|b| std::str::from_utf8(b).map(str::to_owned)) {
+                Ok(Ok(t)) => t,
+                _ => return OpStatus::OP_ERR_BAD_ARGUMENT,
+            }
+        };
+        match e.core().set_image_metadata(doc, text) {
+            Ok(()) => OpStatus::OP_OK,
+            Err(x) => status(x),
+        }
+    })
+}
