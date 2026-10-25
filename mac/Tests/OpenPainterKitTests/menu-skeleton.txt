@@ -1,0 +1,190 @@
+# The menu skeleton, one line per visible item, in order (MenuSkeleton.describe).
+# "(off)" marks items that are present but not built yet. Hidden Option-Command
+# panel twins are not listed. paint.net File > Exit is OpenPainter > Quit here.
+OpenPainter
+OpenPainter > About OpenPainter
+OpenPainter > ---
+OpenPainter > Settings… [⌘,] (off)
+OpenPainter > ---
+OpenPainter > Hide OpenPainter [⌘H]
+OpenPainter > Hide Others [⌥⌘H]
+OpenPainter > Show All
+OpenPainter > ---
+OpenPainter > Quit OpenPainter [⌘Q]
+File
+File > New… [⌘N] (off)
+File > Open… [⌘O]
+File > Open Recent
+File > Open Recent > Clear Menu
+File > Acquire
+File > Acquire > From Scanner or Camera… (off)
+File > ---
+File > Save [⌘S] (off)
+File > Save As… [⇧⌘S] (off)
+File > Save All [⌥⌘S] (off)
+File > ---
+File > Print… [⌘P] (off)
+File > ---
+File > Close [⌘W]
+Edit
+Edit > Undo [⌘Z]
+Edit > Redo [⇧⌘Z]
+Edit > ---
+Edit > Cut [⌘X] (off)
+Edit > Copy [⌘C] (off)
+Edit > Copy Merged [⇧⌘C] (off)
+Edit > Paste [⌘V] (off)
+Edit > Paste into New Layer [⇧⌘V] (off)
+Edit > Paste into New Image [⌥⌘V] (off)
+Edit > ---
+Edit > Copy Selection (off)
+Edit > Paste Selection (off)
+Edit > ---
+Edit > Erase Selection [⌫] (off)
+Edit > Fill Selection [⇧⌫] (off)
+Edit > Invert Selection [⌘I] (off)
+Edit > Select All [⌘A]
+Edit > Deselect [⌘D]
+Edit > ---
+Edit > Content-Aware Fill
+View
+View > Zoom In [⌘=]
+View > Zoom Out [⌘-]
+View > Zoom to Window [⌘0]
+View > Zoom to Selection
+View > Actual Size [⌥⌘0]
+View > ---
+View > Pixel Grid [⌘']
+View > Rulers (off)
+View > ---
+View > Pixels
+View > Inches (off)
+View > Centimeters (off)
+Image
+Image > Crop to Selection [⇧⌘X]
+Image > Resize… [⌘R] (off)
+Image > Canvas Size… [⇧⌘R] (off)
+Image > ---
+Image > Flip Horizontal
+Image > Flip Vertical
+Image > ---
+Image > Rotate 90° Clockwise
+Image > Rotate 90° Counter-Clockwise [⌘G]
+Image > Rotate 180° [⌘J]
+Image > ---
+Image > Color Profile… (off)
+Image > ---
+Image > Flatten [⇧⌘F]
+Layers
+Layers > Add New Layer [⇧⌘N]
+Layers > Delete Layer [⇧⌘⌫]
+Layers > Duplicate Layer [⇧⌘D] (off)
+Layers > Merge Layer Down (off)
+Layers > Toggle Layer Visibility (off)
+Layers > Import From File… (off)
+Layers > ---
+Layers > Flip Horizontal (off)
+Layers > Flip Vertical (off)
+Layers > Rotate 180° (off)
+Layers > Rotate / Zoom… (off)
+Layers > ---
+Layers > Go to Top Layer [⌥Home]
+Layers > Go to Layer Above [⌥PageUp]
+Layers > Go to Layer Below [⌥PageDown]
+Layers > Go to Bottom Layer [⌥End]
+Layers > ---
+Layers > Move Layer to Top (off)
+Layers > Move Layer Up (off)
+Layers > Move Layer Down (off)
+Layers > Move Layer to Bottom (off)
+Layers > ---
+Layers > Layer Properties… [F4] (off)
+Adjustments
+Adjustments > Auto-Level [⇧⌘L]
+Adjustments > Black and White [⇧⌘G]
+Adjustments > Brightness / Contrast
+Adjustments > Hue / Saturation [⇧⌘U]
+Adjustments > Invert Alpha
+Adjustments > Invert Colors [⇧⌘I]
+Adjustments > Posterize [⇧⌘P]
+Adjustments > Sepia [⇧⌘E]
+Adjustments > Temperature and Tint
+Adjustments > ---
+Adjustments > Curves [⇧⌘M] (off)
+Adjustments > Exposure (off)
+Adjustments > Highlights / Shadows (off)
+Adjustments > Levels [⌘L] (off)
+Effects
+Effects > Repeat Effect [⌘F] (off)
+Effects > ---
+Effects > Artistic
+Effects > Artistic > Ink Sketch (off)
+Effects > Artistic > Oil Painting (off)
+Effects > Artistic > Pencil Sketch (off)
+Effects > Blurs
+Effects > Blurs > Bokeh Blur (off)
+Effects > Blurs > Fragment Blur (off)
+Effects > Blurs > Gaussian Blur (off)
+Effects > Blurs > Median Blur (off)
+Effects > Blurs > Motion Blur (off)
+Effects > Blurs > Radial Blur (off)
+Effects > Blurs > Sketch Blur (off)
+Effects > Blurs > Square Blur (off)
+Effects > Blurs > Surface Blur (off)
+Effects > Blurs > Unfocus (off)
+Effects > Blurs > Zoom Blur (off)
+Effects > Color
+Effects > Color > Quantize (off)
+Effects > Distort
+Effects > Distort > Bulge (off)
+Effects > Distort > Crystalize (off)
+Effects > Distort > Dents (off)
+Effects > Distort > Frosted Glass (off)
+Effects > Distort > Morphology (off)
+Effects > Distort > Pixelate (off)
+Effects > Distort > Polar Inversion (off)
+Effects > Distort > Tile Reflection (off)
+Effects > Distort > Twist (off)
+Effects > Noise
+Effects > Noise > Add Noise (off)
+Effects > Noise > Reduce Noise (off)
+Effects > Object
+Effects > Object > Drop Shadow (off)
+Effects > Photo
+Effects > Photo > Glow (off)
+Effects > Photo > Red Eye Removal (off)
+Effects > Photo > Sharpen (off)
+Effects > Photo > Soften Portrait (off)
+Effects > Photo > Straighten (off)
+Effects > Photo > Vignette (off)
+Effects > Render
+Effects > Render > Clouds (off)
+Effects > Render > Julia Fractal (off)
+Effects > Render > Mandelbrot Fractal (off)
+Effects > Render > Turbulence (off)
+Effects > Stylize
+Effects > Stylize > Edge Detect (off)
+Effects > Stylize > Emboss (off)
+Effects > Stylize > Outline (off)
+Effects > Stylize > Relief (off)
+Window
+Window > Tools [F5]
+Window > History [F6]
+Window > Layers [F7]
+Window > Colors [F8]
+Window > ---
+Window > Reset Panel Layout
+Window > ---
+Window > Minimize [⌘M]
+Window > Zoom
+Window > ---
+Window > Bring All to Front
+Help
+Help > OpenPainter Help [⌘?] (off)
+Help > ---
+Help > Tutorials (off)
+Help > Forum (off)
+Help > Plugins (off)
+Help > ---
+Help > Check for Updates… (off)
+Help > Send Feedback… (off)

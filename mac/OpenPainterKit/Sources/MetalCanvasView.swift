@@ -9,6 +9,17 @@ import QuartzCore
 public enum CanvasTool: Int, Sendable {
     case pan = 0
     case zoom = 1
+    /// Drag paints: the points go to `onStroke` on mouse up.
+    case stroke = 2
+    /// A click goes to `onClick` (Magic Wand, Paint Bucket).
+    case click = 3
+    /// A tool that does nothing on the canvas yet.
+    case inactive = 4
+}
+
+/// Keys the canvas hands to its window's editor (focus rules, mac/README.md).
+public enum CanvasKey: Sendable {
+    case escape, enter, delete
 }
 
 @MainActor
@@ -37,6 +48,23 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var onZoomRectangle: ((CGRect?) -> Void)?
     /// Called when an engine call fails (the message is also printed).
     public var onError: ((String) -> Void)?
+    /// A finished brush drag, in document pixels.
+    public var onStroke: (([CGPoint]) -> Void)?
+    /// The brush drag so far, in view points (nil when it ends), for a preview.
+    public var onStrokePreview: (([CGPoint]?) -> Void)?
+    /// A click with the `.click` tool, in document pixels.
+    public var onClick: ((CGPoint) -> Void)?
+    /// The pointer position in document pixels, nil when it leaves the canvas.
+    public var onCursor: ((CGPoint?) -> Void)?
+    /// A plain letter key; return true when it picked a tool.
+    public var onToolKey: ((Character) -> Bool)?
+    /// Escape, Enter and Delete while the canvas has focus.
+    public var onKey: ((CanvasKey) -> Void)?
+    /// True while the zoom is the Fit zoom: size, clear-rectangle and panel
+    /// changes fit again. Any other zoom change clears it.
+    public private(set) var isFitted = true
+    private var strokePoints: [CGPoint] = []
+    private var tracking: NSTrackingArea?
 
     /// Tests only: use these ICC bytes instead of the screen's (simulates a screen
     /// move or a display profile change on a Mac with one display).
@@ -189,6 +217,8 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         if fitOnFirstLayout, newSize.width > 20, newSize.height > 20 {
             fitOnFirstLayout = false
             v.zoomToFit()
+        } else if isFitted {
+            v.zoomToFit()
         }
         viewport = v
         push()
@@ -198,7 +228,28 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
 
     /// Replaces the viewport (menu commands, tools, the trace) and sends it.
     public func setViewport(_ v: Viewport) {
+        if v.zoom != viewport.zoom { isFitted = false }
         viewport = v
+        push()
+    }
+
+    /// Sets the part of the canvas that panels leave clear (view points). A
+    /// fitted document fits again; a chosen zoom is kept.
+    public func setClearRect(_ r: CGRect?) {
+        guard r != viewport.clearRect else { return }
+        var v = viewport
+        v.clearRect = r
+        if isFitted { v.zoomToFit() }
+        viewport = v
+        push()
+    }
+
+    /// Fit (View > Zoom to Window, the status bar's Fit button).
+    public func fit() {
+        var v = viewport
+        v.zoomToFit()
+        viewport = v
+        isFitted = true
         push()
     }
 
@@ -230,7 +281,7 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
 
     @objc public func zoomIn(_ sender: Any?) { change { $0.zoomIn() } }
     @objc public func zoomOut(_ sender: Any?) { change { $0.zoomOut() } }
-    @objc public func zoomToWindow(_ sender: Any?) { change { $0.zoomToFit() } }
+    @objc public func zoomToWindow(_ sender: Any?) { fit() }
     @objc public func actualSize(_ sender: Any?) { change { $0.actualSize() } }
     @objc public func togglePixelGrid(_ sender: Any?) { pixelGrid.toggle() }
     @objc public func selectPanTool(_ sender: Any?) { tool = .pan }
@@ -290,6 +341,9 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         change { v in
             if abs(v.zoom - 1) < 1e-9 { v.zoomToFit() } else { v.setZoom(1, keeping: p) }
         }
+        if abs(viewport.zoom - ZoomPresets.fit(document: viewport.documentSize, view: viewport.viewSize)) < 1e-9 {
+            isFitted = true
+        }
     }
 
     public override func mouseDown(with event: NSEvent) {
@@ -298,17 +352,56 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         dragStart = p
         lastDrag = p
         if effectiveTool == .pan { NSCursor.closedHand.set() }
+        if effectiveTool == .stroke {
+            strokePoints = [p]
+            onStrokePreview?(strokePoints)
+        }
+    }
+
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(
+            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    public override func mouseMoved(with event: NSEvent) {
+        onCursor?(viewport.documentPoint(atView: point(event)))
+    }
+
+    public override func mouseExited(with event: NSEvent) {
+        onCursor?(nil)
+    }
+
+    /// Ends a brush drag without painting (Escape).
+    public func cancelStroke() -> Bool {
+        guard !strokePoints.isEmpty else { return false }
+        strokePoints = []
+        dragStart = nil
+        lastDrag = nil
+        onStrokePreview?(nil)
+        return true
     }
 
     public override func mouseDragged(with event: NSEvent) {
         let p = point(event)
         guard let start = dragStart, let last = lastDrag else { return }
         lastDrag = p
+        onCursor?(viewport.documentPoint(atView: p))
         switch effectiveTool {
         case .pan:
             change { $0.pan(by: CGSize(width: p.x - last.x, height: p.y - last.y)) }
         case .zoom:
             onZoomRectangle?(CGRect(x: start.x, y: start.y, width: p.x - start.x, height: p.y - start.y).standardized)
+        case .stroke:
+            guard !strokePoints.isEmpty else { return }
+            strokePoints.append(p)
+            onStrokePreview?(strokePoints)
+        case .click, .inactive:
+            break
         }
     }
 
@@ -319,6 +412,17 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             lastDrag = nil
             onZoomRectangle?(nil)
             updateCursor()
+        }
+        if effectiveTool == .stroke, dragStart != nil, !strokePoints.isEmpty {
+            let points = strokePoints.map { viewport.documentPoint(atView: $0) }
+            strokePoints = []
+            onStrokePreview?(nil)
+            onStroke?(points)
+            return
+        }
+        if effectiveTool == .click, let start = dragStart, hypot(p.x - start.x, p.y - start.y) < 4 {
+            onClick?(viewport.documentPoint(atView: p))
+            return
         }
         guard let start = dragStart, effectiveTool == .zoom else { return }
         let rect = CGRect(x: start.x, y: start.y, width: p.x - start.x, height: p.y - start.y).standardized
@@ -344,6 +448,21 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     }
 
     public override func keyDown(with event: NSEvent) {
+        let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        switch event.keyCode {
+        case 53:  // Escape
+            if let onKey { return onKey(.escape) }
+        case 36, 76:  // Return, keypad Enter
+            if let onKey { return onKey(.enter) }
+        case 51, 117:  // Delete, forward delete
+            if plain, let onKey { return onKey(.delete) }
+        default: break
+        }
+        if plain, !event.isARepeat, let onToolKey, let c = event.charactersIgnoringModifiers?.lowercased().first,
+            c.isLetter, onToolKey(c)
+        {
+            return
+        }
         switch event.charactersIgnoringModifiers {
         case " ":
             if !event.isARepeat {
@@ -371,7 +490,8 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     private var cursor: NSCursor {
         switch effectiveTool {
         case .pan: return dragStart != nil ? .closedHand : .openHand
-        case .zoom: return .crosshair
+        case .zoom, .stroke, .click: return .crosshair
+        case .inactive: return .arrow
         }
     }
 

@@ -22,6 +22,8 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 mod image_commands;
+mod shell_commands;
+pub use shell_commands::{effect_label, effects_list};
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -687,11 +689,15 @@ fn specs() -> Vec<CommandSpec> {
         },
     ];
     entries.extend(image_commands::specs());
-    for effect in effect::registered() {
+    entries.extend(shell_commands::specs());
+    for (index, effect) in effect::registered().into_iter().enumerate() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
             "effect.adjust.invert_alpha" => run_invert_alpha,
-            _ => continue,
+            _ => match shell_commands::effect_runner(index) {
+                Some(run) => run,
+                None => continue,
+            },
         };
         entries.push(CommandSpec {
             id: effect.id,
@@ -951,9 +957,9 @@ impl Actor {
         let changed = match outcome {
             Outcome::State(state) => {
                 let label = match id {
-                    "effect.adjust.invert_colors" | "image.invert_colors" => "Invert Colors",
-                    "effect.adjust.invert_alpha" => "Invert Alpha",
-                    _ => id,
+                    "effect.adjust.invert_colors" | "image.invert_colors" => "Invert Colors".into(),
+                    "effect.adjust.invert_alpha" => "Invert Alpha".into(),
+                    _ => shell_commands::history_label(id, &params).unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);
                 true
@@ -1573,6 +1579,10 @@ impl Engine {
         self.call(id, Message::StrokeCancel)?
     }
     pub fn query(&self, id: u64, query: &str, params: Value) -> Result<Vec<u8>> {
+        // Catalog queries need no document (id 0 is fine).
+        if query == "effects.list" {
+            return serde_json::to_vec(&effects_list()).map_err(internal);
+        }
         let d = self.doc(id)?;
         let s = d.published.load_full();
         match query {
@@ -1587,6 +1597,17 @@ impl Engine {
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
             ),
+            "doc.selection" => {
+                serde_json::to_vec(&shell_commands::selection_info(&s.state)).map_err(internal)
+            }
+            "commands.list" => {
+                let ids: Vec<_> = specs()
+                    .iter()
+                    .filter(|c| !c.id.starts_with("test."))
+                    .map(|c| (c.id, (c.enabled)(&s.state)))
+                    .collect();
+                serde_json::to_vec(&shell_commands::commands_list(&ids)).map_err(internal)
+            }
             _ => Err(bad("unknown query")),
         }
     }

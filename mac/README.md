@@ -21,10 +21,35 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 
 ## Layout
 
-- `OpenPainter/`: the thin app target (menus, `NSDocument`, one window per document, launch arguments).
+- `OpenPainter/`: the thin app target (`NSDocument`, launch arguments, installs the menu).
 - `OpenPainterKit/Sources/`: the canvas (`MetalCanvasView`, `CanvasContainerView`), the zoom presets and viewport math, the trace runner and the launch clock.
+- `OpenPainterKit/Sources/Shell/`: the main window, panels, menus, tool state and focus rules (M15).
 - `EngineBridge/`: the Swift wrapper over the C interface (`View.swift` wraps `op_view_*`).
 - `Tests/OpenPainterKitTests/`: XCTests. No XCUITest yet (macOS Automation Mode is not enabled on this Mac).
+
+## Main window (M15)
+
+`OpenPainterKit/Sources/Shell/` holds the Classic v2 main window (`docs/design/SPEC.md`). The app target only makes one `Editor` and one `EditorWindowController` per `NSDocument`.
+
+- `Workspace`: the open images in strip order, the active one, the shared `ToolState`, the four panels and the effect catalog (`effects.list`). It reads engine events and refreshes the editor they name.
+- `Editor`: one image. It caches `doc.info`, `doc.selection` and `commands.list`, makes the strip thumbnail from the engine composite, and runs every action as an engine command (`tool.stroke`, `tool.magic_wand`, `tool.paint_bucket`, `selection.select_all`, `selection.deselect`, `layer.set_active`, `history.jump`, the image and effect commands).
+- `EditorWindowController`: the unified toolbar (title with the system Edited state; New, Open, Save, Print | Cut, Copy, Paste | Crop to Selection, Deselect | Undo, Redo | Pixel Grid, Rulers; the four panel toggles), the options row, the image strip, the stage and the status bar.
+- `PanelManager` and `PanelLayout`: the Tools, History, Layers and Colors `NSPanel`s (utility, non-activating, hidden while the app is inactive, close button on the left). Frames are saved per display arrangement in `UserDefaults` (`OPPanels.<screen frames>`). A panel whose title strip is on no screen moves onto the screen it overlaps most. A moved panel moves clear of the others. Window > Reset Panel Layout puts them back.
+- `MenuSkeleton`: the menu bar in paint.net 5.1 order. Its header lists where Mac keys replace paint.net keys. `Tests/OpenPainterKitTests/menu-skeleton.txt` is the checked-in item list; change it together with the menu.
+- The fit rectangle is the stage less the shown panels (left and right reserves) less 16 pt. Fit recomputes when the window resizes or a panel moves, shows or hides. A zoom the user chose stays.
+
+## Focus rules
+
+Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
+
+| Focus | Cmd+A | Delete | Escape | Enter | Undo, Redo |
+| --- | --- | --- | --- | --- | --- |
+| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection (says "comes in a later version" for now) | Cancel a brush drag, else Deselect | Finish (nothing to finish yet) | Document history |
+| A panel with no text field editing | Same as the canvas: the panel forwards to the active document | Same | Same | Same | Same |
+| A text field or text view is editing (options row, status zoom, Colors hex) | Selects the field's text | Deletes text | Ends editing | Ends editing | The field's own undo |
+| A sheet or modal dialog is up | The dialog's field | The dialog | The dialog | The dialog's default button | The dialog; document commands are disabled |
+
+Letter keys pick tools only while the canvas has focus (paint.net keys: S, M, Z, H, F, G, B, E, P, K, L, R, T, O; S, M and O cycle).
 
 ## Canvas
 

@@ -13,7 +13,7 @@ enum AppEngine {
     }()
 }
 
-final class PainterDocument: NSDocument {
+final class PainterDocument: NSDocument, EditorHost {
     private(set) var engineDocument: Document?
     private(set) var pixelSize = CGSize.zero
     nonisolated(unsafe) private static var engine: Engine?
@@ -51,13 +51,21 @@ final class PainterDocument: NSDocument {
     }
 
     override func makeWindowControllers() {
-        guard let doc = engineDocument else { return }
-        addWindowController(DocumentWindowController(document: doc, pixelSize: pixelSize))
+        guard let doc = engineDocument, let workspace = Workspace.shared else { return }
+        let editor = Editor(document: doc, pixelSize: pixelSize, name: displayName)
+        editor.host = self
+        workspace.add(editor)
+        let wc = EditorWindowController(editor: editor, workspace: workspace)
+        addWindowController(wc)
+    }
+
+    override func showWindows() {
+        for case let wc as EditorWindowController in windowControllers { wc.present() }
     }
 
     override func close() {
         // The window controller detached the canvas view when its window closed.
-        for case let wc as DocumentWindowController in windowControllers { wc.detachCanvas() }
+        for case let wc as EditorWindowController in windowControllers { wc.canvas.detach() }
         super.close()
         if let doc = engineDocument {
             engineDocument = nil
@@ -65,5 +73,16 @@ final class PainterDocument: NSDocument {
                 FileHandle.standardError.write(Data("OpenPainter: closing the document failed: \(error)\n".utf8))
             }
         }
+    }
+
+    // MARK: EditorHost
+
+    func closeEditor() {
+        // The standard flow: asks to save a modified image first.
+        for wc in windowControllers { wc.window?.performClose(nil) }
+    }
+
+    func dirtyChanged(_ dirty: Bool) {
+        updateChangeCount(dirty ? .changeDone : .changeCleared)
     }
 }
