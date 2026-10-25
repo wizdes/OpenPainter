@@ -1129,3 +1129,208 @@ fn m54_bulge_radius_edge_pixels_keep_hidden_color() {
         );
     }
 }
+
+/// M54 fix regression: the Bulge kernel does the CPU's f32 steps with
+/// integer-exact rounding, so it gives the CPU's bytes. Metal's fast math used
+/// to fuse `u * scale + cx` and approximate sqrt and divide, which moved one
+/// sample from 250/256 to 249/256 and gave 2/255 at (248,68) on 600x400.
+#[test]
+fn m54fix_bulge_matches_cpu_bytes_for_every_amount() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let spec = effect::find("effect.distort.bulge").unwrap();
+    let mut failures = Vec::new();
+    for (width, height) in [(600u32, 400u32), (520, 300)] {
+        let bytes = m54_synthetic(width, height);
+        for amount in [-200, -199, -80, -50, 0, 1, 45, 99, 100] {
+            let mut params = spec.default_params();
+            params["amount"] = serde_json::json!(amount);
+            let params = spec.schema.validate(params).unwrap();
+            let prepared = effect::Prepared {
+                width: width as i32,
+                height: height as i32,
+                ..effect::Prepared::default()
+            };
+            let sample = |x: i32, y: i32| {
+                let i = (y as usize * width as usize + x as usize) * 4;
+                <[u8; 4]>::try_from(&bytes[i..i + 4]).unwrap()
+            };
+            let mut expected = Vec::with_capacity(bytes.len());
+            for y in 0..height as i32 {
+                for x in 0..width as i32 {
+                    expected.extend((spec.render_cpu)(&sample, x, y, &prepared, &params));
+                }
+            }
+            let actual = gpu
+                .effect_kernel_with_params(GpuKernel::Bulge, width, height, &bytes, [amount, 0, 0])
+                .unwrap();
+            let differ = expected.iter().zip(&actual).filter(|(a, b)| a != b).count();
+            if differ > 0 {
+                failures.push(format!(
+                    "{width}x{height} amount {amount}: {differ} channels differ"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The M54 matrix's synthetic input: gradients plus noise with clear, opaque
+/// and partial alpha bands.
+fn m54_synthetic(width: u32, height: u32) -> Vec<u8> {
+    let mut seed = 0x2468_ace1u32;
+    let mut bytes = Vec::with_capacity((width * height * 4) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            let noise = (seed >> 24) as u8;
+            let alpha = match (x / 37 + y / 23) % 5 {
+                0 => 0,
+                1 => 255,
+                _ => noise | 0x40,
+            };
+            bytes.extend_from_slice(&[
+                (x * 255 / width) as u8 ^ (noise >> 3),
+                (y * 255 / height) as u8,
+                noise,
+                alpha,
+            ]);
+        }
+    }
+    bytes
+}
+
+/// M54 fix regression: the GPU Gaussian sums in whole numbers (u32 columns,
+/// 64-bit rows) as the CPU does, so it gives the CPU's bytes. Its f32 sums
+/// used to round above 2^24 and gave 1/255, which Glow's contrast turned into
+/// 2/255 at radius 20.
+#[test]
+fn m54fix_gaussian_glow_and_soften_match_cpu_bytes() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let mut failures = Vec::new();
+    let mut check = |name: String, expected: Vec<u8>, actual: Vec<u8>| {
+        let differ = expected.iter().zip(&actual).filter(|(a, b)| a != b).count();
+        if differ > 0 {
+            failures.push(format!("{name}: {differ} channels differ"));
+        }
+    };
+    // The CPU reference is O(radius²) per pixel, so large radii use small
+    // images; 200 x 150 still has row sums above 2^32 at radius 50.
+    for (radius, width, height) in [
+        (1, 600, 400),
+        (2, 600, 400),
+        (20, 600, 400),
+        (50, 200, 150),
+        (200, 64, 48),
+    ] {
+        let bytes = m54_synthetic(width, height);
+        let expected = op_ops::effects::gaussian_blur::reference_rgba8_with_radius(
+            width, height, &bytes, radius,
+        );
+        let actual = gpu.gaussian_cached(width, height, &bytes, radius).unwrap();
+        check(
+            format!("Gaussian radius {radius} {width}x{height}"),
+            expected,
+            actual,
+        );
+    }
+    // The failing M54 cells first, on the matrix's 600 x 400 input.
+    for (radius, brightness, contrast, width, height) in [
+        (20, 10, 10, 600, 400),
+        (1, 10, 10, 200, 150),
+        (6, 10, 10, 200, 150),
+        (20, 100, 100, 200, 150),
+        (20, -100, -100, 200, 150),
+    ] {
+        let bytes = m54_synthetic(width, height);
+        let expected = op_ops::effects::glow::reference_rgba8(
+            width, height, &bytes, radius, brightness, contrast,
+        );
+        let actual = gpu
+            .effect_photo_glow(width, height, &bytes, radius, brightness, contrast)
+            .unwrap();
+        check(
+            format!("Glow {radius} {brightness} {contrast}"),
+            expected,
+            actual,
+        );
+    }
+    for (softness, lighting, warmth, width, height) in [
+        (5, 0, 19, 600, 400),
+        (5, 0, 10, 200, 150),
+        (5, 0, 20, 200, 150),
+        (10, 20, 1, 200, 150),
+        (0, -20, 7, 200, 150),
+        (3, 0, 19, 200, 150),
+    ] {
+        let bytes = m54_synthetic(width, height);
+        let expected = op_ops::effects::soften_portrait::reference_rgba8(
+            width, height, &bytes, softness, lighting, warmth,
+        );
+        let actual = gpu
+            .effect_photo_soften(width, height, &bytes, softness, lighting, warmth)
+            .unwrap();
+        check(
+            format!("Soften {softness} {lighting} {warmth}"),
+            expected,
+            actual,
+        );
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// M54 fix regression: the Median kernel takes any radius and percentile and
+/// gives the CPU's bytes, including image edges and percentiles 0 and 100.
+#[test]
+fn m54fix_median_matches_cpu_bytes_for_radius_and_percentile() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let spec = effect::find("effect.blur.median").unwrap();
+    let mut failures = Vec::new();
+    for (radius, percentile, width, height) in [
+        (10, 50, 200, 150),
+        (1, 50, 200, 150),
+        (2, 0, 200, 150),
+        (3, 100, 200, 150),
+        (10, 1, 120, 90),
+        (10, 99, 120, 90),
+        (25, 37, 120, 90),
+        (200, 50, 40, 30),
+        (10, 50, 5, 3),
+    ] {
+        let bytes = m54_synthetic(width, height);
+        let mut params = spec.default_params();
+        params["radius"] = serde_json::json!(radius);
+        params["percentile"] = serde_json::json!(percentile);
+        let params = spec.schema.validate(params).unwrap();
+        let prepared = effect::Prepared {
+            width: width as i32,
+            height: height as i32,
+            ..effect::Prepared::default()
+        };
+        let sample = |x: i32, y: i32| {
+            let i = (y as usize * width as usize + x as usize) * 4;
+            <[u8; 4]>::try_from(&bytes[i..i + 4]).unwrap()
+        };
+        let mut expected = Vec::with_capacity(bytes.len());
+        for y in 0..height as i32 {
+            for x in 0..width as i32 {
+                expected.extend((spec.render_cpu)(&sample, x, y, &prepared, &params));
+            }
+        }
+        let actual = gpu
+            .effect_kernel_with_params(
+                GpuKernel::Median,
+                width,
+                height,
+                &bytes,
+                [radius, percentile, 0],
+            )
+            .unwrap();
+        let differ = expected.iter().zip(&actual).filter(|(a, b)| a != b).count();
+        if differ > 0 {
+            failures.push(format!(
+                "radius {radius} percentile {percentile} {width}x{height}: {differ} channels differ"
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

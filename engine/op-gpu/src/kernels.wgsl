@@ -133,38 +133,84 @@ fn legacy_blend(lhs: vec4<u32>, rhs: vec4<u32>, mode: u32) -> vec4<u32> {
   out.a=total;
   return out;
 }
+// 64-bit whole numbers as (high, low) u32 pairs; same helpers as
+// gaussian_horizontal.wgsl, which is a separate shader module.
+fn wide_mul(a: u32, b: u32) -> vec2<u32> {
+  let a0 = a & 0xffffu;
+  let a1 = a >> 16u;
+  let b0 = b & 0xffffu;
+  let b1 = b >> 16u;
+  let low = a0 * b0;
+  let cross1 = a1 * b0;
+  let cross2 = a0 * b1;
+  var hi = a1 * b1 + (cross1 >> 16u) + (cross2 >> 16u);
+  var lo = low + (cross1 << 16u);
+  hi += u32(lo < low);
+  let before = lo;
+  lo += cross2 << 16u;
+  hi += u32(lo < before);
+  return vec2<u32>(hi, lo);
+}
+fn wide_add(a: vec2<u32>, b: vec2<u32>) -> vec2<u32> {
+  let lo = a.y + b.y;
+  return vec2<u32>(a.x + b.x + u32(lo < a.y), lo);
+}
+fn wide_ge(a: vec2<u32>, b: vec2<u32>) -> bool {
+  return a.x > b.x || (a.x == b.x && a.y >= b.y);
+}
+fn wide_shl(a: vec2<u32>, n: u32) -> vec2<u32> {
+  if n == 0u { return a; }
+  return vec2<u32>((a.x << n) | (a.y >> (32u - n)), a.y << n);
+}
+// n / d truncated and clamped to 0..255, with d > 0.
+fn wide_div_byte(n: vec2<u32>, d: vec2<u32>) -> u32 {
+  if wide_ge(n, wide_shl(d, 8u)) { return 255u; }
+  var rem = n;
+  var q = 0u;
+  for (var bit = 7; bit >= 0; bit--) {
+    let part = wide_shl(d, u32(bit));
+    if wide_ge(rem, part) {
+      rem = vec2<u32>(rem.x - part.x - u32(rem.y < part.y), rem.y - part.y);
+      q |= 1u << u32(bit);
+    }
+  }
+  return q;
+}
+// The CPU's i64 Gaussian (op-ops gaussian_blur.rs without prepared columns).
+// Column sums fit u32 (under 255 * 16 * 201^2); the row sums need 64 bits
+// from tip size 13 up.
 fn legacy_gaussian(pos: vec2<i32>, radius: i32) -> vec4<u32> {
-  var wa_sum=0;
-  var wc_sum=0;
-  var sums=vec4<i32>(0);
+  var wa_sum = vec2<u32>(0u);
+  var wc_sum = vec2<u32>(0u);
+  var sums = array<vec2<u32>, 4>(vec2<u32>(0u), vec2<u32>(0u), vec2<u32>(0u), vec2<u32>(0u));
   for (var dx=-radius; dx<=radius; dx++) {
     let xx=pos.x+dx;
     if xx<0 || xx>=i32(p.width) { continue; }
-    let wx=16*(radius+1-abs(dx));
-    var wa_col=0;
-    var wc_col=0;
-    var col=vec4<i32>(0);
+    let wx=u32(16*(radius+1-abs(dx)));
+    var wa_col=0u;
+    var wc_col=0u;
+    var col=vec4<u32>(0u);
     for (var dy=-radius; dy<=radius; dy++) {
       let yy=pos.y+dy;
       if yy<0 || yy>=i32(p.height) { continue; }
       let color=textureLoad(input_tex,vec2<i32>(xx,yy),0);
-      let wy=16*(radius+1-abs(dy));
+      let wy=u32(16*(radius+1-abs(dy)));
       wa_col+=wy;
-      let alpha_weight=wy*(i32(color.a)+i32(color.a>>7u));
+      let alpha_weight=wy*(color.a+(color.a>>7u));
       wc_col+=alpha_weight;
-      col+=(alpha_weight>>8)*vec4<i32>(color);
+      col+=(alpha_weight>>8u)*color;
     }
-    wa_sum+=wx*wa_col;
-    wc_sum+=wx*wc_col;
-    sums+=wx*col;
+    wa_sum=wide_add(wa_sum,wide_mul(wx,wa_col));
+    wc_sum=wide_add(wc_sum,wide_mul(wx,wc_col));
+    for (var c=0; c<4; c++) { sums[c]=wide_add(sums[c],wide_mul(wx,col[c])); }
   }
-  wc_sum=wc_sum>>8;
-  if wa_sum==0 || wc_sum==0 { return vec4<u32>(0u); }
+  let wc=vec2<u32>(wc_sum.x>>8u,(wc_sum.y>>8u)|(wc_sum.x<<24u));
+  if (wa_sum.x==0u && wa_sum.y==0u) || (wc.x==0u && wc.y==0u) { return vec4<u32>(0u); }
   return vec4<u32>(
-    u32(clamp(sums.r/wc_sum,0,255)),
-    u32(clamp(sums.g/wc_sum,0,255)),
-    u32(clamp(sums.b/wc_sum,0,255)),
-    u32(clamp(sums.a/wa_sum,0,255)));
+    wide_div_byte(sums[0],wc),
+    wide_div_byte(sums[1],wc),
+    wide_div_byte(sums[2],wc),
+    wide_div_byte(sums[3],wa_sum));
 }
 fn legacy_bc(pixel: vec4<u32>, brightness: i32, contrast: i32) -> vec4<u32> {
   let i=i32(artistic_intensity(pixel));
@@ -341,7 +387,20 @@ fn effect_red_eye_removal(@builtin(global_invocation_id) id: vec3<u32>) {
   let saturation = select(0u, (hi - lo) * 255u / max(hi, 1u), hi > 0u);
   var red = src.r;
   if i32(src.r) - i32(max(src.g, src.b)) > i32(p.mode) && saturation > 100u {
-    red = (299u * src.r + 587u * src.g + 114u * src.b) * p.opacity / 100000u;
+    let scaled = (299u * src.r + 587u * src.g + 114u * src.b) * p.opacity;
+    red = scaled / 100000u;
+    // The CPU truncates an f64 product that can sit just under a whole number;
+    // acc holds those colours for this saturation, sorted (see lib.rs).
+    if scaled % 100000u == 0u && red > 0u {
+      let key = f32((src.r << 16u) | (src.g << 8u) | src.b);
+      var lo = 0u;
+      var hi = arrayLength(&acc);
+      while lo < hi {
+        let mid = (lo + hi) / 2u;
+        if acc[mid].x < key { lo = mid + 1u; } else { hi = mid; }
+      }
+      if acc[lo].x == key { red = red - 1u; }
+    }
   }
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(red, src.g, src.b, src.a));
 }
@@ -456,9 +515,13 @@ fn effect_photo_soften_blend(@builtin(global_invocation_id) id: vec3<u32>) {
   let adjusted = textureLoad(input_tex, vec2<i32>(id.xy), 0);
   let original = vec4<u32>(acc[id.y * p.width + id.x]);
   let gray = u32(legacy_intensity(original));
-  let warm = f32(p.mode) / 100.0;
-  let lit = vec4<u32>(u32(clamp(f32(gray) * (1.0 + warm), 0.0, 255.0)), gray,
-    u32(clamp(f32(gray) * (1.0 - warm), 0.0, 255.0)), original.a);
+  // The CPU's f32 steps with exact rounding (sf_* below): Metal's divide is
+  // approximate, so gray * 1.19 could truncate one level low.
+  let warm = sf_div(sf(f32(p.mode)), sf(100.0));
+  let warm_red = bitcast<f32>(sf_mul(sf(f32(gray)), sf_add(sf(1.0), warm)));
+  let warm_blue = bitcast<f32>(sf_mul(sf(f32(gray)), sf_add(sf(1.0), sf_neg(warm))));
+  let lit = vec4<u32>(u32(clamp(warm_red, 0.0, 255.0)), gray,
+    u32(clamp(warm_blue, 0.0, 255.0)), original.a);
   textureStore(output_tex, vec2<i32>(id.xy), photo_blend(lit, adjusted, true));
 }
 @compute @workgroup_size(16, 16)
@@ -934,33 +997,53 @@ fn effect_radial(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(output_tex, vec2<i32>(id.xy), result);
 }
 
+// Median with any radius and percentile, as op-ops median_blur.rs. Its
+// histogram walk returns min(255, k + 1), where k is the m-th smallest sample
+// (m = area * percentile / 100), or the smallest sample when m is 0. Each
+// channel's k is found one bit at a time by counting samples below a trial
+// value, so no per-thread histogram is needed.
 @compute @workgroup_size(16, 16)
 fn effect_median(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }
-  var hist: array<vec4<u32>, 256>;
+  let r = i32(p.mode);
+  let x = i32(id.x);
+  let y = i32(id.y);
+  let cutoff = ((2 * r + 1) * (2 * r + 1) + 2) / 4;
+  let y0 = max(-r, -y);
+  let y1 = min(r, i32(p.height) - 1 - y);
   var area = 0u;
-  for (var dy = -10; dy <= 10; dy++) {
-    for (var dx = -10; dx <= 10; dx++) {
-      let uv = vec2<i32>(id.xy) + vec2<i32>(dx,dy);
-      if uv.x < 0 || uv.y < 0 || uv.x >= i32(p.width) || uv.y >= i32(p.height) || dx*dx+dy*dy > 110 { continue; }
-      let c = textureLoad(input_tex, uv, 0);
-      hist[c.r].r += 1u;
-      hist[c.g].g += 1u;
-      hist[c.b].b += 1u;
-      hist[c.a].a += 1u;
-      area += 1u;
+  for (var dy = y0; dy <= y1; dy++) {
+    let half = median_half_width(cutoff - dy * dy, r);
+    area += u32(max(min(half, i32(p.width) - 1 - x) - max(-half, -x) + 1, 0));
+  }
+  let m = area * p.opacity / 100u;
+  let target_rank = max(m, 1u);
+  var k = vec4<u32>(0u);
+  for (var bit = 7; bit >= 0; bit--) {
+    let trial = k | vec4<u32>(1u << u32(bit));
+    var below = vec4<u32>(0u);
+    for (var dy = y0; dy <= y1; dy++) {
+      let half = median_half_width(cutoff - dy * dy, r);
+      let x0 = max(-half, -x);
+      let x1 = min(half, i32(p.width) - 1 - x);
+      for (var dx = x0; dx <= x1; dx++) {
+        let c = textureLoad(input_tex, vec2<i32>(x + dx, y + dy), 0);
+        below += vec4<u32>(c < trial);
+      }
     }
+    k = select(k, trial, below < vec4<u32>(target_rank));
   }
-  let rank = area / 2u;
-  var result = vec4<u32>(0u);
-  for (var channel = 0u; channel < 4u; channel++) {
-    var value = 0u;
-    while value < 255u && hist[value][channel] == 0u { value += 1u; }
-    var count = 0u;
-    while value < 255u && count < rank { count += hist[value][channel]; value += 1u; }
-    result[channel] = value;
-  }
+  var result = k;
+  if m > 0u { result = min(k + vec4<u32>(1u), vec4<u32>(255u)); }
   textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+// Largest dx with dx * dx <= limit, at most r; -1 when limit < 0.
+fn median_half_width(limit: i32, r: i32) -> i32 {
+  if limit < 0 { return -1; }
+  var half = min(i32(sqrt(f32(limit))), r);
+  while half * half > limit { half -= 1; }
+  while half < r && (half + 1) * (half + 1) <= limit { half += 1; }
+  return half;
 }
 @compute @workgroup_size(16, 16)
 fn effect_sharpen(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -1104,22 +1187,149 @@ fn bilinear_clamp(x: f32, y: f32) -> vec4<u32> {
   let rgb = (a.rgb * a.a * wa + b.rgb * b.a * wb + c.rgb * c.a * wc + d.rgb * d.a * wd) / alpha;
   return vec4<u32>(rgb, (alpha + 32768u) >> 16u);
 }
+// IEEE f32 arithmetic in integers, rounded to nearest even, for finite normal
+// numbers and zero (no denormals, infinities or NaN). Metal compiles WGSL
+// with fast math, which may fuse a * b + c and makes divide and sqrt
+// approximate; these give the bits Rust's f32 operations give.
+// Rounds sign * mant * 2^pow, where `sticky` says the true value is a little
+// above mant (mant > 0).
+fn sf_round(sign: u32, mant: u32, pow: i32, sticky: bool) -> u32 {
+  var m = mant;
+  var e = pow;
+  var s = sticky;
+  let top = 31 - i32(countLeadingZeros(m));
+  if top > 30 {
+    s = s || (m & 1u) != 0u;
+    m = m >> 1u;
+    e = e + 1;
+  } else if top < 30 {
+    m = m << u32(30 - top);
+    e = e - (30 - top);
+  }
+  // m is in [2^30, 2^31): keep 24 bits, round on the 7 below.
+  var kept = m >> 7u;
+  let half = (m & 64u) != 0u;
+  let rest = (m & 63u) != 0u || s;
+  if half && (rest || (kept & 1u) != 0u) { kept = kept + 1u; }
+  e = e + 7;
+  if kept == 0x1000000u {
+    kept = 0x800000u;
+    e = e + 1;
+  }
+  return (sign << 31u) | (u32(e + 150) << 23u) | (kept & 0x7fffffu);
+}
+fn sf_exp(a: u32) -> i32 { return i32((a >> 23u) & 255u); }
+fn sf_mant(a: u32) -> u32 { return (a & 0x7fffffu) | 0x800000u; }
+fn sf_mul(a: u32, b: u32) -> u32 {
+  if sf_exp(a) == 0 || sf_exp(b) == 0 { return 0u; }
+  let ma = sf_mant(a);
+  let mb = sf_mant(b);
+  // 48-bit product from 16-bit halves.
+  let a0 = ma & 0xffffu;
+  let a1 = ma >> 16u;
+  let b0 = mb & 0xffffu;
+  let b1 = mb >> 16u;
+  let low = a0 * b0;
+  let mid = a1 * b0 + a0 * b1;
+  let lo = low + (mid << 16u);
+  let carry = u32(lo < low);
+  let hi = a1 * b1 + (mid >> 16u) + carry;
+  let mant = (hi << 16u) | (lo >> 16u);
+  let pow = sf_exp(a) - 150 + sf_exp(b) - 150 + 16;
+  return sf_round((a ^ b) >> 31u, mant, pow, (lo & 0xffffu) != 0u);
+}
+fn sf_add(a: u32, b: u32) -> u32 {
+  if sf_exp(a) == 0 { return b; }
+  if sf_exp(b) == 0 { return a; }
+  // x has the larger magnitude.
+  var x = a;
+  var y = b;
+  if (b & 0x7fffffffu) > (a & 0x7fffffffu) {
+    x = b;
+    y = a;
+  }
+  let mx = sf_mant(x) << 7u;
+  let shift = u32(sf_exp(x) - sf_exp(y));
+  let full = sf_mant(y) << 7u;
+  var my = 0u;
+  var sticky = full != 0u;
+  if shift < 32u {
+    my = full >> shift;
+    sticky = shift > 0u && (full & ((1u << shift) - 1u)) != 0u;
+  }
+  let pow = sf_exp(x) - 157;
+  if ((x ^ y) >> 31u) == 0u { return sf_round(x >> 31u, mx + my, pow, sticky); }
+  // The true value is mx - my - fraction, so take one more off and keep it sticky.
+  let diff = mx - my - u32(sticky);
+  if diff == 0u { return 0u; }
+  return sf_round(x >> 31u, diff, pow, sticky);
+}
+fn sf_neg(a: u32) -> u32 { return a ^ 0x80000000u; }
+fn sf_div(a: u32, b: u32) -> u32 {
+  if sf_exp(a) == 0 { return 0u; }
+  var ma = sf_mant(a);
+  let mb = sf_mant(b);
+  var ea = sf_exp(a);
+  if ma < mb {
+    ma = ma << 1u;
+    ea = ea - 1;
+  }
+  // 31 quotient bits of ma / mb, which is in [1, 2).
+  var rem = ma;
+  var q = 0u;
+  for (var i = 0; i < 31; i = i + 1) {
+    q = q << 1u;
+    if rem >= mb {
+      rem = rem - mb;
+      q = q | 1u;
+    }
+    rem = rem << 1u;
+  }
+  return sf_round((a ^ b) >> 31u, q, ea - sf_exp(b) - 30, rem != 0u);
+}
+fn sf_sqrt(a: u32) -> u32 {
+  if sf_exp(a) == 0 { return 0u; }
+  var m = sf_mant(a);
+  var pow = sf_exp(a) - 150;
+  if (pow & 1) != 0 {
+    m = m << 1u;
+    pow = pow - 1;
+  }
+  // Square root of m * 2^28, two radicand bits at a time.
+  var rem = 0u;
+  var root = 0u;
+  for (var i = 26; i >= 0; i = i - 1) {
+    var pair = 0u;
+    if i >= 14 { pair = (m >> u32(2 * i - 28)) & 3u; }
+    rem = (rem << 2u) | pair;
+    let trial = (root << 2u) | 1u;
+    root = root << 1u;
+    if rem >= trial {
+      rem = rem - trial;
+      root = root | 1u;
+    }
+  }
+  return sf_round(0u, root, pow / 2 - 14, rem != 0u);
+}
+fn sf(x: f32) -> u32 { return bitcast<u32>(x); }
 @compute @workgroup_size(16, 16)
 fn effect_bulge(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }
+  // Same f32 steps as op-ops bulge.rs, each rounded as the CPU rounds it.
   let cx = f32(p.width) * 0.5;
   let cy = f32(p.height) * 0.5;
   let radius = min(cx, cy);
   if radius <= 0.0 { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
-  let u = f32(id.x) - cx;
-  let v = f32(id.y) - cy;
-  // Compare squares: they are exact here, while Metal's sqrt and divide are
-  // not, and the CPU's t <= 0 is exact on the radius.
-  let d2 = u * u + v * v;
-  if d2 >= radius * radius { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
-  let t = max(0.0, 1.0 - sqrt(d2) / radius);
-  let scale = 1.0 - (f32(bitcast<i32>(p.mode)) / 100.0) * t * t;
-  textureStore(output_tex, vec2<i32>(id.xy), bilinear_clamp(u * scale + cx, v * scale + cy));
+  let u = sf_add(sf(f32(id.x)), sf_neg(sf(cx)));
+  let v = sf_add(sf(f32(id.y)), sf_neg(sf(cy)));
+  let d = sf_sqrt(sf_add(sf_mul(u, u), sf_mul(v, v)));
+  let t = sf_add(sf(1.0), sf_neg(sf_div(d, sf(radius))));
+  if bitcast<f32>(t) <= 0.0 { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
+  let amount = sf_div(sf(f32(bitcast<i32>(p.mode))), sf(100.0));
+  let scale = sf_add(sf(1.0), sf_neg(sf_mul(sf_mul(amount, t), t)));
+  let x = bitcast<f32>(sf_add(sf_mul(u, scale), sf(cx)));
+  let y = bitcast<f32>(sf_add(sf_mul(v, scale), sf(cy)));
+  textureStore(output_tex, vec2<i32>(id.xy), bilinear_clamp(x, y));
 }
 fn blend4(a: vec4<u32>, b: vec4<u32>, c: vec4<u32>, d: vec4<u32>) -> vec4<u32> {
   let alpha = a.a + b.a + c.a + d.a;

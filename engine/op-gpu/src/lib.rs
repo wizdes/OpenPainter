@@ -238,6 +238,7 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Square => [4, 0, 0],
             op_ops::effect::GpuKernel::Surface => [6, 15, 0],
             op_ops::effect::GpuKernel::Unfocus => [4, 0, 0],
+            op_ops::effect::GpuKernel::Median => [10, 50, 0],
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
@@ -511,6 +512,9 @@ impl GpuContext {
                 (1..=100).contains(&values[0]) && (1..=100).contains(&values[1])
             }
             op_ops::effect::GpuKernel::Unfocus => (1..=200).contains(&values[0]),
+            op_ops::effect::GpuKernel::Median => {
+                (1..=200).contains(&values[0]) && (0..=100).contains(&values[1])
+            }
             op_ops::effect::GpuKernel::Turbulence => {
                 let packed = values[0] as u32;
                 (1..=10).contains(&(packed & 15))
@@ -561,6 +565,17 @@ impl GpuContext {
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("stylize precomputed weights"),
                     contents: bytemuck::cast_slice(&values),
+                    usage: wgpu::BufferUsages::STORAGE,
+                })
+        } else if kernel == op_ops::effect::GpuKernel::RedEyeRemoval {
+            let keys: Vec<[f32; 4]> = red_eye_low_colours(values[1] as u32)
+                .iter()
+                .map(|&key| [key, 0.0, 0.0, 0.0])
+                .collect();
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("red eye colours the CPU truncates low"),
+                    contents: bytemuck::cast_slice(&keys),
                     usage: wgpu::BufferUsages::STORAGE,
                 })
         } else {
@@ -1003,6 +1018,54 @@ pub const MODES: [LayerBlendMode; 14] = [
     LayerBlendMode::Screen,
     LayerBlendMode::Xor,
 ];
+
+/// Red Eye colours where the CPU's f64 result is one below the exact integer
+/// result at this saturation, as sorted `r << 16 | g << 8 | b` keys (exact in
+/// f32), ending with a 2^24 sentinel. The CPU truncates
+/// `(0.299 r + 0.587 g + 0.114 b) * s / 100` in f64; that only differs from
+/// `(299 r + 587 g + 114 b) * s / 100000` when the exact value is a whole number
+/// and the f64 sum lands just under it. Only colours with red above green and
+/// blue are listed, since the kernel changes no others. Cached per saturation.
+fn red_eye_low_colours(saturation: u32) -> Arc<Vec<f32>> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<HashMap<u32, Arc<Vec<f32>>>>> =
+        std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(Default::default);
+    if let Some(keys) = cache.lock().unwrap().get(&saturation) {
+        return keys.clone();
+    }
+    let s = saturation;
+    let mut keys = Vec::new();
+    if s > 0 {
+        // Blue values by their share of the exact product mod 100000.
+        let mut by_residue: HashMap<u32, Vec<u32>> = HashMap::new();
+        for b in 0..256 {
+            by_residue.entry(114 * b * s % 100_000).or_default().push(b);
+        }
+        for r in 1..256u32 {
+            for g in 0..r {
+                let need = (100_000 - (299 * r + 587 * g) * s % 100_000) % 100_000;
+                let Some(blues) = by_residue.get(&need) else {
+                    continue;
+                };
+                for &b in blues.iter().filter(|&&b| b < r) {
+                    let exact = (299 * r + 587 * g + 114 * b) * s / 100_000;
+                    let intensity =
+                        0.299 * f64::from(r) + 0.587 * f64::from(g) + 0.114 * f64::from(b);
+                    let cpu = (intensity * f64::from(s) / 100.0) as u8;
+                    if u32::from(cpu) != exact {
+                        debug_assert_eq!(u32::from(cpu) + 1, exact);
+                        keys.push(((r << 16) | (g << 8) | b) as f32);
+                    }
+                }
+            }
+        }
+        keys.sort_by(f32::total_cmp);
+    }
+    keys.push(16_777_216.0);
+    let keys = Arc::new(keys);
+    cache.lock().unwrap().insert(saturation, keys.clone());
+    keys
+}
 fn mode_index(mode: LayerBlendMode) -> u32 {
     MODES.iter().position(|&m| m == mode).unwrap() as u32
 }

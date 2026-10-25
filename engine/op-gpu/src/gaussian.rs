@@ -87,8 +87,8 @@ impl GpuContext {
             .poll(wgpu::PollType::wait_indefinitely())
             .map_err(|_| GpuError::DeviceLost)?;
         let upload_ms = upload_start.elapsed().as_secs_f64() * 1000.0;
-        let sums = intermediate(self, width, height, wgpu::TextureFormat::Rgba32Float);
-        let wc = intermediate(self, width, height, wgpu::TextureFormat::R32Float);
+        let sums = intermediate(self, width, height, wgpu::TextureFormat::Rgba32Uint);
+        let wc = intermediate(self, width, height, wgpu::TextureFormat::R32Uint);
         let output = self.texture(width, height);
         let params = self
             .device
