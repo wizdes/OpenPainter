@@ -159,7 +159,7 @@ final class StripAndToolTests: XCTestCase {
         XCTAssertEqual(status.imageValue.stringValue, "512 × 384 px")
         XCTAssertEqual(status.selectionValue.stringValue, "None")
         XCTAssertEqual(status.units.titleOfSelectedItem, "px")
-        XCTAssertFalse(status.units.item(at: 1)!.isEnabled, "inches come later")
+        XCTAssertTrue(status.units.item(at: 1)!.isEnabled, "M56 built inches")
         // The shown zoom equals the real scale, including after Fit.
         XCTAssertEqual(status.zoomField.stringValue, ZoomPresets.label(wc.canvas.viewport.zoom))
         status.actualButton.performClick(nil)
