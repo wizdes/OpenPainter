@@ -64,7 +64,7 @@ final class PanelTests: XCTestCase {
         func check(_ k: PanelKind, _ shown: Bool, _ how: String) {
             XCTAssertEqual(panels.isShown(k), shown, "\(k) \(how)")
             XCTAssertEqual(panels.panels[k]!.isVisible, shown, "\(k) window \(how)")
-            XCTAssertEqual(wc.panelToggles[k]!.isOn, shown, "\(k) toolbar toggle \(how)")
+            XCTAssertEqual(wc.moreItem(k.title)!.state == .on, shown, "\(k) toolbar toggle \(how)")
             let item = windowMenu.items.first { $0.title == k.title && !$0.isHidden }!
             _ = fx.workspace.menuTarget.validateMenuItem(item)
             XCTAssertEqual(item.state == .on, shown, "\(k) menu check mark \(how)")
@@ -79,7 +79,7 @@ final class PanelTests: XCTestCase {
             XCTAssertTrue(menu.performKeyEquivalent(with: d), "⌥⌘\(k.digit)")
             check(k, false, "after ⌥⌘\(k.digit)")
             // The toolbar toggle and the panel's own close button agree too.
-            wc.panelToggles[k]!.performClick(nil)
+            wc.clickMoreItem(k.title)
             check(k, true, "after the toolbar toggle")
             _ = panels.windowShouldClose(panels.panels[k]!)
             check(k, false, "after the close button")

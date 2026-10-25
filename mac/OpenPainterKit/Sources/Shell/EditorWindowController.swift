@@ -1,11 +1,12 @@
-// The Classic v2 main window for one image: the unified toolbar (document
-// title with the system Edited state, command buttons in paint.net order, the
-// four panel toggles), the tool-options row, the image strip, the stage with
-// the canvas, and the status bar. docs/design/SPEC.md has the sizes.
+// The Classic v2 main window for one image: the title bar (document title with
+// the system Edited state, no toolbar row), the tool-options row (the command
+// buttons and More menu from CommandBar.swift, then the tool's options), the
+// image strip, the stage with the canvas, and the status bar.
+// docs/design/SPEC.md has the sizes.
 import AppKit
 
 @MainActor
-public final class EditorWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate,
+public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     NSMenuItemValidation, EditorMenuActions
 {
     public let editor: Editor
@@ -14,8 +15,14 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public let optionsBar: OptionsBarView
     public let strip: ImageStripView
     public let statusBar = StatusBarView()
-    public private(set) var commandButtons: [String: ShellButton] = [:]
-    public private(set) var panelToggles: [PanelKind: ToggleButton] = [:]
+    /// The command buttons at the start of the options row, by key (CommandBar.swift).
+    public internal(set) var commandButtons: [String: ShellButton] = [:]
+    /// The seven command buttons, then More, left to right.
+    public internal(set) var commandBarButtons: [ShellButton] = []
+    /// Opens the menu with the other commands (CommandBar.swift).
+    public internal(set) var moreButton: ShellButton!
+    /// Sends a command button's or More item's action (tests record it).
+    var sendCommand: (Selector, AnyObject, Any?) -> Void = { NSApp.sendAction($0, to: $1, from: $2) }
     /// Live brush strokes from the canvas (M38).
     public private(set) var brush: BrushStrokeController!
     /// Rectangle Select, the Crop tool and the marching ants (M23).
@@ -49,18 +56,14 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         window.contentMinSize = NSSize(
             width: min(Self.minimumSize.width, visible.width), height: min(Self.minimumSize.height - 52, visible.height))
         window.title = editor.name
-        window.toolbarStyle = .unified
         window.titleVisibility = .visible
+        window.collectionBehavior.insert(.fullScreenPrimary)
         window.delegate = self
         let root = ShellRootView(controller: self)
         window.contentView = root
         window.initialFirstResponder = canvas
-        let toolbar = NSToolbar(identifier: "OpenPainterMain")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconOnly
-        toolbar.allowsUserCustomization = false
-        window.toolbar = toolbar
         editor.windowController = self
+        setUpCommandBar()  // the command buttons lead the options row
         wireCanvas()
         FileDrop.register(self)  // M17: dropped files open as documents
         textTool = TextToolController(window: self)
@@ -224,7 +227,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
 
     private func workspaceChanged() {
         strip.reload()
-        for (k, b) in panelToggles { b.isOn = workspace.panels.isShown(k) }
         updateClearRect()
     }
 
@@ -248,14 +250,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     private func updateCommandStates() {
-        let ids: [String: Bool] = [
-            "crop": editor.isEnabled("image.crop_to_selection") && editor.selection != nil,
-            "deselect": editor.selection != nil,
-            "undo": canUndo,
-            "redo": canRedo,
-        ]
-        for (k, on) in ids { commandButtons[k]?.isEnabled = on }
-        updateViewStates()
+        refreshCommandBar()
     }
 
     private func zoomFromStatus(_ z: Double?) {
@@ -370,101 +365,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         default: return true
         }
     }
-
-    // MARK: Toolbar
-
-    static let commandsID = NSToolbarItem.Identifier("commands")
-    static let panelsID = NSToolbarItem.Identifier("panels")
-
-    public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [Self.commandsID, .flexibleSpace, Self.panelsID]
-    }
-
-    public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar)
-    }
-
-    public func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier,
-                        willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        let item = NSToolbarItem(itemIdentifier: id)
-        if id == Self.commandsID {
-            item.view = commandStack()
-            item.label = "Commands"
-        } else if id == Self.panelsID {
-            item.view = panelStack()
-            item.label = "Panels"
-        } else {
-            return nil
-        }
-        return item
-    }
-
-    /// paint.net order: New, Open, Save, Print | Cut, Copy, Paste | Crop to
-    /// Selection, Deselect | Undo, Redo | Pixel Grid, Rulers. 6 pt gaps inside a
-    /// group, 12 pt between groups.
-    private func commandStack() -> NSStackView {
-        typealias C = (key: String, symbol: String, label: String, shortcut: String, action: Selector?)
-        let groups: [[C]] = [
-            [("new", "doc.badge.plus", "New", "⌘N", nil),
-             ("open", "folder", "Open", "⌘O", #selector(openDocument(_:))),
-             ("save", "square.and.arrow.down", "Save", "⌘S", nil),
-             ("print", "printer", "Print", "⌘P", nil)],
-            [("cut", "scissors", "Cut", "⌘X", nil),
-             ("copy", "doc.on.doc", "Copy", "⌘C", nil),
-             ("paste", "doc.on.clipboard", "Paste", "⌘V", nil)],
-            [("crop", "crop", "Crop to Selection", "⇧⌘X", #selector(cropClicked(_:))),
-             ("deselect", "rectangle.dashed.badge.record", "Deselect", "⌘D", #selector(deselectClicked(_:)))],
-            [("undo", "arrow.uturn.backward", "Undo", "⌘Z", #selector(undoClicked(_:))),
-             ("redo", "arrow.uturn.forward", "Redo", "⇧⌘Z", #selector(redoClicked(_:)))],
-            [("grid", "grid", "Pixel Grid", "⌘'", #selector(togglePixelGrid(_:))),
-             ("rulers", "ruler", "Rulers", "", #selector(toggleRulers(_:)))],
-        ]
-        let outer = NSStackView()
-        outer.translatesAutoresizingMaskIntoConstraints = false
-        outer.orientation = .horizontal
-        outer.spacing = 12
-        for g in groups {
-            let inner = NSStackView()
-            inner.translatesAutoresizingMaskIntoConstraints = false
-            inner.orientation = .horizontal
-            inner.spacing = 6
-            for c in g {
-                let tip = c.shortcut.isEmpty ? c.label : "\(c.label) (\(c.shortcut))"
-                let b: ShellButton = c.key == "grid" || c.key == "rulers"
-                    ? ToggleButton(symbol: c.symbol, label: c.label, tooltip: tip, target: self, action: c.action)
-                    : ShellButton(symbol: c.symbol, label: c.label, tooltip: c.action == nil ? "\(tip), comes later" : tip,
-                                  target: self, action: c.action)
-                b.isEnabled = c.action != nil
-                commandButtons[c.key] = b
-                inner.addArrangedSubview(b)
-            }
-            outer.addArrangedSubview(inner)
-        }
-        updateCommandStates()
-        return outer
-    }
-
-    private func panelStack() -> NSStackView {
-        let stack = NSStackView()
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.orientation = .horizontal
-        stack.spacing = 6
-        for k in PanelKind.allCases {
-            let b = ToggleButton(symbol: k.symbol, label: k.title, tooltip: "\(k.title) (F\(k.functionKey), ⌥⌘\(k.digit))",
-                                 target: workspace.menuTarget, action: #selector(PanelMenuTarget.togglePanel(_:)))
-            b.tag = k.digit
-            b.isOn = workspace.panels.isShown(k)
-            panelToggles[k] = b
-            stack.addArrangedSubview(b)
-        }
-        return stack
-    }
-
-    @objc private func openDocument(_ sender: Any?) { NSDocumentController.shared.openDocument(sender) }
-    @objc private func cropClicked(_ sender: Any?) { editor.run("image.crop_to_selection") }
-    @objc private func deselectClicked(_ sender: Any?) { editor.run("selection.deselect") }
-    @objc private func undoClicked(_ sender: Any?) { undo() }
-    @objc private func redoClicked(_ sender: Any?) { redo() }
 
     // MARK: NSWindowDelegate
 

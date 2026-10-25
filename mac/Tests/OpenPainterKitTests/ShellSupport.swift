@@ -131,3 +131,21 @@ func functionKey(_ n: Int) -> String {
 let functionKeyCodes: [Int: UInt16] = [5: 96, 6: 97, 7: 98, 8: 100]
 /// Mac key codes for the digits 1 to 4.
 let digitKeyCodes: [Int: UInt16] = [1: 18, 2: 19, 3: 20, 4: 21]
+
+extension EditorWindowController {
+    /// A More menu item (the old toolbar's other commands), validated as the
+    /// menu validates it when it opens.
+    func moreItem(_ title: String) -> NSMenuItem? {
+        let menu = moreMenu()
+        menu.update()
+        return menu.items.first { $0.title == title }
+    }
+
+    /// Chooses a More menu item, as a click on it does.
+    func clickMoreItem(_ title: String) {
+        let menu = moreMenu()
+        menu.update()
+        guard let item = menu.items.first(where: { $0.title == title }) else { return XCTFail("no More item \(title)") }
+        menu.performActionForItem(at: menu.index(of: item))
+    }
+}

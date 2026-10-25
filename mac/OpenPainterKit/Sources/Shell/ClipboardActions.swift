@@ -224,7 +224,10 @@ extension EditorWindowController: ClipboardActions {
         let canvas = CGSize(width: editor.info.width, height: editor.info.height)
         let size = CGSize(width: pixels.width, height: pixels.height)
         guard size.width > canvas.width || size.height > canvas.height else {
-            done?(beginPaste(pixels, newLayer: newLayer, name: name))
+            // Not `done?(beginPaste(...))`: with no `done` (Edit > Paste) Swift
+            // would skip the call, and the paste would never start.
+            let opened = beginPaste(pixels, newLayer: newLayer, name: name)
+            done?(opened)
             return
         }
         ImageClipboard.oversizePrompt(window, size, canvas) { [weak self] choice in
@@ -233,14 +236,16 @@ extension EditorWindowController: ClipboardActions {
             case .cancel:
                 done?(false)
             case .keepCanvasSize:
-                done?(self.beginPaste(pixels, newLayer: newLayer, name: name))
+                let opened = self.beginPaste(pixels, newLayer: newLayer, name: name)
+                done?(opened)
             case .expandCanvas:
                 // Canvas Size, anchored top left; its own step before the paste.
                 self.editor.run("image.canvas_size", [
                     "width": max(Int(canvas.width), pixels.width), "height": max(Int(canvas.height), pixels.height),
                     "anchor": "top_left", "fill": "transparent",
                 ])
-                done?(self.beginPaste(pixels, newLayer: newLayer, name: name, at: (0, 0)))
+                let opened = self.beginPaste(pixels, newLayer: newLayer, name: name, at: (0, 0))
+                done?(opened)
             }
         }
     }

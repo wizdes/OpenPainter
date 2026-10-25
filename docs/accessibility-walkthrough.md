@@ -39,6 +39,14 @@ Window (StandardWindow) "plasma_alpha_512x384.png"
         Button (DecrementArrow) [off]
         Button (IncrementPage) [off]
         Button (DecrementPage) [off]
+    Button "New" — help: New (⌘N)
+    Button "Open" — help: Open (⌘O)
+    Button "Save" [off] — help: Save (⌘S)
+    Button "Undo" [off] — help: Undo (⌘Z)
+    Button "Redo" [off] — help: Redo (⇧⌘Z)
+    Button "Crop to Selection" [off] — help: Crop to Selection (⇧⌘X)
+    CheckBox (Toggle) "Magic Wand" = 0 — help: Magic Wand (S)
+    Button "More commands" — help: More commands
   ScrollArea
     Button "plasma_alpha_512x384.png" = saved, active [off] — help: plasma_alpha_512x384.png
       StaticText = plasma_alpha_512x384.png
@@ -62,28 +70,8 @@ Window (StandardWindow) "plasma_alpha_512x384.png"
     Button "100%"
     Slider "Zoom slider" = 0
       ValueIndicator = 0
-  Toolbar
-    Group
-      Button "New" [off] — help: New (⌘N), comes later
-      Button "Open" — help: Open (⌘O)
-      Button "Save" [off] — help: Save (⌘S), comes later
-      Button "Print" [off] — help: Print (⌘P), comes later
-      Button "Cut" [off] — help: Cut (⌘X), comes later
-      Button "Copy" [off] — help: Copy (⌘C), comes later
-      Button "Paste" [off] — help: Paste (⌘V), comes later
-      Button "Crop to Selection" [off] — help: Crop to Selection (⇧⌘X)
-      Button "Deselect" [off] — help: Deselect (⌘D)
-      Button "Undo" [off] — help: Undo (⌘Z)
-      Button "Redo" [off] — help: Redo (⇧⌘Z)
-      CheckBox (Toggle) "Pixel Grid" = 0 — help: Pixel Grid (⌘')
-      CheckBox (Toggle) "Rulers" = 0 — help: Rulers
-    Group
-      CheckBox (Toggle) "Tools" = 1 — help: Tools (F5, ⌥⌘1)
-      CheckBox (Toggle) "History" = 1 — help: History (F6, ⌥⌘2)
-      CheckBox (Toggle) "Layers" = 1 — help: Layers (F7, ⌥⌘3)
-      CheckBox (Toggle) "Colors" = 1 — help: Colors (F8, ⌥⌘4)
   Button (CloseButton)
-  Button (ZoomButton)
+  Button (FullScreenButton) — help: this button also has an action to zoom the window
     Group
   Button (MinimizeButton)
 ```

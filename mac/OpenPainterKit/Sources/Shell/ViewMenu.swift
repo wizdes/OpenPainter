@@ -71,9 +71,10 @@ extension EditorWindowController: ViewMenuActions {
         if statusBar.dpi != dpi { statusBar.dpi = dpi }
     }
 
+    /// Pixel Grid and Rulers have check marks in the More menu (CommandBar.swift),
+    /// which reads them when it opens; the command buttons follow the new state.
     func updateViewStates() {
-        (commandButtons["grid"] as? ToggleButton)?.isOn = canvas.pixelGrid
-        (commandButtons["rulers"] as? ToggleButton)?.isOn = container.rulersVisible
+        refreshCommandBar()
     }
 
     @objc public func toggleRulers(_ sender: Any?) {

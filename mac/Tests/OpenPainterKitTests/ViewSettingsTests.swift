@@ -154,8 +154,8 @@ final class ViewSettingsTests: XCTestCase {
         XCTAssertEqual(c.horizontalRuler.frame.width, c.canvas.frame.width)
         XCTAssertEqual(c.verticalRuler.frame.height, c.canvas.frame.height)
         XCTAssertFalse(c.horizontalRuler.isHidden)
-        XCTAssertTrue(wc.commandButtons["rulers"]!.isEnabled)
-        XCTAssertTrue((wc.commandButtons["rulers"] as? ToggleButton)?.isOn == true)
+        XCTAssertTrue(wc.moreItem("Rulers")!.isEnabled)
+        XCTAssertTrue(wc.moreItem("Rulers")?.state == .on)
         for zoom in [0.25, 1, 4] {
             var v = c.canvas.viewport
             v.setZoom(zoom)
@@ -298,7 +298,7 @@ final class ViewSettingsTests: XCTestCase {
         XCTAssertTrue(settings.pixelGrid)
         _ = wc.validateMenuItem(grid)
         XCTAssertEqual(grid.state, .on)
-        XCTAssertTrue((wc.commandButtons["grid"] as? ToggleButton)?.isOn == true)
+        XCTAssertTrue(wc.moreItem("Pixel Grid")?.state == .on)
         // Settings… works with no document window.
         let app = try XCTUnwrap(MenuSkeleton.build(effects: [], panelTarget: nil).item(withTitle: "OpenPainter")?.submenu)
         let settingsItem = try XCTUnwrap(app.item(withTitle: "Settings…"))

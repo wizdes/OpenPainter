@@ -1737,6 +1737,10 @@
       "comment" : "Colors panel: button or checkbox title",
       "extractionState" : "manual"
     },
+    "More commands" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
     "Motion Blur" : {
       "comment" : "Motion Blur dialog: window title",
       "extractionState" : "manual"
@@ -1799,6 +1803,10 @@
     },
     "New" : {
       "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "New (⌘N)" : {
+      "comment" : "Main window: tooltip",
       "extractionState" : "manual"
     },
     "New (⌘N), comes later" : {
@@ -2355,6 +2363,10 @@
     },
     "Save" : {
       "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Save (⌘S)" : {
+      "comment" : "Main window: tooltip",
       "extractionState" : "manual"
     },
     "Save (⌘S), comes later" : {

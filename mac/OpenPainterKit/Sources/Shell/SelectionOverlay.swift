@@ -117,6 +117,9 @@ public final class SelectionOverlayView: NSView {
     public var shownSelectionPath: CGPath? { antsOver.path }
 
     func redraw() {
+        // AppKit can drop layer animations when the view joins a window (seen
+        // once the window lost its NSToolbar); start the dashes again.
+        if !antsAnimating { startAnts() }
         var t = transform
         antsUnder.path = selectionPath?.copy(using: &t)
         antsOver.path = antsUnder.path

@@ -111,20 +111,20 @@ final class MenuTests: XCTestCase {
         let crop = try XCTUnwrap(image.item(withTitle: "Crop to Selection"))
         XCTAssertFalse(wc.validateMenuItem(deselect))
         XCTAssertFalse(wc.validateMenuItem(crop))
-        XCTAssertFalse(wc.commandButtons["deselect"]!.isEnabled)
+        XCTAssertFalse(wc.moreItem("Deselect")!.isEnabled)
         wc.selectAllPixels()
         XCTAssertTrue(waitUntil { wc.editor.selection != nil })
         XCTAssertTrue(wc.validateMenuItem(deselect))
         XCTAssertTrue(wc.validateMenuItem(crop))
-        XCTAssertTrue(wc.commandButtons["deselect"]!.isEnabled)
+        XCTAssertTrue(wc.moreItem("Deselect")!.isEnabled)
         XCTAssertTrue(wc.commandButtons["crop"]!.isEnabled)
         wc.runCommand(deselect)
         XCTAssertTrue(waitUntil { wc.editor.selection == nil })
-        // Not-yet-built toolbar commands keep their place, disabled.
-        for k in ["new", "save", "print", "cut", "copy", "paste"] {
-            XCTAssertFalse(wc.commandButtons[k]!.isEnabled, k)
-        }
-        XCTAssertTrue(wc.commandButtons["rulers"]!.isEnabled, "M56 built Rulers")
+        // New and Copy are built now and turn on; Print is not in v1 and stays off.
+        XCTAssertTrue(wc.commandButtons["new"]!.isEnabled)
+        XCTAssertTrue(wc.moreItem("Copy")!.isEnabled)
+        XCTAssertFalse(wc.moreItem("Print")!.isEnabled)
+        XCTAssertTrue(wc.moreItem("Rulers")!.isEnabled, "M56 built Rulers")
         XCTAssertTrue(wc.commandButtons["open"]!.isEnabled)
         // Layers > Add New Layer and Go to Layer use the engine.
         let layers = try XCTUnwrap(menu.item(withTitle: "Layers")?.submenu)

@@ -1,4 +1,5 @@
-// The 36 pt tool-options row: the tool picker, then the current tool's options.
+// The 36 pt tool-options row: the window's command buttons (CommandBar.swift,
+// fixed at the leading end), then the tool picker and the current tool's options.
 // Paintbrush: width with - and +, hardness, antialiasing, blend mode, opacity,
 // pen pressure for size and for opacity. Eraser: the same without blend mode.
 // Pencil (always 1 px, hard, aliased in paint.net): blend mode, opacity, pen
@@ -6,7 +7,8 @@
 // Wand and Paint Bucket: tolerance (slider and field), tolerance alpha,
 // selection or blend mode, sampling, flood mode, antialiasing and Finish
 // (M31: the click stays live until Finish). Zoom and Pan:
-// none. Color Picker: sample size, layer or image, after click. At narrow sizes the row scrolls sideways instead of wrapping.
+// none. Color Picker: sample size, layer or image, after click. At narrow sizes the tool options scroll sideways
+// instead of wrapping; the command buttons never scroll or clip.
 import AppKit
 
 @MainActor
@@ -51,6 +53,17 @@ public final class OptionsBarView: FilledView {
         didSet {
             shownSet = nil
             sync()
+        }
+    }
+    /// The window's command buttons, fixed before the tool picker; nil for none.
+    public var commandBar: NSView? {
+        didSet {
+            oldValue?.removeFromSuperview()
+            if let commandBar {
+                commandBar.translatesAutoresizingMaskIntoConstraints = true
+                addSubview(commandBar)
+            }
+            needsLayout = true
         }
     }
     private var shownSet: PaintTool.OptionSet?
@@ -138,7 +151,12 @@ public final class OptionsBarView: FilledView {
 
     public override func layout() {
         super.layout()
-        scroll.frame = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - 1)
+        var x: CGFloat = 0
+        if let commandBar {
+            x = ceil(commandBar.fittingSize.width)
+            commandBar.frame = NSRect(x: 0, y: 0, width: x, height: bounds.height - 1)
+        }
+        scroll.frame = NSRect(x: x, y: 0, width: max(bounds.width - x, 0), height: bounds.height - 1)
     }
 
     private func setUpPicker() {
