@@ -29,6 +29,12 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/BrightnessAndContrastAdjustment.cs` | Original brightness and contrast effect class. |
 | `Effects/PosterizeAdjustment.cs` | Original posterize effect class. |
 | `Effects/GaussianBlurEffect.cs` | Original tent-kernel Gaussian effect class. |
+| `Effects/FragmentEffect.cs` | Original fragment sample offsets and blend. |
+| `Effects/LocalHistogramEffect.cs` | Original circular histograms for Median. |
+| `Effects/MedianEffect.cs` | Original Median radius and percentile effect. |
+| `Effects/MotionBlurEffect.cs` | Original linear samples and bilinear interpolation. |
+| `Effects/RadialBlurEffect.cs` | Original fixed-point rotation blur. |
+| `Effects/ZoomBlurEffect.cs` | Original fixed-point zoom blur. |
 
 `Shims/Utility.cs` contains verbatim numeric methods from `Core/Utility.cs` with the Windows UI methods removed. Its header records the source revision and changes.
 `Shims/AddNoiseEffect.cs`, `Shims/FrostedGlassEffect.cs`, and `Shims/CloudsEffect.cs` copy their named effect files. Each replaces only a clock-derived random seed with a fixed value. Their headers name the source and exact change.

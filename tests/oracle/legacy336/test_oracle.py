@@ -106,7 +106,11 @@ class OracleOutputTests(unittest.TestCase):
             inputs = sorted(pathlib.Path(entry['input']).stem for entry in core
                             if entry['op'] == name)
             self.assertEqual(inputs, sorted(EFFECT_FIXTURES), name)
-        self.assertEqual(len({entry['op'] for entry in core}), 13)
+        original = {entry['op'] for entry in core} - {
+            'Fragment Blur', 'Median Blur', 'Motion Blur', 'Radial Blur', 'Zoom Blur'
+        }
+        self.assertEqual(len(original), 13)
+        self.assertEqual(len({entry['op'] for entry in core}), 18)
 
     def test_effects_keep_hidden_color_fixture_bytes(self):
         # alpha_edge_64 holds straight color under zero alpha, so its outputs exist and are hashed.

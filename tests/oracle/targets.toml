@@ -77,6 +77,49 @@ reference = "provisional encoded-channel contract; paint.net 5.1 capture pending
 tolerance = "exact"
 
 [[effect]]
+id = "effect.blur.fragment"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Fragment_Blur_*.png"
+tolerance = "exact"
+docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.gaussian"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Gaussian_Blur_*.png"
+tolerance = "exact"
+own_5_1 = "gamma and quality controls are provisional until Paint.NET 5.1 capture"
+docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.median"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Median_Blur_*.png"
+tolerance = "exact"
+docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.motion"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Motion_Blur_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.radial"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Radial_Blur_*.png"
+tolerance = "exact"
+docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.zoom"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Zoom_Blur_*.png"
+tolerance = "exact"
+docs = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
 id = "effect.adjust.invert_alpha"
 target = "own"
 reference = "own goldens"

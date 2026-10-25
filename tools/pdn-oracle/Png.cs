@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 
 internal sealed class Png
@@ -30,7 +31,8 @@ internal sealed class Png
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);using var f=File.Create(path);using var writer=new BinaryWriter(f);
         writer.Write(new byte[]{137,80,78,71,13,10,26,10});byte[] header=new byte[13];BinaryPrimitives.WriteUInt32BigEndian(header,(uint)Width);BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4),(uint)Height);header[8]=8;header[9]=6;Chunk(writer,"IHDR",header);
-        using var raw=new MemoryStream();using(var z=new ZLibStream(raw,CompressionLevel.SmallestSize,true)) { for(int y=0;y<Height;y++){z.WriteByte(0);z.Write(Pixels,y*Width*4,Width*4);} }Chunk(writer,"IDAT",raw.ToArray());Chunk(writer,"IEND",Array.Empty<byte>());
+        bool subFilter=new[]{"Fragment_Blur_","Median_Blur_","Motion_Blur_","Radial_Blur_","Zoom_Blur_"}.Any(prefix=>Path.GetFileName(path).StartsWith(prefix,StringComparison.Ordinal));
+        using var raw=new MemoryStream();using(var z=new ZLibStream(raw,CompressionLevel.SmallestSize,true)) { for(int y=0;y<Height;y++){if(subFilter){z.WriteByte(1);byte[] row=new byte[Width*4];for(int i=0;i<row.Length;i++)row[i]=unchecked((byte)(Pixels[y*Width*4+i]-(i>=4?Pixels[y*Width*4+i-4]:0)));z.Write(row);}else{z.WriteByte(0);z.Write(Pixels,y*Width*4,Width*4);}} }Chunk(writer,"IDAT",raw.ToArray());Chunk(writer,"IEND",Array.Empty<byte>());
     }
     private static int Paeth(int a,int b,int c){int p=a+b-c,da=Math.Abs(p-a),db=Math.Abs(p-b),dc=Math.Abs(p-c);return da<=db&&da<=dc?a:db<=dc?b:c;}
     private static uint Read32(BinaryReader r){byte[] b=r.ReadBytes(4);if(b.Length!=4)throw new EndOfStreamException();return BinaryPrimitives.ReadUInt32BigEndian(b);}
