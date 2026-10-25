@@ -142,7 +142,10 @@ public final class ColorsPanelView: NSView {
         hexLabel.frame = NSRect(x: 100, y: p + 1, width: 72, height: 15)
         hexField.frame = NSRect(x: 100, y: p + 18, width: 72, height: 24)
         wheel.frame = NSRect(x: bounds.width - p - 52, y: p, width: 52, height: 52)
-        moreButton.frame = NSRect(x: p - 2, y: Self.rowY, width: 84, height: 24)
+        // M59: wider when a translation needs it, up to the add-color button.
+        let moreWidth = L10n.adjustsLayout
+            ? max(84, min((moreButton.cell?.cellSize.width ?? 84).rounded(.up), bounds.width - 2 * p - 60)) : 84
+        moreButton.frame = NSRect(x: p - 2, y: Self.rowY, width: moreWidth, height: 24)
         paletteButton.frame = NSRect(x: bounds.width - p - 24, y: Self.rowY, width: 24, height: 24)
         addColorButton.frame = NSRect(x: bounds.width - p - 52, y: Self.rowY, width: 24, height: 24)
         var y = Self.moreY
@@ -171,7 +174,8 @@ public final class ColorsPanelView: NSView {
             hexField.stringValue = c.hex
             shownHex = c.hex
         }
-        hexField.setAccessibilityLabel(tools.activeSlot == .primary ? "Primary color hex" : "Secondary color hex")
+        hexField.setVoiceOverLabel(tools.activeSlot == .primary  // M59: translated, and on the cell VoiceOver reads
+            ? L10n.tr("Primary color hex", "Colors panel: VoiceOver label") : L10n.tr("Secondary color hex", "Colors panel: VoiceOver label"))
         wheel.hsv = hsv
         let values: [Channel: Double] = [
             .red: Double(c.r), .green: Double(c.g), .blue: Double(c.b), .hue: hsv.h.rounded(),
@@ -284,8 +288,8 @@ public final class ColorsPanelView: NSView {
     public func setExpanded(_ on: Bool) {
         guard on != isExpanded else { return }
         isExpanded = on
-        moreButton.title = on ? "« Less" : "More »"
-        moreButton.setAccessibilityLabel(on ? "Less" : "More")
+        moreButton.title = on ? L10n.tr("« Less", "Colors panel: button title") : L10n.tr("More »", "Colors panel: button title")
+        moreButton.setVoiceOverLabel(on ? L10n.tr("Less", "Colors panel: VoiceOver label") : L10n.tr("More", "Colors panel: VoiceOver label"))
         for row in channels.values { row.isHidden = !on }
         sync()
         needsLayout = true
@@ -427,6 +431,15 @@ public final class SwatchPair: NSView {
         guard let tools else { return false }
         onPick?(tools.activeSlot.other)
         return true
+    }
+
+    // M59: Keyboard navigation reaches the swatches; Space or Return swaps the active slot.
+    public override var acceptsFirstResponder: Bool { KeyboardAccess.enabled }
+    public override var canBecomeKeyView: Bool { KeyboardAccess.enabled }
+    public override var focusRingMaskBounds: NSRect { Self.primaryRect.union(Self.secondaryRect) }
+    public override func drawFocusRingMask() { Self.primaryRect.union(Self.secondaryRect).fill() }
+    public override func keyDown(with event: NSEvent) {
+        if KeyboardAccess.isPress(event) { _ = accessibilityPerformPress() } else { super.keyDown(with: event) }
     }
 }
 
@@ -574,6 +587,28 @@ public final class ColorWheelView: NSView {
     public override func accessibilityValue() -> Any? {
         "hue \(Int(hsv.h.rounded())), saturation \(Int(hsv.s.rounded()))"
     }
+
+    // M59: Keyboard navigation reaches the wheel. Left and right turn the hue
+    // by 1 degree (Shift: 15), up and down change the saturation by 1 (Shift: 10).
+    public override var acceptsFirstResponder: Bool { KeyboardAccess.enabled }
+    public override var canBecomeKeyView: Bool { KeyboardAccess.enabled }
+    public override var focusRingMaskBounds: NSRect { bounds }
+    public override func drawFocusRingMask() { NSBezierPath(ovalIn: bounds).fill() }
+    public override func keyDown(with event: NSEvent) {
+        let big = event.modifierFlags.contains(.shift)
+        var h = hsv.h, s = hsv.s
+        switch event.keyCode {
+        case 123: h -= big ? 15 : 1
+        case 124: h += big ? 15 : 1
+        case 125: s -= big ? 10 : 1
+        case 126: s += big ? 10 : 1
+        default: return super.keyDown(with: event)
+        }
+        h = (h.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        s = min(max(s, 0), 100)
+        let a = h * .pi / 180
+        onPick?(cos(a) * s / 100, sin(a) * s / 100, [], false)
+    }
 }
 
 // MARK: Sliders
@@ -714,6 +749,19 @@ public final class GradientSlider: NSView {
         onChange?(max(value - 1, range.lowerBound))
         return true
     }
+
+    // M59: Keyboard navigation reaches the slider; the arrow keys step by one.
+    public override var acceptsFirstResponder: Bool { KeyboardAccess.enabled }
+    public override var canBecomeKeyView: Bool { KeyboardAccess.enabled }
+    public override var focusRingMaskBounds: NSRect { track.insetBy(dx: -4, dy: -6) }
+    public override func drawFocusRingMask() { track.insetBy(dx: -4, dy: -6).fill() }
+    public override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 123, 125: _ = accessibilityPerformDecrement()
+        case 124, 126: _ = accessibilityPerformIncrement()
+        default: super.keyDown(with: event)
+        }
+    }
 }
 
 // MARK: Palette grid
@@ -816,9 +864,11 @@ public final class PaletteCell: NSView {
     var isChosen: Bool { owner.chosen == index }
 
     func updateAccessibility() {
-        setAccessibilityLabel("Palette color \(index + 1), \(color.hex)")
+        setAccessibilityLabel(String(format: L10n.tr("Palette color %d, %@", "VoiceOver name of a palette swatch: number, hex"),
+                                     index + 1, color.hex))
         setAccessibilitySelected(isChosen)
-        toolTip = "\(color.hex): click for the active color, right-click or Shift-click for the other"
+        toolTip = String(format: L10n.tr("%@: click for the active color, right-click or Shift-click for the other",
+                                         "Tooltip of a palette swatch; %@ is its hex color"), color.hex)
     }
 
     public override func draw(_ dirtyRect: NSRect) {
@@ -856,6 +906,28 @@ public final class PaletteCell: NSView {
     public override func accessibilityPerformPress() -> Bool {
         owner.onPick?(index, false)
         return true
+    }
+
+    // M59: Keyboard navigation reaches each swatch. Space or Return sets the
+    // active color, Shift-Space the other one; the arrow keys move in the grid.
+    public override var acceptsFirstResponder: Bool { KeyboardAccess.enabled }
+    public override var canBecomeKeyView: Bool { KeyboardAccess.enabled }
+    public override var focusRingMaskBounds: NSRect { bounds }
+    public override func drawFocusRingMask() { bounds.fill() }
+    public override func keyDown(with event: NSEvent) {
+        if KeyboardAccess.isPress(event) { return owner.onPick?(index, event.modifierFlags.contains(.shift)) ?? () }
+        let step: Int? = switch event.keyCode {
+        case 123: -1
+        case 124: 1
+        case 125: PaletteView.columns
+        case 126: -PaletteView.columns
+        default: nil
+        }
+        if let step, owner.cells.indices.contains(index + step) {
+            window?.makeFirstResponder(owner.cells[index + step])
+            return
+        }
+        super.keyDown(with: event)
     }
 }
 

@@ -49,6 +49,7 @@ public final class Workspace {
         panels.panels[.colors]!.contentView = colorsView
         panels.panels[.layers]!.contentView = layersView
         panels.panels[.history]!.contentView = historyView
+        PanelAccessibility.install(panels)  // M59: headings, translated strings, dialog hook
         for p in panels.panels.values { p.router = { [weak self] in self?.active?.windowController?.window } }
         panels.stage = { [weak self] in self?.active?.windowController?.stageInScreen }
         panels.onChange = { [weak self] in self?.notify() }

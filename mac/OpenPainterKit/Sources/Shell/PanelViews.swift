@@ -198,6 +198,26 @@ public class PanelRow: NSView {
         onClick?(index)
         return true
     }
+
+    // M59: with Keyboard navigation on, Tab reaches each row; Space or Return
+    // picks it and the up and down arrows move to the row above or below.
+    public override var acceptsFirstResponder: Bool { KeyboardAccess.enabled }
+    public override var canBecomeKeyView: Bool { KeyboardAccess.enabled }
+    public override var focusRingMaskBounds: NSRect { bounds }
+    public override func drawFocusRingMask() { bounds.insetBy(dx: 1, dy: 1).fill() }
+
+    public override func keyDown(with event: NSEvent) {
+        if KeyboardAccess.isPress(event) { return onClick?(index) ?? () }
+        if let step = KeyboardAccess.verticalStep(event),
+           let rows = superview?.subviews.compactMap({ $0 as? PanelRow }).sorted(by: { $0.frame.minY < $1.frame.minY }),
+           let at = rows.firstIndex(where: { $0 === self }), rows.indices.contains(at + step) {
+            let next = rows[at + step]
+            window?.makeFirstResponder(next)
+            next.scrollToVisible(next.bounds)
+            return
+        }
+        super.keyDown(with: event)
+    }
 }
 
 /// A scrolling list of rows above an action bar.
@@ -244,10 +264,13 @@ public class RowListPanelView: NSView {
     }
 
     func setRows(_ new: [PanelRow]) {
+        // M59: a row with keyboard focus keeps it across a reload.
+        let focused = (window?.firstResponder as? PanelRow).flatMap { rows.contains($0) ? $0.index : nil }
         for r in rows { r.removeFromSuperview() }
         rows = new
         for r in rows { list.addSubview(r) }
         layoutRows()
+        if let focused, let r = rows.first(where: { $0.index == focused }) ?? rows.last { window?.makeFirstResponder(r) }
     }
 
     private func layoutRows() {

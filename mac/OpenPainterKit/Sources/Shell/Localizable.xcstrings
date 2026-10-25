@@ -1,0 +1,2714 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@: click for the active color, right-click or Shift-click for the other" : {
+      "comment" : "Tooltip of a palette swatch; %@ is its hex color",
+      "extractionState" : "manual"
+    },
+    "%d by %d pixels, zoom %@, tool %@" : {
+      "comment" : "VoiceOver value of the canvas: width, height, zoom percent, current tool",
+      "extractionState" : "manual"
+    },
+    "0 stores the pixels; 9 is smallest. Every level keeps every pixel." : {
+      "comment" : "Save Options: PNG dialog: label",
+      "extractionState" : "manual"
+    },
+    "4:2:0 (best compression)" : {
+      "comment" : "Save Options: JPEG dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "4:2:2 (default)" : {
+      "comment" : "Save Options: JPEG dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "4:4:4 (best quality)" : {
+      "comment" : "Save Options: JPEG dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "About OpenPainter" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Absolute colorimetric" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Acquire" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Action:" : {
+      "comment" : "Color Profile dialog: label",
+      "extractionState" : "manual"
+    },
+    "Actual Size" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Adaptive (Sharp)" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Add (union)" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Add color to palette" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Add New Layer" : {
+      "comment" : "Layers panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Add New Layer (⇧⌘N)" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Add Noise" : {
+      "comment" : "Add Noise dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Add the active color: then click a palette swatch to replace it" : {
+      "comment" : "Colors panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Additive" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Adjustments" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Adobe RGB (1998)" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Alpha" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Amount" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Amount value, -200.0 to 200.0" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Amount:" : {
+      "comment" : "Twist dialog: label",
+      "extractionState" : "manual"
+    },
+    "Anchor" : {
+      "comment" : "Canvas Size dialog: label",
+      "extractionState" : "manual"
+    },
+    "Anchor Bottom" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Bottom Left" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Bottom Right" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Center" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Left" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Right" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Top" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Top Left" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Anchor Top Right" : {
+      "comment" : "Canvas Size dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Angle" : {
+      "comment" : "Motion Blur dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Angle value, -180.0 to 180.0" : {
+      "comment" : "Motion Blur dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Angle:" : {
+      "comment" : "Motion Blur dialog: label",
+      "extractionState" : "manual"
+    },
+    "Antialiasing" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Appearance" : {
+      "comment" : "Settings dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Appearance:" : {
+      "comment" : "Settings dialog: label",
+      "extractionState" : "manual"
+    },
+    "Artistic" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Assign: keep pixels, change only the profile" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Auto" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Background" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Best Quality" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Bicubic" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Bicubic (Smooth)" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Bilinear" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Bilinear (Low Quality)" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Black" : {
+      "comment" : "Canvas Size dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Black and white" : {
+      "comment" : "Colors panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Black point compensation" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Blend mode" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Blend mode:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Blue" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Blurs" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Brightness" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Brightness \/ Contrast" : {
+      "comment" : "Brightness \/ Contrast dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Brightness value, -100 to 100" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Brightness:" : {
+      "comment" : "Brightness \/ Contrast dialog: label",
+      "extractionState" : "manual"
+    },
+    "Bring All to Front" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Brush width" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Button" : {
+      "comment" : "Tools panel: button or checkbox title",
+      "extractionState" : "manual"
+    },
+    "By absolute size" : {
+      "comment" : "Resize Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "By percentage:" : {
+      "comment" : "Resize Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Cancel" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Canvas area" : {
+      "comment" : "VoiceOver name of the area around the image",
+      "extractionState" : "manual"
+    },
+    "Canvas Size" : {
+      "comment" : "Canvas Size dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Canvas Size…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Center" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Center X value, -1.00 to 1.00" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Center Y value, -1.00 to 1.00" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Center:" : {
+      "comment" : "Twist dialog: label",
+      "extractionState" : "manual"
+    },
+    "Centered" : {
+      "comment" : "Motion Blur dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Centimeters" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Channel:" : {
+      "comment" : "Levels dialog: label",
+      "extractionState" : "manual"
+    },
+    "Check for Updates…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Chroma subsampling" : {
+      "comment" : "Save Options: JPEG dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Chroma subsampling:" : {
+      "comment" : "Save Options: JPEG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Clear Menu" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Click to add a point. Option-click removes one." : {
+      "comment" : "Curves dialog: label",
+      "extractionState" : "manual"
+    },
+    "Click: active color. Right-click: the other color. ⌘ keeps saturation, ⌥ keeps hue, ⇧ snaps to 15° spokes." : {
+      "comment" : "Colors panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Clone Stamp" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Clone Stamp (L)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Clone Stamp is coming soon" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Close" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Clouds" : {
+      "comment" : "Clouds dialog: window title",
+      "extractionState" : "manual"
+    },
+    "cm" : {
+      "comment" : "Main window: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Color" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Color Burn" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Color Dodge" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Color Picker" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Color Picker (K)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Color Picker: click sets the primary color, right-click the secondary; Command-click samples the image" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Color Profile" : {
+      "comment" : "Color Profile dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Color Profile…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Color space RGB. The image has no embedded profile." : {
+      "comment" : "Color Profile dialog: label",
+      "extractionState" : "manual"
+    },
+    "Color wheel" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Colors" : {
+      "comment" : "Floating panel title",
+      "extractionState" : "manual"
+    },
+    "Colors (4)" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Colors (F8 or ⌥⌘4)" : {
+      "comment" : "Menu bar: menu item tooltip",
+      "extractionState" : "manual"
+    },
+    "Colors (F8, ⌥⌘4)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Colors panel" : {
+      "comment" : "VoiceOver name of a floating panel",
+      "extractionState" : "manual"
+    },
+    "Comes in a later version" : {
+      "comment" : "Menu bar: menu item tooltip",
+      "extractionState" : "manual"
+    },
+    "Commands" : {
+      "comment" : "Main window: toolbar group name",
+      "extractionState" : "manual"
+    },
+    "Compression level" : {
+      "comment" : "Save Options: PNG dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Compression:" : {
+      "comment" : "Save Options: PNG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Contrast" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Contrast value, -100 to 100" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Contrast:" : {
+      "comment" : "Brightness \/ Contrast dialog: label",
+      "extractionState" : "manual"
+    },
+    "Convert: change pixels so colors look the same" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Converts every layer into Display P3. Colors stay the same; pixel values change." : {
+      "comment" : "Color Profile dialog: label",
+      "extractionState" : "manual"
+    },
+    "Copy" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Copy (⌘C), comes later" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Copy Merged" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Copy Selection" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Coverage" : {
+      "comment" : "Add Noise dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Coverage value, 0.0 to 100.0" : {
+      "comment" : "Add Noise dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Coverage:" : {
+      "comment" : "Add Noise dialog: label",
+      "extractionState" : "manual"
+    },
+    "Crop to Selection" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Crop to Selection (⇧⌘X)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Crop Tool" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Current profile" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Current:" : {
+      "comment" : "Color Profile dialog: label",
+      "extractionState" : "manual"
+    },
+    "Cursor" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Curve" : {
+      "comment" : "Curves dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Curve channel" : {
+      "comment" : "Curves dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Curve:" : {
+      "comment" : "Curves dialog: label",
+      "extractionState" : "manual"
+    },
+    "Curves" : {
+      "comment" : "Curves dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Cut" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Cut (⌘X), comes later" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Dark" : {
+      "comment" : "Settings dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Darken" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Decrease brush width" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Delete Layer" : {
+      "comment" : "Layers panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Delete Layer (⇧⌘⌫)" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Deselect" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Deselect (⌘D)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Difference" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Display P3" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Distance" : {
+      "comment" : "Motion Blur dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Distance value, 1 to 200" : {
+      "comment" : "Motion Blur dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Distance:" : {
+      "comment" : "Motion Blur dialog: label",
+      "extractionState" : "manual"
+    },
+    "Distort" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Duplicate Layer" : {
+      "comment" : "Layers panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Duplicate Layer (⇧⌘D)" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Edit" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Effects" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Ellipse Select" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Ellipse Select (S)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Ellipse Select: drag an ellipse; Command adds, Option subtracts, Shift makes a circle" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Emboss" : {
+      "comment" : "Emboss dialog: window title",
+      "extractionState" : "manual"
+    },
+    "engine.document.open" : {
+      "comment" : "Engine label for the command document.open. English: Open",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.auto_level" : {
+      "comment" : "Engine label for the command effect.adjust.auto_level. English: Auto-Level",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Level"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.black_and_white" : {
+      "comment" : "Engine label for the command effect.adjust.black_and_white. English: Black and White",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black and White"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.brightness_contrast" : {
+      "comment" : "Engine label for the command effect.adjust.brightness_contrast. English: Brightness \/ Contrast",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness \/ Contrast"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.curves" : {
+      "comment" : "Engine label for the command effect.adjust.curves. English: Curves",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curves"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.exposure" : {
+      "comment" : "Engine label for the command effect.adjust.exposure. English: Exposure",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exposure"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.highlights_shadows" : {
+      "comment" : "Engine label for the command effect.adjust.highlights_shadows. English: Highlights \/ Shadows",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlights \/ Shadows"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.hue_saturation" : {
+      "comment" : "Engine label for the command effect.adjust.hue_saturation. English: Hue \/ Saturation",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hue \/ Saturation"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.invert_alpha" : {
+      "comment" : "Engine label for the command effect.adjust.invert_alpha. English: Invert Alpha",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invert Alpha"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.invert_colors" : {
+      "comment" : "Engine label for the command effect.adjust.invert_colors. English: Invert Colors",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invert Colors"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.levels" : {
+      "comment" : "Engine label for the command effect.adjust.levels. English: Levels",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Levels"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.posterize" : {
+      "comment" : "Engine label for the command effect.adjust.posterize. English: Posterize",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posterize"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.sepia" : {
+      "comment" : "Engine label for the command effect.adjust.sepia. English: Sepia",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sepia"
+          }
+        }
+      }
+    },
+    "engine.effect.adjust.temperature_tint" : {
+      "comment" : "Engine label for the command effect.adjust.temperature_tint. English: Temperature and Tint",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperature and Tint"
+          }
+        }
+      }
+    },
+    "engine.effect.artistic.ink_sketch" : {
+      "comment" : "Engine label for the command effect.artistic.ink_sketch. English: Ink Sketch",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ink Sketch"
+          }
+        }
+      }
+    },
+    "engine.effect.artistic.oil_painting" : {
+      "comment" : "Engine label for the command effect.artistic.oil_painting. English: Oil Painting",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oil Painting"
+          }
+        }
+      }
+    },
+    "engine.effect.artistic.pencil_sketch" : {
+      "comment" : "Engine label for the command effect.artistic.pencil_sketch. English: Pencil Sketch",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pencil Sketch"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.bokeh" : {
+      "comment" : "Engine label for the command effect.blur.bokeh. English: Bokeh Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bokeh Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.fragment" : {
+      "comment" : "Engine label for the command effect.blur.fragment. English: Fragment Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fragment Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.gaussian" : {
+      "comment" : "Engine label for the command effect.blur.gaussian. English: Gaussian Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaussian Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.median" : {
+      "comment" : "Engine label for the command effect.blur.median. English: Median Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.motion" : {
+      "comment" : "Engine label for the command effect.blur.motion. English: Motion Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motion Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.radial" : {
+      "comment" : "Engine label for the command effect.blur.radial. English: Radial Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Radial Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.sketch" : {
+      "comment" : "Engine label for the command effect.blur.sketch. English: Sketch Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sketch Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.square" : {
+      "comment" : "Engine label for the command effect.blur.square. English: Square Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Square Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.surface" : {
+      "comment" : "Engine label for the command effect.blur.surface. English: Surface Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surface Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.unfocus" : {
+      "comment" : "Engine label for the command effect.blur.unfocus. English: Unfocus",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfocus"
+          }
+        }
+      }
+    },
+    "engine.effect.blur.zoom" : {
+      "comment" : "Engine label for the command effect.blur.zoom. English: Zoom Blur",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom Blur"
+          }
+        }
+      }
+    },
+    "engine.effect.color.quantize" : {
+      "comment" : "Engine label for the command effect.color.quantize. English: Quantize",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantize"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.bulge" : {
+      "comment" : "Engine label for the command effect.distort.bulge. English: Bulge",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bulge"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.crystalize" : {
+      "comment" : "Engine label for the command effect.distort.crystalize. English: Crystalize",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crystalize"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.dents" : {
+      "comment" : "Engine label for the command effect.distort.dents. English: Dents",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dents"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.frosted_glass" : {
+      "comment" : "Engine label for the command effect.distort.frosted_glass. English: Frosted Glass",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frosted Glass"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.morphology" : {
+      "comment" : "Engine label for the command effect.distort.morphology. English: Morphology",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morphology"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.pixelate" : {
+      "comment" : "Engine label for the command effect.distort.pixelate. English: Pixelate",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixelate"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.polar_inversion" : {
+      "comment" : "Engine label for the command effect.distort.polar_inversion. English: Polar Inversion",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polar Inversion"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.tile_reflection" : {
+      "comment" : "Engine label for the command effect.distort.tile_reflection. English: Tile Reflection",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tile Reflection"
+          }
+        }
+      }
+    },
+    "engine.effect.distort.twist" : {
+      "comment" : "Engine label for the command effect.distort.twist. English: Twist",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twist"
+          }
+        }
+      }
+    },
+    "engine.effect.fill.content_aware" : {
+      "comment" : "Engine label for the command effect.fill.content_aware. English: Content-Aware Fill",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Content-Aware Fill"
+          }
+        }
+      }
+    },
+    "engine.effect.layers.rotate_zoom" : {
+      "comment" : "Engine label for the command effect.layers.rotate_zoom. English: Rotate \/ Zoom…",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotate \/ Zoom…"
+          }
+        }
+      }
+    },
+    "engine.effect.noise.add" : {
+      "comment" : "Engine label for the command effect.noise.add. English: Add Noise",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Noise"
+          }
+        }
+      }
+    },
+    "engine.effect.noise.reduce" : {
+      "comment" : "Engine label for the command effect.noise.reduce. English: Reduce Noise",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reduce Noise"
+          }
+        }
+      }
+    },
+    "engine.effect.object.drop_shadow" : {
+      "comment" : "Engine label for the command effect.object.drop_shadow. English: Drop Shadow",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop Shadow"
+          }
+        }
+      }
+    },
+    "engine.effect.photo.glow" : {
+      "comment" : "Engine label for the command effect.photo.glow. English: Glow",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glow"
+          }
+        }
+      }
+    },
+    "engine.effect.photo.red_eye_removal" : {
+      "comment" : "Engine label for the command effect.photo.red_eye_removal. English: Red Eye Removal",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Red Eye Removal"
+          }
+        }
+      }
+    },
+    "engine.effect.photo.sharpen" : {
+      "comment" : "Engine label for the command effect.photo.sharpen. English: Sharpen",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharpen"
+          }
+        }
+      }
+    },
+    "engine.effect.photo.soften_portrait" : {
+      "comment" : "Engine label for the command effect.photo.soften_portrait. English: Soften Portrait",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soften Portrait"
+          }
+        }
+      }
+    },
+    "engine.effect.photo.vignette" : {
+      "comment" : "Engine label for the command effect.photo.vignette. English: Vignette",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vignette"
+          }
+        }
+      }
+    },
+    "engine.effect.render.clouds" : {
+      "comment" : "Engine label for the command effect.render.clouds. English: Clouds",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clouds"
+          }
+        }
+      }
+    },
+    "engine.effect.render.julia_fractal" : {
+      "comment" : "Engine label for the command effect.render.julia_fractal. English: Julia Fractal",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Julia Fractal"
+          }
+        }
+      }
+    },
+    "engine.effect.render.mandelbrot_fractal" : {
+      "comment" : "Engine label for the command effect.render.mandelbrot_fractal. English: Mandelbrot Fractal",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mandelbrot Fractal"
+          }
+        }
+      }
+    },
+    "engine.effect.render.turbulence" : {
+      "comment" : "Engine label for the command effect.render.turbulence. English: Turbulence",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turbulence"
+          }
+        }
+      }
+    },
+    "engine.effect.stylize.edge_detect" : {
+      "comment" : "Engine label for the command effect.stylize.edge_detect. English: Edge Detect",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edge Detect"
+          }
+        }
+      }
+    },
+    "engine.effect.stylize.emboss" : {
+      "comment" : "Engine label for the command effect.stylize.emboss. English: Emboss",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emboss"
+          }
+        }
+      }
+    },
+    "engine.effect.stylize.outline" : {
+      "comment" : "Engine label for the command effect.stylize.outline. English: Outline",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outline"
+          }
+        }
+      }
+    },
+    "engine.effect.stylize.relief" : {
+      "comment" : "Engine label for the command effect.stylize.relief. English: Relief",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relief"
+          }
+        }
+      }
+    },
+    "engine.selection.select_all" : {
+      "comment" : "Engine label for the command selection.select_all. English: Select All",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select All"
+          }
+        }
+      }
+    },
+    "Erase Selection" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Eraser" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Eraser (E)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Eraser: drag to paint" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Exclude" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Expand Selection" : {
+      "comment" : "Expand Selection dialog: title",
+      "extractionState" : "manual"
+    },
+    "Expand Selection…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Fant" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "File" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "File size" : {
+      "comment" : "Save Options: JPEG dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Fill" : {
+      "comment" : "Canvas Size dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Fill Selection" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Fill:" : {
+      "comment" : "Canvas Size dialog: label",
+      "extractionState" : "manual"
+    },
+    "Fit" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Flatten" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Flip Horizontal" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Flip Vertical" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "From Scanner or Camera…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Gamma" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Gamma correction" : {
+      "comment" : "Resize Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Gamma value, 0.10 to 10.00" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Gamma:" : {
+      "comment" : "Levels dialog: label",
+      "extractionState" : "manual"
+    },
+    "Glow" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Go to Bottom Layer" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Go to Layer Above" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Go to Layer Below" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Go to Top Layer" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Gradient" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Gradient (G)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Gradient is coming soon" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Green" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Grow the selection by this many pixels. A negative number shrinks it." : {
+      "comment" : "Expand Selection dialog: explanation",
+      "extractionState" : "manual"
+    },
+    "Hardness" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Height in pixels" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Height:" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Help" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Hex" : {
+      "comment" : "Colors panel: label",
+      "extractionState" : "manual"
+    },
+    "Hide OpenPainter" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Hide Others" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "History" : {
+      "comment" : "Floating panel title",
+      "extractionState" : "manual"
+    },
+    "History (2)" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "History (F6 or ⌥⌘2)" : {
+      "comment" : "Menu bar: menu item tooltip",
+      "extractionState" : "manual"
+    },
+    "History (F6, ⌥⌘2)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "History panel" : {
+      "comment" : "VoiceOver name of a floating panel",
+      "extractionState" : "manual"
+    },
+    "Horizontal ruler" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Hue" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Hue \/ Saturation" : {
+      "comment" : "Hue \/ Saturation dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Hue value, -180 to 180" : {
+      "comment" : "Hue \/ Saturation dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Hue:" : {
+      "comment" : "Hue \/ Saturation dialog: label",
+      "extractionState" : "manual"
+    },
+    "ICC File…" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Image" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Image %@" : {
+      "comment" : "VoiceOver name of the canvas; %@ is the image name",
+      "extractionState" : "manual"
+    },
+    "Image plasma_alpha_512x384.png" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Image size: 1.8 MB (800 × 600 px)" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Import From File…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "in" : {
+      "comment" : "Main window: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "inches" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Inches" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Increase brush width" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Input black" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Input black value, 0 to 255" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Input black:" : {
+      "comment" : "Levels dialog: label",
+      "extractionState" : "manual"
+    },
+    "Input white" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Input white value, 0 to 255" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Input white:" : {
+      "comment" : "Levels dialog: label",
+      "extractionState" : "manual"
+    },
+    "Intensity" : {
+      "comment" : "Add Noise dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Intensity value, 0 to 100" : {
+      "comment" : "Add Noise dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Intensity:" : {
+      "comment" : "Add Noise dialog: label",
+      "extractionState" : "manual"
+    },
+    "Intent:" : {
+      "comment" : "Color Profile dialog: label",
+      "extractionState" : "manual"
+    },
+    "Intersect" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Invert (\"xor\")" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Invert Selection" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "JPEG options" : {
+      "comment" : "Save Options: JPEG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Keep all" : {
+      "comment" : "Save Options: JPEG dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Lanczos" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Lasso Select" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Lasso Select (S)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Lasso Select: drag around an area; Command adds, Option subtracts" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Layer name" : {
+      "comment" : "Layer Properties dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Layer Properties" : {
+      "comment" : "Layers panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Layer Properties (F4)" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Layer Properties…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Layers" : {
+      "comment" : "Floating panel title",
+      "extractionState" : "manual"
+    },
+    "Layers (3)" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Layers (F7 or ⌥⌘3)" : {
+      "comment" : "Menu bar: menu item tooltip",
+      "extractionState" : "manual"
+    },
+    "Layers (F7, ⌥⌘3)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Layers panel" : {
+      "comment" : "VoiceOver name of a floating panel",
+      "extractionState" : "manual"
+    },
+    "Levels" : {
+      "comment" : "Levels dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Levels channel" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Light" : {
+      "comment" : "Settings dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Lighten" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Lightness" : {
+      "comment" : "Hue \/ Saturation dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Lightness value, -100 to 100" : {
+      "comment" : "Hue \/ Saturation dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Lightness:" : {
+      "comment" : "Hue \/ Saturation dialog: label",
+      "extractionState" : "manual"
+    },
+    "Line \/ Curve" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Line \/ Curve (O)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Line \/ Curve is coming soon" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Load, save or reset the palette" : {
+      "comment" : "Colors panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Luminosity" : {
+      "comment" : "Curves dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Magic Wand" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Magic Wand (S)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Magic Wand: click to select a region of similar color" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Maintain aspect ratio" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Measuring…" : {
+      "comment" : "Save Options: JPEG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Merge Layer Down" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Metadata" : {
+      "comment" : "Save Options: JPEG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Metadata:" : {
+      "comment" : "Save Options: JPEG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Minimize" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "More" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "More »" : {
+      "comment" : "Colors panel: button or checkbox title",
+      "extractionState" : "manual"
+    },
+    "Motion Blur" : {
+      "comment" : "Motion Blur dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Move Layer Down" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Move Layer to Bottom" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Move Layer to Top" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Move Layer Up" : {
+      "comment" : "Layers panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Move Selected Pixels" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Move Selected Pixels (M)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Move Selected Pixels: drag to move, nubs scale, drag outside to rotate; Enter finishes, Escape cancels" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Move Selection" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Move Selection (M)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Move Selection: drag to move the outline, nubs scale, drag outside to rotate; Enter finishes" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Multiply" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Name:" : {
+      "comment" : "Layer Properties dialog: label",
+      "extractionState" : "manual"
+    },
+    "Nearest Neighbor" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Negation" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "New" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "New (⌘N), comes later" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "New Image" : {
+      "comment" : "New Image dialog: window title",
+      "extractionState" : "manual"
+    },
+    "New size: 768 KB (512 × 384 px)" : {
+      "comment" : "Resize Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "New…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Next Panel" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Noise" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "None" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "None, treated as sRGB" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Normal" : {
+      "comment" : "Main window: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Note" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Object" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "OK" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "On" : {
+      "comment" : "Main window: button or checkbox title",
+      "extractionState" : "manual"
+    },
+    "Opacity" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Opacity value, 0 to 255" : {
+      "comment" : "Layer Properties dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Opacity:" : {
+      "comment" : "Layer Properties dialog: label",
+      "extractionState" : "manual"
+    },
+    "Open" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Open (⌘O)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Open images" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Open Recent" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Open…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "OpenPainter" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "OpenPainter Help" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Output black" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Output black value, 0 to 255" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Output black:" : {
+      "comment" : "Levels dialog: label",
+      "extractionState" : "manual"
+    },
+    "Output white" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Output white value, 0 to 255" : {
+      "comment" : "Levels dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Output white:" : {
+      "comment" : "Levels dialog: label",
+      "extractionState" : "manual"
+    },
+    "Overlay" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Overwrite" : {
+      "comment" : "Main window: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Paint Bucket" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Paint Bucket (F)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Paint Bucket: click to fill with the primary color, right-click for the secondary" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Paintbrush" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Paintbrush (B)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Paintbrush: drag to paint" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Palette color %d, %@" : {
+      "comment" : "VoiceOver name of a palette swatch: number, hex",
+      "extractionState" : "manual"
+    },
+    "Palette menu" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Pan" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Pan (H)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Pan: drag to move the view" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Panels" : {
+      "comment" : "Main window: toolbar group name",
+      "extractionState" : "manual"
+    },
+    "Paste" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Paste (⌘V), comes later" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Paste into New Image" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Paste into New Layer" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Paste Selection" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Pen pressure" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Pen pressure changes the brush width" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Pen pressure changes the opacity" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Pencil" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Pencil (P)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Pencil: drag to paint" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Percentage" : {
+      "comment" : "Resize Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Perceptual" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Photo" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Pick a new random seed" : {
+      "comment" : "Clouds dialog: tooltip",
+      "extractionState" : "manual"
+    },
+    "Pixel Grid" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Pixel Grid (⌘')" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Pixel size" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "pixels" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Pixels" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "pixels\/centimeter" : {
+      "comment" : "New Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "pixels\/inch" : {
+      "comment" : "New Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "plasma_alpha_512x384.png" : {
+      "comment" : "Main window: window title",
+      "extractionState" : "manual"
+    },
+    "PNG options" : {
+      "comment" : "Save Options: PNG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Preview of the saved image" : {
+      "comment" : "Save Options: JPEG dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Previous Panel" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Primary alpha" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Primary alpha value, 0 to 255" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Primary alpha:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Primary and secondary colors" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Primary color" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Primary Color" : {
+      "comment" : "Canvas Size dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Primary color hex" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Primary color:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Print" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Print (⌘P), comes later" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Print height" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Print size" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Print width" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Profile" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Profile:" : {
+      "comment" : "Color Profile dialog: label",
+      "extractionState" : "manual"
+    },
+    "ProPhoto RGB" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "px" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Quality" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Quality value" : {
+      "comment" : "Save Options: JPEG dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Quality value, 1 to 5" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Quality:" : {
+      "comment" : "Twist dialog: label",
+      "extractionState" : "manual"
+    },
+    "Quit OpenPainter" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Random seed value, 0 to 255" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Random seed value, 0 to 2147483647" : {
+      "comment" : "Add Noise dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Random seed:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Recolor" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Recolor (R)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Recolor is coming soon" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Rectangle Select" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Rectangle Select (S)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Rectangle Select: drag a rectangle; Command adds, Option subtracts, Shift makes a square" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Red" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "redo" : {
+      "comment" : "History panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Redo" : {
+      "comment" : "History panel: button or checkbox title",
+      "extractionState" : "manual"
+    },
+    "Redo (⇧⌘Z)" : {
+      "comment" : "History panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Reflect" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Relative colorimetric" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Remove all (EXIF, XMP, GPS, IPTC)" : {
+      "comment" : "Save Options: JPEG dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Remove location (GPS)" : {
+      "comment" : "Save Options: JPEG dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Render" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Rendering intent" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Rendering preview" : {
+      "comment" : "Brightness \/ Contrast dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Repeat Effect" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Replace" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Resampling" : {
+      "comment" : "Resize Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Resampling:" : {
+      "comment" : "Resize Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Reseed" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Reset colors" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Reset Panel Layout" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Resize Image" : {
+      "comment" : "Resize Image dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Resize…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Resolution" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Resolution unit" : {
+      "comment" : "Resize Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Resolution:" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Revert to Saved" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "RGB" : {
+      "comment" : "Curves dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Rotate 90° Clockwise" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Rotate 90° Counter-Clockwise" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Rotate 180°" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Roughness" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Roughness value, 0.00 to 1.00" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Roughness:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "RRGGBB, or RRGGBBAA with alpha" : {
+      "comment" : "Colors panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Rulers" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Saturation" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Saturation value, 0 to 200" : {
+      "comment" : "Hue \/ Saturation dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Saturation value, 0 to 400" : {
+      "comment" : "Add Noise dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Saturation:" : {
+      "comment" : "Hue \/ Saturation dialog: label",
+      "extractionState" : "manual"
+    },
+    "Save" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Save (⌘S), comes later" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Save a Copy…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Save All" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Save As…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Save Options: JPEG" : {
+      "comment" : "Save Options: JPEG dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Save Options: PNG" : {
+      "comment" : "Save Options: PNG dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Scale" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Scale value, 2 to 1000" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Scale:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Screen" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Secondary alpha" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Secondary alpha value, 0 to 255" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Secondary alpha:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Secondary color" : {
+      "comment" : "Clouds dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Secondary Color" : {
+      "comment" : "Canvas Size dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Secondary color:" : {
+      "comment" : "Clouds dialog: label",
+      "extractionState" : "manual"
+    },
+    "Select All" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Selection" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Send Feedback…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Settings" : {
+      "comment" : "Settings dialog: window title",
+      "extractionState" : "manual"
+    },
+    "Settings…" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Shapes" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Shapes (O)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Shapes is coming soon" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "Show All" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Show rulers" : {
+      "comment" : "Settings dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Show the pixel grid" : {
+      "comment" : "Settings dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Size" : {
+      "comment" : "Main window: button or checkbox title",
+      "extractionState" : "manual"
+    },
+    "Size value, 0.01 to 2.00" : {
+      "comment" : "Twist dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Size:" : {
+      "comment" : "Twist dialog: label",
+      "extractionState" : "manual"
+    },
+    "sRGB" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "sRGB (none)" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Status bar" : {
+      "comment" : "VoiceOver name of the status bar",
+      "extractionState" : "manual"
+    },
+    "Straighten" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Stylize" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Super Sampling" : {
+      "comment" : "Resize Image dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Swap colors" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Swap colors (X)" : {
+      "comment" : "Colors panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "System" : {
+      "comment" : "Settings dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "System follows the Mac's light or dark setting." : {
+      "comment" : "Settings dialog: label",
+      "extractionState" : "manual"
+    },
+    "Target profile" : {
+      "comment" : "Color Profile dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Text" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Text (T)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Text being typed" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Text: click to type; Escape, Finish, a click outside or another tool commits" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    },
+    "The grid shows at 400% zoom and above." : {
+      "comment" : "Settings dialog: label",
+      "extractionState" : "manual"
+    },
+    "This display: DELL U2414H" : {
+      "comment" : "Color Profile dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "This image has no EXIF, XMP or GPS metadata." : {
+      "comment" : "Save Options: JPEG dialog: label",
+      "extractionState" : "manual"
+    },
+    "Toggle Layer Visibility" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Tool" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Tool letters pick tools. Shift with a letter goes back. Bracket keys change the brush width." : {
+      "comment" : "VoiceOver help for the canvas",
+      "extractionState" : "manual"
+    },
+    "Tool options" : {
+      "comment" : "VoiceOver name of the tool options row",
+      "extractionState" : "manual"
+    },
+    "Tools" : {
+      "comment" : "Floating panel title",
+      "extractionState" : "manual"
+    },
+    "Tools (1)" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Tools (F5 or ⌥⌘1)" : {
+      "comment" : "Menu bar: menu item tooltip",
+      "extractionState" : "manual"
+    },
+    "Tools (F5, ⌥⌘1)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "Tools panel" : {
+      "comment" : "VoiceOver name of a floating panel",
+      "extractionState" : "manual"
+    },
+    "Transfer map" : {
+      "comment" : "Curves dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Transfer map:" : {
+      "comment" : "Curves dialog: label",
+      "extractionState" : "manual"
+    },
+    "Transparent" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Twist" : {
+      "comment" : "Twist dialog: window title",
+      "extractionState" : "manual"
+    },
+    "undo" : {
+      "comment" : "History panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Undo" : {
+      "comment" : "History panel: button or checkbox title",
+      "extractionState" : "manual"
+    },
+    "Undo (⌘Z)" : {
+      "comment" : "History panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Units" : {
+      "comment" : "Main window: label",
+      "extractionState" : "manual"
+    },
+    "Units:" : {
+      "comment" : "Settings dialog: label",
+      "extractionState" : "manual"
+    },
+    "Units: pixels, inches or centimeters (View menu)" : {
+      "comment" : "Main window: tooltip",
+      "extractionState" : "manual"
+    },
+    "User Interface" : {
+      "comment" : "Settings dialog: label",
+      "extractionState" : "manual"
+    },
+    "Value" : {
+      "comment" : "Colors panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Vertical ruler" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "View" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Visible" : {
+      "comment" : "Layer Properties dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "White" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Width in pixels" : {
+      "comment" : "New Image dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Width:" : {
+      "comment" : "New Image dialog: label",
+      "extractionState" : "manual"
+    },
+    "Window" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "X:" : {
+      "comment" : "Twist dialog: label",
+      "extractionState" : "manual"
+    },
+    "xctest alert" : {
+      "comment" : "Dialog: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Xor" : {
+      "comment" : "Clouds dialog: menu choice in a popup",
+      "extractionState" : "manual"
+    },
+    "Y:" : {
+      "comment" : "Twist dialog: label",
+      "extractionState" : "manual"
+    },
+    "Zoom" : {
+      "comment" : "Tools panel: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Zoom (Z)" : {
+      "comment" : "Tools panel: tooltip",
+      "extractionState" : "manual"
+    },
+    "Zoom In" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Zoom Out" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Zoom Presets" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Zoom slider" : {
+      "comment" : "Main window: VoiceOver label",
+      "extractionState" : "manual"
+    },
+    "Zoom to Selection" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Zoom to Window" : {
+      "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Zoom: click to zoom in, Option-click to zoom out, drag a rectangle" : {
+      "comment" : "Status bar hint for the current tool",
+      "extractionState" : "manual"
+    }
+  },
+  "version" : "1.0"
+}

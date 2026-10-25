@@ -192,7 +192,8 @@ public final class OptionsBarView: FilledView {
         // Paint Bucket uses blend mode; Magic Wand uses selection mode.
         if tool.options == .flood {
             selectionMode.isHidden = tool != .magicWand
-            modeLabel?.stringValue = tool == .magicWand ? "Selection mode" : "Blend mode"
+            modeLabel?.stringValue = tool == .magicWand
+                ? L10n.tr("Selection mode", "Tool options row: label") : L10n.tr("Blend mode", "Tool options row: label")
             blendInFlood?.isHidden = tool == .magicWand
         }
     }
@@ -269,6 +270,8 @@ public final class OptionsBarView: FilledView {
             let has = v.constraints.contains { $0.firstAttribute == .height && $0.firstItem === v }
             if !has { v.heightAnchor.constraint(equalToConstant: 28).isActive = true }
         }
+        L10n.localize(stack, context: "Tool options row")  // M59: the new row's words
+        L10n.growWidthConstraints(in: stack)
     }
 
     static func number(_ v: Double) -> String {

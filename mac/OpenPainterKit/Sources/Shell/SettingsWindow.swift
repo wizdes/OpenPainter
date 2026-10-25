@@ -36,6 +36,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         window.delegate = self
         let root = content()
         window.contentView = root
+        L10n.localizeDialog(window)  // M59: translated before it is sized
         root.layoutSubtreeIfNeeded()
         let fit = root.subviews.first?.fittingSize ?? .zero
         window.setContentSize(NSSize(width: max(420, fit.width + 48), height: fit.height + 32))

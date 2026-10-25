@@ -72,6 +72,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         wireViewSettings()  // M56: rulers, units, pixel grid, appearance
         toolChanged()
         editorChanged()
+        wireAccessibility()  // M59: canvas keys, VoiceOver, translated strings
     }
 
     @available(*, unavailable)
@@ -240,8 +241,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         let size = CGSize(width: editor.info.width, height: editor.info.height)
         statusBar.update(
             selection: editor.selection, cursor: cursor, imageSize: size, zoom: canvas.viewport.zoom,
-            hint: editor.message ?? textTool?.notice ?? workspace.tools.tool.hint)
+            hint: editor.message ?? textTool?.notice
+                ?? L10n.tr(workspace.tools.tool.hint, "Status bar hint for the current tool"))
         statusBar.setProfile(short: ColorProfileNames.short(editor.info), full: ColorProfileNames.full(editor.info))
+        updateCanvasAccessibility()  // M59
     }
 
     private func updateCommandStates() {

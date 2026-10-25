@@ -65,7 +65,7 @@ public final class HistoryRow: PanelRow {
 
     init(index: Int, label: String, command: String, undone: Bool) {
         self.undone = undone
-        super.init(index: index, title: HistoryStep.title(label), detail: nil, symbol: HistoryStep.symbol(command),
+        super.init(index: index, title: L10n.engine(command, english: HistoryStep.title(label)), detail: nil, symbol: HistoryStep.symbol(command),
                    height: 27)
         dimmed = undone
         icon.contentTintColor = undone ? Theme.muted : Theme.ink

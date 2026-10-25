@@ -206,6 +206,8 @@ Window > Layers [F7]
 Window > Colors [F8]
 Window > ---
 Window > Reset Panel Layout
+Window > Next Panel [⌃`]
+Window > Previous Panel [⌃⇧`]
 Window > ---
 Window > Minimize [⌘M]
 Window > Zoom

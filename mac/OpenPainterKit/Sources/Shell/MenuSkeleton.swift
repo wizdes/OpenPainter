@@ -322,6 +322,9 @@ public enum MenuSkeleton {
             .submenu("Window", PanelKind.allCases.map { .item($0.title, key(NSF5FunctionKey - 5 + $0.functionKey), [], .panel($0)) } + [
                 .separator,
                 .item("Reset Panel Layout", "", [], .resetPanels),
+                // M59: keyboard focus to the next or previous panel (KeyboardShortcuts.swift).
+                .item("Next Panel", "`", [.control], .selector(#selector(PanelFocusCycler.focusNextPanel(_:)))),
+                .item("Previous Panel", "`", [.control, .shift], .selector(#selector(PanelFocusCycler.focusPreviousPanel(_:)))),
                 .separator,
                 .item("Minimize", "m", cmd, .selector(#selector(NSWindow.performMiniaturize(_:)))),
                 .item("Zoom", "", [], .selector(#selector(NSWindow.performZoom(_:)))),
@@ -351,6 +354,7 @@ public enum MenuSkeleton {
             item.submenu = menu
             main.addItem(item)
         }
+        L10n.localize(main, context: "Menu bar")  // M59: translated titles
         return main
     }
 
@@ -381,6 +385,9 @@ public enum MenuSkeleton {
                        let tag = SelectionClipboard.pasteTitles.firstIndex(of: title) { item.tag = tag }
                     // Settings… works with no document window (M56).
                     if s == #selector(SettingsMenuActions.showSettings(_:)) { item.target = SettingsMenuTarget.shared }
+                    if s == #selector(PanelFocusCycler.focusNextPanel(_:)) || s == #selector(PanelFocusCycler.focusPreviousPanel(_:)) {
+                        item.target = PanelFocusCycler.shared
+                    }
                 case let .command(id):
                     item.action = #selector(EditorMenuActions.runCommand(_:))
                     item.representedObject = id

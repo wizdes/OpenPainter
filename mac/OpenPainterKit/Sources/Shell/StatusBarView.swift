@@ -105,7 +105,7 @@ public final class StatusBarView: FilledView {
     public func update(selection: CGRect?, cursor: CGPoint?, imageSize: CGSize, zoom: Double, hint text: String) {
         let u = unit, d = dpi
         func v(_ px: CGFloat) -> String { u.format(u.value(ofPixels: Double(px), dpi: d)) }
-        selectionValue.stringValue = selection.map { "\(v($0.width)) × \(v($0.height)) \(u.abbreviation)" } ?? "None"
+        selectionValue.stringValue = selection.map { "\(v($0.width)) × \(v($0.height)) \(u.abbreviation)" } ?? L10n.tr("None", "Status bar: no selection")
         cursorValue.stringValue = cursor.map { "\(v($0.x)), \(v($0.y))" } ?? "–"
         imageValue.stringValue = "\(v(imageSize.width)) × \(v(imageSize.height)) \(u.abbreviation)"
         if zoomField.currentEditor() == nil { zoomField.stringValue = ZoomPresets.label(zoom) }
