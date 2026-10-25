@@ -11,6 +11,7 @@ use op_ops::effect::{self, Rect};
 pub use op_ops::effect::{Param, ParamKind, ParamSchema};
 use op_tools::flood::{self, AlphaMode, FloodOptions, Sampling};
 use op_tools::gradient::GradientSession;
+use op_tools::line::LineSession;
 use op_tools::r#move::{MoveKind, MoveOptions, MoveSession};
 use op_tools::{BrushSettings, CloneSource, RecolorOptions, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
@@ -27,6 +28,7 @@ mod color_sample;
 mod gradient_commands;
 mod image_commands;
 mod layer_commands;
+mod line_commands;
 mod shell_commands;
 pub use layer_commands::{BLEND_MODES, blend_name, content_key};
 pub use shell_commands::{effect_label, effects_list};
@@ -918,6 +920,7 @@ struct Actor {
     stroke: Option<ActiveStroke>,
     move_session: Option<(u64, MoveSession)>,
     gradient_session: Option<(u64, GradientSession)>,
+    line_session: Option<(u64, LineSession)>,
     published: Arc<ArcSwap<Published>>,
     read_only: Arc<AtomicBool>,
     events: Sender<Event>,
@@ -991,9 +994,34 @@ impl Actor {
         self.stroke = None;
         self.move_session = None;
         self.gradient_session = None;
+        self.line_session = None;
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if id.starts_with("tool.line.") {
+            return self.line_command(id, &params);
+        }
+        if self.line_session.is_some() {
+            if id == "edit.undo" {
+                self.line_session = None;
+                self.publish(None);
+                return Ok(());
+            }
+            if id == "layer.delete" {
+                self.line_session = None;
+                self.publish(None);
+            } else if id == "tool.select" || id.starts_with("tool.") {
+                self.line_finish()?;
+                if id == "tool.select" {
+                    return Ok(());
+                }
+            } else {
+                return Err(Error::Busy);
+            }
+        }
+        if id == "tool.select" {
+            return Ok(());
+        }
         if id.starts_with("tool.gradient.") {
             return self.gradient_command(id, &params);
         }
@@ -1057,7 +1085,11 @@ impl Actor {
         Ok(())
     }
     fn begin(&mut self, id: &str, params: Value, ticket: JobTicket) -> Result<u64> {
-        if self.stroke.is_some() || self.move_session.is_some() || self.gradient_session.is_some() {
+        if self.stroke.is_some()
+            || self.move_session.is_some()
+            || self.gradient_session.is_some()
+            || self.line_session.is_some()
+        {
             return Err(Error::Busy);
         }
         if self.read_only.load(Ordering::Acquire) {
@@ -1218,6 +1250,91 @@ impl Actor {
                 Ok(())
             }
             _ => Err(bad("unknown gradient command")),
+        }
+    }
+    fn line_finish(&mut self) -> Result<()> {
+        let Some((_, session)) = self.line_session.take() else {
+            return Ok(());
+        };
+        if session.base_revision != self.history.current_state().revision
+            || session.target_layer != self.active_id()
+        {
+            self.publish(None);
+            return Err(Error::Busy);
+        }
+        let state = session.finish().map_err(bad)?;
+        self.history.commit("Line/Curve", "tool.line.finish", state);
+        self.revision += 1;
+        self.publish(None);
+        self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+        self.event(EventKind::HistoryChanged, 0, json!({}));
+        Ok(())
+    }
+    fn line_command(&mut self, id: &str, params: &Value) -> Result<()> {
+        match id {
+            "tool.line.begin" => {
+                if self.read_only.load(Ordering::Acquire) {
+                    return Err(Error::ReadOnly);
+                }
+                if self.preview.is_some()
+                    || self.stroke.is_some()
+                    || self.move_session.is_some()
+                    || self.gradient_session.is_some()
+                    || self.line_session.is_some()
+                {
+                    return Err(Error::Busy);
+                }
+                let (points, options) = line_commands::begin(params)?;
+                let session =
+                    LineSession::new(self.history.current_state().clone(), points, options)
+                        .map_err(bad)?;
+                let state = session.preview().map_err(bad)?;
+                let sid = self.next_session.fetch_add(1, Ordering::Relaxed);
+                self.line_session = Some((sid, session));
+                self.publish(Some(state));
+                Ok(())
+            }
+            "tool.line.update" => {
+                let update = line_commands::update(params)?;
+                let (_, session) = self
+                    .line_session
+                    .as_mut()
+                    .ok_or_else(|| bad("no line session"))?;
+                let style = if params.as_object().is_some_and(|o| {
+                    o.keys().any(|k| {
+                        matches!(
+                            k.as_str(),
+                            "kind"
+                                | "width"
+                                | "antialias"
+                                | "dash"
+                                | "start_cap"
+                                | "end_cap"
+                                | "join"
+                                | "miter_limit"
+                                | "primary"
+                                | "blend"
+                        )
+                    })
+                }) {
+                    Some(line_commands::style(params, session.options)?)
+                } else {
+                    None
+                };
+                session
+                    .update_all(update.points, update.handle, style)
+                    .map_err(bad)?;
+                let state = session.preview().map_err(bad)?;
+                self.publish(Some(state));
+                Ok(())
+            }
+            "tool.line.finish" => self.line_finish(),
+            "tool.line.cancel" => {
+                self.line_session = None;
+                self.publish(None);
+                Ok(())
+            }
+            _ => Err(bad("unknown line command")),
         }
     }
     fn stroke_begin(&mut self, settings: BrushSettings, seed: u64) -> Result<u64> {
@@ -1491,6 +1608,7 @@ impl Actor {
                     self.preview = None;
                     self.stroke = None;
                     self.gradient_session = None;
+                    self.line_session = None;
                     self.publish(None);
                     stopping = Some(reply);
                 }
@@ -1783,6 +1901,7 @@ impl Engine {
             stroke: None,
             move_session: None,
             gradient_session: None,
+            line_session: None,
             published: published.clone(),
             read_only: read_only.clone(),
             events: self.events_tx.clone(),
@@ -1870,7 +1989,10 @@ impl Engine {
     fn precheck(&self, op: &Op) -> Result<()> {
         match op {
             Op::Command(id, p) => {
-                if id.starts_with("tool.gradient.") {
+                if id.starts_with("tool.gradient.")
+                    || id.starts_with("tool.line.")
+                    || id == "tool.select"
+                {
                     return Ok(());
                 }
                 spec(id)?.params.validate(p.clone()).map_err(bad)?;
