@@ -15,6 +15,16 @@ public enum CanvasTool: Int, Sendable {
     case click = 3
     /// A tool that does nothing on the canvas yet.
     case inactive = 4
+    /// Presses, drags and releases go to `pointerSink` (M23: Rectangle Select, the Crop tool).
+    case overlay = 5
+}
+
+/// Receives the canvas pointer for `.overlay` tools, in document pixels and view points.
+@MainActor
+public protocol CanvasPointerSink: AnyObject {
+    func pointerDown(document: CGPoint, view: CGPoint, modifiers: NSEvent.ModifierFlags, right: Bool)
+    func pointerDragged(document: CGPoint, view: CGPoint, modifiers: NSEvent.ModifierFlags)
+    func pointerUp(document: CGPoint, view: CGPoint, modifiers: NSEvent.ModifierFlags)
 }
 
 /// Keys the canvas hands to its window's editor (focus rules, mac/README.md).
@@ -53,6 +63,8 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var onError: ((String) -> Void)?
     /// Receives brush drags sample by sample (the main window's live stroke).
     public weak var strokeSink: StrokeSink?
+    /// Receives the pointer for the `.overlay` tool (M23).
+    public weak var pointerSink: CanvasPointerSink?
     /// Tests and diagnostics: records every pen sample of brush drags.
     public var recorder: TabletLogRecorder?
     /// A click with the `.click` tool, in document pixels.
@@ -257,6 +269,18 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         push()
     }
 
+    /// The image changed size (Crop, Resize, Canvas Size, a 90° rotation): the
+    /// viewport takes the new size and fits again.
+    public func setDocumentSize(_ size: CGSize) {
+        guard size != viewport.documentSize, size.width > 0, size.height > 0 else { return }
+        var v = viewport
+        v.documentSize = size
+        v.zoomToFit()
+        viewport = v
+        isFitted = true
+        push()
+    }
+
     /// Fit (View > Zoom to Window, the status bar's Fit button).
     public func fit() {
         var v = viewport
@@ -372,6 +396,11 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         lastDrag = p
         if effectiveTool == .pan { NSCursor.closedHand.set() }
         if effectiveTool == .stroke { beginPen(event, secondary: pressUsesSecondary) }
+        if effectiveTool == .overlay {
+            pointerSink?.pointerDown(
+                document: viewport.documentPoint(atView: p), view: p, modifiers: pressModifiers,
+                right: pressUsesSecondary)
+        }
     }
 
     // MARK: Pen input (M38)
@@ -457,6 +486,10 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             onZoomRectangle?(CGRect(x: start.x, y: start.y, width: p.x - start.x, height: p.y - start.y).standardized)
         case .stroke:
             movePen(event)
+        case .overlay:
+            pointerSink?.pointerDragged(
+                document: viewport.documentPoint(atView: p), view: p,
+                modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask))
         case .click, .inactive:
             break
         }
@@ -474,6 +507,12 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             // The release position is not painted (as before: the drag samples are).
             recorder?.record(penSample(event), buttons: 0)
             endPen(commit: true)
+            return
+        }
+        if effectiveTool == .overlay, dragStart != nil {
+            pointerSink?.pointerUp(
+                document: viewport.documentPoint(atView: p), view: p,
+                modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask))
             return
         }
         if effectiveTool == .click, let start = dragStart, hypot(p.x - start.x, p.y - start.y) < 4 {
@@ -499,7 +538,9 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
 
     public override func rightMouseDown(with event: NSEvent) {
         // Brush and click tools use the right button for the secondary color.
-        if effectiveTool == .stroke || effectiveTool == .click { return press(event, right: true) }
+        if effectiveTool == .stroke || effectiveTool == .click || effectiveTool == .overlay {
+            return press(event, right: true)
+        }
         guard effectiveTool == .zoom else { return super.rightMouseDown(with: event) }
         let p = point(event)
         change { $0.zoomOut(at: p) }
@@ -558,7 +599,7 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     private var cursor: NSCursor {
         switch effectiveTool {
         case .pan: return dragStart != nil ? .closedHand : .openHand
-        case .zoom, .stroke, .click: return .crosshair
+        case .zoom, .stroke, .click, .overlay: return .crosshair
         case .inactive: return .arrow
         }
     }

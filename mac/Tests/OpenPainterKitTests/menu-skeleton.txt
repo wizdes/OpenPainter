@@ -62,8 +62,9 @@ View > Inches (off)
 View > Centimeters (off)
 Image
 Image > Crop to Selection [⇧⌘X]
-Image > Resize… [⌘R] (off)
-Image > Canvas Size… [⇧⌘R] (off)
+Image > Crop Tool
+Image > Resize… [⌘R]
+Image > Canvas Size… [⇧⌘R]
 Image > ---
 Image > Flip Horizontal
 Image > Flip Vertical

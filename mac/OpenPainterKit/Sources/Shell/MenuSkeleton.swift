@@ -211,8 +211,9 @@ public enum MenuSkeleton {
             ]),
             .submenu("Image", [
                 .item("Crop to Selection", "x", shiftCmd, .command("image.crop_to_selection")),
-                i("Resize…", "r"),
-                i("Canvas Size…", "r", shiftCmd),
+                .item("Crop Tool", "", [], .selector(#selector(ImageSizeActions.showCropTool(_:)))),
+                .item("Resize…", "r", cmd, .selector(#selector(ImageSizeActions.showResizeImage(_:)))),
+                .item("Canvas Size…", "r", shiftCmd, .selector(#selector(ImageSizeActions.showCanvasSize(_:)))),
                 .separator,
                 .item("Flip Horizontal", "", [], .command("image.flip_horizontal")),
                 .item("Flip Vertical", "", [], .command("image.flip_vertical")),

@@ -34,6 +34,7 @@ mod layer_commands;
 mod layer_menu_commands;
 mod line_commands;
 pub mod live_stroke;
+mod select_crop_commands;
 mod shape_commands;
 mod shell_commands;
 mod text_commands;
@@ -767,6 +768,7 @@ fn specs() -> Vec<CommandSpec> {
     entries.extend(shell_commands::specs());
     entries.extend(layer_commands::specs());
     entries.extend(layer_menu_commands::specs());
+    entries.extend(select_crop_commands::specs());
     for (index, effect) in effect::registered().into_iter().enumerate() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
@@ -1164,7 +1166,9 @@ impl Actor {
         if !(spec.enabled)(self.history.current_state()) {
             return Err(bad("command disabled"));
         }
-        let outcome = (spec.run)(&self.ctx(ticket), self.history.current_state(), &params)?;
+        let (amend, params) = select_crop_commands::amend_base(id, params, &self.history);
+        let base = amend.as_ref().unwrap_or(self.history.current_state());
+        let outcome = (spec.run)(&self.ctx(ticket), base, &params)?;
         // A cancel that lands after the last check still wins: nothing commits.
         self.ctx(ticket).check()?;
         let selection = self.history.current_state().selection.clone();
@@ -1176,6 +1180,7 @@ impl Actor {
                     _ => shell_commands::history_label(id, &params)
                         .or_else(|| layer_commands::history_label(id, &params))
                         .or_else(|| layer_menu_commands::history_label(id).map(str::to_owned))
+                        .or_else(|| select_crop_commands::history_label(id).map(str::to_owned))
                         .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);
@@ -2513,6 +2518,18 @@ impl Engine {
                     .map_err(internal)
             }
             "layer.thumbnail" => layer_commands::thumbnail(&s.state, &params),
+            "doc.selection_path" => {
+                serde_json::to_vec(&select_crop_commands::selection_path(&s.state))
+                    .map_err(internal)
+            }
+            "doc.selection_mask" => Ok(s
+                .state
+                .rasterize_selection(op_core::selection::RasterMode::Pixelated)
+                .bytes
+                .to_vec()),
+            "doc.resolution" => {
+                serde_json::to_vec(&select_crop_commands::resolution(&s.state)).map_err(internal)
+            }
             "commands.list" => {
                 let ids: Vec<_> = specs()
                     .iter()
