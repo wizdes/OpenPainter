@@ -126,12 +126,11 @@ Effects > Blurs > Gaussian Blur
 Effects > Blurs > Motion Blur
 Effects > Blurs > Radial Blur
 Effects > Blurs > Zoom Blur
-Effects > Blurs > ---
-Effects > Blurs > Bokeh Blur (off)
-Effects > Blurs > Sketch Blur (off)
-Effects > Blurs > Square Blur (off)
-Effects > Blurs > Surface Blur (off)
-Effects > Blurs > Unfocus (off)
+Effects > Blurs > Bokeh Blur
+Effects > Blurs > Sketch Blur
+Effects > Blurs > Square Blur
+Effects > Blurs > Surface Blur
+Effects > Blurs > Unfocus
 Effects > Color
 Effects > Color > Quantize (off)
 Effects > Distort

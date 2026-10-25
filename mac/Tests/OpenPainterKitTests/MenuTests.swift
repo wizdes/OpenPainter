@@ -68,15 +68,21 @@ final class MenuTests: XCTestCase {
         XCTAssertEqual(adjustments.item(withTitle: "Invert Colors")?.keyEquivalent, "i")
         XCTAssertEqual(adjustments.item(withTitle: "Invert Colors")?.keyEquivalentModifierMask, [.command, .shift])
         // A registry with an added effect gets a menu item for it, in its submenu.
-        // (Square Blur stands in for an effect the engine does not have yet.)
-        XCTAssertFalse(registry.contains { $0.label == "Square Blur" })
-        let extra = registry + [Engine.EffectInfo(id: "effect.blur.square", label: "Square Blur", category: "Blurs")]
-        let blurs = MenuSkeleton.build(effects: extra, panelTarget: nil).item(withTitle: "Effects")?.submenu?
-            .item(withTitle: "Blurs")?.submenu
-        let square = try XCTUnwrap(blurs?.item(withTitle: "Square Blur"))
-        XCTAssertEqual(square.representedObject as? String, "effect.blur.square")
-        XCTAssertEqual(square.action, #selector(EditorMenuActions.runEffect(_:)))
-        XCTAssertEqual(blurs?.items.filter { $0.title == "Square Blur" }.count, 1, "no disabled twin")
+        // The stand-in is the first paint.net effect the engine does not have yet,
+        // so new engine effects never collide with it.
+        let (submenu, title) = try XCTUnwrap(
+            MenuSkeleton.paintNetEffects.lazy
+                .flatMap { sub in sub.1.map { (sub.0, $0) } }
+                .first { pair in !registry.contains { $0.label == pair.1 } },
+            "every paint.net effect is registered; pick another stand-in")
+        let id = "effect.test.stand_in"
+        let extra = registry + [Engine.EffectInfo(id: id, label: title, category: submenu)]
+        let sub = MenuSkeleton.build(effects: extra, panelTarget: nil).item(withTitle: "Effects")?.submenu?
+            .item(withTitle: submenu)?.submenu
+        let item = try XCTUnwrap(sub?.item(withTitle: title))
+        XCTAssertEqual(item.representedObject as? String, id)
+        XCTAssertEqual(item.action, #selector(EditorMenuActions.runEffect(_:)))
+        XCTAssertEqual(sub?.items.filter { $0.title == title }.count, 1, "no disabled twin")
     }
 
     func testEveryAdjustmentRunsWithDefaultsFromItsMenuItem() throws {
