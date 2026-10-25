@@ -50,3 +50,32 @@ fn webp_chunks_larger_than_the_file_are_refused_before_decoding() {
         );
     }
 }
+
+/// Checkpoint fuzzing on Linux (`cargo xtask fuzz`, icc target): two 568-byte
+/// profiles whose `desc` tag is a 36-byte mluc that claims 33,554,433 records.
+/// lcms2 allocates and zeroes 12 bytes per claimed record (about 400 MB) before
+/// it reads one, which took 70 ms on the Mac and over the 1 s limit in the VM.
+/// `Profile::from_icc` must refuse a record count the tag cannot hold.
+#[test]
+fn icc_mluc_with_more_records_than_the_tag_holds_is_refused() {
+    for name in ["icc-mluc-huge-count-1.bin", "icc-mluc-huge-count-2.bin"] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fuzz-found")
+            .join(name);
+        let bytes = std::fs::read(&path).unwrap();
+        let Err(error) = op_color::Profile::from_icc(&bytes) else {
+            panic!("{name} was read")
+        };
+        let error = error.to_string();
+        assert!(
+            error.contains("mluc tag claims more records than it holds"),
+            "{name}: {error}"
+        );
+    }
+    // A real mluc tag still reads: the built-in profiles carry one.
+    for name in ["srgb", "display-p3", "adobe-rgb", "prophoto"] {
+        let bytes = op_color::Profile::builtin(name).unwrap().bytes();
+        let profile = op_color::Profile::from_icc(&bytes).unwrap();
+        assert!(!profile.description().is_empty(), "{name}");
+    }
+}
