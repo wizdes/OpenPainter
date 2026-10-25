@@ -1,5 +1,6 @@
 //! Sparse, deterministic brush strokes over immutable document tiles.
 pub mod flood;
+mod heal;
 // Clone and recolor arithmetic is ported from OpenPDN 3.36
 // src/tools/CloneStampTool.cs and src/tools/RecoloringTool.cs (MIT).
 // Copyright dotPDN LLC, Rick Brewster, Tom Jackson, and contributors.
@@ -20,6 +21,8 @@ pub enum Tool {
     Pencil,
     CloneStamp,
     Recolor,
+    HealingBrush,
+    SpotHeal,
 }
 impl Tool {
     pub fn label(self) -> &'static str {
@@ -29,6 +32,8 @@ impl Tool {
             Self::Pencil => "Pencil",
             Self::CloneStamp => "Clone Stamp",
             Self::Recolor => "Recolor",
+            Self::HealingBrush => "Healing Brush",
+            Self::SpotHeal => "Spot Heal",
         }
     }
 }
@@ -53,6 +58,14 @@ enum StrokeEffect {
         offset: Option<(i32, i32)>,
     },
     Recolor(RecolorOptions),
+    Heal {
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    },
+    SpotHeal {
+        offset: Option<(i32, i32)>,
+    },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PressureMode {
@@ -142,7 +155,10 @@ pub struct StrokeSession {
 }
 impl StrokeSession {
     pub fn new(base: DocState, layer: usize, settings: BrushSettings, seed: u64) -> Result<Self> {
-        if matches!(settings.tool, Tool::CloneStamp | Tool::Recolor) {
+        if matches!(
+            settings.tool,
+            Tool::CloneStamp | Tool::Recolor | Tool::HealingBrush | Tool::SpotHeal
+        ) {
             return Err(StrokeError::BadInput(
                 "tool needs clone or recolor options".into(),
             ));
@@ -175,6 +191,51 @@ impl StrokeSession {
                 point,
                 offset,
             },
+        )
+    }
+    pub fn new_heal(
+        base: DocState,
+        layer: usize,
+        settings: BrushSettings,
+        seed: u64,
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    ) -> Result<Self> {
+        if settings.tool != Tool::HealingBrush
+            || matches!(source, CloneSource::Layer(i) if i >= base.layers.len())
+        {
+            return Err(StrokeError::BadInput(
+                "invalid healing tool or source layer".into(),
+            ));
+        }
+        Self::with_effect(
+            base,
+            layer,
+            settings,
+            seed,
+            StrokeEffect::Heal {
+                source,
+                point,
+                offset,
+            },
+        )
+    }
+    pub fn new_spot_heal(
+        base: DocState,
+        layer: usize,
+        settings: BrushSettings,
+        seed: u64,
+    ) -> Result<Self> {
+        if settings.tool != Tool::SpotHeal {
+            return Err(StrokeError::BadInput("invalid spot healing tool".into()));
+        }
+        Self::with_effect(
+            base,
+            layer,
+            settings,
+            seed,
+            StrokeEffect::SpotHeal { offset: None },
         )
     }
     pub fn new_recolor(
@@ -230,7 +291,7 @@ impl StrokeSession {
     }
     pub fn clone_offset(&self) -> Option<(i32, i32)> {
         match self.effect {
-            StrokeEffect::Clone { offset, .. } => offset,
+            StrokeEffect::Clone { offset, .. } | StrokeEffect::Heal { offset, .. } => offset,
             _ => None,
         }
     }
@@ -259,7 +320,8 @@ impl StrokeSession {
         self.dirty.clear();
         for &s in samples {
             if self.last.is_none()
-                && let StrokeEffect::Clone { point, offset, .. } = &mut self.effect
+                && let StrokeEffect::Clone { point, offset, .. }
+                | StrokeEffect::Heal { point, offset, .. } = &mut self.effect
                 && offset.is_none()
             {
                 let x = (s.x.floor() as i32).checked_sub(point.0);
@@ -297,6 +359,14 @@ impl StrokeSession {
                 self.dab(s.x, s.y, s.pressure);
             }
             self.last = Some(s);
+        }
+        if matches!(
+            self.effect,
+            StrokeEffect::Heal { .. } | StrokeEffect::SpotHeal { .. }
+        ) {
+            self.preview = heal::render(self)?;
+            self.dirty.extend(self.mask.keys().copied());
+            return Ok(&self.dirty);
         }
         let mut source_cache: BTreeMap<(i32, i32), Vec<u8>> = BTreeMap::new();
         for &(tx, ty) in &self.dirty {
