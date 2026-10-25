@@ -32,7 +32,7 @@ pub(crate) fn resampling(name: &str) -> Option<Resampling> {
 /// `{"transform":[a,b,c,d,tx,ty],"resampling","copy"}`; every key is optional
 /// (identity, bicubic, no copy). The transform maps document points x' = a x +
 /// c y + tx, y' = b x + d y + ty.
-fn options(v: &Value) -> Result<MoveOptions, OpStatus> {
+pub(crate) fn options(v: &Value) -> Result<MoveOptions, OpStatus> {
     let bad = OpStatus::OP_ERR_BAD_ARGUMENT;
     let transform = match v.get("transform") {
         None | Some(Value::Null) => Affine::identity(),

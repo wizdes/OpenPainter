@@ -207,6 +207,25 @@ public final class MoveToolController: NSObject, CanvasPointerSink {
         return true
     }
 
+    /// Takes over the engine move session a paste started (M34,
+    /// ClipboardActions.swift): `box` is the pasted bounds in document pixels.
+    /// Drags, Finish and Escape then work as for any Move Selected Pixels session.
+    func adoptPaste(box: CGRect) {
+        kind = .pixels
+        active = true
+        copy = false
+        drag = nil
+        updatesSent = 0
+        nudges = 0
+        baseRevision = editor.info.revision
+        state = MoveState(base: box)
+        basePath = CGPath(rect: box, transform: nil)
+        controller.selectCrop.overlay.setSelectionPath(basePath)
+        lastSent = sentKey  // paste began at the identity
+        syncOptions()
+        redraw()
+    }
+
     /// Sends the current transform now (drags send at most once per main
     /// run-loop turn; a release, a nudge and Finish send at once).
     public func flush() {

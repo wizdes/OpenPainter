@@ -111,6 +111,18 @@ Rules follow paint.net's Move Tools page (https://www.getpaint.net/doc/latest/Mo
 - `Shell/MoveGeometry.swift`: the hit test (nub, pivot, inside, corridor, outside) and the drag math. The session keeps the original box and one cumulative transform, so a second drag continues from the first.
 - `EngineBridge/Move.swift` wraps `op_move_begin`, `op_move_update`, `op_move_finish` and `op_move_cancel` (`engine/op-ffi/src/move_tool.rs`).
 
+## Clipboard (M34)
+
+Rules follow paint.net's Edit menu page (https://www.getpaint.net/doc/latest/EditMenu.html).
+
+- `Shell/ClipboardActions.swift`: Cut (Command-X), Copy (Command-C), Copy Merged (Shift-Command-C), Paste (Command-V), Paste into New Layer (Shift-Command-V) and Paste into New Image (Option-Command-V). Cut, Copy and Paste are the standard `cut:`, `copy:` and `paste:` actions, so a focused text field gets them first.
+- Copy takes the active layer's pixels under the selection (the whole layer with no selection), with partial coverage as alpha, cropped to the selection bounds (the engine's `clipboard.copy` query). Copy Merged does the same on the flattened image. Both write PNG and TIFF with the document's ICC profile (`clipboard.profile_icc`: the engine's sRGB bytes for a document with no profile). Cut copies, then sends Erase Selection: one history step, and the selection goes away. An open Move or Magic Wand session finishes first.
+- Paste reads PNG exactly (`op_png_decode`), else TIFF or any image NSImage reads (ImageIO). Pixels in another profile are converted to the document's profile by the engine (op-color, perceptual), and the status bar says "converted from … to …".
+- Paste turns on Move Selected Pixels and opens one engine move session (`op_paste_begin`, `engine/op-ffi/src/clipboard.rs`) with the pixels floating at the top left of the visible part of the canvas, moved in so an image that fits stays inside; the selection is the pasted bounds. Drags, nudges, Finish and Escape work as for any move: Finish commits one "Paste" step, Escape leaves the document exactly as it was. Paste into New Layer adds the layer inside the same session, so it is one "Paste into New Layer" step and Escape leaves no layer behind.
+- An image wider or taller than the canvas asks Expand Canvas, Keep Canvas Size or Cancel (`ImageClipboard.oversizePrompt`). Expand sends Canvas Size (top left anchor, transparent) as its own step, then pastes at (0, 0); Keep pastes and the part outside the canvas comes in when moved.
+- Paste into New Image opens an untitled image the size of the clipboard image, holding its pixels and profile.
+- Items are on only when they can act: Copy and Copy Merged need a selection that covers a pixel (or none); Cut needs a selection; the Paste items need an image on the clipboard. Tests use a private named pasteboard (`ImageClipboard.pasteboard`).
+
 ## Magic Wand and Paint Bucket (M31)
 
 - `Shell/FloodTool.swift`: as in paint.net 5, a click with the Magic Wand or the Paint Bucket stays live. The window's `click` starts an engine preview session (`Document.floodBegin`, `EngineBridge/FloodPreview.swift`) at the clicked pixel; nothing enters History yet.

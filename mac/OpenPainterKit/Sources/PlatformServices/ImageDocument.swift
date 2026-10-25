@@ -89,6 +89,15 @@ open class ImageDocument: NSDocument, EditorHost {
         fileType = ImageFormats.opaintIdentifier
     }
 
+    /// Edit > Paste into New Image (M34): an untitled image made from an engine
+    /// document that already holds the pasted pixels; it saves as .opaint.
+    public func startPasted(_ doc: Document, size: CGSize, notes: [String] = []) {
+        engineDocument = doc
+        pixelSize = size
+        importNotes = notes
+        fileType = ImageFormats.opaintIdentifier
+    }
+
     /// Open, and Revert (a second read): Revert gives the open engine document
     /// the file's content, so the window, canvas and panels stay.
     override open func read(from url: URL, ofType typeName: String) throws {
