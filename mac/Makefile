@@ -1,6 +1,7 @@
 # Build, test and measure the Mac app. Run from the repo root as `make -C mac`.
 #   make -C mac            the Rust staticlib, the Xcode project, then the app (Release)
-#   make -C mac test       the XCTests (unit tests, view tests and the 30 s trace gate)
+#   make -C mac test       the XCTests (unit tests, view tests and the 30 s trace gate);
+#                          builds opcli first for the M28 scenario (Phase2EndToEndTests)
 #   make -C mac launch-time  scripts/launch-time.sh on the Release app
 #   make -C mac trace      `OpenPainter --trace` on a generated 6000x4000 PNG
 # Order: engine (cargo build -p op-ffi --release) -> xcodegen -> xcodebuild.
@@ -8,11 +9,14 @@ DERIVED := build/DerivedData
 APP := $(DERIVED)/Build/Products/Release/OpenPainter.app
 XCB := xcodebuild -project OpenPainter.xcodeproj -scheme OpenPainter -derivedDataPath $(DERIVED)
 
-.PHONY: all engine project app test launch-time trace clean
+.PHONY: all engine opcli project app test launch-time trace clean
 all: app
 
 engine:
 	scripts/build-engine.sh
+
+opcli:
+	scripts/build-opcli.sh
 
 project:
 	xcodegen generate --spec project.yml --quiet
@@ -20,7 +24,7 @@ project:
 app: engine project
 	$(XCB) -configuration Release build
 
-test: engine project
+test: engine opcli project
 	$(XCB) -configuration Debug test
 
 launch-time: app

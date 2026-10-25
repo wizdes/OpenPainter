@@ -26,12 +26,12 @@ the Mac key wins and the note says so. Sources: paint.net's Keyboard & Mouse Com
 | OpenPainter > Quit OpenPainter | Alt+F4 | ⌘Q | v1 | On the Mac, Quit is the last item of the application menu |
 | Edit > Undo | Ctrl+Z | ⌘Z | v1 | – |
 | Edit > Redo | Ctrl+Y | ⇧⌘Z | v1 | Mac standard Redo key |
-| Edit > Cut | Ctrl+X | ⌘X | pending | M34 (Clipboard) builds it; not merged when M55 ran |
-| Edit > Copy | Ctrl+C | ⌘C | pending | M34 (Clipboard) builds it; not merged when M55 ran |
-| Edit > Copy Merged | Ctrl+Shift+C | ⇧⌘C | pending | M34 (Clipboard) builds it; not merged when M55 ran |
-| Edit > Paste | Ctrl+V | ⌘V | pending | M34 (Clipboard) builds it; not merged when M55 ran |
-| Edit > Paste into New Layer | Ctrl+Shift+V | ⇧⌘V | pending | M34 (Clipboard) builds it; not merged when M55 ran |
-| Edit > Paste into New Image | Ctrl+Alt+V | ⌥⌘V | pending | M34 (Clipboard) builds it; not merged when M55 ran |
+| Edit > Cut | Ctrl+X | ⌘X | v1 | – |
+| Edit > Copy | Ctrl+C | ⌘C | v1 | – |
+| Edit > Copy Merged | Ctrl+Shift+C | ⇧⌘C | v1 | – |
+| Edit > Paste | Ctrl+V | ⌘V | v1 | – |
+| Edit > Paste into New Layer | Ctrl+Shift+V | ⇧⌘V | v1 | – |
+| Edit > Paste into New Image | Ctrl+Alt+V | ⌥⌘V | v1 | – |
 | Edit > Copy Selection | Ctrl+Alt+Shift+C | ⌥⇧⌘C | v1 | – |
 | Edit > Paste Selection > Replace | Ctrl+Alt+Shift+V | ⌥⇧⌘V | v1 | – |
 | Edit > Erase Selection | Delete | ⌫ | v1 | The Mac Delete key (backspace) |
