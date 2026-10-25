@@ -46,7 +46,7 @@ final class FocusTests: XCTestCase {
         send(#selector(EditorWindow.redo(_:)))
         XCTAssertTrue(waitUntil { self.editor.selection == nil }, "Redo removes it again")
         key("\u{7f}", 51)
-        XCTAssertEqual(editor.message, "Erase Selection comes in a later version.", "Delete reaches the document")
+        XCTAssertEqual(editor.message, "Erase Selection: nothing is selected", "Delete reaches the document")
         key("\r", 36)
         XCTAssertNil(editor.message, "Enter reaches the document")
         // A non-text control with focus (an image-strip item) still routes to the document.
