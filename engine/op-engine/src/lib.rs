@@ -10,7 +10,7 @@ use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use op_ops::effect::{self, Rect};
 pub use op_ops::effect::{Param, ParamKind, ParamSchema};
 use op_tools::flood::{self, AlphaMode, FloodOptions, Sampling};
-use op_tools::{BrushSettings, StrokeSample, StrokeSession};
+use op_tools::{BrushSettings, CloneSource, RecolorOptions, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
 use rayon::ThreadPool;
 use serde_json::{Value, json};
@@ -851,6 +851,16 @@ enum Message {
     View(Sender<Published>),
     Identity(Sender<JobIdentity>),
     StrokeBegin(BrushSettings, u64, Sender<Result<u64>>),
+    StrokeBeginClone(
+        BrushSettings,
+        u64,
+        CloneSource,
+        (i32, i32),
+        Option<(i32, i32)>,
+        Sender<Result<u64>>,
+    ),
+    StrokeBeginRecolor(BrushSettings, u64, RecolorOptions, Sender<Result<u64>>),
+    StrokeCloneOffset(Sender<Result<Option<(i32, i32)>>>),
     StrokeAppend(Vec<StrokeSample>, Sender<Result<()>>),
     StrokeCommit(Sender<Result<()>>),
     StrokeCancel(Sender<Result<()>>),
@@ -1078,12 +1088,7 @@ impl Actor {
         result
     }
     fn stroke_begin(&mut self, settings: BrushSettings, seed: u64) -> Result<u64> {
-        if self.read_only.load(Ordering::Acquire) {
-            return Err(Error::ReadOnly);
-        }
-        if self.preview.is_some() || self.stroke.is_some() {
-            return Err(Error::Busy);
-        }
+        self.check_stroke_begin()?;
         let session = StrokeSession::new(
             self.history.current_state().clone(),
             self.history.current_state().active_layer,
@@ -1091,6 +1096,56 @@ impl Actor {
             seed,
         )
         .map_err(bad)?;
+        self.begin_stroke_session(session)
+    }
+    fn stroke_begin_clone(
+        &mut self,
+        settings: BrushSettings,
+        seed: u64,
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    ) -> Result<u64> {
+        self.check_stroke_begin()?;
+        let session = StrokeSession::new_clone(
+            self.history.current_state().clone(),
+            self.history.current_state().active_layer,
+            settings,
+            seed,
+            source,
+            point,
+            offset,
+        )
+        .map_err(bad)?;
+        self.begin_stroke_session(session)
+    }
+    fn stroke_begin_recolor(
+        &mut self,
+        settings: BrushSettings,
+        seed: u64,
+        options: RecolorOptions,
+    ) -> Result<u64> {
+        self.check_stroke_begin()?;
+        let session = StrokeSession::new_recolor(
+            self.history.current_state().clone(),
+            self.history.current_state().active_layer,
+            settings,
+            seed,
+            options,
+        )
+        .map_err(bad)?;
+        self.begin_stroke_session(session)
+    }
+    fn check_stroke_begin(&self) -> Result<()> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        if self.preview.is_some() || self.stroke.is_some() {
+            return Err(Error::Busy);
+        }
+        Ok(())
+    }
+    fn begin_stroke_session(&mut self, session: StrokeSession) -> Result<u64> {
         let id = self.next_session.fetch_add(1, Ordering::Relaxed);
         self.stroke = Some(ActiveStroke {
             session,
@@ -1260,6 +1315,34 @@ impl Actor {
                         self.mark_read_only();
                     }
                     let _ = r.send(result);
+                }
+                Message::StrokeBeginClone(settings, seed, source, point, offset, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        self.stroke_begin_clone(settings, seed, source, point, offset)
+                    }))
+                    .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeBeginRecolor(settings, seed, options, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        self.stroke_begin_recolor(settings, seed, options)
+                    }))
+                    .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeCloneOffset(r) => {
+                    let _ = r.send(
+                        self.stroke
+                            .as_ref()
+                            .map(|s| s.session.clone_offset())
+                            .ok_or_else(|| bad("no stroke")),
+                    );
                 }
                 Message::StrokeAppend(samples, r) => {
                     let result = catch_unwind(AssertUnwindSafe(|| self.stroke_append(&samples)))
@@ -1561,6 +1644,34 @@ impl Engine {
     /// Begins a brush preview on the active layer.
     pub fn stroke_begin(&self, id: u64, settings: BrushSettings, seed: u64) -> Result<u64> {
         self.call(id, |r| Message::StrokeBegin(settings, seed, r))?
+    }
+    /// Begin cloning. Pass the previous stroke's offset for aligned mode, or None to reset at the first sample.
+    pub fn stroke_begin_clone(
+        &self,
+        id: u64,
+        settings: BrushSettings,
+        seed: u64,
+        source: CloneSource,
+        point: (i32, i32),
+        offset: Option<(i32, i32)>,
+    ) -> Result<u64> {
+        self.call(id, |r| {
+            Message::StrokeBeginClone(settings, seed, source, point, offset, r)
+        })?
+    }
+    pub fn stroke_begin_recolor(
+        &self,
+        id: u64,
+        settings: BrushSettings,
+        seed: u64,
+        options: RecolorOptions,
+    ) -> Result<u64> {
+        self.call(id, |r| {
+            Message::StrokeBeginRecolor(settings, seed, options, r)
+        })?
+    }
+    pub fn stroke_clone_offset(&self, id: u64) -> Result<Option<(i32, i32)>> {
+        self.call(id, Message::StrokeCloneOffset)?
     }
     /// Appends ordered input samples and publishes only tiles changed by the batch.
     pub fn stroke_append(&self, id: u64, samples: &[StrokeSample]) -> Result<()> {
