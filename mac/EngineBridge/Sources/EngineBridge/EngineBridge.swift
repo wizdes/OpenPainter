@@ -263,6 +263,13 @@ public final class Engine: @unchecked Sendable {
         }
     }
 
+    /// `effects.list` as raw JSON objects, each with its `schema` array (M24
+    /// effect dialogs build their controls from it). Needs no document.
+    public func effectCatalog() throws -> [[String: Any]] {
+        let data = try query(doc: 0, id: "effects.list", json: Data("{}".utf8))
+        return try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
+    }
+
     fileprivate func closeDoc(_ doc: UInt64) throws {
         try withHandle { h in try check(op_doc_close(h, doc)) }
     }

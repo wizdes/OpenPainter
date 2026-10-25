@@ -308,6 +308,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             guard let id = item.representedObject as? String else { return false }
             if id == "effect.fill.content_aware" { return !busy && editor.selection != nil }
             return !busy && editor.isEnabled(id)
+        case #selector(repeatEffect(_:)): return validateRepeat(item, busy: busy)
         case #selector(addLayer(_:)): return !busy && editor.isEnabled("layer.add")
         case #selector(toggleLayerVisibility(_:)), #selector(showLayerProperties(_:)): return !busy
         case #selector(goToLayer(_:)):
