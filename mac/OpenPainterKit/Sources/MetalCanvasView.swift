@@ -92,6 +92,9 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var onCursor: ((CGPoint?) -> Void)?
     /// A plain letter key; return true when it picked a tool.
     public var onToolKey: ((Character) -> Bool)?
+    /// M59: any key, before the canvas's own handling; return true when used
+    /// (Shift-letter tool cycling, the bracket keys, Control-Tab).
+    public var onShortcutKey: ((NSEvent) -> Bool)?
     /// Escape, Enter and Delete while the canvas has focus.
     public var onKey: ((CanvasKey) -> Void)?
     /// An arrow key (key code 123 to 126) while the canvas has focus; return
@@ -619,6 +622,7 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     }
 
     public override func keyDown(with event: NSEvent) {
+        if let onShortcutKey, onShortcutKey(event) { return }
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
         switch event.keyCode {
         case 53:  // Escape

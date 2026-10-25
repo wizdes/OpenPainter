@@ -162,11 +162,13 @@ public final class ExpandSelectionDialog: NSObject, NSTextFieldDelegate {
     init(apply: @escaping (Int) -> Void) {
         self.apply = apply
         super.init()
-        alert.messageText = "Expand Selection"
-        alert.informativeText = "Grow the selection by this many pixels. A negative number shrinks it."
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-        field.setAccessibilityLabel("Pixels")
+        // M59: translated before the alert lays itself out.
+        alert.messageText = L10n.tr("Expand Selection", "Expand Selection dialog: title")
+        alert.informativeText = L10n.tr("Grow the selection by this many pixels. A negative number shrinks it.",
+                                        "Expand Selection dialog: explanation")
+        alert.addButton(withTitle: L10n.tr("OK", "Dialog button"))
+        alert.addButton(withTitle: L10n.tr("Cancel", "Dialog button"))
+        field.setVoiceOverLabel(L10n.tr("Pixels", "Expand Selection dialog: VoiceOver label of the field"))
         field.delegate = self
         let row = NSStackView(views: [field, Labels.label("px")])
         row.orientation = .horizontal

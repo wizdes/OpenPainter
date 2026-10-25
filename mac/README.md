@@ -193,6 +193,15 @@ paint.net's Save Configuration dialog (https://www.getpaint.net/doc/latest/FileM
 - Shortcut changes: Zoom to Window Cmd B, Zoom to Selection Shift-Cmd-B, Actual Size Cmd 0, Go to Top and Bottom Layer Option-Cmd-PageUp and PageDown, Brightness / Contrast Shift-Cmd-T, Invert Alpha Option-Cmd-I. File > Print and Help > Plugins are gone (not in v1).
 - `M55_PNG_DIR=<dir>` (as `TEST_RUNNER_M55_PNG_DIR`) makes `testRenderMenuSheets` draw every menu into `menus-light.png` and `menus-dark.png`.
 
+## Keyboard, VoiceOver and translation (M59)
+
+- `docs/shortcuts.md` lists every key: the menu keys from the catalog, the canvas and panel keys from `Shell/KeyboardShortcuts.swift`, the macOS keys left alone, and the paint.net keys not in this version. `KeyboardAccessibilityTests` writes it and fails on a shared key or a key macOS uses.
+- Canvas keys (paint.net's Keyboard & Mouse Commands page): tool letters cycle tools that share a letter and Shift with the letter cycles back (Shift-S is Magic Wand); `[` and `]` change the brush width by 1 and ⌘`[` ⌘`]` by 5; X swaps the colors; C moves the notch; ⌃Tab and ⌃⇧Tab go to the next and previous image.
+- Focus: Window > Next Panel (⌃`) and Previous Panel (⌃⇧`) move keyboard focus from the image window through the shown panels in toolbar order and back (`PanelFocusCycler`). ⌘` and ⌃F6 stay with macOS. Tab and Shift-Tab move through a window's controls. Layer and History rows, the swatches, the palette, the wheel and the color sliders take focus while Keyboard navigation is on (System Settings > Keyboard), as AppKit buttons do (`KeyboardAccess`); Space or Return picks, the arrows move.
+- VoiceOver (`Shell/AccessibilitySupport.swift`): the canvas is an image element named after the image whose value gives the size, zoom and tool; each panel has a heading; the status bar and options row are named groups. Labels go on the control and its cell (`setVoiceOverLabel`), because the tree AppKit gives VoiceOver lists the cell. `docs/accessibility-walkthrough.md` is the test's transcript of that tree with actions done through it.
+- Strings (`Shell/L10n.swift`, `Shell/Localizable.xcstrings`): the English text is the key. Windows, panels, menus and dialogs are translated by one pass over their views after they are built (`L10n.localize`); sheets by a hook when they open. Rows, swatches and strip items show user data and are not translated. Engine labels are keyed `engine.<command id>`; in English the engine's own label shows. `M59_WRITE_STRINGS=1` (as `TEST_RUNNER_M59_WRITE_STRINGS`) makes the test add new strings to the catalog.
+- Pseudo-localization: `L10n.pseudo` doubles every string. Outside English, buttons and popups with a fixed width grow (`growWidthConstraints`) and frame-based dialogs widen (`widenToFit`); in English every size stays as SPEC gives it. `M59_PNG_DIR=<dir>` renders the main window, panels and dialogs, light and dark.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
@@ -204,7 +213,7 @@ Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the acti
 | A text field or text view is editing (options row, status zoom, Colors hex) | Selects the field's text | Deletes text | Ends editing | Ends editing | The field's own undo |
 | A sheet or modal dialog is up | The dialog's field | The dialog | The dialog | The dialog's default button | The dialog; document commands are disabled |
 
-Letter keys pick tools only while the canvas has focus (paint.net keys: S, M, Z, H, F, G, B, E, P, K, L, R, T, O; S, M and O cycle).
+Letter keys pick tools only while the canvas has focus (paint.net keys: S, M, Z, H, F, G, B, E, P, K, L, R, T, O; S, M and O cycle; Shift with the letter cycles back, M59).
 
 ## Canvas
 

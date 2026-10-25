@@ -257,6 +257,7 @@ public class ImageSizeController: NSWindowController, NSTextFieldDelegate {
         }
         unitPopup.target = self
         unitPopup.action = #selector(controlChanged(_:))
+        unitPopup.setAccessibilityLabel("Resolution unit")  // M59: VoiceOver name
         for (f, name) in [(percentField, "Percentage"), (widthField, "Width in pixels"), (heightField, "Height in pixels"),
                           (resolutionField, "Resolution"), (printWidthField, "Print width"),
                           (printHeightField, "Print height")] {

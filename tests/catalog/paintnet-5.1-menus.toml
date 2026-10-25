@@ -2001,6 +2001,28 @@ source = "https://www.getpaint.net/doc/latest/MenuBar.html"
 [[item]]
 pdn = ""
 win = ""
+mac = "Window > Next Panel"
+key = "⌃`"
+command = "focusNextPanel:"
+icon = false
+status = "mac"
+reason = "M59 keyboard use: moves keyboard focus from the image window through the shown panels. Cmd+` is the macOS next-window key and Ctrl+F6 its focus-the-floating-window key, so neither is taken"
+source = "https://support.apple.com/en-us/102650"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Window > Previous Panel"
+key = "⌃⇧`"
+command = "focusPreviousPanel:"
+icon = false
+status = "mac"
+reason = "M59 keyboard use: the Next Panel cycle backwards"
+source = "https://support.apple.com/en-us/102650"
+
+[[item]]
+pdn = ""
+win = ""
 mac = "Window > Minimize"
 key = "⌘M"
 command = "performMiniaturize:"
