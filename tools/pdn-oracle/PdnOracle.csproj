@@ -54,6 +54,13 @@
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/GlowEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/DesaturateEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/InvertColorsEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/BulgeEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PixelateEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PolarInversionEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/TileEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/TwistEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/WarpEffectBase.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/WarpEdgeBehavior.cs" />
   </ItemGroup>
   <Target Name="ExtractLegacyFlood" BeforeTargets="CoreCompile">
     <Exec Command="python3 &quot;$(MSBuildProjectDirectory)/extract-flood.py&quot;" />

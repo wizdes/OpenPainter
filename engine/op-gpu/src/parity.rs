@@ -45,6 +45,9 @@ impl GpuOp for EffectOp {
                 | GpuKernel::Outline
                 | GpuKernel::InkSketch
                 | GpuKernel::PencilSketch
+                | GpuKernel::Pixelate
+                | GpuKernel::Bulge
+                | GpuKernel::Twist
         ) {
             return op_ops::effect::reference_rgba8(
                 self.effect_id,

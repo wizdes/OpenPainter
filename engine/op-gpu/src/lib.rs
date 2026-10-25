@@ -193,6 +193,8 @@ impl GpuContext {
             op_ops::effect::GpuKernel::InkSketch => [50, 50, 0],
             op_ops::effect::GpuKernel::PencilSketch => [2, 0, 0],
             op_ops::effect::GpuKernel::EdgeDetect | op_ops::effect::GpuKernel::Relief => [45, 0, 0],
+            op_ops::effect::GpuKernel::Pixelate => [2, 0, 0],
+            op_ops::effect::GpuKernel::Bulge => [45, 0, 0],
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
@@ -233,6 +235,8 @@ impl GpuContext {
             op_ops::effect::GpuKernel::EdgeDetect
             | op_ops::effect::GpuKernel::Emboss
             | op_ops::effect::GpuKernel::Relief => (-180..=180).contains(&values[0]),
+            op_ops::effect::GpuKernel::Pixelate => (1..=100).contains(&values[0]),
+            op_ops::effect::GpuKernel::Bulge => (-200..=100).contains(&values[0]),
             _ => true,
         };
         if !valid {
@@ -324,6 +328,9 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Outline => "effect_outline",
             op_ops::effect::GpuKernel::InkSketch => "effect_ink_sketch",
             op_ops::effect::GpuKernel::PencilSketch => "effect_pencil_sketch",
+            op_ops::effect::GpuKernel::Pixelate => "effect_pixelate",
+            op_ops::effect::GpuKernel::Bulge => "effect_bulge",
+            op_ops::effect::GpuKernel::Twist => "effect_twist",
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

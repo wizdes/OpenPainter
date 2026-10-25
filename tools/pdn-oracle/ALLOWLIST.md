@@ -46,8 +46,15 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/GlowEffect.cs` | Used by Ink Sketch. |
 | `Effects/DesaturateEffect.cs` | Used by Pencil Sketch. |
 | `Effects/InvertColorsEffect.cs` | Used by Pencil Sketch. |
+| `Effects/BulgeEffect.cs` | Original bulge warp. |
+| `Effects/PixelateEffect.cs` | Original four-corner pixelation. |
+| `Effects/PolarInversionEffect.cs` | Original polar inversion warp. |
+| `Effects/TileEffect.cs` | Original tile reflection warp. |
+| `Effects/TwistEffect.cs` | Original twist warp. |
+| `Effects/WarpEffectBase.cs` | Shared polar inversion transform and antialiasing. |
+| `Effects/WarpEdgeBehavior.cs` | Original warp edge modes. |
 
-`Shims/Utility.cs` contains verbatim numeric methods from `Core/Utility.cs` with the Windows UI methods removed. Its header records the source revision and changes.
+`Shims/Utility.cs` also carries `GetRgssOffsets` for legacy warp antialiasing and contains verbatim numeric methods from `Core/Utility.cs` with the Windows UI methods removed. Its header records the source revision and changes.
 `Shims/AddNoiseEffect.cs`, `Shims/FrostedGlassEffect.cs`, and `Shims/CloudsEffect.cs` copy their named effect files. Each replaces only a clock-derived random seed with a fixed value. Their headers name the source and exact change.
 
 ## Stubbed types

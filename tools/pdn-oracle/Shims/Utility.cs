@@ -3,6 +3,20 @@
 // Changed: kept byte math and numeric helpers verbatim; removed Windows UI methods.
 using System; using System.Drawing; using System.IO;
 namespace PaintDotNet { public static class Utility {
+        // Original OpenPDN Utility.GetRgssOffsets at cca476b, MIT.
+        public static unsafe void GetRgssOffsets(PointF* samplesArray, int sampleCount, int quality)
+        {
+            if (sampleCount < 1 || sampleCount != quality * quality) throw new ArgumentOutOfRangeException(nameof(sampleCount));
+            if (sampleCount == 1) { samplesArray[0] = new PointF(0.0f, 0.0f); return; }
+            for (int i = 0; i < sampleCount; ++i)
+            {
+                double y = (i + 1d) / (sampleCount + 1d);
+                double x = y * quality;
+                x -= (int)x;
+                samplesArray[i] = new PointF((float)(x - 0.5d), (float)(y - 0.5d));
+            }
+        }
+
         // TODO: In v4.0 codebase, turn this into an extension method
         public static double Clamp(double x, double min, double max)
         {

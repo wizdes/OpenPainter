@@ -58,6 +58,9 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Outline
                 | GpuKernel::InkSketch
                 | GpuKernel::PencilSketch
+                | GpuKernel::Pixelate
+                | GpuKernel::Bulge
+                | GpuKernel::Twist
         );
         let mut expected = bytes.clone();
         for pixel in expected.chunks_exact_mut(4) {
@@ -102,7 +105,10 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Median
                 | GpuKernel::Motion
                 | GpuKernel::Radial
-                | GpuKernel::Zoom => break,
+                | GpuKernel::Zoom
+                | GpuKernel::Pixelate
+                | GpuKernel::Bulge
+                | GpuKernel::Twist => break,
                 GpuKernel::EdgeDetect
                 | GpuKernel::Emboss
                 | GpuKernel::Relief
@@ -695,5 +701,50 @@ fn gaussian_gpu_radius_endpoints_match_cpu() {
         op_ops::effects::gaussian_blur::reference_rgba8_with_radius(width, height, &bytes, 200);
     for (a, b) in actual.iter().zip(&expected) {
         assert!(a.abs_diff(*b) <= 1, "{a} vs {b}");
+    }
+}
+
+#[test]
+fn pixelate_cell_size_endpoints_match_cpu_on_metal() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    #[cfg(target_os = "macos")]
+    assert_eq!(format!("{:?}", gpu.info().backend), "Metal");
+    let (width, height) = (257, 3);
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| {
+            let x = i % width;
+            [
+                x as u8,
+                (i / width) as u8,
+                149,
+                if x == 256 { 0 } else { 193 },
+            ]
+        })
+        .collect();
+    let spec = effect::find("effect.distort.pixelate").unwrap();
+    for size in [1, 2, 100] {
+        let mut params = spec.default_params();
+        params["cell_size"] = size.into();
+        let prep = effect::Prepared {
+            width: width as i32,
+            height: height as i32,
+            ..Default::default()
+        };
+        let sample = |x: i32, y: i32| {
+            let i = (y as usize * width as usize + x as usize) * 4;
+            bytes[i..i + 4].try_into().unwrap()
+        };
+        let mut expected = Vec::with_capacity(bytes.len());
+        for y in 0..height as i32 {
+            for x in 0..width as i32 {
+                expected.extend_from_slice(&(spec.render_cpu)(&sample, x, y, &prep, &params));
+            }
+        }
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_kernel_with_params(GpuKernel::Pixelate, width, height, &bytes, [size, 0, 0])
+            .unwrap();
+        assert_eq!(gpu.dispatch_count() - before, 1);
+        assert_eq!(actual, expected, "cell size {size}");
     }
 }

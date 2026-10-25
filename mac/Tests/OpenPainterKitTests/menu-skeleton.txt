@@ -117,9 +117,9 @@ Effects
 Effects > Repeat Effect [⌘F] (off)
 Effects > ---
 Effects > Artistic
-Effects > Artistic > Ink Sketch (off)
-Effects > Artistic > Oil Painting (off)
-Effects > Artistic > Pencil Sketch (off)
+Effects > Artistic > Ink Sketch
+Effects > Artistic > Oil Painting
+Effects > Artistic > Pencil Sketch
 Effects > Blurs
 Effects > Blurs > Fragment Blur
 Effects > Blurs > Gaussian Blur
@@ -136,15 +136,16 @@ Effects > Blurs > Unfocus (off)
 Effects > Color
 Effects > Color > Quantize (off)
 Effects > Distort
-Effects > Distort > Bulge (off)
+Effects > Distort > Bulge
+Effects > Distort > Frosted Glass
+Effects > Distort > Pixelate
+Effects > Distort > Polar Inversion
+Effects > Distort > Tile Reflection
+Effects > Distort > Twist
+Effects > Distort > ---
 Effects > Distort > Crystalize (off)
 Effects > Distort > Dents (off)
-Effects > Distort > Frosted Glass (off)
 Effects > Distort > Morphology (off)
-Effects > Distort > Pixelate (off)
-Effects > Distort > Polar Inversion (off)
-Effects > Distort > Tile Reflection (off)
-Effects > Distort > Twist (off)
 Effects > Noise
 Effects > Noise > Add Noise (off)
 Effects > Noise > Reduce Noise (off)
@@ -163,10 +164,10 @@ Effects > Render > Julia Fractal (off)
 Effects > Render > Mandelbrot Fractal (off)
 Effects > Render > Turbulence (off)
 Effects > Stylize
-Effects > Stylize > Edge Detect (off)
-Effects > Stylize > Emboss (off)
-Effects > Stylize > Outline (off)
-Effects > Stylize > Relief (off)
+Effects > Stylize > Edge Detect
+Effects > Stylize > Emboss
+Effects > Stylize > Outline
+Effects > Stylize > Relief
 Window
 Window > Tools [F5]
 Window > History [F6]
