@@ -29,6 +29,7 @@ mod gpu_effects;
 mod gradient_commands;
 mod image_commands;
 mod layer_commands;
+mod layer_menu_commands;
 mod line_commands;
 mod shell_commands;
 pub use gpu_effects::EngineOptions;
@@ -760,6 +761,7 @@ fn specs() -> Vec<CommandSpec> {
     entries.extend(image_commands::specs());
     entries.extend(shell_commands::specs());
     entries.extend(layer_commands::specs());
+    entries.extend(layer_menu_commands::specs());
     for (index, effect) in effect::registered().into_iter().enumerate() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
@@ -1113,6 +1115,7 @@ impl Actor {
                     "effect.adjust.invert_alpha" => "Invert Alpha".into(),
                     _ => shell_commands::history_label(id, &params)
                         .or_else(|| layer_commands::history_label(id, &params))
+                        .or_else(|| layer_menu_commands::history_label(id).map(str::to_owned))
                         .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);

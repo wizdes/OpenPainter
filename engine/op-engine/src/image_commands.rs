@@ -109,7 +109,7 @@ fn dims(p: &Value) -> Result<(u32, u32)> {
     }
     Ok((w, h))
 }
-fn read(s: &DocState, layer: usize) -> Result<Vec<u8>> {
+pub(super) fn read(s: &DocState, layer: usize) -> Result<Vec<u8>> {
     let mut out = vec![0; s.width as usize * s.height as usize * 4];
     for ty in 0..s.height.div_ceil(TILE_SIZE as u32) {
         for tx in 0..s.width.div_ceil(TILE_SIZE as u32) {
@@ -133,7 +133,7 @@ fn read(s: &DocState, layer: usize) -> Result<Vec<u8>> {
     }
     Ok(out)
 }
-fn write(mut next: DocState, layer: usize, pixels: &[u8]) -> Result<DocState> {
+pub(super) fn write(mut next: DocState, layer: usize, pixels: &[u8]) -> Result<DocState> {
     let w = next.width as usize;
     let h = next.height as usize;
     for ty in 0..h.div_ceil(TILE_SIZE) {
@@ -351,21 +351,22 @@ fn canvas(ctx: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
         [1.0, 0.0, 0.0, 1.0, dx as f64, dy as f64],
     )
 }
+pub(super) fn transform_source(w: u32, h: u32, kind: u8, x: u32, y: u32) -> (u32, u32) {
+    match kind {
+        0 => (w - 1 - x, y),
+        1 => (x, h - 1 - y),
+        2 => (y, h - 1 - x),
+        3 => (w - 1 - y, x),
+        _ => (w - 1 - x, h - 1 - y),
+    }
+}
 fn transform(ctx: &RunCtx, s: &DocState, kind: u8) -> Result<Outcome> {
     let (w, h) = if kind == 2 || kind == 3 {
         (s.height, s.width)
     } else {
         (s.width, s.height)
     };
-    let map = move |x: u32, y: u32| -> (u32, u32) {
-        match kind {
-            0 => (s.width - 1 - x, y),
-            1 => (x, s.height - 1 - y),
-            2 => (y, s.height - 1 - x),
-            3 => (s.width - 1 - y, x),
-            _ => (s.width - 1 - x, s.height - 1 - y),
-        }
-    };
+    let map = move |x: u32, y: u32| transform_source(s.width, s.height, kind, x, y);
     let affine = match kind {
         0 => [-1.0, 0.0, 0.0, 1.0, s.width as f64, 0.0],
         1 => [1.0, 0.0, 0.0, -1.0, 0.0, s.height as f64],
