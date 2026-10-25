@@ -249,6 +249,11 @@ public enum MenuSkeleton {
                 i("Flip Vertical"),
                 i("Rotate 180°"),
                 layerItem("Rotate / Zoom…"),
+                // M53: RemoveBackground.swift (paint.net 5.1 has no such item).
+                .submenu("Remove Background", [
+                    .item("Select Foreground", "", [], .selector(#selector(RemoveBackgroundActions.selectForeground(_:)))),
+                    .item("Remove Background", "", [], .selector(#selector(RemoveBackgroundActions.removeBackground(_:)))),
+                ]),
                 .separator,
                 .item("Go to Top Layer", key(NSHomeFunctionKey), opt, .selector(#selector(EditorMenuActions.goToLayer(_:)))),
                 .item("Go to Layer Above", key(NSPageUpFunctionKey), opt, .selector(#selector(EditorMenuActions.goToLayer(_:)))),

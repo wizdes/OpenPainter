@@ -346,6 +346,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         case #selector(addLayer(_:)): return !busy && editor.isEnabled("layer.add")
         case #selector(toggleLayerVisibility(_:)), #selector(showLayerProperties(_:)): return !busy
         case #selector(showColorProfile(_:)): return !busy
+        case #selector(selectForeground(_:)), #selector(removeBackground(_:)): return !busy  // M53
         case #selector(goToLayer(_:)):
             let count = editor.info.layers.count, active = editor.info.activeLayer
             return !busy && [active != count - 1, active < count - 1, active > 0, active != 0][min(max(item.tag, 0), 3)]

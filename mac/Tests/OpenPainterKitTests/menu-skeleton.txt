@@ -122,6 +122,9 @@ Layers > Flip Horizontal (off)
 Layers > Flip Vertical (off)
 Layers > Rotate 180° (off)
 Layers > Rotate / Zoom…
+Layers > Remove Background
+Layers > Remove Background > Select Foreground
+Layers > Remove Background > Remove Background
 Layers > ---
 Layers > Go to Top Layer [⌥Home]
 Layers > Go to Layer Above [⌥PageUp]

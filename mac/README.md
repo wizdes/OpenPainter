@@ -100,6 +100,15 @@ The Mac side shapes text; the engine only composites what it is given, so the en
 - `Shell/SelectionEditActions.swift`: Erase Selection (Delete; transparent pixels, then deselect), Fill Selection (Shift-Delete; the primary color, the selection stays), Expand Selection… (a sheet; a negative number shrinks), Copy Selection (Option-Shift-Command-C; paint.net's `{"polygonList": [...]}` JSON text from the `doc.selection_polygons` query) and the Paste Selection submenu (one item per combine mode; Replace is Option-Shift-Command-V). Invert Selection (Command-I) is the engine command `selection.invert`. Each changing item is one history step, and each item is off when it would do nothing. Enter deselects, as in paint.net.
 - Every selection tool and Paste Selection combine with an empty selection when nothing is selected, and new shapes are clipped to the canvas.
 
+## Remove Background (M53)
+
+paint.net 5.1 has no Remove Background command (its Image and Layers menu pages list none), so Layers > Remove Background is OpenPainter's. It sits in Layers because it works on the active layer.
+
+- `Shell/RemoveBackground.swift`: two items, Select Foreground and Remove Background. Each reads the active layer (`layer.pixels`, not the flattened image) and shows a sheet with a progress bar and Cancel while Vision runs off the main thread. Cancel stops Vision and sends nothing. Then one engine command, so one history step: `selection.from_mask` (a Coverage selection holding the soft mask) or `layer.remove_background` (the layer's alpha times the mask). No foreground, or an image that changed meanwhile, sends nothing and says so in the status bar.
+- `PlatformServices/ForegroundMask.swift` and the `VisionMask` package (`mac/VisionMask`, Objective-C): `VNGenerateForegroundInstanceMaskRequest` (macOS 14+) with `generateScaledMaskForImage(forInstances:from:)` over all instances, at the full layer size, rounded to one byte per pixel so soft edges stay. Swift code must not `import Vision`: its Swift overlay then loads into every module that imports OpenPainterKit and changes type inference elsewhere (on the macOS 27 SDK, `stride(...).first { ... } ?? 0` becomes `Int?` and `DocumentLifecycleTests` stops compiling).
+- Engine: `engine/op-engine/src/mask_commands.rs`. The mask is base64 of width × height bytes.
+- Test photos: `tests/fixtures/remove-bg` (10 composites with exact masks; its README lists sources and licenses). `RemoveBackgroundTests` checks IoU ≥ 0.9 at threshold 128 for each.
+
 ## Move Selected Pixels and Move Selection (M33)
 
 Rules follow paint.net's Move Tools page (https://www.getpaint.net/doc/latest/MoveTools.html), with Ctrl as Command and Alt as Option.
