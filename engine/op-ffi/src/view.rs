@@ -98,6 +98,11 @@ pub struct OpViewInfo {
     pub region_uploads: u64,
     /// Tiles uploaded by those partial uploads.
     pub region_tiles: u64,
+    /// The fill around the document, red, green, blue in 0..=1 (M56).
+    pub background_red: f32,
+    pub background_green: f32,
+    pub background_blue: f32,
+    pub _pad2: f32,
 }
 
 /// One presented frame, for latency measurements (M38). `time_ns` is
@@ -153,6 +158,8 @@ struct Request {
     display_gen: u64,
     /// False until the first op_view_set.
     set: bool,
+    /// Fill outside the document (`op_view_set_background`, M56).
+    background: [f32; 4],
 }
 
 #[cfg(target_os = "macos")]
@@ -524,7 +531,7 @@ fn render_one(host: &Host, v: &View) {
             zoom: (req.zoom * req.scale) as f32,
             origin_x: (req.origin_x * req.scale) as f32,
             origin_y: (req.origin_y * req.scale) as f32,
-            background: BACKGROUND,
+            background: req.background,
         },
         checker_px: ((CHECKER_PT * req.scale).round() as u32).max(1),
         pixel_grid: req.flags & OP_VIEW_PIXEL_GRID != 0 && req.zoom >= GRID_MIN_ZOOM - 1e-9,
@@ -709,6 +716,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             display_icc: None,
             display_gen: 0,
             set: false,
+            background: BACKGROUND,
         }),
         dirty: false.into(),
         render: Mutex::new(Some(Render {
@@ -825,6 +833,52 @@ pub extern "C" fn op_view_set(p: *mut OpEngine, view: u64, state: *const OpViewS
     })
 }
 
+/// The fill for `op_view_set_background`: each component in 0..=1, alpha 1.
+fn background(red: f64, green: f64, blue: f64) -> Option<[f32; 4]> {
+    let ok = |c: f64| c.is_finite() && (0.0..=1.0).contains(&c);
+    (ok(red) && ok(green) && ok(blue)).then_some([red as f32, green as f32, blue as f32, 1.0])
+}
+
+/// Sets the color drawn around the document (the canvas surround, M56: the
+/// app sends its `stage` appearance token). Components are 0 to 1 in the
+/// display's encoding, as the default mid grey is. Until it is called the
+/// view uses that grey. A component outside 0..=1 (or NaN) returns
+/// OP_ERR_BAD_ARGUMENT and changes nothing; a stale view id returns
+/// OP_ERR_NO_SUCH_DOC. Returns at once and asks for a frame.
+#[unsafe(no_mangle)]
+pub extern "C" fn op_view_set_background(
+    p: *mut OpEngine,
+    view: u64,
+    red: f64,
+    green: f64,
+    blue: f64,
+) -> OpStatus {
+    guard(|| {
+        if let Err(s) = engine(p) {
+            return s;
+        }
+        let Some(color) = background(red, green, blue) else {
+            return OpStatus::OP_ERR_BAD_ARGUMENT;
+        };
+        let Some(host) = find_host(p) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
+        let Some(v) = host.view(view) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
+        {
+            let mut r = v.request.lock();
+            if r.background == color {
+                return OpStatus::OP_OK;
+            }
+            r.background = color;
+        }
+        v.dirty.store(true, Ordering::Release);
+        host.wake.notify_all();
+        OpStatus::OP_OK
+    })
+}
+
 /// Detaches a view: waits for its in-flight frame, drops its surface and
 /// releases the layer. A stale id returns OP_ERR_NO_SUCH_DOC.
 #[unsafe(no_mangle)]
@@ -869,6 +923,9 @@ pub extern "C" fn op_view_info(p: *mut OpEngine, view: u64, out: *mut OpViewInfo
             flags: req.flags,
             display_icc_len: req.display_icc.as_ref().map_or(0, |i| i.len() as u64),
             frames: v.log.lock().frames,
+            background_red: req.background[0],
+            background_green: req.background[1],
+            background_blue: req.background[2],
             ..Default::default()
         };
         fill_render_info(&v, &mut info);

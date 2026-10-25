@@ -124,6 +124,16 @@ File > New, Open, Save, Save As, Save a Copy and Revert to Saved, following pain
 - Revert to Saved reads the file again and gives the open engine document its content (`op_doc_replace`): one history step, not modified, same window.
 - Close and Quit with unsaved work ask Save, Don't Save or Cancel for each image, one at a time. Cancel keeps that window and the app open. Tests answer the prompts through `ImageDocument.unsavedPrompt` and `ImageDocument.flattenPrompt`.
 
+## View menu, Settings and appearance (M56)
+
+- View menu (paint.net 5.1 order, https://www.getpaint.net/doc/latest/ViewMenu.html): Zoom In, Zoom Out, Zoom to Window, Zoom to Selection, Actual Size, Zoom Presets (paint.net's 25 preset zooms, 3200% to 1%, the current one checked), Pixel Grid, Rulers (Option-Command-R, paint.net Ctrl+Alt+R), and Pixels, Inches, Centimeters. The zoom commands reuse `ZoomPresets` and `Viewport` (M09).
+- `RulerScale.swift`: `MeasurementUnit` (pixels per unit from the document's `doc.resolution` DPI: 1, DPI, DPI / 2.54) and the tick math. A labelled tick lands on 1, 2 or 5 times a power of ten units, the smallest step at least 48 pt apart; minor ticks split it into 10, 5, 4 or 2 parts at least 4 pt apart. Pixel steps are whole pixels.
+- `Shell/RulerView.swift`: the 20 pt rulers along the top and left of the canvas, with the unit in the corner. They follow zoom and scroll, highlight the selection's bounds with `wash` and mark the pointer with `accent`. `CanvasContainerView` moves the canvas in by 20 pt while they show.
+- The status bar shows the selection, pointer and image size in the current units; its units popup and the View menu change the same setting.
+- `Shell/AppSettings.swift`: appearance (System, Light, Dark), units, rulers and pixel grid, in `UserDefaults` under `OPSettings.*` (the workspace's panel-store defaults). A change applies to every open window at once and to windows opened later. The pixel grid still shows only at 400% and above (the engine's limit; the paint.net page says 200%).
+- `Shell/SettingsWindow.swift`: OpenPainter > Settings… (Cmd+,), one page with those four settings. It works with no document open.
+- Appearance: the setting sets `NSApp.appearance`; panels, dialogs and the shell follow through the dynamic `Theme` tokens. The canvas surround is the `stage` token, sent to the engine with `op_view_set_background` whenever the canvas's appearance changes (`op_view_info` reports it back).
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
@@ -144,6 +154,7 @@ Letter keys pick tools only while the canvas has focus (paint.net keys: S, M, Z,
 - Checkerboard: 8 x 8 point squares, white and 80% grey, fixed in screen space.
 - At 100% and above the engine samples the nearest document pixel. Below 100% it reads a mip pyramid (premultiplied 2 x 2 box filter, built on the GPU the first time the view zooms out) and box-filters 1 or 2 texels of the chosen level. No trilinear blend between levels.
 - The pixel grid (View > Pixel Grid) shows at 400% and above. It is drawn after the display table, in display space.
+- The fill around the document is the `stage` token for the canvas's appearance (`op_view_set_background`, M56); before the first call the engine uses a mid grey.
 - 100% means one document pixel per point.
 
 ## Zoom and keys

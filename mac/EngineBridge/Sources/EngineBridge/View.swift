@@ -59,6 +59,8 @@ public struct CanvasViewInfo: Sendable {
     /// Changes uploaded as changed tiles only (live strokes), and those tiles.
     public let regionUploads: UInt64
     public let regionTiles: UInt64
+    /// The fill around the document, red, green, blue in 0...1 (M56).
+    public let background: [Double]
 
     init(_ i: OpViewInfo) {
         state = CanvasViewState(
@@ -83,6 +85,7 @@ public struct CanvasViewInfo: Sendable {
         lastError = EngineError(OpStatus(rawValue: i.last_error))
         regionUploads = i.region_uploads
         regionTiles = i.region_tiles
+        background = [Double(i.background_red), Double(i.background_green), Double(i.background_blue)]
     }
 }
 
@@ -150,6 +153,12 @@ public final class EngineView: @unchecked Sendable {
                 try checkStatus(op_view_set(h, id, &s))
             }
         }
+    }
+
+    /// Sets the fill around the document (`op_view_set_background`, M56).
+    /// Components are 0 to 1 in the display's encoding.
+    public func setBackground(red: Double, green: Double, blue: Double) throws {
+        try document.engine.withHandle { h in try checkStatus(op_view_set_background(h, id, red, green, blue)) }
     }
 
     private func withICC(_ icc: Data?, _ body: (UnsafePointer<UInt8>?, UInt) throws -> Void) throws {

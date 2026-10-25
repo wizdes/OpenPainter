@@ -121,9 +121,10 @@ final class MenuTests: XCTestCase {
         wc.runCommand(deselect)
         XCTAssertTrue(waitUntil { wc.editor.selection == nil })
         // Not-yet-built toolbar commands keep their place, disabled.
-        for k in ["new", "save", "print", "cut", "copy", "paste", "rulers"] {
+        for k in ["new", "save", "print", "cut", "copy", "paste"] {
             XCTAssertFalse(wc.commandButtons[k]!.isEnabled, k)
         }
+        XCTAssertTrue(wc.commandButtons["rulers"]!.isEnabled, "M56 built Rulers")
         XCTAssertTrue(wc.commandButtons["open"]!.isEnabled)
         // Layers > Add New Layer and Go to Layer use the engine.
         let layers = try XCTUnwrap(menu.item(withTitle: "Layers")?.submenu)

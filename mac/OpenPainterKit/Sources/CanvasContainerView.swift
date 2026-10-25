@@ -10,6 +10,32 @@ public final class CanvasContainerView: NSView {
     private let horizontal = NSScroller()
     private let vertical = NSScroller()
     private let overlay = ZoomRectangleView()
+    /// View > Rulers (M56): along the top and left edges of the canvas.
+    public let horizontalRuler = RulerView(axis: .horizontal)
+    public let verticalRuler = RulerView(axis: .vertical)
+    private let rulerCorner = RulerCornerView()
+    public var rulersVisible = false {
+        didSet {
+            guard rulersVisible != oldValue else { return }
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+        }
+    }
+    /// The rulers' units and the document's pixels per inch.
+    public var rulerUnit: MeasurementUnit = .pixels {
+        didSet { updateRulers() }
+    }
+    public var rulerDPI: Double = 96 {
+        didSet { updateRulers() }
+    }
+    /// The selection bounds (document pixels) the rulers highlight.
+    public var rulerSelection: CGRect? {
+        didSet { if rulerSelection != oldValue { updateRulers() } }
+    }
+    /// The pointer (document pixels) the rulers mark.
+    public var rulerCursor: CGPoint? {
+        didSet { if rulerCursor != oldValue { updateRulers() } }
+    }
     /// Called after every viewport change (for a zoom label).
     public var onViewportChange: ((Viewport) -> Void)?
 
@@ -25,6 +51,10 @@ public final class CanvasContainerView: NSView {
         }
         addSubview(canvas)
         addSubview(overlay)
+        for r in [horizontalRuler, verticalRuler, rulerCorner] as [NSView] {
+            r.isHidden = true
+            addSubview(r)
+        }
         canvas.onViewportChange = { [weak self] v in self?.viewportChanged(v) }
         canvas.onZoomRectangle = { [weak self] r in self?.overlay.rectangle = r }
     }
@@ -41,11 +71,40 @@ public final class CanvasContainerView: NSView {
     public override func layout() {
         super.layout()
         let w = scrollerWidth
-        let canvasFrame = NSRect(x: 0, y: 0, width: max(bounds.width - w, 1), height: max(bounds.height - w, 1))
+        let r: CGFloat = rulersVisible ? RulerView.thickness : 0
+        let canvasFrame = NSRect(
+            x: r, y: r, width: max(bounds.width - w - r, 1), height: max(bounds.height - w - r, 1))
         canvas.frame = canvasFrame
         overlay.frame = canvasFrame
-        vertical.frame = NSRect(x: canvasFrame.maxX, y: 0, width: w, height: canvasFrame.height)
-        horizontal.frame = NSRect(x: 0, y: canvasFrame.maxY, width: canvasFrame.width, height: w)
+        vertical.frame = NSRect(x: canvasFrame.maxX, y: canvasFrame.minY, width: w, height: canvasFrame.height)
+        horizontal.frame = NSRect(x: canvasFrame.minX, y: canvasFrame.maxY, width: canvasFrame.width, height: w)
+        for v in [horizontalRuler, verticalRuler, rulerCorner] as [NSView] { v.isHidden = !rulersVisible }
+        horizontalRuler.frame = NSRect(x: r, y: 0, width: canvasFrame.width, height: r)
+        verticalRuler.frame = NSRect(x: 0, y: r, width: r, height: canvasFrame.height)
+        rulerCorner.frame = NSRect(x: 0, y: 0, width: r, height: r)
+        updateRulers()
+    }
+
+    /// Gives the rulers the current zoom, scroll, units, selection and pointer.
+    func updateRulers() {
+        let v = canvas.viewport
+        let scale = RulerScale(unit: rulerUnit, dpi: rulerDPI, zoom: v.zoom)
+        rulerCorner.unit = rulerUnit
+        horizontalRuler.scale = scale
+        verticalRuler.scale = scale
+        horizontalRuler.origin = v.origin.x
+        verticalRuler.origin = v.origin.y
+        if let s = rulerSelection, s.width > 0, s.height > 0 {
+            let a = v.viewPoint(ofDocument: s.origin), b = v.viewPoint(ofDocument: CGPoint(x: s.maxX, y: s.maxY))
+            horizontalRuler.highlight = a.x...b.x
+            verticalRuler.highlight = a.y...b.y
+        } else {
+            horizontalRuler.highlight = nil
+            verticalRuler.highlight = nil
+        }
+        let c = rulerCursor.map { v.viewPoint(ofDocument: $0) }
+        horizontalRuler.marker = c?.x
+        verticalRuler.marker = c?.y
     }
 
     private func viewportChanged(_ v: Viewport) {
@@ -57,6 +116,7 @@ public final class CanvasContainerView: NSView {
         vertical.knobProportion = p.height
         vertical.doubleValue = Double(f.y)
         vertical.isEnabled = p.height < 1
+        updateRulers()
         onViewportChange?(v)
     }
 

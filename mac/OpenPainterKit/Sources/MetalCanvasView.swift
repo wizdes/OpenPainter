@@ -53,8 +53,16 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     /// Called when the tool changes (keys Z and H, the Tools menu).
     public var onToolChange: ((CanvasTool) -> Void)?
     public var pixelGrid = false {
-        didSet { if pixelGrid != oldValue { push() } }
+        didSet {
+            guard pixelGrid != oldValue else { return }
+            push()
+            onPixelGridChange?(pixelGrid)
+        }
     }
+    /// Called when `pixelGrid` changes (the window keeps the setting in step).
+    public var onPixelGridChange: ((Bool) -> Void)?
+    /// The surround color last sent to the engine (sRGB 0...1), nil before attach.
+    public private(set) var sentBackground: [Double]?
     /// Called after every viewport change (scroll bars, zoom label).
     public var onViewportChange: ((Viewport) -> Void)?
     /// Called on the main thread once the first frame of the document is presented.
@@ -135,6 +143,8 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         guard engineView == nil else { return }
         engineView = try EngineView(document: document, layer: metalLayer)
         waitingForFirstFrame = true
+        sentBackground = nil
+        pushBackground()
         push()
         waitForFirstFrame()
     }
@@ -230,6 +240,36 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public func setSuspended(_ on: Bool) {
         suspended = on
         push()
+    }
+
+    /// The `stage` token's color under an appearance, as sRGB components.
+    public static func stageComponents(for appearance: NSAppearance) -> [Double] {
+        var out: [Double] = [0, 0, 0]
+        appearance.performAsCurrentDrawingAppearance {
+            if let c = Theme.stage.usingColorSpace(.sRGB) {
+                out = [Double(c.redComponent), Double(c.greenComponent), Double(c.blueComponent)]
+            }
+        }
+        return out
+    }
+
+    /// Sends the canvas surround (the `stage` token for this view's appearance).
+    /// The tokens are greys, which have the same encoding in sRGB and Display P3.
+    private func pushBackground() {
+        guard let engineView else { return }
+        let c = Self.stageComponents(for: effectiveAppearance)
+        guard c != sentBackground else { return }
+        do {
+            try engineView.setBackground(red: c[0], green: c[1], blue: c[2])
+            sentBackground = c
+        } catch {
+            report("op_view_set_background: \(error)")
+        }
+    }
+
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        pushBackground()
     }
 
     public override func viewDidChangeBackingProperties() {

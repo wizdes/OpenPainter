@@ -193,6 +193,13 @@ typedef struct OpViewInfo {
    * Tiles uploaded by those partial uploads.
    */
   uint64_t region_tiles;
+  /**
+   * The fill around the document, red, green, blue in 0..=1 (M56).
+   */
+  float background_red;
+  float background_green;
+  float background_blue;
+  float _pad2;
 } OpViewInfo;
 
 /**
@@ -387,6 +394,20 @@ enum OpStatus op_view_attach(struct OpEngine *p, uint64_t doc, void *layer, uint
  * OP_ERR_NO_SUCH_DOC.
  */
 enum OpStatus op_view_set(struct OpEngine *p, uint64_t view, const struct OpViewState *state);
+
+/**
+ * Sets the color drawn around the document (the canvas surround, M56: the
+ * app sends its `stage` appearance token). Components are 0 to 1 in the
+ * display's encoding, as the default mid grey is. Until it is called the
+ * view uses that grey. A component outside 0..=1 (or NaN) returns
+ * OP_ERR_BAD_ARGUMENT and changes nothing; a stale view id returns
+ * OP_ERR_NO_SUCH_DOC. Returns at once and asks for a frame.
+ */
+enum OpStatus op_view_set_background(struct OpEngine *p,
+                                     uint64_t view,
+                                     double red,
+                                     double green,
+                                     double blue);
 
 /**
  * Detaches a view: waits for its in-flight frame, drops its surface and

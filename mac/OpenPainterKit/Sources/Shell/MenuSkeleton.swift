@@ -154,7 +154,7 @@ public enum MenuSkeleton {
             .submenu("OpenPainter", [
                 .item("About OpenPainter", "", [], .selector(#selector(NSApplication.orderFrontStandardAboutPanel(_:)))),
                 .separator,
-                i("Settings…", ","),
+                .item("Settings…", ",", cmd, .selector(#selector(SettingsMenuActions.showSettings(_:)))),
                 .separator,
                 .item("Hide OpenPainter", "h", cmd, .selector(#selector(NSApplication.hide(_:)))),
                 .item("Hide Others", "h", optCmd, .selector(#selector(NSApplication.hideOtherApplications(_:)))),
@@ -211,13 +211,14 @@ public enum MenuSkeleton {
                 .item("Zoom to Window", "0", cmd, .selector(#selector(CanvasMenuActions.zoomToWindow(_:)))),
                 .item("Zoom to Selection", "", [], .selector(#selector(EditorMenuActions.zoomToSelection(_:)))),
                 .item("Actual Size", "0", optCmd, .selector(#selector(CanvasMenuActions.actualSize(_:)))),
+                .submenu("Zoom Presets", zoomPresetEntries),  // M56: paint.net's zoom presets
                 .separator,
                 .item("Pixel Grid", "'", cmd, .selector(#selector(CanvasMenuActions.togglePixelGrid(_:)))),
-                i("Rulers"),
+                .item("Rulers", "r", optCmd, .selector(#selector(ViewMenuActions.toggleRulers(_:)))),
                 .separator,
                 .item("Pixels", "", [], .selector(#selector(EditorMenuActions.setUnits(_:)))),
-                i("Inches"),
-                i("Centimeters"),
+                .item("Inches", "", [], .selector(#selector(EditorMenuActions.setUnits(_:)))),
+                .item("Centimeters", "", [], .selector(#selector(EditorMenuActions.setUnits(_:)))),
             ]),
             .submenu("Image", [
                 .item("Crop to Selection", "x", shiftCmd, .command("image.crop_to_selection")),
@@ -322,6 +323,8 @@ public enum MenuSkeleton {
                     if let tag = goToTitles.firstIndex(of: title) { item.tag = tag }
                     if s == #selector(SelectionEditActions.pasteSelection(_:)),
                        let tag = SelectionClipboard.pasteTitles.firstIndex(of: title) { item.tag = tag }
+                    // Settings… works with no document window (M56).
+                    if s == #selector(SettingsMenuActions.showSettings(_:)) { item.target = SettingsMenuTarget.shared }
                 case let .command(id):
                     item.action = #selector(EditorMenuActions.runCommand(_:))
                     item.representedObject = id
