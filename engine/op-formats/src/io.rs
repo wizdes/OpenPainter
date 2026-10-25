@@ -53,6 +53,12 @@ pub struct Options {
     pub png_compression: PngCompression,
     pub tiff_compression: TiffCompression,
     pub bmp_alpha: bool,
+    /// Pixels per inch written into the file (PNG pHYs, JPEG JFIF density);
+    /// None writes no resolution (M50).
+    pub dpi: Option<f64>,
+    /// GIF: Floyd-Steinberg error diffusion onto the palette (M50). Off maps
+    /// each color to its nearest palette entry.
+    pub gif_dither: bool,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -62,6 +68,8 @@ impl Default for Options {
             png_compression: PngCompression::Default,
             tiff_compression: TiffCompression::None,
             bmp_alpha: true,
+            dpi: None,
+            gif_dither: false,
         }
     }
 }
@@ -141,7 +149,7 @@ pub fn encode(format: Format, image: &Decoded, options: &Options) -> Result<Vec<
         Format::Png => encode_png(image, options),
         Format::Jpeg => encode_jpeg(image, options),
         Format::Bmp => bmp::encode(image, options.bmp_alpha),
-        Format::Gif => encode_gif(image),
+        Format::Gif => encode_gif(image, options.gif_dither),
         Format::Tiff => encode_tiff(image, options),
         Format::WebP => encode_webp(image),
     }
@@ -247,6 +255,14 @@ fn encode_png(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     info.bit_depth = png::BitDepth::Eight;
     info.icc_profile = image.icc.as_deref().map(Cow::Borrowed);
     info.exif_metadata = image.metadata.exif.as_deref().map(Cow::Borrowed);
+    if let Some(dpi) = opt.dpi {
+        let ppm = dpi_to_ppm(dpi)?;
+        info.pixel_dims = Some(png::PixelDimensions {
+            xppu: ppm,
+            yppu: ppm,
+            unit: png::Unit::Meter,
+        });
+    }
     for (k, v) in &image.metadata.text {
         info.uncompressed_latin1_text
             .push(png::text_metadata::TEXtChunk::new(k.clone(), v.clone()));
@@ -273,6 +289,13 @@ fn encode_png(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     writer.write_image_data(&image.rgba8).map_err(codec)?;
     writer.finish().map_err(codec)?;
     Ok(out)
+}
+/// Pixels per inch to the PNG pHYs pixels per meter (1 inch = 0.0254 m).
+fn dpi_to_ppm(dpi: f64) -> Result<u32> {
+    if !dpi.is_finite() || !(1.0..=100_000.0).contains(&dpi) {
+        return Err(Error::Invalid("resolution out of range"));
+    }
+    Ok((dpi / 0.0254).round() as u32)
 }
 fn decode_jpeg(bytes: &[u8]) -> Result<Decoded> {
     if !bytes.ends_with(b"\xff\xd9") {
@@ -389,6 +412,13 @@ fn encode_jpeg(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
         ChromaSubsampling::S422 => jpeg_encoder::SamplingFactor::R_4_2_2,
         ChromaSubsampling::S444 => jpeg_encoder::SamplingFactor::R_4_4_4,
     });
+    if let Some(dpi) = opt.dpi {
+        if !dpi.is_finite() || dpi < 1.0 {
+            return Err(Error::Invalid("resolution out of range"));
+        }
+        let d = dpi.round().min(u16::MAX as f64) as u16;
+        enc.set_density(jpeg_encoder::Density::Inch { x: d, y: d });
+    }
     if let Some(icc) = &image.icc {
         enc.add_icc_profile(icc).map_err(codec)?;
     }
@@ -431,7 +461,7 @@ fn decode_gif(bytes: &[u8]) -> Result<Decoded> {
     }
     Ok(out)
 }
-fn encode_gif(image: &Decoded) -> Result<Vec<u8>> {
+fn encode_gif(image: &Decoded, dither: bool) -> Result<Vec<u8>> {
     let w = u16::try_from(image.width).map_err(|_| Error::Invalid("GIF width"))?;
     let h = u16::try_from(image.height).map_err(|_| Error::Invalid("GIF height"))?;
     let transparent = image.rgba8.chunks_exact(4).any(|p| p[3] < 128);
@@ -508,30 +538,64 @@ fn encode_gif(image: &Decoded) -> Result<Vec<u8>> {
     if palette.is_empty() {
         palette.extend_from_slice(&[0, 0, 0]);
     }
+    let nearest = |rgb: [u8; 3]| -> u8 {
+        let (i, _) = palette_colors
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, q)| {
+                (0..3)
+                    .map(|c| {
+                        let d = rgb[c] as i32 - q[c] as i32;
+                        (d * d) as u32
+                    })
+                    .sum::<u32>()
+            })
+            .unwrap();
+        (i + first) as u8
+    };
     let mut indexed = Vec::with_capacity((w as usize) * (h as usize));
     let mut cache = std::collections::BTreeMap::<[u8; 3], u8>::new();
-    for p in image.rgba8.chunks_exact(4) {
-        if p[3] < 128 {
-            indexed.push(0);
-            continue;
+    if dither && !palette_colors.is_empty() {
+        // Floyd-Steinberg: each pixel's error goes 7/16 right, 3/16 down-left,
+        // 5/16 down and 1/16 down-right, over opaque pixels only.
+        let (wu, hu) = (w as usize, h as usize);
+        let mut err = vec![[0i32; 3]; wu * 2 + 4];
+        for y in 0..hu {
+            let (cur, next) = if y % 2 == 0 { (0, wu + 2) } else { (wu + 2, 0) };
+            for e in &mut err[next..next + wu + 2] {
+                *e = [0; 3];
+            }
+            for x in 0..wu {
+                let p = &image.rgba8[(y * wu + x) * 4..(y * wu + x) * 4 + 4];
+                if p[3] < 128 {
+                    indexed.push(0);
+                    continue;
+                }
+                let e = err[cur + x + 1];
+                let want: [i32; 3] =
+                    std::array::from_fn(|c| (p[c] as i32 * 16 + e[c]).clamp(0, 255 * 16));
+                let rgb: [u8; 3] = std::array::from_fn(|c| ((want[c] + 8) / 16) as u8);
+                let index = *cache.entry(rgb).or_insert_with(|| nearest(rgb));
+                indexed.push(index);
+                let q = palette_colors[(index as usize) - first];
+                for c in 0..3 {
+                    let d = want[c] - q[c] as i32 * 16;
+                    err[cur + x + 2][c] += d * 7 / 16;
+                    err[next + x][c] += d * 3 / 16;
+                    err[next + x + 1][c] += d * 5 / 16;
+                    err[next + x + 2][c] += d / 16;
+                }
+            }
         }
-        let rgb = [p[0], p[1], p[2]];
-        let index = *cache.entry(rgb).or_insert_with(|| {
-            let (i, _) = palette_colors
-                .iter()
-                .enumerate()
-                .min_by_key(|(_, q)| {
-                    (0..3)
-                        .map(|c| {
-                            let d = rgb[c] as i32 - q[c] as i32;
-                            (d * d) as u32
-                        })
-                        .sum::<u32>()
-                })
-                .unwrap();
-            (i + first) as u8
-        });
-        indexed.push(index);
+    } else {
+        for p in image.rgba8.chunks_exact(4) {
+            if p[3] < 128 {
+                indexed.push(0);
+                continue;
+            }
+            let rgb = [p[0], p[1], p[2]];
+            indexed.push(*cache.entry(rgb).or_insert_with(|| nearest(rgb)));
+        }
     }
     let frame = gif::Frame::from_palette_pixels(w, h, indexed, palette, transparent.then_some(0));
     let mut out = Vec::new();

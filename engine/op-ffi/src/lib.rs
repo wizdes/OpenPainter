@@ -11,9 +11,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 mod document;
+mod export;
 mod stroke;
 mod view;
 pub use document::*;
+pub use export::*;
 pub use stroke::*;
 pub use view::*;
 

@@ -1,6 +1,8 @@
-// Writes an engine document to a file (M19): .opaint and PNG through the
-// engine (op_doc_save), the other formats through ImageIO. Save and Save As
-// mark the written history step as saved; Save a Copy does not.
+// Writes an engine document to a file (M19): .opaint through the engine
+// (op_doc_save). Since M50 every flat format goes through SaveEncoder with the
+// save options, the metadata choice and the resolution: PNG, JPEG and GIF are
+// encoded by the engine, the others by ImageIO, and the app writes the bytes.
+// Save and Save As mark the written history step as saved; Save a Copy does not.
 import Foundation
 
 public enum DocumentSaverError: Error, LocalizedError, Equatable {
@@ -16,30 +18,24 @@ public enum DocumentSaverError: Error, LocalizedError, Equatable {
 }
 
 public enum DocumentSaver {
-    /// JPEG quality until M50 adds the options dialog.
-    public static let jpegQuality = 0.9
-
-    /// Writes `doc` to `url` as `type`. `markSaved` false is Save a Copy.
-    /// Returns false when the file was written but the image changed during
-    /// an ImageIO save, so it stays marked as modified.
+    /// Writes `doc` to `url` as `type` with `options` (the defaults when nil).
+    /// `markSaved` false is Save a Copy. Returns false when the file was
+    /// written but the image changed during the save, so it stays marked as
+    /// modified.
     @discardableResult
     public static func write(_ doc: Document, to url: URL, type: String, metadata: ImageMetadata?,
-                             markSaved: Bool) throws -> Bool {
+                             options: SaveOptions? = nil, markSaved: Bool) throws -> Bool {
         switch type {
         case ImageFormats.opaintIdentifier:
             try doc.save(to: url.path, format: .opaint, markSaved: markSaved)
             return true
-        case "public.png":
-            try doc.save(to: url.path, format: .png, markSaved: markSaved)
-            return true
         default:
-            guard ImageFormats.imageIOSaveTypes().contains(type) else { throw DocumentSaverError.unsupported(type) }
+            guard type == "public.png" || ImageFormats.imageIOSaveTypes().contains(type) else {
+                throw DocumentSaverError.unsupported(type)
+            }
             let snap = try snapshot(doc)
-            var rgba = snap.rgba
-            if type == "public.jpeg" { rgba = onWhite(rgba) }
-            let data = try ImageIOExporter.encode(
-                rgba: rgba, width: snap.width, height: snap.height, icc: snap.icc.isEmpty ? nil : snap.icc,
-                type: type, quality: jpegQuality, metadata: metadata)
+            let data = try SaveEncoder.encode(snap.pixels, type: type, options: options ?? SaveOptions(),
+                                              metadata: metadata)
             try data.write(to: url, options: .atomic)
             guard markSaved else { return true }
             do {
@@ -57,6 +53,9 @@ public enum DocumentSaver {
         var width: Int
         var height: Int
         var icc: Data
+        var dpi: Double
+
+        var pixels: SavePixels { SavePixels(rgba: rgba, width: width, height: height, icc: icc, dpi: dpi) }
     }
 
     /// Pixels, size and profile read at one revision (re-read if an edit lands
@@ -66,16 +65,27 @@ public enum DocumentSaver {
             let before = try doc.info()
             let rgba = try doc.pixels()
             let icc = try doc.queryData("doc.profile_icc")
+            let dpi = try resolution(doc)
             let after = try doc.info()
             let r1 = (before["revision"] as? NSNumber)?.uint64Value ?? 0
             let r2 = (after["revision"] as? NSNumber)?.uint64Value ?? 0
             if r1 == r2 {
                 return Snapshot(revision: r1, rgba: rgba, width: (after["width"] as? NSNumber)?.intValue ?? 0,
-                                height: (after["height"] as? NSNumber)?.intValue ?? 0, icc: icc)
+                                height: (after["height"] as? NSNumber)?.intValue ?? 0, icc: icc, dpi: dpi)
             }
         }
         throw DocumentSaverError.busy
     }
+
+    /// The document's pixels per inch (`doc.resolution`).
+    public static func resolution(_ doc: Document) throws -> Double {
+        let data = try doc.queryData("doc.resolution")
+        let v = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return (v?["dpi"] as? NSNumber)?.doubleValue ?? 96
+    }
+
+    /// The pixels the save sheet's preview encodes (one revision).
+    public static func savePixels(_ doc: Document) throws -> SavePixels { try snapshot(doc).pixels }
 
     /// JPEG has no alpha: transparent pixels go onto white.
     static func onWhite(_ rgba: [UInt8]) -> [UInt8] {

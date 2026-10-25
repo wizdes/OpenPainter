@@ -204,6 +204,25 @@ public enum ImageIOImporter {
         return (pixels, w, h)
     }
 
+    /// The file's resolution in pixels per inch (kCGImagePropertyDPIWidth), or
+    /// nil when the file states none or one out of range (M50).
+    public static func resolution(url: URL) -> Double? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+              let dpi = (props[kCGImagePropertyDPIWidth as String] as? NSNumber)?.doubleValue,
+              dpi.isFinite, dpi >= 1, dpi <= 100_000
+        else { return nil }
+        return dpi
+    }
+
+    /// A file's EXIF, TIFF, GPS, IPTC and XMP metadata (empty when ImageIO
+    /// cannot read the file), for files the engine decodes itself (M50).
+    public static func metadata(url: URL) -> ImageMetadata {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return ImageMetadata() }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] ?? [:]
+        return metadata(source, props)
+    }
+
     /// The source's metadata with orientation reset to 1 (the pixels are turned).
     static func metadata(_ source: CGImageSource, _ props: [String: Any]) -> ImageMetadata {
         var kept: [String: Any] = [:]

@@ -4,8 +4,8 @@
 // The engine's straight RGBA8 pixels become a CGImage tagged with the document
 // profile, and CGImageDestination writes it
 // (https://developer.apple.com/documentation/imageio/cgimagedestination).
-// kCGImageDestinationLossyCompressionQuality is 0.9 for now; M50 adds the
-// save dialog. Kept metadata goes back in with CGImageDestinationAddImageAndMetadata
+// kCGImageDestinationLossyCompressionQuality comes from M50's save options
+// (0.9 when none are given). Kept metadata goes back in with CGImageDestinationAddImageAndMetadata
 // (https://developer.apple.com/documentation/imageio/cgimagedestinationaddimageandmetadata(_:_:_:_:)).
 import CoreGraphics
 import Foundation
@@ -34,7 +34,8 @@ public enum ImageIOExporter {
     public static func encode(
         rgba: [UInt8], width: Int, height: Int, icc: Data?, type: String,
         quality: Double = defaultQuality, metadata: ImageMetadata? = nil,
-        destinationTypes: [String] = ImageFormats.systemDestinationTypes
+        destinationTypes: [String] = ImageFormats.systemDestinationTypes,
+        dpi: Double? = nil, tiffCompression: Int? = nil
     ) throws -> Data {
         guard ImageFormats.imageIOSaveTypes(destinationTypes: destinationTypes).contains(type)
         else { throw ImageIOExportError.unsupportedType(UTType(type)?.preferredFilenameExtension?.uppercased() ?? type) }
@@ -48,9 +49,20 @@ public enum ImageIOExporter {
             kCGImageDestinationLossyCompressionQuality: quality,
             kCGImagePropertyOrientation: 1,
         ]
-        if let metadata {
-            for (k, v) in metadata.properties { options[k as CFString] = v }
+        var props = metadata?.properties ?? [:]
+        // M50: the document resolution and the TIFF compression.
+        if let dpi {
+            props = ImageMetadata.withResolution(props, dpi: dpi)
+            options[kCGImagePropertyDPIWidth] = dpi
+            options[kCGImagePropertyDPIHeight] = dpi
         }
+        if let tiffCompression {
+            let key = kCGImagePropertyTIFFDictionary as String
+            var tiff = props[key] as? [String: Any] ?? [:]
+            tiff[kCGImagePropertyTIFFCompression as String] = tiffCompression
+            props[key] = tiff
+        }
+        for (k, v) in props { options[k as CFString] = v }
         if let xmp = metadata?.xmp, let md = CGImageMetadataCreateFromXMPData(xmp as CFData) {
             CGImageDestinationAddImageAndMetadata(dest, image, md, options as CFDictionary)
         } else {

@@ -35,6 +35,17 @@ open class ImageDocument: NSDocument, EditorHost {
     nonisolated(unsafe) public static var flattenPrompt: FlattenPrompt = { doc, type, done in
         ImageDocument.showFlattenAlert(doc, type, done)
     }
+    public typealias SaveOptionsPrompt = @MainActor (ImageDocument, String, SaveOptions,
+                                                     @escaping @MainActor (SaveOptions?) -> Void) -> Void
+    /// M50: the save options sheet for a format (nil answer: Cancel). Shown
+    /// on Save As and Save a Copy, and on Save for a lossy format whose options were
+    /// never chosen for this image, when the save comes from the menu or the
+    /// save panel. Tests replace it; the default is SaveOptionsController.
+    nonisolated(unsafe) public static var saveOptionsPrompt: SaveOptionsPrompt = { doc, type, options, done in
+        ImageDocument.showSaveOptions(doc, type, options, done)
+    }
+    /// The last options per format (UserDefaults). Tests set their own.
+    nonisolated(unsafe) public static var saveOptionsStore = SaveOptionsStore()
 
     nonisolated(unsafe) public private(set) var engineDocument: Document?
     nonisolated(unsafe) public private(set) var pixelSize = CGSize.zero
@@ -45,6 +56,12 @@ open class ImageDocument: NSDocument, EditorHost {
     nonisolated(unsafe) private var importNotes: [String] = []
     public private(set) var editor: Editor?
     private var pendingSaveDone: (@MainActor (Bool) -> Void)?
+    /// M50: options chosen on the sheet for this image, per format.
+    nonisolated(unsafe) public private(set) var chosenSaveOptions: [String: SaveOptions] = [:]
+    /// The options of the save in progress (from the sheet).
+    nonisolated(unsafe) private var pendingSaveOptions: SaveOptions?
+    /// True between a menu or save-panel save and its save(to:) call.
+    nonisolated(unsafe) private var saveFromUI = false
 
     public required override init() {
         super.init()
@@ -150,32 +167,92 @@ open class ImageDocument: NSDocument, EditorHost {
         ((try? engineDocument?.info())?["layers"] as? [Any])?.count ?? 1
     }
 
-    /// Every save comes through here. A layered image going to a flat format
-    /// asks Flatten or Cancel first; Cancel saves nothing.
+    /// The save panel (Save As, Save a Copy) and File > Save come through
+    /// here before save(to:ofType:for:completionHandler:); M50 marks those
+    /// saves so the options sheet may show.
+    override open func save(to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType,
+                            delegate: Any?, didSave didSaveSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
+        saveFromUI = true
+        super.save(to: url, ofType: typeName, for: saveOperation, delegate: delegate, didSave: didSaveSelector,
+                   contextInfo: contextInfo)
+    }
+
+    /// True when a save of `type` by `op` asks for options first: Save As and
+    /// Save a Copy always; Save only for a lossy format (JPEG, HEIC, AVIF,
+    /// WebP, GIF) until options were chosen for this image. Save to PNG or
+    /// TIFF, where every option keeps every pixel, uses the last options
+    /// without asking (M19's File > Save tests save PNG with no sheet).
+    public func needsSaveOptions(_ type: String, _ op: NSDocument.SaveOperationType) -> Bool {
+        guard let kind = SaveOptionKind(type: type) else { return false }
+        switch op {
+        case .saveAsOperation, .saveToOperation: return true
+        case .saveOperation: return kind.isLossy && chosenSaveOptions[type] == nil
+        default: return false
+        }
+    }
+
+    /// The options a save of `type` uses without the sheet: this image's
+    /// choice, else the last ones for the format, else the defaults.
+    public func saveOptions(for type: String) -> SaveOptions {
+        chosenSaveOptions[type] ?? Self.saveOptionsStore.options(type)
+    }
+
+    /// Every save comes through here. A menu or save-panel save of a format
+    /// with options shows the options sheet first (M50). A layered image going
+    /// to a flat format then asks Flatten or Cancel; Cancel saves nothing.
     override open func save(to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType,
                             completionHandler: @escaping ((any Error)?) -> Void) {
         let finish: ((any Error)?) -> Void = { [weak self] error in
+            self?.pendingSaveOptions = nil
             MainActor.assumeIsolated { self?.afterSave() }
             completionHandler(error)
         }
         let type = ImageFormats.saveTypes().contains(typeName)
             ? typeName : (ImageFormats.saveType(forExtension: url.pathExtension) ?? typeName)
-        guard ImageFormats.isFlat(type), layerCount > 1, saveOperation != .autosaveElsewhereOperation,
-              saveOperation != .autosaveInPlaceOperation, saveOperation != .autosaveAsOperation
-        else {
-            super.save(to: url, ofType: typeName, for: saveOperation, completionHandler: finish)
-            return
-        }
-        MainActor.assumeIsolated {
-            Self.flattenPrompt(self, type) { [weak self] flatten in
-                guard let self else { return }
-                if flatten {
-                    self.superSave(to: url, ofType: typeName, for: saveOperation, completionHandler: finish)
-                } else {
-                    completionHandler(CocoaError(.userCancelled))
+        let fromUI = saveFromUI
+        saveFromUI = false
+        let flattenThenSave = { [weak self] in
+            guard let self else { return }
+            guard ImageFormats.isFlat(type), self.layerCount > 1, saveOperation != .autosaveElsewhereOperation,
+                  saveOperation != .autosaveInPlaceOperation, saveOperation != .autosaveAsOperation
+            else {
+                self.superSave(to: url, ofType: typeName, for: saveOperation, completionHandler: finish)
+                return
+            }
+            MainActor.assumeIsolated {
+                Self.flattenPrompt(self, type) { [weak self] flatten in
+                    guard let self else { return }
+                    if flatten {
+                        self.superSave(to: url, ofType: typeName, for: saveOperation, completionHandler: finish)
+                    } else {
+                        self.pendingSaveOptions = nil
+                        completionHandler(CocoaError(.userCancelled))
+                    }
                 }
             }
         }
+        guard fromUI, needsSaveOptions(type, saveOperation) else {
+            flattenThenSave()
+            return
+        }
+        MainActor.assumeIsolated {
+            Self.saveOptionsPrompt(self, type, saveOptions(for: type)) { [weak self] chosen in
+                guard let self else { return }
+                guard let chosen else {
+                    completionHandler(CocoaError(.userCancelled))
+                    return
+                }
+                self.chooseSaveOptions(chosen, for: type)
+                self.pendingSaveOptions = chosen
+                flattenThenSave()
+            }
+        }
+    }
+
+    /// Records the sheet's options for this image and as the format's last ones.
+    public func chooseSaveOptions(_ options: SaveOptions, for type: String) {
+        chosenSaveOptions[type] = options
+        Self.saveOptionsStore.save(options, for: type)
     }
 
     private func superSave(to url: URL, ofType typeName: String, for op: NSDocument.SaveOperationType,
@@ -197,7 +274,7 @@ open class ImageDocument: NSDocument, EditorHost {
         let mark = saveOperation == .saveOperation || saveOperation == .saveAsOperation
         do {
             try DocumentSaver.write(doc, to: url, type: type, metadata: metadata.isEmpty ? nil : metadata,
-                                    markSaved: mark)
+                                    options: pendingSaveOptions ?? saveOptions(for: type), markSaved: mark)
         } catch {
             throw NSError(domain: "OpenPainter", code: 4, userInfo: [
                 NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” could not be saved.",
@@ -312,6 +389,37 @@ open class ImageDocument: NSDocument, EditorHost {
             done(map(alert.runModal()))
         }
     }
+
+    /// The save options sheet over the image's window (M50).
+    @MainActor
+    static func showSaveOptions(_ doc: ImageDocument, _ type: String, _ options: SaveOptions,
+                                _ done: @escaping @MainActor (SaveOptions?) -> Void) {
+        let pixels: SavePixels
+        do {
+            guard let engineDoc = doc.engineDocument else { throw NSError(domain: "OpenPainter", code: 4) }
+            pixels = try DocumentSaver.savePixels(engineDoc)
+        } catch {
+            doc.showError(NSError(domain: "OpenPainter", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "The save options could not be shown.",
+                NSLocalizedFailureReasonErrorKey: error.localizedDescription,
+            ]))
+            done(nil)
+            return
+        }
+        let sheet = SaveOptionsController(type: type, options: options, pixels: pixels,
+                                          metadata: doc.metadata.isEmpty ? nil : doc.metadata)
+        openSaveOptions = sheet
+        sheet.onClose = { result in
+            MainActor.assumeIsolated {
+                openSaveOptions = nil
+                done(result)
+            }
+        }
+        sheet.present(on: doc.windowControllers.first?.window)
+    }
+
+    /// The save options sheet while it is open.
+    @MainActor public private(set) static var openSaveOptions: SaveOptionsController?
 
     /// paint.net's flatten prompt: Flatten or Cancel.
     @MainActor
