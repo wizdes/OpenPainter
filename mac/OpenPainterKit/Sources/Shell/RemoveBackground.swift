@@ -121,6 +121,7 @@ public final class RemoveBackgroundController: NSWindowController {
             return false
         }
         Self.open[ObjectIdentifier(editor)] = self
+        L10n.localizeDialog(self.window!)  // M59: translated and named before it shows
         window.beginSheet(self.window!) { _ in }
         progress.startAnimation(nil)
         let job = self.job

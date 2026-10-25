@@ -2229,6 +2229,10 @@
       "comment" : "Save Options: JPEG dialog: menu choice in a popup",
       "extractionState" : "manual"
     },
+    "Remove Background" : {
+      "comment" : "Menu bar: Layers menu item that cuts the subject out of the active layer (M53)",
+      "extractionState" : "manual"
+    },
     "Remove location (GPS)" : {
       "comment" : "Save Options: JPEG dialog: menu choice in a popup",
       "extractionState" : "manual"
@@ -2419,6 +2423,10 @@
     },
     "Select All" : {
       "comment" : "Menu bar: menu item",
+      "extractionState" : "manual"
+    },
+    "Select Foreground" : {
+      "comment" : "Menu bar: Layers menu item that selects the subject of the active layer (M53)",
       "extractionState" : "manual"
     },
     "Selection" : {

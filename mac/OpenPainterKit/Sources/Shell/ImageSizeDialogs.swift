@@ -354,6 +354,7 @@ public class ImageSizeController: NSWindowController, NSTextFieldDelegate {
     public func present(on window: NSWindow) {
         Self.openDialogs[ObjectIdentifier(editor)] = self
         show()
+        L10n.localizeDialog(self.window!)  // M59: translated and named before it shows
         window.beginSheet(self.window!) { _ in }
     }
 

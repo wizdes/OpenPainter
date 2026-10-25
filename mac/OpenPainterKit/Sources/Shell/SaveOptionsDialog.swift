@@ -249,6 +249,7 @@ public final class SaveOptionsController: NSWindowController, NSTextFieldDelegat
     }
 
     public func present(on parent: NSWindow?) {
+        if let window { L10n.localizeDialog(window) }  // M59: translated and named before it shows
         if let parent {
             parent.beginSheet(window!) { _ in }
         } else {
