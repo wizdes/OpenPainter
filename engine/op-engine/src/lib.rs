@@ -22,6 +22,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
+mod color_sample;
 mod image_commands;
 mod shell_commands;
 pub use shell_commands::{effect_label, effects_list};
@@ -1906,6 +1907,10 @@ impl Engine {
             ),
             "doc.selection" => {
                 serde_json::to_vec(&shell_commands::selection_info(&s.state)).map_err(internal)
+            }
+            "doc.sample_color" => {
+                serde_json::to_vec(&color_sample::sample_color(&s.state, &params)?)
+                    .map_err(internal)
             }
             "commands.list" => {
                 let ids: Vec<_> = specs()

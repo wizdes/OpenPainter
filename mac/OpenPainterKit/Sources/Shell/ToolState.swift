@@ -88,7 +88,7 @@ public enum PaintTool: String, CaseIterable, Sendable {
     /// Tools that work in this version. The rest are selectable and say "coming soon".
     public var isFunctional: Bool {
         switch self {
-        case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket: true
+        case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket, .colorPicker: true
         default: false
         }
     }
@@ -103,12 +103,13 @@ public enum PaintTool: String, CaseIterable, Sendable {
         }
     }
 
-    public enum OptionSet: Sendable { case none, brush, flood }
+    public enum OptionSet: Sendable { case none, brush, flood, picker }
 
     public var options: OptionSet {
         switch self {
         case .paintbrush, .eraser, .pencil: .brush
         case .magicWand, .paintBucket: .flood
+        case .colorPicker: .picker
         default: .none
         }
     }
@@ -120,7 +121,8 @@ public enum PaintTool: String, CaseIterable, Sendable {
         case .zoom: return "Zoom: click to zoom in, Option-click to zoom out, drag a rectangle"
         case .pan: return "Pan: drag to move the view"
         case .magicWand: return "Magic Wand: click to select a region of similar color"
-        case .paintBucket: return "Paint Bucket: click to fill a region with the primary color"
+        case .paintBucket: return "Paint Bucket: click to fill with the primary color, right-click for the secondary"
+        case .colorPicker: return "Color Picker: click sets the primary color, right-click the secondary; Command-click samples the image"
         default: return "\(label): drag to paint"
         }
     }
@@ -164,6 +166,10 @@ public struct ToolSettings: Equatable, Sendable {
     public var floodMode = FloodMode.contiguous
     public var sampling = Sampling.layer
     public var selectionMode = SelectionMode.replace
+    /// Color Picker options (M36).
+    public var pickerSize = PickerSampleSize.one
+    public var pickerSampling = Sampling.layer
+    public var pickerAfterClick = PickerAfterClick.doNotSwitch
 
     public init() {}
 
@@ -200,7 +206,7 @@ public struct DocColor: Equatable, Sendable {
     public init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6 || s.count == 8, let v = UInt32(s, radix: 16) else { return nil }
+        guard s.count == 6 || s.count == 8, s.allSatisfy(\.isHexDigit), let v = UInt32(s, radix: 16) else { return nil }
         if s.count == 6 {
             self.init(r: UInt8(v >> 16 & 0xFF), g: UInt8(v >> 8 & 0xFF), b: UInt8(v & 0xFF))
         } else {
@@ -230,10 +236,21 @@ public struct DocColor: Equatable, Sendable {
 public final class ToolState {
     public static let shared = ToolState()
 
-    public var tool: PaintTool = .paintbrush { didSet { if tool != oldValue { changed() } } }
+    public var tool: PaintTool = .paintbrush {
+        didSet {
+            guard tool != oldValue else { return }
+            previousTool = oldValue
+            changed()
+        }
+    }
+    /// The tool before the current one (Color Picker's "Switch to previous tool").
+    public private(set) var previousTool: PaintTool?
     public var settings = ToolSettings() { didSet { if settings != oldValue { changed() } } }
     public var primary = DocColor(r: 0xCF, g: 0x68, b: 0x4D) { didSet { if primary != oldValue { changed() } } }
     public var secondary = DocColor(r: 0xE9, g: 0xE7, b: 0xDC) { didSet { if secondary != oldValue { changed() } } }
+    /// The slot with the notch: Colors panel edits and left-clicks go here.
+    public var activeSlot = ColorSlot.primary { didSet { if activeSlot != oldValue { changed() } } }
+    public var palette = Palette.standard { didSet { if palette != oldValue { changed() } } }
 
     private var observers: [(AnyObject?, () -> Void)] = []
 
@@ -250,14 +267,31 @@ public final class ToolState {
         secondary = p
     }
 
+    public func color(_ slot: ColorSlot) -> DocColor { slot == .primary ? primary : secondary }
+
+    public func set(_ slot: ColorSlot, _ c: DocColor) {
+        if slot == .primary { primary = c } else { secondary = c }
+    }
+
+    /// The black and white button: primary black, secondary white.
+    public func resetColors() {
+        primary = DocColor(r: 0, g: 0, b: 0)
+        secondary = DocColor(r: 255, g: 255, b: 255)
+    }
+
+    /// The C key: move the notch to the other slot.
+    public func toggleActiveSlot() { activeSlot = activeSlot.other }
+
     private func changed() {
         observers.removeAll { $0.0 == nil }
         for (_, body) in observers { body() }
     }
 
     /// Parameters for `tool.stroke` (without the points).
-    public func strokeParams(tool: PaintTool) -> [String: any Sendable] {
-        let color = tool == .eraser ? DocColor(r: 0, g: 0, b: 0) : primary
+    /// `secondary` is a right-button (or Control) drag, which paints with the
+    /// secondary color as in paint.net.
+    public func strokeParams(tool: PaintTool, secondary useSecondary: Bool = false) -> [String: any Sendable] {
+        let color = tool == .eraser ? DocColor(r: 0, g: 0, b: 0) : (useSecondary ? secondary : primary)
         return [
             "tool": tool.strokeName ?? "paintbrush",
             "width": settings.brushWidth,
@@ -269,7 +303,7 @@ public final class ToolState {
     }
 
     /// Parameters for `tool.magic_wand` or `tool.paint_bucket` at a document pixel.
-    public func floodParams(tool: PaintTool, x: Int, y: Int) -> [String: any Sendable] {
+    public func floodParams(tool: PaintTool, x: Int, y: Int, secondary useSecondary: Bool = false) -> [String: any Sendable] {
         var p: [String: any Sendable] = [
             "x": x, "y": y,
             "tolerance": settings.tolerance / 100,
@@ -278,7 +312,7 @@ public final class ToolState {
             "antialias": settings.antialias,
         ]
         if tool == .paintBucket {
-            var c = primary
+            var c = useSecondary ? secondary : primary
             c.a = UInt8((Double(c.a) * settings.opacity / 100).rounded())
             p["color"] = c.engineHex
             p["blend"] = settings.blend.rawValue
