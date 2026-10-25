@@ -201,7 +201,7 @@ final class LayersHistoryTests: XCTestCase {
         XCTAssertEqual(ui.count, 2)
         XCTAssertEqual(ui, engine, "every layer's bytes")
         XCTAssertEqual(e.info.layers.map(\.name), ["Background", "Glow copy"])
-        XCTAssertEqual(e.info.historyLabels, ["Open", "layer.add", "layer.add", "layer.delete", "Paintbrush",
+        XCTAssertEqual(e.info.historyLabels, ["Open", "Add New Layer", "Add New Layer", "Delete Layer", "Paintbrush",
                                               "Duplicate Layer", "Move Layer Down", "Hide Layer", "Layer Properties",
                                               "Move Layer", "Show Layer", "Merge Layer Down", "Move Layer Up"])
     }

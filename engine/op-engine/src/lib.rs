@@ -1191,6 +1191,7 @@ impl Actor {
                         .or_else(|| layer_menu_commands::history_label(id).map(str::to_owned))
                         .or_else(|| select_crop_commands::history_label(id).map(str::to_owned))
                         .or_else(|| selection_commands::history_label(id, &params))
+                        .or_else(|| image_commands::history_label(id).map(str::to_owned))
                         .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);

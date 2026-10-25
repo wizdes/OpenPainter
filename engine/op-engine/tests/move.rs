@@ -125,7 +125,7 @@ fn layer_change_finishes_the_live_move_first() {
         .unwrap();
     assert_eq!(
         e.snapshot(id).unwrap().history.labels,
-        ["Open", "Move Selected Pixels", "layer.add"]
+        ["Open", "Move Selected Pixels", "Add New Layer"]
     );
     assert!(e.move_finish(id).is_err());
 }

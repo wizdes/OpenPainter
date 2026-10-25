@@ -82,7 +82,7 @@ fn selecting_a_layer_adds_no_history_step_and_keeps_the_document_clean() {
     paint(&e, id);
     let s = e.snapshot(id).unwrap();
     assert!(s.state.layers[1].tiles.iter().count() > 0);
-    assert_eq!(labels(&e, id), ["Open", "layer.add", "Paintbrush"]);
+    assert_eq!(labels(&e, id), ["Open", "Add New Layer", "Paintbrush"]);
 }
 
 #[test]
@@ -154,8 +154,7 @@ fn duplicate_merge_down_and_reorder() {
         [
             "Open",
             "Duplicate Layer",
-            // layer.add keeps its id as its label (tests/move.rs checks it).
-            "layer.add",
+            "Add New Layer",
             "Paintbrush",
             "Layer Properties",
             "Move Layer Down",

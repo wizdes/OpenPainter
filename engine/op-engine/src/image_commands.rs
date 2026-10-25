@@ -518,6 +518,25 @@ fn auto_crop(ctx: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
     crop(ctx, s, b, None)
 }
 
+/// The History label for the Image menu commands, as paint.net names them.
+pub(super) fn history_label(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "image.resize" => "Resize",
+        "image.canvas_size" => "Canvas Size",
+        "image.flatten" => "Flatten",
+        "image.flip_horizontal" => "Flip Horizontal",
+        "image.flip_vertical" => "Flip Vertical",
+        "image.rotate_90_cw" => "Rotate 90° Clockwise",
+        "image.rotate_90_ccw" => "Rotate 90° Counter-Clockwise",
+        "image.rotate_180" => "Rotate 180°",
+        "image.crop_to_selection" => "Crop to Selection",
+        "image.auto_crop" => "Auto Crop",
+        "image.assign_profile" => "Assign Color Profile",
+        "image.convert_profile" => "Convert Color Profile",
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

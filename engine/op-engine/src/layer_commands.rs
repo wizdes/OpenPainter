@@ -295,6 +295,8 @@ pub(super) fn specs() -> Vec<CommandSpec> {
 pub(super) fn history_label(id: &str, params: &Value) -> Option<String> {
     Some(
         match id {
+            "layer.add" => "Add New Layer",
+            "layer.delete" => "Delete Layer",
             "layer.duplicate" => "Duplicate Layer",
             "layer.merge_down" => "Merge Layer Down",
             "layer.move_up" => "Move Layer Up",

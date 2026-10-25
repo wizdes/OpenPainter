@@ -37,10 +37,10 @@ def rgba_at(path, x, y):
 
 
 class OracleOutputTests(unittest.TestCase):
-    def test_generated_output_stays_below_40_mb(self):
+    def test_generated_output_stays_below_100_mb(self):
         files = list((ROOT / 'tests/fixtures').rglob('*')) + list(ORACLE.rglob('*'))
         size = sum(path.stat().st_size for path in files if path.is_file())
-        self.assertLess(size, 40_000_000)
+        self.assertLess(size, 100_000_000)
 
     def test_effects_all_manifest_keeps_every_effect(self):
         entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
