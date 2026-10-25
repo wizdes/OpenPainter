@@ -24,6 +24,7 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `OpenPainter/`: the thin app target (`NSDocument`, launch arguments, installs the menu).
 - `OpenPainterKit/Sources/`: the canvas (`MetalCanvasView`, `CanvasContainerView`), the zoom presets and viewport math, the trace runner and the launch clock.
 - `OpenPainterKit/Sources/Shell/`: the main window, panels, menus, tool state and focus rules (M15).
+- `OpenPainterKit/Sources/PlatformServices/`: ImageIO import and export, and the file-open routing (M17).
 - `EngineBridge/`: the Swift wrapper over the C interface (`View.swift` wraps `op_view_*`).
 - `Tests/OpenPainterKitTests/`: XCTests. No XCUITest yet (macOS Automation Mode is not enabled on this Mac).
 
@@ -91,6 +92,17 @@ The Mac side shapes text; the engine only composites what it is given, so the en
 - `Shell/ImageSizeDialogs.swift`: the Resize and Canvas Size sheets. They show the new size before OK and send `image.resize` or `image.canvas_size` once. The resolution field converts between pixel and print size only; the document's resolution is not changed.
 - `Shell/SelectCropGeometry.swift`: the drag, handle, preset and rotation math.
 - A size change (crop, resize, canvas size, 90 degree rotation) refits the canvas to the new image size.
+
+## File formats and drag and drop (M17)
+
+The engine decodes PNG itself. ImageIO decodes HEIC, HEIF, AVIF and every Camera RAW type that `CGImageSourceCopyTypeIdentifiers()` lists (30 on macOS 27). Swift hands the engine straight 8-bit RGBA and the ICC profile through `op_import_pixels`.
+
+- `PlatformServices/ImageFormats.swift`: which files open (the route reads the file's first bytes, so a wrong extension still opens the right way) and which types Save As offers. HEIC is always offered. AVIF is offered only when `CGImageDestinationCopyTypeIdentifiers()` lists `public.avif`.
+- `PlatformServices/ImageIOImport.swift`: decodes the first image, converts it with vImage to straight RGBA8 in the image's own RGB color space (no color conversion), and applies the EXIF orientation (all 8). The color space's ICC bytes become the document profile. A 16-bit, float or HDR source becomes 8-bit, and the status bar says so. A gray or CMYK source becomes sRGB, with a note.
+- Metadata: the engine has no metadata slot, so `PainterDocument.metadata` keeps it for M50. It has the XMP packet (EXIF, TIFF, GPS and IPTC namespaces) and the EXIF, ExifAux, TIFF, GPS and IPTC property dictionaries. Orientation is reset to 1, because the pixels are already turned.
+- `PlatformServices/ImageIOExport.swift` and `DocumentLoader.export`: File > Save As writes HEIC (and AVIF where it can) at quality 0.9 with the document profile (the engine's `doc.profile_icc` query) and the kept metadata. M50 adds the options dialog.
+- `Shell/FileDrop.swift`: files dropped on the canvas area or the image strip open one at a time, in drop order. A 2 pt accent outline shows while files are over the target. Files that cannot open are named in one status-bar message, and nothing opens for them. Import as Layer comes later.
+- Camera RAW tests use three CC0 samples from https://raw.pixls.us. `tools/fetch-raw-samples.sh` puts them in `~/Library/Caches/OpenPainter/raw-samples`, and `tools/raw-samples.txt` lists each URL, license and SHA-256. Without them, the RAW test skips and prints why.
 
 ## Focus rules
 

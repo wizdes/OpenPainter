@@ -21,6 +21,8 @@ public final class Workspace {
     public private(set) var historyView: HistoryPanelView!
     /// Target of the Window menu's panel items and the toolbar's panel toggles.
     public private(set) lazy var menuTarget = PanelMenuTarget(panels: panels)
+    /// Opens one file as a document (M17 drag and drop). The app sets it.
+    public var fileOpener: FileOpener?
     private var observers: [(AnyObject?, () -> Void)] = []
     private var eventTask: Task<Void, Never>?
 

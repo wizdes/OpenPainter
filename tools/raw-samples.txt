@@ -1,0 +1,8 @@
+# Camera RAW samples for the M17 RAW import tests (mac/Tests/OpenPainterKitTests/ImageIOImportTests.swift).
+# tools/fetch-raw-samples.sh downloads them into ~/Library/Caches/OpenPainter/raw-samples (outside the repo)
+# and checks each SHA-256. Source: https://raw.pixls.us (the RAW sample archive run by pixls.us).
+# Each file's license is shown on the archive's list (https://raw.pixls.us/json/getrepository.php?set=all).
+# Fields are separated by tabs: file name, SHA-256, license, maker, model, URL.
+Panasonic-DMC-LX7.RW2	d142a23aca836053ed53e9ce3cb3ed2d434541d734d71a94a6eefadcd08bd31b	CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)	Panasonic	DMC-LX7	https://raw.pixls.us/getfile.php/7008/nice/Panasonic%20-%20DMC-LX7%20-%201:1.RW2
+Nikon-D2H.NEF	155edb938f884ea7372ce98d4ff5f965c3e413b43b95bc9923da6e92082cf914	CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)	Nikon	D2H	https://raw.pixls.us/getfile.php/5227/nice/Nikon%20-%20D2H%20-%2012bit%2012bit%20compressed%20(Lossy%20(type%201))%20(3:2).NEF
+Sony-ILCE-7S.ARW	a35ebb2fbec929daa5beb20d1ce5c15a8aac7b1a7a231455387f3df8a7442e07	CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)	Sony	ILCE-7S	https://raw.pixls.us/getfile.php/1582/nice/Sony%20-%20ILCE-7S%20-%2014bit%2014bit%20compressed%20(3:2).ARW

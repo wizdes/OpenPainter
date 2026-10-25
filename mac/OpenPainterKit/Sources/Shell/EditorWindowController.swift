@@ -58,6 +58,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         window.toolbar = toolbar
         editor.windowController = self
         wireCanvas()
+        FileDrop.register(self)  // M17: dropped files open as documents
         textTool = TextToolController(window: self)
         optionsBar.textControls.onFinish = { [weak self] in self?.textTool.finish() }
         workspace.tools.observe(self) { [weak self] in self?.toolChanged() }
