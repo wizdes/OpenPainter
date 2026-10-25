@@ -83,11 +83,14 @@ extension L10n {
         }
     }
 
-    private static var done = Set<ObjectIdentifier>()
+    /// Windows already translated, held weakly: a freed window leaves the set,
+    /// so a new window at the same address is not skipped (an ObjectIdentifier
+    /// set kept freed identities and skipped new dialogs).
+    private static let done = NSHashTable<NSWindow>.weakObjects()
 
     static func localizeSheet(of parent: NSWindow?) {
-        guard let sheet = parent?.attachedSheet, !done.contains(ObjectIdentifier(sheet)) else { return }
-        done.insert(ObjectIdentifier(sheet))
+        guard let sheet = parent?.attachedSheet, !done.contains(sheet) else { return }
+        done.add(sheet)
         localize(sheet, context: sheet.title.isEmpty ? "Dialog" : "\(sheet.title) dialog")
         if let content = sheet.contentView { growWidthConstraints(in: content) }
         // NSAlert lays itself out; the others are frame-based dialogs.
@@ -96,8 +99,8 @@ extension L10n {
 
     /// Translates a dialog window now (tests, and windows that are not sheets).
     public static func localizeDialog(_ window: NSWindow) {
-        guard !done.contains(ObjectIdentifier(window)) else { return }
-        done.insert(ObjectIdentifier(window))
+        guard !done.contains(window) else { return }
+        done.add(window)
         localize(window, context: window.title.isEmpty ? "Dialog" : "\(window.title) dialog")
         if let content = window.contentView { growWidthConstraints(in: content) }
         widenToFit(window)

@@ -133,6 +133,7 @@ public final class LayerPropertiesController: NSWindowController, NSTextFieldDel
     /// Opens the dialog as a sheet on the editor's window.
     public func present(on window: NSWindow) {
         Self.open[ObjectIdentifier(editor)] = self
+        L10n.localizeDialog(self.window!)  // M59: translated and named before it shows
         window.beginSheet(self.window!) { _ in }
         self.window?.makeFirstResponder(nameField)
     }

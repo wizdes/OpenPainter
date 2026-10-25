@@ -435,6 +435,7 @@ public final class EffectDialogController: NSWindowController {
     /// Opens the dialog as a sheet on the editor's window and starts the preview.
     public func present(on window: NSWindow) {
         Self.open[ObjectIdentifier(editor)] = self
+        L10n.localizeDialog(self.window!)  // M59: translated and named before it shows
         window.beginSheet(self.window!) { _ in }
         self.window?.initialFirstResponder = firstField
         if let firstField { self.window?.makeFirstResponder(firstField) }

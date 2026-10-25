@@ -650,6 +650,50 @@ final class KeyboardAccessibilityTests: XCTestCase {
         XCTAssertEqual(unnamed, [], "controls with no VoiceOver name")
     }
 
+    /// A dialog is translated and every control named the moment it opens,
+    /// before any run-loop turn (VoiceOver can read it at once). Under load the
+    /// sheet hook ran a turn later, so Hue / Saturation's sliders and fields had
+    /// no names in the full suite (M59 merge follow-up).
+    func testDialogControlsAreNamedTheMomentTheDialogOpens() throws {
+        let wc = try fx.open()
+        let window = try XCTUnwrap(wc.window)
+        for id in ["effect.adjust.hue_saturation", "effect.adjust.brightness_contrast"] {
+            let d = try XCTUnwrap(wc.showEffect(id))
+            let sheet = try XCTUnwrap(d.window)
+            let unnamed = unnamedControls(axTree(sheet))
+            XCTAssertEqual(unnamed, [], "\(id): controls with no VoiceOver name when the sheet opens")
+            d.cancel(nil)
+            XCTAssertTrue(waitUntil { window.attachedSheet == nil })
+        }
+        if let d = wc.presentResizeImage(), let s = d.window {
+            XCTAssertEqual(unnamedControls(axTree(s)), [], "Resize Image when the sheet opens")
+            d.cancel(nil)
+            XCTAssertTrue(waitUntil { window.attachedSheet == nil })
+        }
+    }
+
+    /// Each new dialog window is translated, even when it reuses the memory of
+    /// an earlier, freed dialog window (the full suite hit this: Motion Blur's
+    /// sliders had no names because a freed window's identity was remembered).
+    func testEveryNewDialogWindowIsTranslatedAfterEarlierOnesAreFreed() {
+        var misses = 0
+        for i in 0..<300 {
+            autoreleasepool {
+                let w = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 200, height: 60), styleMask: [.titled],
+                                backing: .buffered, defer: true)
+                w.isReleasedWhenClosed = false
+                let slider = NSSlider(value: 1, minValue: 0, maxValue: 2, target: nil, action: nil)
+                slider.frame = NSRect(x: 10, y: 10, width: 100, height: 20)
+                slider.setAccessibilityLabel("Brightness")
+                w.contentView?.addSubview(slider)
+                L10n.localizeDialog(w)
+                if slider.cell?.accessibilityLabel() != "Brightness" { misses += 1 }
+                _ = i
+            }
+        }
+        XCTAssertEqual(misses, 0, "dialog windows skipped as already translated")
+    }
+
     /// Opens each dialog on `wc`, calls `body` with its window, and closes it.
     func forEachDialog(_ wc: EditorWindowController, _ body: (String, NSWindow) throws -> Void) throws {
         let window = try XCTUnwrap(wc.window)
