@@ -11,6 +11,14 @@
 #include <stdlib.h>
 
 /**
+ * The most bytes `op_doc_open_png` reads: a PNG whose pixels fit the 1 GiB
+ * decode limit is smaller (a 16-bit one stored without compression is about
+ * 2 GiB), so a larger file is refused before it is read (release review
+ * item 7).
+ */
+#define MAX_PNG_FILE ((((2 * 1024) * 1024) * 1024) + ((16 * 1024) * 1024))
+
+/**
  * `OpViewState::flags`: draw the pixel grid (shown only at 400% and above).
  */
 #define OP_VIEW_PIXEL_GRID 1
@@ -415,6 +423,24 @@ enum OpStatus op_doc_replace(struct OpEngine *p, uint64_t doc, uint64_t source);
  * the engine had already written (and marked) its temporary copy.
  */
 enum OpStatus op_doc_mark_unsaved(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Release review item 1: finishes every open tool session that changes the
+ * image (text, paste or move, line/curve, shape, gradient, a live Magic Wand
+ * or Paint Bucket), each as its own history step, after the commands queued
+ * before it. Save, Close and Quit call it first.
+ */
+enum OpStatus op_doc_finish_sessions(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Release review item 5: keeps the app's image metadata (UTF-8 text; empty
+ * removes it) with the document, on every history step, adding none. `.opaint`
+ * saves and recovery records hold it; `doc.image_metadata` reads it back.
+ */
+enum OpStatus op_doc_set_image_metadata(struct OpEngine *p,
+                                        uint64_t doc,
+                                        const uint8_t *text,
+                                        uintptr_t len);
 
 /**
  * Encodes `rgba` (`width` × `height` straight RGBA8, top row first) into

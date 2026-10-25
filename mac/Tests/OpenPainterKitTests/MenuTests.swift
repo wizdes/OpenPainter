@@ -131,6 +131,11 @@ final class MenuTests: XCTestCase {
         wc.addLayer(layers.item(withTitle: "Add New Layer"))
         XCTAssertTrue(waitUntil { wc.editor.info.layers.count == 2 })
         let top = try XCTUnwrap(layers.item(withTitle: "Go to Top Layer"))
+        // The new layer is active and on top already (item 13, paint.net placement).
+        XCTAssertFalse(wc.validateMenuItem(top))
+        // Go to the bottom first, so Go to Top Layer still has a move to make.
+        wc.goToLayer(try XCTUnwrap(layers.item(withTitle: "Go to Bottom Layer")))
+        XCTAssertTrue(waitUntil { wc.editor.info.activeLayer == 0 })
         XCTAssertTrue(wc.validateMenuItem(top))
         wc.goToLayer(top)
         XCTAssertTrue(waitUntil { wc.editor.info.activeLayer == 1 })

@@ -126,6 +126,21 @@ impl History {
             .current_state()
             .ensure_resident(rect.0, rect.1, rect.2, rect.3)?)
     }
+    /// Sets (or with None removes) one metadata entry on every step, in
+    /// place: no step is added and the saved step stays the saved one.
+    pub fn set_metadata_everywhere(&mut self, key: &str, value: Option<String>) {
+        for step in &mut self.steps {
+            let map = std::sync::Arc::make_mut(&mut step.state.metadata);
+            match &value {
+                Some(v) => {
+                    map.insert(key.to_owned(), v.clone());
+                }
+                None => {
+                    map.remove(key);
+                }
+            }
+        }
+    }
     pub fn mark_saved(&mut self) {
         self.saved = Some(self.steps[self.current].identity);
     }

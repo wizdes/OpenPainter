@@ -27,6 +27,8 @@ public enum DocumentSaver {
                              options: SaveOptions? = nil, markSaved: Bool) throws -> Bool {
         switch type {
         case ImageFormats.opaintIdentifier:
+            // The metadata travels inside the engine document (release review
+            // item 5: DocumentLoader and ImageDocument keep it there).
             try doc.save(to: url.path, format: .opaint, markSaved: markSaved)
             return true
         default:

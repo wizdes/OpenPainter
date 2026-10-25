@@ -50,6 +50,12 @@ public final class MoveToolController: NSObject, CanvasPointerSink {
     public private(set) var active = false
     /// Command was held during a drag of this session: the move works on a copy.
     public private(set) var copy = false
+    /// The session holds pasted pixels (adoptPaste).
+    public private(set) var pasted = false
+    /// Release review item 1: Finish would change the image or the
+    /// selection (pasted pixels, a moved box, or a copy). The engine counts
+    /// the same sessions as edits.
+    public var hasChanges: Bool { active && (pasted || copy || (state.map { $0.m != .identity } ?? false)) }
     /// Engine updates sent in this session (tests).
     public private(set) var updatesSent = 0
     /// Arrow-key nudges in this session (tests, the status bar).
@@ -213,6 +219,7 @@ public final class MoveToolController: NSObject, CanvasPointerSink {
     func adoptPaste(box: CGRect) {
         kind = .pixels
         active = true
+        pasted = true
         copy = false
         drag = nil
         updatesSent = 0
@@ -300,6 +307,7 @@ public final class MoveToolController: NSObject, CanvasPointerSink {
 
     private func endSession() {
         active = false
+        pasted = false
         drag = nil
         flushQueued = false
         copy = false

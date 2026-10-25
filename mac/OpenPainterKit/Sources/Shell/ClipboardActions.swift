@@ -315,6 +315,7 @@ extension ImageDocumentController {
         controller.addDocument(image)
         image.makeWindowControllers()
         image.showWindows()
+        image.syncEditedState()
         return image
     }
 }

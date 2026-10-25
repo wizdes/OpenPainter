@@ -19,6 +19,24 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 const MIME: &[u8] = b"image/openraster";
 const NS: &str = "https://openpainter.dev/ns/1";
 const MAX_ZIP: u64 = 4 * 1024 * 1024 * 1024;
+/// The most `stack.xml` bytes the reader accepts; the writer refuses to make more.
+pub const MAX_STACK_XML: usize = 16 * 1024 * 1024;
+/// The most ICC profile bytes the reader accepts; the writer refuses more.
+pub const MAX_PROFILE: usize = 16 * 1024 * 1024;
+/// The most decoded pixel bytes one file may hold over all its layers and its
+/// selection mask (release review item 12a: a small file of many layers that
+/// all point at one highly compressed PNG would otherwise decode for a very
+/// long time). 16 GiB: for example 16 layers of a 16384 x 16384 image.
+pub const MAX_DECODED_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+pub use op_core::doc::{MAX_LAYER_NAME_CHARS, MAX_LAYERS};
+/// The `DocState::metadata` key that holds the app's kept image metadata
+/// (EXIF, XMP and IPTC as the Mac app holds them, as text). The writer puts
+/// it in its own ZIP entry, not in `stack.xml` (release review item 5), so
+/// other OpenRaster readers ignore it.
+pub const IMAGE_METADATA_KEY: &str = "openpainter.image-metadata";
+const IMAGE_METADATA_ENTRY: &str = "data/image-metadata.txt";
+/// The most kept-metadata bytes the reader accepts; the writer refuses more.
+pub const MAX_IMAGE_METADATA: usize = 16 * 1024 * 1024;
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 type XmlAttrs = BTreeMap<String, String>;
 
@@ -121,6 +139,13 @@ fn save_impl(
     keep_temp: bool,
     hooks: SaveHooks<'_>,
 ) -> Result<()> {
+    // Every limit the reader enforces is checked before any file is made, so
+    // a refused save leaves the old file as it was (release review item 3).
+    let plan = plan_save(doc)?;
+    // Release review item 10: a symlink is saved through to its target, and
+    // the target keeps its permissions.
+    let target = crate::save_target(path)?;
+    let path = target.path.as_path();
     let parent = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -156,7 +181,7 @@ fn save_impl(
         zip.start_file("mimetype", stored).map_err(zip_err)?;
         zip.write_all(MIME)?;
         checkpoint(1)?;
-        let xml = make_xml(doc)?;
+        let xml = &plan.xml;
         zip.start_file("stack.xml", deflated).map_err(zip_err)?;
         zip.write_all(xml.as_bytes())?;
         checkpoint(2)?;
@@ -173,7 +198,26 @@ fn save_impl(
                 .map_err(zip_err)?;
             zip.write_all(profile)?;
         }
-        if let SelectionState::Active(SelectionSource::Coverage(mask)) = &doc.selection {
+        if let Some(m) = doc
+            .metadata
+            .get(IMAGE_METADATA_KEY)
+            .filter(|m| !m.is_empty())
+        {
+            zip.start_file(IMAGE_METADATA_ENTRY, deflated)
+                .map_err(zip_err)?;
+            zip.write_all(m.as_bytes())?;
+        }
+        let rasterized;
+        let coverage = match &doc.selection {
+            SelectionState::Active(SelectionSource::Coverage(mask)) => Some(mask.as_ref()),
+            // A shape selection too large for stack.xml is kept as its mask.
+            SelectionState::Active(SelectionSource::Geometry(_)) if plan.selection_as_mask => {
+                rasterized = doc.rasterize_selection(op_core::selection::RasterMode::Antialiased);
+                Some(rasterized.as_ref())
+            }
+            _ => None,
+        };
+        if let Some(mask) = coverage {
             if mask.width != doc.width || mask.height != doc.height {
                 return Err(invalid("selection mask size mismatch"));
             }
@@ -204,6 +248,11 @@ fn save_impl(
         zip.write_all(&encode_png(&thumb).map_err(other)?)?;
         let file = zip.finish().map_err(zip_err)?;
         file.file.sync_all()?;
+        // The written entries are inside every reader size limit.
+        check_written(&temp, doc)?;
+        if let Some(permissions) = &target.permissions {
+            fs::set_permissions(&temp, permissions.clone())?;
+        }
         checkpoint(usize::MAX)?;
         if !keep_temp {
             fs::rename(&temp, path)?;
@@ -353,12 +402,127 @@ fn ora_mode(s: &str) -> LayerBlendMode {
         _ => Normal,
     }
 }
-fn make_xml(doc: &DocState) -> Result<String> {
+/// The checked `stack.xml` of a save.
+struct SavePlan {
+    xml: String,
+    /// The shape selection is written as a mask (its outline is too long).
+    selection_as_mask: bool,
+}
+
+/// Checks `doc` against every limit the reader enforces and builds its
+/// `stack.xml` (release review items 3, 11 and 12a). An error says which
+/// limit, and nothing has been written yet.
+fn plan_save(doc: &DocState) -> Result<SavePlan> {
+    let raw = image_len(doc.width, doc.height)? as u64;
+    if doc.layers.len() > MAX_LAYERS {
+        return Err(invalid(format!(
+            "the image has {} layers; an .opaint file holds at most {MAX_LAYERS}",
+            doc.layers.len()
+        )));
+    }
+    let masks = u64::from(matches!(doc.selection, SelectionState::Active(_)));
+    if (doc.layers.len() as u64 + masks).saturating_mul(raw) > MAX_DECODED_BYTES {
+        return Err(invalid(format!(
+            "the image's layers hold more than {} GiB of pixels, the most an .opaint file can hold",
+            MAX_DECODED_BYTES >> 30
+        )));
+    }
+    if let Some(l) = doc
+        .layers
+        .iter()
+        .find(|l| l.name.chars().count() > MAX_LAYER_NAME_CHARS)
+    {
+        return Err(invalid(format!(
+            "a layer name is {} characters long; the most is {MAX_LAYER_NAME_CHARS}",
+            l.name.chars().count()
+        )));
+    }
+    if doc
+        .metadata
+        .get(IMAGE_METADATA_KEY)
+        .is_some_and(|m| m.len() > MAX_IMAGE_METADATA)
+    {
+        return Err(invalid("the image's metadata is larger than 16 MiB"));
+    }
+    if doc.profile.as_ref().is_some_and(|p| p.len() > MAX_PROFILE) {
+        return Err(invalid("the color profile is larger than 16 MiB"));
+    }
+    if let SelectionState::Active(SelectionSource::Geometry(poly)) = &doc.selection
+        && poly
+            .0
+            .iter()
+            .flatten()
+            .any(|(x, y)| !x.is_finite() || !y.is_finite())
+    {
+        return Err(invalid(
+            "the selection outline has a point that is not a finite number",
+        ));
+    }
+    let mut xml = make_xml(doc, false)?;
+    let mut selection_as_mask = false;
+    if xml.len() > MAX_STACK_XML
+        && matches!(
+            doc.selection,
+            SelectionState::Active(SelectionSource::Geometry(_))
+        )
+    {
+        xml = make_xml(doc, true)?;
+        selection_as_mask = true;
+    }
+    if xml.len() > MAX_STACK_XML {
+        return Err(invalid(format!(
+            "the layer list would need {} bytes; an .opaint file holds at most {MAX_STACK_XML}",
+            xml.len()
+        )));
+    }
+    Ok(SavePlan {
+        xml,
+        selection_as_mask,
+    })
+}
+
+/// Checks the written ZIP's entries against the reader's size limits (its
+/// central directory only, so this reads little).
+fn check_written(path: &Path, doc: &DocState) -> Result<()> {
+    let mut zip = ZipArchive::new(File::open(path)?).map_err(other)?;
+    let raw = image_len(doc.width, doc.height)? as u64;
+    let mut total = 0_u64;
+    for i in 0..zip.len() {
+        let entry = zip.by_index_raw(i).map_err(other)?;
+        let name = entry.name().to_owned();
+        let size = entry.size();
+        total = total.saturating_add(size);
+        let limit = match name.as_str() {
+            "stack.xml" => MAX_STACK_XML as u64,
+            "data/profile.icc" => MAX_PROFILE as u64,
+            IMAGE_METADATA_ENTRY => MAX_IMAGE_METADATA as u64,
+            n if n.starts_with("data/") && n.ends_with(".png") => raw + 1024 * 1024,
+            _ => u64::MAX,
+        };
+        if size > limit {
+            return Err(invalid(format!(
+                "{name} would be {size} bytes, more than an .opaint reader accepts"
+            )));
+        }
+    }
+    if total > MAX_ZIP {
+        return Err(invalid(
+            "the file would be larger than 4 GiB, the most an .opaint file can hold",
+        ));
+    }
+    Ok(())
+}
+
+fn make_xml(doc: &DocState, selection_as_mask: bool) -> Result<String> {
     image_len(doc.width, doc.height)?;
     if doc.layers.is_empty() || doc.active_layer >= doc.layers.len() {
         return Err(invalid("invalid layer stack"));
     }
-    let metadata = serde_json::to_string(doc.metadata.as_ref()).map_err(other)?;
+    let mut metadata = doc.metadata.as_ref().clone();
+    let image_metadata = metadata
+        .remove(IMAGE_METADATA_KEY)
+        .filter(|m| !m.is_empty());
+    let metadata = serde_json::to_string(&metadata).map_err(other)?;
     let mut xml = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><image version=\"0.0.6\" w=\"{}\" h=\"{}\" xres=\"{}\" yres=\"{}\" xmlns:op=\"{NS}\" op:version=\"1.0\" op:dpi=\"{}\" op:metadata=\"{}\" op:active-layer=\"{}\"",
         doc.width,
@@ -372,9 +536,15 @@ fn make_xml(doc: &DocState) -> Result<String> {
     if doc.profile.is_some() {
         xml.push_str(" op:profile=\"data/profile.icc\"");
     }
+    if image_metadata.is_some() {
+        xml.push_str(&format!(" op:image-metadata=\"{IMAGE_METADATA_ENTRY}\""));
+    }
     match &doc.selection {
         SelectionState::None => xml.push_str(" op:selection=\"none\""),
         SelectionState::Active(SelectionSource::Coverage(_)) => {
+            xml.push_str(" op:selection=\"coverage\" op:selection-src=\"data/selection.png\"")
+        }
+        SelectionState::Active(SelectionSource::Geometry(_)) if selection_as_mask => {
             xml.push_str(" op:selection=\"coverage\" op:selection-src=\"data/selection.png\"")
         }
         SelectionState::Active(SelectionSource::Geometry(poly)) => {
@@ -456,7 +626,7 @@ fn load_opaint_from_reader<R: Read + std::io::Seek>(
     if mime != MIME {
         return Err(invalid("wrong mimetype"));
     }
-    let xml = read_entry(&mut zip, "stack.xml", 16 * 1024 * 1024)?;
+    let xml = read_entry(&mut zip, "stack.xml", MAX_STACK_XML as u64)?;
     let (root, layers) = parse_xml(&xml)?;
     let version = required(&root, "op:version")?;
     let (major, minor) = version
@@ -477,6 +647,20 @@ fn load_opaint_from_reader<R: Read + std::io::Seek>(
     let raw_len = image_len(width, height)?;
     if layers.is_empty() {
         return Err(invalid("empty layer stack"));
+    }
+    // Release review item 12a: the layer count and the total pixels decoded.
+    if layers.len() > MAX_LAYERS {
+        return Err(invalid(format!(
+            "{} layers; an .opaint file holds at most {MAX_LAYERS}",
+            layers.len()
+        )));
+    }
+    let masks = u64::from(root.get("op:selection").is_some_and(|s| s == "coverage"));
+    if (layers.len() as u64 + masks).saturating_mul(raw_len as u64) > MAX_DECODED_BYTES {
+        return Err(invalid(format!(
+            "the layers hold more than {} GiB of pixels",
+            MAX_DECODED_BYTES >> 30
+        )));
     }
     let dpi: f64 = parse_required(&root, "op:dpi")?;
     let mut doc = DocState::new(store, width, height, dpi).map_err(other)?;
@@ -561,7 +745,7 @@ fn load_opaint_from_reader<R: Read + std::io::Seek>(
         doc = doc.set_profile(Some(Arc::from(read_entry(
             &mut zip,
             profile_path,
-            16 * 1024 * 1024,
+            MAX_PROFILE as u64,
         )?)));
     }
     if let Some(metadata) = root.get("op:metadata") {
@@ -569,6 +753,12 @@ fn load_opaint_from_reader<R: Read + std::io::Seek>(
         for (key, value) in map {
             doc = doc.set_metadata(key, value);
         }
+    }
+    if let Some(src) = root.get("op:image-metadata") {
+        check_path(src)?;
+        let bytes = read_entry(&mut zip, src, MAX_IMAGE_METADATA as u64)?;
+        let text = String::from_utf8(bytes).map_err(|_| invalid("image metadata is not UTF-8"))?;
+        doc = doc.set_metadata(IMAGE_METADATA_KEY.into(), text);
     }
     let active: u64 = parse_required(&root, "op:active-layer")?;
     let active_index = doc

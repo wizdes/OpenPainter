@@ -99,6 +99,10 @@ fn duplicate_merge_down_and_reorder() {
         .unwrap();
     assert!(e.dispatch(id, "layer.merge_down", json!({})).is_err());
     assert!(e.dispatch(id, "layer.move_down", json!({})).is_err());
+    // A new layer goes just above the active one (item 13): add it from the
+    // top layer so "Top" lands on top.
+    e.dispatch(id, "layer.set_active", json!({"index":1}))
+        .unwrap();
     e.dispatch(id, "layer.add", json!({"name":"Top"})).unwrap();
     e.dispatch(id, "layer.set_active", json!({"index":2}))
         .unwrap();

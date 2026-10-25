@@ -288,13 +288,14 @@ fn job_dropped_when_base_revision_changed() {
     let (e, rx) = engine_with_events();
     let doc = small(&e);
     slow_fill(&e, doc, 1, 300);
-    // layer.add puts the new layer on top; the active layer stays the same.
+    // layer.add puts the new layer just above the active one and makes it
+    // active (item 13), so the target layer changes along with the revision.
     e.dispatch(doc, "layer.add", json!({})).unwrap();
     let ev = wait_job(&rx, 1, Duration::from_secs(5));
     assert_eq!(status(&ev), "dropped");
     let m = mismatch(&ev);
     assert!(m.contains(&"base_revision".into()), "{m:?}");
-    assert!(!m.contains(&"target_layer".into()), "{m:?}");
+    assert!(m.contains(&"target_layer".into()), "{m:?}");
     assert!(!m.contains(&"selection_revision".into()), "{m:?}");
     assert!(e.snapshot(doc).unwrap().preview.is_none());
     assert_eq!(e.query(doc, "doc.pixels", json!({})).unwrap()[0], 10);

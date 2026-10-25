@@ -18,8 +18,10 @@ fn rgba_round_trip_preserves_hidden_color() {
     assert!(decode_png(&corrupt).is_err());
 }
 
+/// Was `rejects_16_bit` (16-bit PNG "unsupported in M04"); the release
+/// review (item 6) built 16-bit support, so a 16-bit PNG now decodes to 8-bit.
 #[test]
-fn rejects_16_bit() {
+fn decodes_16_bit() {
     let mut out = Vec::new();
     let mut encoder = png::Encoder::new(&mut out, 1, 1);
     encoder.set_depth(png::BitDepth::Sixteen);
@@ -27,12 +29,7 @@ fn rejects_16_bit() {
     let mut writer = encoder.write_header().unwrap();
     writer.write_image_data(&[0; 8]).unwrap();
     drop(writer);
-    assert!(
-        decode_png(&out)
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported in M04")
-    );
+    assert_eq!(decode_png(&out).unwrap().pixels, [0, 0, 0, 0]);
 }
 
 #[test]

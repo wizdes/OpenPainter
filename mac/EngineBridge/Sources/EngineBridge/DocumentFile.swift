@@ -50,6 +50,28 @@ extension Document {
         try engine.withHandle { h in try checkStatus(op_doc_mark_saved(h, id, revision)) }
     }
 
+    /// Release review item 1: finishes every open tool session that changes
+    /// the image (text, paste or move, line/curve, shape, gradient, a live
+    /// Magic Wand or Paint Bucket), each as its own history step. Waits for
+    /// the commands queued before it, so `info()` afterwards shows the result.
+    public func finishSessions() throws {
+        try engine.withHandle { h in try checkStatus(op_doc_finish_sessions(h, id)) }
+    }
+
+    /// Release review item 5: keeps the app's image metadata (text; empty
+    /// removes it) with the document. .opaint saves and recovery records hold
+    /// it. It adds no history step.
+    public func setImageMetadata(_ text: String) throws {
+        let bytes = Array(text.utf8)
+        try engine.withHandle { h in try checkStatus(op_doc_set_image_metadata(h, id, bytes, UInt(bytes.count))) }
+    }
+
+    /// The text `setImageMetadata` kept (also after opening an .opaint file
+    /// or a recovery record), or nil.
+    public func imageMetadata() throws -> String? {
+        (try query("doc.image_metadata") as? [String: Any])?["text"] as? String
+    }
+
     /// Revert: this document takes `source`'s content as a fresh, saved
     /// history. The caller still closes `source`.
     public func replaceContent(with source: Document) throws {

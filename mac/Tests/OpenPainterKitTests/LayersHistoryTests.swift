@@ -117,6 +117,30 @@ final class LayersHistoryTests: XCTestCase {
 
     // MARK: Tests
 
+    /// Release review item 13: Add New Layer in the Layers panel puts the
+    /// layer just above the active one and makes it active (paint.net), so the
+    /// next paint goes onto the new layer, not Background.
+    func testAddNewLayerGoesAboveTheActiveLayerAndThePaintLandsOnIt() throws {
+        let wc = try fx.open()
+        let e = wc.editor
+        let before = try Self.layerBytes(e.document)[0]
+        layers.addButton.performClick(nil)
+        waitSteps(e, 2, "add")
+        XCTAssertEqual(e.info.layers.map(\.name), ["Background", "Layer 2"])
+        XCTAssertEqual(e.info.activeLayer, 1, "the new layer is active")
+        run(e, "tool.stroke", stroke)
+        let bytes = try Self.layerBytes(e.document)
+        XCTAssertEqual(bytes[0], before, "Background is unchanged")
+        XCTAssertTrue(bytes[1].contains { $0 != 0 }, "the paint is on the new layer")
+        // From the bottom layer, a new layer lands just above it.
+        click(try row(0))
+        XCTAssertTrue(waitUntil { e.info.activeLayer == 0 })
+        layers.addButton.performClick(nil)
+        waitSteps(e, 4, "add above Background")
+        XCTAssertEqual(e.info.layers.map(\.name), ["Background", "Layer 3", "Layer 2"])
+        XCTAssertEqual(e.info.activeLayer, 1)
+    }
+
     func testUIScenarioEqualsEngineScenarioByteForByte() throws {
         let wc = try fx.open()
         let e = wc.editor

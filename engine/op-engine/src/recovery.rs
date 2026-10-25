@@ -811,14 +811,22 @@ struct WriterState {
     saves: Arc<AtomicU64>,
     cancel: Arc<AtomicBool>,
     events: Sender<Event>,
-    /// The revision the record on disk holds, written in this session.
-    written: Option<u64>,
-    seen: u64,
+    /// The revision (and open session's preview serial) the record on disk
+    /// holds, written in this session.
+    written: Option<(u64, u64)>,
+    seen: (u64, u64),
     last_change: Option<Instant>,
     first_unrecorded: Option<Instant>,
     /// After a failed clean-up, the next try waits until then.
     retry_clear_at: Option<Instant>,
     lock: Option<FolderLock>,
+}
+
+/// What a record of `p` holds: its revision, and while an edit session is
+/// open the preview it shows (release review item 1: an open text, paste or
+/// shape is recorded as the screen shows it).
+fn record_key(p: &Published) -> (u64, u64) {
+    (p.revision, if p.session { p.preview_serial } else { 0 })
 }
 
 fn event_to(events: &Sender<Event>, doc: u64, json: serde_json::Value) {
@@ -851,7 +859,7 @@ impl WriterState {
         if !snap.history.dirty {
             return self.clear().map(|()| None);
         }
-        if self.written == Some(snap.revision) {
+        if self.written == Some(record_key(&snap)) {
             return Ok(Some(snap.revision));
         }
         match &self.lock {
@@ -867,7 +875,7 @@ impl WriterState {
         }
         let result = write_record(
             &self.dir,
-            &snap.state,
+            snap.shown_state(),
             snap.revision,
             &self.shared,
             (epoch, &self.saves),
@@ -876,7 +884,7 @@ impl WriterState {
         );
         match result {
             Ok(WriteOutcome::Committed(m)) => {
-                self.written = Some(m.revision);
+                self.written = Some((m.revision, record_key(&snap).1));
                 self.first_unrecorded = None;
                 let mut status = self.status.lock();
                 status.acknowledged = Some(m.revision);
@@ -983,10 +991,10 @@ impl WriterState {
     fn tick(&mut self) {
         let snap = self.published.load();
         let now = Instant::now();
-        if snap.revision != self.seen {
-            self.seen = snap.revision;
+        if record_key(&snap) != self.seen {
+            self.seen = record_key(&snap);
             self.last_change = Some(now);
-            if self.written != Some(snap.revision) && self.first_unrecorded.is_none() {
+            if self.written != Some(self.seen) && self.first_unrecorded.is_none() {
                 self.first_unrecorded = Some(now);
             }
         }
@@ -995,7 +1003,7 @@ impl WriterState {
             let _ = self.clear();
             return;
         }
-        if self.written == Some(snap.revision) {
+        if self.written == Some(record_key(&snap)) {
             self.first_unrecorded = None;
             return;
         }
@@ -1190,8 +1198,8 @@ impl Engine {
             saves: saves.clone(),
             cancel: cancel.clone(),
             events: self.events_tx.clone(),
-            written: adopt.then_some(current.revision),
-            seen: current.revision,
+            written: adopt.then_some(record_key(&current)),
+            seen: record_key(&current),
             last_change: None,
             first_unrecorded: None,
             retry_clear_at: None,

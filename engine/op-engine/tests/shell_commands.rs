@@ -38,8 +38,8 @@ fn set_active_layer() {
     let e = Engine::new(None).unwrap();
     let id = doc(&e);
     e.dispatch(id, "layer.add", json!({"name":"Two"})).unwrap();
-    // layer.add keeps the active layer where it was.
-    assert_eq!(query(&e, id, "doc.info")["active_layer"], json!(0));
+    // layer.add makes the new layer active (item 13, paint.net placement).
+    assert_eq!(query(&e, id, "doc.info")["active_layer"], json!(1));
     e.dispatch(id, "layer.set_active", json!({"index":1}))
         .unwrap();
     assert_eq!(query(&e, id, "doc.info")["active_layer"], json!(1));

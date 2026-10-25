@@ -36,7 +36,8 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
     let mut decoder = png::Decoder::new_with_limits(
         Cursor::new(bytes),
         png::Limits {
-            bytes: 1024 * 1024 * 1024 + 1024 * 1024,
+            // A 16-bit image decodes to twice the bytes of its 8-bit result.
+            bytes: 2 * 1024 * 1024 * 1024 + 1024 * 1024,
         },
     );
     decoder.set_transformations(png::Transformations::EXPAND);
@@ -46,20 +47,32 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
         (i.width, i.height, i.bit_depth)
     };
     let len = image_len(width, height)?;
-    if depth == png::BitDepth::Sixteen {
-        return Err(err("16-bit PNG unsupported in M04"));
-    }
-    if depth != png::BitDepth::Eight && reader.output_color_type().1 != png::BitDepth::Eight {
-        return Err(err("PNG bit depth unsupported in M04"));
+    // Release review item 6: 16-bit PNGs (RGBA, RGB, gray, gray and alpha)
+    // become 8-bit with the engine's rounding, floor(v * 255 / 65535 + 0.5).
+    let sixteen = reader.output_color_type().1 == png::BitDepth::Sixteen;
+    if !sixteen
+        && depth != png::BitDepth::Eight
+        && reader.output_color_type().1 != png::BitDepth::Eight
+    {
+        return Err(err("PNG bit depth unsupported"));
     }
     let output_size = reader
         .output_buffer_size()
         .ok_or_else(|| err("PNG output size overflow"))?;
-    if output_size > 1024 * 1024 * 1024 {
+    if output_size > if sixteen { 2 } else { 1 } * 1024 * 1024 * 1024 {
         return Err(err("PNG output exceeds 1 GiB"));
     }
     let mut raw = vec![0; output_size];
-    let output = reader.next_frame(&mut raw).map_err(err)?;
+    let mut output = reader.next_frame(&mut raw).map_err(err)?;
+    if sixteen {
+        let n = output.buffer_size() / 2;
+        for i in 0..n {
+            raw[i] = crate::io::round16(u16::from_be_bytes([raw[2 * i], raw[2 * i + 1]]));
+        }
+        raw.truncate(n);
+        output.line_size /= 2;
+        output.bit_depth = png::BitDepth::Eight;
+    }
     let embedded_icc = reader.info().icc_profile.as_ref().map(|p| p.to_vec());
     let mut pixels = Vec::with_capacity(len);
     let mut gray_expanded = false;

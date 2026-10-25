@@ -312,6 +312,33 @@ pub extern "C" fn op_import_pixels(
         }
     })
 }
+/// The most bytes `op_doc_open_png` reads: a PNG whose pixels fit the 1 GiB
+/// decode limit is smaller (a 16-bit one stored without compression is about
+/// 2 GiB), so a larger file is refused before it is read (release review
+/// item 7).
+pub const MAX_PNG_FILE: u64 = 2 * 1024 * 1024 * 1024 + 16 * 1024 * 1024;
+
+/// Reads a PNG file of at most `MAX_PNG_FILE` bytes.
+fn read_png_file(path: &str) -> Result<Vec<u8>, OpStatus> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).map_err(|_| OpStatus::OP_ERR_BAD_ARGUMENT)?;
+    let size = file
+        .metadata()
+        .map_err(|_| OpStatus::OP_ERR_BAD_ARGUMENT)?
+        .len();
+    if size > MAX_PNG_FILE {
+        return Err(OpStatus::OP_ERR_BAD_ARGUMENT);
+    }
+    let mut bytes = Vec::with_capacity(size as usize);
+    file.take(MAX_PNG_FILE + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| OpStatus::OP_ERR_BAD_ARGUMENT)?;
+    if bytes.len() as u64 > MAX_PNG_FILE {
+        return Err(OpStatus::OP_ERR_BAD_ARGUMENT);
+    }
+    Ok(bytes)
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn op_doc_open_png(
     p: *mut OpEngine,
@@ -333,10 +360,7 @@ pub extern "C" fn op_doc_open_png(
             Ok(s) => s,
             Err(s) => return s,
         };
-        match std::fs::read(path)
-            .map_err(|_| OpStatus::OP_ERR_BAD_ARGUMENT)
-            .and_then(|b| e.core().open_png(&b).map_err(status))
-        {
+        match read_png_file(path).and_then(|b| e.core().open_png(&b).map_err(status)) {
             Ok(id) => {
                 unsafe { *out_doc = id };
                 OpStatus::OP_OK

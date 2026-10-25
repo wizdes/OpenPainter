@@ -41,6 +41,27 @@ public struct ImageMetadata: @unchecked Sendable {
     ]
 }
 
+extension ImageMetadata {
+    /// Release review item 5: the metadata as text the engine keeps with the
+    /// document (.opaint files and recovery records): a binary property list
+    /// of `xmp` and `properties`, in base64. Throws when a value cannot go in
+    /// a property list.
+    public func archived() throws -> String {
+        var root: [String: Any] = ["properties": properties]
+        if let xmp { root["xmp"] = xmp }
+        let data = try PropertyListSerialization.data(fromPropertyList: root, format: .binary, options: 0)
+        return data.base64EncodedString()
+    }
+
+    /// Reads `archived()` text back (nil for text that is not one).
+    public init?(archived text: String) {
+        guard let data = Data(base64Encoded: text),
+              let root = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else { return nil }
+        self.init(xmp: root["xmp"] as? Data, properties: root["properties"] as? [String: Any] ?? [:])
+    }
+}
+
 /// A decoded image ready for `op_import_pixels`.
 public struct ImportedImage: Sendable {
     public var width: Int
@@ -66,9 +87,14 @@ public enum ImageIOImportError: Error, LocalizedError, Equatable {
     case cannotRead(String)
     case noImage(String)
     case convert(String)
+    /// Release review item 7: width, height (from the file's header).
+    case tooLarge(String, Int, Int)
 
     public var errorDescription: String? {
         switch self {
+        case .tooLarge(let n, let w, let h):
+            "“\(n)” is \(w) × \(h) pixels. OpenPainter opens images of at most 1 GiB of pixels "
+                + "(about 268 million pixels)."
         case .cannotRead(let n): "ImageIO could not read “\(n)”."
         case .noImage(let n): "“\(n)” has no image ImageIO can decode."
         case .convert(let n): "“\(n)” could not be converted to 8-bit RGBA."
@@ -77,6 +103,9 @@ public enum ImageIOImportError: Error, LocalizedError, Equatable {
 }
 
 public enum ImageIOImporter {
+    /// The most RGBA8 bytes an import may decode to: the engine's limit.
+    public static let maxRGBABytes = 1 << 30
+
     public static func decode(url: URL) throws -> ImportedImage {
         let name = url.lastPathComponent
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
@@ -96,6 +125,11 @@ public enum ImageIOImporter {
         let type = CGImageSourceGetType(source) as String? ?? "unknown"
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] ?? [:]
         let orientation = (props[kCGImagePropertyOrientation as String] as? NSNumber)?.intValue ?? 1
+        // Release review item 7: the header's size is checked before any
+        // pixel is decoded, so a huge image is refused at once.
+        let headerW = (props[kCGImagePropertyPixelWidth as String] as? NSNumber)?.intValue ?? 0
+        let headerH = (props[kCGImagePropertyPixelHeight as String] as? NSNumber)?.intValue ?? 0
+        try checkSize(headerW, headerH, name: name)
         guard var image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw ImageIOImportError.noImage(name)
         }
@@ -109,6 +143,8 @@ public enum ImageIOImporter {
             let kind = image.bitmapInfo.contains(.floatComponents) ? "\(image.bitsPerComponent)-bit float" : "\(image.bitsPerComponent)-bit"
             notes.append("Converted from \(kind) to 8 bits per channel (OpenPainter stores 8-bit).")
         }
+        // The decoded image may differ from the header (a RAW's rendering).
+        try checkSize(image.width, image.height, name: name)
         let (target, converted) = documentSpace(for: image.colorSpace)
         if converted { notes.append("Converted to sRGB: the source color space is not RGB.") }
         guard let icc = target.copyICCData() as Data? else { throw ImageIOImportError.convert(name) }
@@ -120,6 +156,12 @@ public enum ImageIOImporter {
             width: w, height: h, rgba: rgba, icc: icc, colorSpaceName: target.name as String?,
             sourceOrientation: orientation, sourceBitsPerComponent: image.bitsPerComponent, sourceType: type,
             metadata: metadata(source, props), notes: notes)
+    }
+
+    /// Throws `.tooLarge` when `w` x `h` RGBA8 pixels pass the engine's 1 GiB.
+    static func checkSize(_ w: Int, _ h: Int, name: String) throws {
+        let (bytes, overflow) = w.multipliedReportingOverflow(by: h)
+        if overflow || bytes > maxRGBABytes / 4 { throw ImageIOImportError.tooLarge(name, w, h) }
     }
 
     static func isHDR(_ space: CGColorSpace) -> Bool {
@@ -141,17 +183,16 @@ public enum ImageIOImporter {
             bitsPerComponent: 8, bitsPerPixel: 32, colorSpace: space,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue), renderingIntent: .defaultIntent)
         else { throw ImageIOImportError.convert(name) }
-        var buffer = vImage_Buffer()
-        let err = vImageBuffer_InitWithCGImage(&buffer, &format, nil, image, vImage_Flags(kvImageNoFlags))
-        guard err == kvImageNoError, let base = buffer.data else { throw ImageIOImportError.convert(name) }
-        defer { free(base) }
-        let w = Int(buffer.width), h = Int(buffer.height)
+        // Release review item 7: vImage writes straight into the result
+        // (kvImageNoAllocate), with no second full-size copy.
+        let w = image.width, h = image.height
         var out = [UInt8](repeating: 0, count: w * h * 4)
-        out.withUnsafeMutableBytes { dst in
-            for y in 0..<h {
-                memcpy(dst.baseAddress! + y * w * 4, base + y * buffer.rowBytes, w * 4)
-            }
+        let err: vImage_Error = out.withUnsafeMutableBytes { dst in
+            var buffer = vImage_Buffer(data: dst.baseAddress, height: vImagePixelCount(h),
+                                       width: vImagePixelCount(w), rowBytes: w * 4)
+            return vImageBuffer_InitWithCGImage(&buffer, &format, nil, image, vImage_Flags(kvImageNoAllocate))
         }
+        guard err == kvImageNoError else { throw ImageIOImportError.convert(name) }
         // An image with no alpha channel is opaque.
         if image.alphaInfo == .none || image.alphaInfo == .noneSkipLast || image.alphaInfo == .noneSkipFirst {
             for i in stride(from: 3, to: out.count, by: 4) { out[i] = 255 }

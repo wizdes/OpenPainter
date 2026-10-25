@@ -102,7 +102,7 @@ fn expand(raw: &[u8], channels: usize) -> Vec<u8> {
     out
 }
 /// Convert a 16-bit sample with floor(v * 255 / 65535 + 0.5).
-fn round16(v: u16) -> u8 {
+pub(crate) fn round16(v: u16) -> u8 {
     ((v as u32 * 255 + 32767) / 65535) as u8
 }
 

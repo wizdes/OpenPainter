@@ -120,6 +120,36 @@ final class ImageIOFuzzTests: XCTestCase {
         XCTAssertGreaterThan(cases, 10, name)
     }
 
+    /// Release review item 8: every input a fuzz run saved (fuzz-found/,
+    /// next to this file) still opens or fails cleanly within the fuzz
+    /// run's 30 s deadline, through the same ImageIO import path.
+    func testSavedFuzzFoundInputsOpenOrFailWithinTheDeadline() throws {
+        let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("fuzz-found")
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { !$0.lastPathComponent.hasPrefix(".") }
+        XCTAssertFalse(files.isEmpty, "fuzz-found has inputs")
+        let engine = try Engine()
+        defer { engine.close() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("op-fuzz-found-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for file in files {
+            let data = try Data(contentsOf: file)
+            // The saved name says the format ("heic-imageio-...") for the loader.
+            let ext = file.lastPathComponent.split(separator: "-").first.map(String.init) ?? "bin"
+            let url = dir.appendingPathComponent("case.\(ext)")
+            try data.write(to: url)
+            let start = Date()
+            let finished = FuzzLimits.run(data, deadline: 30.0, { _ -> Bool in
+                guard let loaded = try? DocumentLoader.open(url, engine: engine) else { return false }
+                try? loaded.document.close()
+                return true
+            })
+            XCTAssertNotNil(finished, "\(file.lastPathComponent) passed the 30 s limit")
+            print("FUZZ_FOUND \(file.lastPathComponent) opened \(finished ?? false) in \(Int(Date().timeIntervalSince(start) * 1000)) ms")
+        }
+    }
+
     func testMutatedHEICAVIFAndRAWFilesOpenOrFailCleanlyWithinTheLimits() throws {
         let engine = try Engine()
         defer { engine.close() }

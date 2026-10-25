@@ -45,6 +45,10 @@ pub(crate) enum FileOp {
     Replace(DocState),
     /// M57: no step is saved (a document recovered after a crash).
     MarkUnsaved,
+    /// Release review item 1: finish open edit sessions (each its own step).
+    FinishSessions,
+    /// Release review item 5: the app's kept image metadata (as text).
+    SetImageMetadata(String),
 }
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -57,7 +61,13 @@ fn store() -> Result<Arc<TileStore>> {
 
 /// Writes `bytes` to a temporary file next to `path`, syncs it and renames it
 /// over `path`, so a failed save never leaves a half-written image.
+///
+/// Release review item 10: a symlink is written through to its target, and
+/// the replaced file's permissions stay.
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    let target = op_formats::save_target(path)
+        .map_err(|e| internal(format!("cannot write {}: {e}", path.display())))?;
+    let path = target.path.as_path();
     let parent = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -81,6 +91,9 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     let result = (|| {
         file.write_all(bytes)?;
         file.sync_all()?;
+        if let Some(permissions) = &target.permissions {
+            fs::set_permissions(&temp, permissions.clone())?;
+        }
         fs::rename(&temp, path)?;
         File::open(parent)?.sync_all()
     })();
@@ -171,6 +184,27 @@ impl Engine {
         result
     }
 
+    /// Release review item 1: finishes every open tool session that changes
+    /// the image (text, paste or move, line/curve, shape, gradient, a live
+    /// Magic Wand or Paint Bucket), each as its own history step. Save,
+    /// Close and Quit call it first, so the file holds what the screen shows.
+    /// It waits for the commands queued before it.
+    pub fn finish_sessions(&self, id: u64) -> Result<()> {
+        self.call(id, |r| Message::File(FileOp::FinishSessions, r))?
+    }
+
+    /// Release review item 5: keeps `text` (the app's EXIF, XMP and IPTC as
+    /// text; empty removes it) with the document, so .opaint saves and
+    /// recovery records hold it (`doc.image_metadata` reads it back). It goes
+    /// on every history step and adds none, so the image stays as edited (or
+    /// not) as it was. The app calls it right after opening an image.
+    pub fn set_image_metadata(&self, id: u64, text: String) -> Result<()> {
+        if text.len() > op_formats::opaint::MAX_IMAGE_METADATA {
+            return Err(bad("the image's metadata is larger than 16 MiB"));
+        }
+        self.call(id, |r| Message::File(FileOp::SetImageMetadata(text), r))?
+    }
+
     /// M57: marks the document unsaved (no step is the saved one).
     pub fn mark_unsaved(&self, id: u64) -> Result<()> {
         self.call(id, |r| Message::File(FileOp::MarkUnsaved, r))?
@@ -202,6 +236,9 @@ impl Actor {
                 format,
                 mark_saved,
             } => {
+                // Release review item 1: an open session is part of what the
+                // screen shows, so it becomes a step before the write.
+                self.finish_edit_sessions()?;
                 let state = self.history.current_state();
                 match format {
                     SaveFormat::Opaint => op_formats::opaint::save_opaint(state, &path)
@@ -227,6 +264,16 @@ impl Actor {
                     return Err(Error::Busy);
                 }
                 self.mark_current_saved();
+                Ok(())
+            }
+            FileOp::FinishSessions => self.finish_edit_sessions(),
+            FileOp::SetImageMetadata(text) => {
+                self.history.set_metadata_everywhere(
+                    op_formats::opaint::IMAGE_METADATA_KEY,
+                    (!text.is_empty()).then_some(text),
+                );
+                let preview = self.published.load().preview.clone();
+                self.publish(preview);
                 Ok(())
             }
             FileOp::MarkUnsaved => {
@@ -260,7 +307,7 @@ impl Actor {
         self.history.mark_saved();
         // Only the dirty flag changes: a preview or tool session on screen stays.
         let mut view = (*self.published.load_full()).clone();
-        view.history.dirty = self.history.is_dirty();
+        view.history.dirty = self.history.is_dirty() || view.session;
         self.published.store(Arc::new(view));
         if was {
             self.event(EventKind::HistoryChanged, 0, json!({"saved":true}));
