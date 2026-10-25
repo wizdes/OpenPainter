@@ -243,9 +243,13 @@ fn main() -> ExitCode {
         }
     }
     if tier == "checkpoint" {
-        let app = find_app(repo);
-        run_script(&mut steps, "scripts/size-report.sh", repo, app.as_deref());
-        run_script(&mut steps, "scripts/launch-time.sh", repo, app.as_deref());
+        for script in checkpoint_scripts() {
+            if cfg!(target_os = "macos") {
+                run_script(&mut steps, script, repo, None);
+            } else {
+                skip(&mut steps, script, "the Mac app builds only on macOS");
+            }
+        }
     }
     println!("\nSummary");
     println!("{:<8} {:>10}  Step", "Result", "Duration");
@@ -326,15 +330,12 @@ fn fail(steps: &mut Vec<Step>, name: &str, reason: &str) {
     });
 }
 
-fn find_app(repo: &Path) -> Option<PathBuf> {
-    [
-        "mac/build/OpenPainter.app",
-        "mac/build/Build/Products/Release/OpenPainter.app",
-        "mac/build/Release/OpenPainter.app",
-    ]
-    .iter()
-    .map(|relative| repo.join(relative))
-    .find(|path| path.is_dir())
+/// Scripts the checkpoint tier runs from the repository root on macOS (M58).
+/// `scripts/perf-check.sh` builds the Release app fresh, then fails on the
+/// size and launch budgets, an effect pipeline before `OP_READY`, a first
+/// effect off the GPU, or a regression over `perf/baseline.toml`.
+fn checkpoint_scripts() -> [&'static str; 1] {
+    ["scripts/perf-check.sh"]
 }
 
 fn script_status(success: bool, stdout: &str) -> Status {
@@ -441,6 +442,13 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_tier_runs_the_perf_check() {
+        // M58: perf-check builds the Release app fresh and runs the size,
+        // launch (with --first-effect), lazy-pipeline and regression checks.
+        assert_eq!(checkpoint_scripts(), ["scripts/perf-check.sh"]);
+    }
+
+    #[test]
     fn a_missing_optional_program_is_a_skip_and_a_missing_required_one_fails() {
         let dir = std::env::temp_dir();
         let missing = "op-xtask-no-such-program";
@@ -516,15 +524,17 @@ mod tests {
         );
     }
 
+    /// Runs scripts/launch-time.sh (with `args`) on a fake app whose binary
+    /// prints `ready` and then waits. Returns (success, stdout, stderr).
     #[cfg(target_os = "macos")]
-    #[test]
-    fn launch_script_reads_five_ready_lines_without_a_temp_file() {
+    fn launch_script(tag: &str, ready: Option<&str>, args: &[&str]) -> (bool, String, String) {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
             .parent()
             .unwrap();
-        let fixture = std::env::temp_dir().join(format!("op-launch-test-{}", std::process::id()));
+        let fixture =
+            std::env::temp_dir().join(format!("op-launch-test-{tag}-{}", std::process::id()));
         let app = fixture.join("Fake.app");
         let contents = app.join("Contents");
         let macos = contents.join("MacOS");
@@ -535,20 +545,160 @@ mod tests {
         )
         .unwrap();
         let binary = macos.join("Fake");
-        fs::write(&binary, "#!/bin/sh\necho 'OP_READY 123'\nexec sleep 5\n").unwrap();
+        let script = match ready {
+            Some(line) => format!("#!/bin/sh\necho '{line}'\nexec sleep 5\n"),
+            None => "#!/bin/sh\nexec sleep 5\n".to_owned(),
+        };
+        fs::write(&binary, script).unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
+        let mut command = Command::new("bash");
+        command.arg("scripts/launch-time.sh").args(["--runs", "3"]);
+        command.args(args).current_dir(repo);
+        if tag != "no-app" {
+            command.arg(&app);
+        }
+        let output = command.output().unwrap();
+        fs::remove_dir_all(&fixture).unwrap();
+        (
+            output.status.success(),
+            String::from_utf8_lossy(&output.stdout).into_owned(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn launch_script_reads_five_ready_lines_without_a_temp_file() {
+        // M58 fix: the fake app prints the pipeline counts the real app prints.
+        let (ok, out, err) = launch_script("ok", Some("OP_READY 123 effect=0 view=1 mip=0"), &[]);
+        assert!(ok, "{err}");
+        assert!(out.contains("Cold launch median: 123 ms"), "{out}");
+        assert!(out.contains("PASS lazy pipelines"), "{out}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn launch_script_without_an_app_fails() {
+        let (ok, out, err) = launch_script("no-app", None, &[]);
+        assert!(!ok, "{out}");
+        assert!(err.contains("Usage"), "{err}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn launch_script_fails_without_pipeline_counts_in_every_mode() {
+        let (ok, out, _) = launch_script("no-counts", Some("OP_READY 123"), &[]);
+        assert!(!ok, "{out}");
+        assert!(!out.contains("PASS launch time"), "{out}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn launch_script_fails_when_no_canvas_view_is_ready() {
+        // The empty start window prints view=0: it is not a usable canvas.
+        let (ok, out, err) =
+            launch_script("no-view", Some("OP_READY 123 effect=0 view=0 mip=0"), &[]);
+        assert!(!ok, "{out}");
+        assert!(err.contains("view"), "{err}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn launch_script_fails_on_an_effect_pipeline_before_ready() {
+        let (ok, out, err) =
+            launch_script("early", Some("OP_READY 123 effect=2 view=1 mip=0"), &[]);
+        assert!(!ok, "{out}");
+        assert!(err.contains("FAIL lazy pipelines"), "{err}");
+    }
+
+    /// Runs scripts/perf-compare.sh on a run and a baseline that differ from
+    /// the defaults by `run` and `base` (key, value) pairs.
+    fn perf_compare(tag: &str, run: &[(&str, &str)], base: &[(&str, &str)]) -> (bool, String) {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let dir = std::env::temp_dir().join(format!("op-compare-{tag}-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let write = |name: &str, changes: &[(&str, &str)]| {
+            let mut values = [
+                ("machine", "\"Test Mac\""),
+                ("cache_purged", "0"),
+                ("launch_median_ms", "1000"),
+                ("launch_p95_ms", "2000"),
+                ("first_effect_median_ms", "1100"),
+                ("app_bundle_mb", "10.75"),
+            ];
+            for (key, value) in changes {
+                values.iter_mut().find(|(k, _)| k == key).unwrap().1 = value;
+            }
+            let text: String = values.iter().map(|(k, v)| format!("{k} = {v}\n")).collect();
+            let path = dir.join(name);
+            fs::write(&path, text).unwrap();
+            path
+        };
+        let numbers = write("numbers.toml", run);
+        let baseline = write("baseline.toml", base);
         let output = Command::new("bash")
-            .arg("scripts/launch-time.sh")
-            .arg(&app)
+            .arg("scripts/perf-compare.sh")
+            .arg(&numbers)
+            .arg(&baseline)
             .current_dir(repo)
             .output()
             .unwrap();
-        fs::remove_dir_all(&fixture).unwrap();
-        assert!(
-            output.status.success(),
-            "{}",
+        fs::remove_dir_all(&dir).unwrap();
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(String::from_utf8_lossy(&output.stdout).contains("Cold launch median: 123 ms"));
+        (output.status.success(), text)
+    }
+
+    #[test]
+    fn perf_compare_passes_within_ten_percent() {
+        let (ok, text) = perf_compare("ok", &[("launch_p95_ms", "2199")], &[]);
+        assert!(ok, "{text}");
+        for name in [
+            "launch median",
+            "launch p95",
+            "first GPU effect median",
+            "app bundle",
+        ] {
+            assert!(text.contains(&format!("PASS regression: {name}")), "{text}");
+        }
+    }
+
+    #[test]
+    fn perf_compare_fails_on_a_launch_p95_regression() {
+        let (ok, text) = perf_compare("p95", &[("launch_p95_ms", "2201")], &[]);
+        assert!(
+            !ok && text.contains("FAIL regression: launch p95"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn perf_compare_fails_on_a_first_effect_regression() {
+        let (ok, text) = perf_compare("effect", &[("first_effect_median_ms", "1300")], &[]);
+        assert!(
+            !ok && text.contains("FAIL regression: first GPU effect median"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn perf_compare_refuses_a_purged_run_against_an_unpurged_baseline() {
+        let (ok, text) = perf_compare("purge", &[("cache_purged", "1")], &[]);
+        assert!(!ok && text.contains("do not compare"), "{text}");
+        let (ok, text) = perf_compare("purge2", &[], &[("cache_purged", "1")]);
+        assert!(!ok && text.contains("do not compare"), "{text}");
+    }
+
+    #[test]
+    fn perf_compare_refuses_another_machine() {
+        let (ok, text) = perf_compare("machine", &[], &[("machine", "\"Other Mac\"")]);
+        assert!(!ok && text.contains("the baseline is from"), "{text}");
     }
 }

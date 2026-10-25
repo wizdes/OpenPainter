@@ -219,5 +219,5 @@ Window > Bring All to Front
 Help
 Help > OpenPainter Help [⌘?] (off)
 Help > ---
-Help > Check for Updates… (off)
+Help > Check for Updates…
 Help > Send Feedback… (off)

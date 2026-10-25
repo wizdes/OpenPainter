@@ -187,6 +187,16 @@
 	<string>OpenPainter. Zoom steps from Paint.NET 3.36 (MIT).</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUFeedURL</key>
+	<string>https://yili.dev/projects/openpainter/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string></string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUSignedFeedFailureExpirationInterval</key>
+	<integer>0</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

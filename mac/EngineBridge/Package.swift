@@ -1,15 +1,16 @@
 // swift-tools-version: 6.0
-// Build the engine first: from engine/, run `cargo build -p op-ffi --release`.
+// Build the engine first: run mac/scripts/build-engine.sh (the staticlib with
+// the app-release profile).
 // See README.md for the full build order.
 import Foundation
 import PackageDescription
 
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 // The release staticlib libop_ffi.a. OP_ENGINE_LIB_DIR overrides the default
-// engine/target/release folder.
+// engine/target/app-release folder.
 let engineLibDir =
     ProcessInfo.processInfo.environment["OP_ENGINE_LIB_DIR"]
-    ?? packageDir.appendingPathComponent("../../engine/target/release").standardizedFileURL.path
+    ?? packageDir.appendingPathComponent("../../engine/target/app-release").standardizedFileURL.path
 
 let package = Package(
     name: "EngineBridge",

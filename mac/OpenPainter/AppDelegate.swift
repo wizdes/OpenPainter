@@ -34,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.startWindow = nil
         }
         PainterDocument.prepareEngine()
+        // M58: OP_LAUNCH_PROBE=first-effect times the first GPU effect after OP_READY.
+        LaunchClock.afterReady = { LaunchProbe.runIfAsked(engine: AppEngine.shared) }
         let workspace = Workspace(engine: AppEngine.shared, tools: ToolState.shared)
         Workspace.shared = workspace
         // M17: files dropped on a canvas or the image strip open one at a time, in order.
@@ -82,6 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         for f in files { open(URL(fileURLWithPath: f)) }
         DispatchQueue.main.async { self.showStartWindowIfIdle() }
+        // M58: Sparkle starts only once M60 sets the release public key.
+        UpdateMenuTarget.shared.startIfSetUp()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

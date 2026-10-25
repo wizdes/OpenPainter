@@ -22,13 +22,13 @@ A thin Swift wrapper over the OpenPainter engine's C interface
 
 The package links the Rust static library `libop_ffi.a`, so build that first.
 
-1. From the repo root, build the engine library in release mode:
+1. From the repo root, build the engine library with the app's build script:
 
    ```sh
-   cd engine && cargo build -p op-ffi --release && cd ..
+   mac/scripts/build-engine.sh
    ```
 
-   This writes `engine/target/release/libop_ffi.a` and regenerates the header.
+   It runs `cargo rustc -p op-ffi --profile app-release --crate-type staticlib` (release with fat LTO), writes `engine/target/app-release/libop_ffi.a` and regenerates the header.
    To use another folder, set `OP_ENGINE_LIB_DIR` to the folder that holds `libop_ffi.a`.
 
 2. Build and test the Swift package:

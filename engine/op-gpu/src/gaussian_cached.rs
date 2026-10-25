@@ -83,6 +83,7 @@ impl GpuContext {
                 compilation_options: Default::default(),
                 cache: None,
             });
+        crate::pipeline_stats::note_effect();
         self.pipelines.insert(label, pipeline.clone());
         pipeline
     }

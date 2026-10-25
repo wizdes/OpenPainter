@@ -115,6 +115,7 @@ final class SaveOptionsTests: XCTestCase {
         UserDefaults().removePersistentDomain(forName: suite)
         fx.tearDown()
         try? FileManager.default.removeItem(at: dir)
+        removeDefaultsSuite(suite)
     }
 
     // MARK: Fixtures and helpers

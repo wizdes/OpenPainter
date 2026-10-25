@@ -27,6 +27,19 @@ panic = "unwind"
 [profile.release.build-override]
 strip = false
 
+# M58: the Mac app's staticlib only (mac/scripts/build-engine.sh passes
+# `--profile app-release`; output in target/app-release/). M58 measured fat
+# against thin on the app: OpenPainterKit 8.3 MB instead of 9.5 MB (bundle
+# 10.7 MB instead of 11.9 MB) at the same launch time; an engine-only rebuild
+# takes about 48 s instead of 38 s. Other release builds (op-cli, Linux) keep
+# the release profile above.
+[profile.app-release]
+inherits = "release"
+lto = "fat"
+
+[profile.app-release.build-override]
+strip = false
+
 [profile.dev]
 opt-level = 1
 

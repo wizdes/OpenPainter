@@ -2147,11 +2147,12 @@ pdn = ""
 win = ""
 mac = "Help > Check for Updates…"
 key = ""
-command = ""
+command = "checkForUpdates:"
 icon = false
-status = "pending"
-reason = "M58 (Sparkle update feed) builds it"
-source = "docs/MILESTONES.md M58"
+status = "mac"
+reason = "Mac apps sold outside the App Store check for updates themselves (Sparkle 2, M58)"
+note = "Says \"Updates are not set up yet\" until M60 adds the release signing key"
+source = "docs/MILESTONES.md M58 https://sparkle-project.org/documentation/"
 
 [[item]]
 pdn = "Help > Send feedback or bug report..."
