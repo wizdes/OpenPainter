@@ -64,13 +64,23 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `TabletLog.swift`: the JSON tablet log (`t`, `x`, `y`, `pressure`, `tilt`, `buttons`), a recorder (`MetalCanvasView.recorder`) and a replay that rebuilds tablet `NSEvent`s. `Tests/OpenPainterKitTests/tablet-logs/` holds the checked-in log.
 - Latency: `op_view_take_frame_stamps` gives each frame's GPU-done time (CLOCK_UPTIME_RAW, the clock of `NSEvent.timestamp`) and the preview serial it shows; `PenInputTests.testPenEventToFrameLatencyOn6000x4000` prints a `LATENCY` line with the median and p95.
 
+## Rectangle Select, Crop tool, Resize and Canvas Size (M23)
+
+- `Shell/SelectCropTool.swift`: the canvas sends presses, drags and releases of the `.overlay` tool to `SelectCropController`.
+  - Rectangle Select: one `selection.rectangle` per finished drag (one history step). Combine mode comes from the keys, else the options row: Command adds, Option subtracts, Command with the right button (or Control-click) inverts, Option with the right button intersects. Shift makes a square. Styles: Normal, Fixed Ratio, Fixed Size (pixels). Eight handles change the last rectangle; the release sends `selection.rectangle` with `amend`, which replaces that same step. A click without a drag deselects.
+  - Crop tool (Image > Crop Tool): a frame with aspect presets (Free, Original, 1:1, 4:3, 3:2, 16:9, 3:4, 2:3, 9:16) and a straighten angle (-45 to 45 degrees). Enter or Crop sends one `image.crop_rect` (rotate with the Rotate / Zoom effect, then crop, in one step). Escape, Cancel or another tool leaves the image as it was.
+- `Shell/SelectionOverlay.swift`: marching ants from the engine query `doc.selection_path` (rings for shape selections, edge runs for Magic Wand masks), redrawn for each viewport change. The ants move with a Core Animation dash-phase animation.
+- `Shell/ImageSizeDialogs.swift`: the Resize and Canvas Size sheets. They show the new size before OK and send `image.resize` or `image.canvas_size` once. The resolution field converts between pixel and print size only; the document's resolution is not changed.
+- `Shell/SelectCropGeometry.swift`: the drag, handle, preset and rotation math.
+- A size change (crop, resize, canvas size, 90 degree rotation) refits the canvas to the new image size.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
 
 | Focus | Cmd+A | Delete | Escape | Enter | Undo, Redo |
 | --- | --- | --- | --- | --- | --- |
-| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection (says "comes in a later version" for now) | Cancel a brush drag (no change, no history step), else Deselect | Finish (nothing to finish yet) | Document history |
+| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection (says "comes in a later version" for now) | Cancel a brush drag or a Rectangle Select drag, or turn off the Crop tool (no change, no history step), else Deselect | Finish the Crop tool (crop), else nothing | Document history |
 | A panel with no text field editing | Same as the canvas: the panel forwards to the active document | Same | Same | Same | Same |
 | A text field or text view is editing (options row, status zoom, Colors hex) | Selects the field's text | Deletes text | Ends editing | Ends editing | The field's own undo |
 | A sheet or modal dialog is up | The dialog's field | The dialog | The dialog | The dialog's default button | The dialog; document commands are disabled |

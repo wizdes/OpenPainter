@@ -18,6 +18,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public private(set) var panelToggles: [PanelKind: ToggleButton] = [:]
     /// Live brush strokes from the canvas (M38).
     public private(set) var brush: BrushStrokeController!
+    /// Rectangle Select, the Crop tool and the marching ants (M23).
+    public private(set) var selectCrop: SelectCropController!
     private var cursor: CGPoint?
     static let minimumSize = NSSize(width: 1100, height: 792)
 
@@ -101,6 +103,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     private func wireCanvas() {
         brush = BrushStrokeController(controller: self)
         canvas.strokeSink = brush
+        selectCrop = SelectCropController(controller: self)
         canvas.onClick = { [weak self] p in
             guard let self else { return }
             self.click(p, secondary: self.canvas.pressUsesSecondary, modifiers: self.canvas.pressModifiers)
@@ -123,7 +126,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             if t == .zoom, self.workspace.tools.tool != .zoom { self.workspace.tools.tool = .zoom }
             if t == .pan, self.workspace.tools.tool != .pan { self.workspace.tools.tool = .pan }
         }
-        container.onViewportChange = { [weak self] _ in self?.updateStatus() }
+        container.onViewportChange = { [weak self] _ in
+            self?.updateStatus()
+            self?.selectCrop?.viewportChanged()
+        }
         // scripts/launch-time.sh waits for this line (the trace replaces the hook).
         canvas.onFirstFrame = { LaunchClock.markReady() }
     }
@@ -154,23 +160,28 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         switch key {
         case .escape:
             if canvas.cancelStroke() { return }
+            if selectCrop.escape() { return }
             if editor.selection != nil { editor.run("selection.deselect") }
         case .enter:
+            if selectCrop.enter() { return }
             editor.clearMessage()
         case .delete:
             editor.report("Erase Selection comes in a later version.")
         }
     }
 
-    private func toolChanged() {
+    func toolChanged() {
         let t = workspace.tools.tool
         let mode: CanvasTool =
+            if selectCrop?.cropActive == true { .overlay } else {
             switch t {
+            case .rectangleSelect: .overlay
             case .pan: .pan
             case .zoom: .zoom
             case .paintbrush, .eraser, .pencil: .stroke
             case .magicWand, .paintBucket, .colorPicker: .click
             default: .inactive
+            }
             }
         if canvas.tool != mode { canvas.tool = mode }
         editor.clearMessage()
@@ -187,6 +198,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
 
     private func editorChanged() {
         window?.title = editor.name
+        canvas.setDocumentSize(CGSize(width: editor.info.width, height: editor.info.height))
         if window?.isDocumentEdited != editor.info.dirty { window?.isDocumentEdited = editor.info.dirty }
         updateCommandStates()
         updateStatus()
@@ -290,6 +302,9 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             let count = editor.info.layers.count, active = editor.info.activeLayer
             return !busy && [active != count - 1, active < count - 1, active > 0, active != 0][min(max(item.tag, 0), 3)]
         case #selector(zoomToSelection(_:)): return editor.selection != nil
+        case #selector(ImageSizeActions.showCropTool(_:)): return !busy && !selectCrop.cropActive
+        case #selector(ImageSizeActions.showResizeImage(_:)), #selector(ImageSizeActions.showCanvasSize(_:)):
+            return !busy
         case #selector(setUnits(_:)):
             item.state = .on
             return true

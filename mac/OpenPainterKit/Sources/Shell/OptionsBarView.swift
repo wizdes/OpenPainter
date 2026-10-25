@@ -33,6 +33,14 @@ public final class OptionsBarView: FilledView {
     public let pickerSize = Labels.popup(PickerSampleSize.allCases.map(\.label))
     public let pickerSampling = Labels.popup(ToolSettings.Sampling.allCases.map(\.label))
     public let pickerAfterClick = Labels.popup(PickerAfterClick.allCases.map(\.label))
+    /// Views another controller shows after the tool picker in place of the
+    /// tool's options (M23: Rectangle Select and the Crop tool); nil for none.
+    public var customOptions: [NSView]? {
+        didSet {
+            shownSet = nil
+            sync()
+        }
+    }
     private var shownSet: PaintTool.OptionSet?
     private var shownTool: PaintTool?
 
@@ -170,6 +178,9 @@ public final class OptionsBarView: FilledView {
         func group() { add(Labels.gap(8)) }  // 8 + 8 stack spacing = 16 pt between groups
         add(picker)
         group()
+        if let customOptions {
+            for v in customOptions { add(v) }
+        } else {
         switch set {
         case .none:
             add(Labels.label("This tool has no options."))
@@ -212,6 +223,7 @@ public final class OptionsBarView: FilledView {
             add(Labels.label("Layer or image"), pickerSampling)
             group()
             add(Labels.label("After click"), pickerAfterClick)
+        }
         }
         for v in stack.arrangedSubviews where v is NSPopUpButton || v is NSButton {
             let has = v.constraints.contains { $0.firstAttribute == .height && $0.firstItem === v }
