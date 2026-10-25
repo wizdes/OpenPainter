@@ -1080,3 +1080,22 @@ fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {
   }
   textureStore(output_tex, vec2<i32>(id.xy), blend4(samples[0], samples[1], samples[2], samples[3]));
 }
+
+// Provisional 5.1 Morphology: channel-wise extrema in an integer rectangle.
+@compute @workgroup_size(16, 16)
+fn effect_morphology(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let w = i32(p.mode);
+  let h = i32(p.opacity);
+  var best = select(vec4<u32>(255u),vec4<u32>(0u),p.masked == 1u);
+  for (var dy = -(h/2); dy <= (h-1)/2; dy++) {
+    for (var dx = -(w/2); dx <= (w-1)/2; dx++) {
+      let sx = clamp(i32(id.x)+dx,0,i32(p.width)-1);
+      let sy = clamp(i32(id.y)+dy,0,i32(p.height)-1);
+      let color = textureLoad(input_tex,vec2<i32>(sx,sy),0);
+      if p.masked == 1u { best = max(best,color); }
+      else { best = min(best,color); }
+    }
+  }
+  textureStore(output_tex,vec2<i32>(id.xy),best);
+}

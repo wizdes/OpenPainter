@@ -116,14 +116,14 @@ internal static class Program
         File.WriteAllBytes(path,mask);
         Record(dir,"FloodToolBase",new{seed=new[]{x,y},tolerance_percent=percent,t,contiguous,width=surface.Width,height=surface.Height},input,path);
     }
-    private static readonly string[] EffectNames={"Ink Sketch","Oil Painting","Pencil Sketch","Edge Detect","Emboss","Outline","Relief","Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Unfocus","Surface Blur","Add Noise","Frosted Glass","Clouds","Bulge","Pixelate","Polar Inversion","Tile Reflection","Twist","Reduce Noise","Glow","Red Eye Removal","Sharpen","Soften Portrait"};
+    private static readonly string[] EffectNames={"Dents","Ink Sketch","Oil Painting","Pencil Sketch","Edge Detect","Emboss","Outline","Relief","Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Unfocus","Surface Blur","Add Noise","Frosted Glass","Clouds","Bulge","Pixelate","Polar Inversion","Tile Reflection","Twist","Reduce Noise","Glow","Red Eye Removal","Sharpen","Soften Portrait"};
     private static void EffectsAll()
     {
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         foreach(string old in Directory.GetFiles(dir,"*.png"))File.Delete(old);
         entries.Clear();
         string sourceDir=Path.Combine(Environment.GetEnvironmentVariable("OpenPdnSourceRoot")??Path.Combine(Root,".pdn-src"),"src/Effects");
-        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","UnfocusEffect","SurfaceBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect","InkSketchEffect","OilPaintingEffect","PencilSketchEffect","EdgeDetectEffect","EmbossEffect","OutlineEffect","ReliefEffect","BulgeEffect","PixelateEffect","PolarInversionEffect","TileEffect","TwistEffect","ReduceNoiseEffect","GlowEffect","RedEyeRemoveEffect","SharpenEffect","SoftenPortraitEffect"};
+        var represented=new HashSet<string>(StringComparer.Ordinal){"DentsEffect","PerlinNoise2D","InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","UnfocusEffect","SurfaceBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect","InkSketchEffect","OilPaintingEffect","PencilSketchEffect","EdgeDetectEffect","EmbossEffect","OutlineEffect","ReliefEffect","BulgeEffect","PixelateEffect","PolarInversionEffect","TileEffect","TwistEffect","ReduceNoiseEffect","GlowEffect","RedEyeRemoveEffect","SharpenEffect","SoftenPortraitEffect"};
         var abstractHelpers=new HashSet<string>(StringComparer.Ordinal){"InternalPropertyBasedEffect","PropertyBasedEffect","ConvolutionFilterEffect","LocalHistogramEffect"};
         var names=EffectNames.Concat(Directory.EnumerateFiles(sourceDir,"*Effect.cs")
             .Select(Path.GetFileNameWithoutExtension).Where(n=>n!="Effect"&&!represented.Contains(n)&&!abstractHelpers.Contains(n)))
@@ -131,6 +131,17 @@ internal static class Program
         foreach(string name in names)
         {
             Effects(name,"{}",false);
+            if(name=="Dents")
+            {
+                foreach((string label,string settings) in new[]{
+                    ("scale_min","{\"scale\":1}"),("scale_max","{\"scale\":200}"),
+                    ("refraction_min","{\"refraction\":0}"),("refraction_max","{\"refraction\":200}"),
+                    ("roughness_min","{\"roughness\":0}"),("roughness_max","{\"roughness\":100}"),
+                    ("tension_min","{\"tension\":0}"),("tension_max","{\"tension\":100}"),
+                    ("quality_min","{\"quality\":1}"),("quality_max","{\"quality\":5}"),
+                    ("seed_min","{\"seed\":0}"),("seed_max","{\"seed\":255}")})
+                    Effects(name,settings,false,label);
+            }
             if(name=="Hue and Saturation")
             {
                 foreach((string label,string settings) in new[]{
@@ -203,7 +214,7 @@ internal static class Program
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         string manifest=Path.Combine(dir,"manifest.json");
         if(save&&entries.Count==0&&File.Exists(manifest))entries=JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(manifest))??new();
-        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Unfocus" or "Surface Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait";
+        bool supported=name is "Dents" or "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Unfocus" or "Surface Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait";
         foreach(string fixture in EffectFixtures)
         {
             string input=F(fixture);
@@ -218,7 +229,7 @@ internal static class Program
                 continue;
             }
             var src=Png.Read(input);
-            if(name is "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Unfocus" or "Surface Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait")
+            if(name is "Dents" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Unfocus" or "Surface Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait")
             {
                 using var sourceSurface=SurfaceOf(src);
                 using var destSurface=new Surface(src.Width,src.Height);
@@ -248,6 +259,7 @@ internal static class Program
                     "Outline"=>new OutlineEffect(),
                     "Relief"=>new ReliefEffect(),
                     "Bulge"=>new BulgeEffect(),
+                    "Dents"=>new DentsEffect(),
                     "Pixelate"=>new PixelateEffect(),
                     "Polar Inversion"=>new PolarInversionEffect(),
                     "Tile Reflection"=>new TileEffect(),
@@ -255,6 +267,16 @@ internal static class Program
                     _=>new CloudsEffect()
                 };
                 var token=effect.CreateToken();
+                if(effect is DentsEffect dents)
+                {
+                    typeof(DentsEffect).GetField("instanceSeed",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.SetValue(dents,(byte)0);
+                    token.GetProperty<DoubleProperty>(DentsEffect.PropertyNames.Scale).Value=DoubleParam(doc.RootElement,"scale",25);
+                    token.GetProperty<DoubleProperty>(DentsEffect.PropertyNames.Refraction).Value=DoubleParam(doc.RootElement,"refraction",50);
+                    token.GetProperty<DoubleProperty>(DentsEffect.PropertyNames.Roughness).Value=DoubleParam(doc.RootElement,"roughness",10);
+                    token.GetProperty<DoubleProperty>(DentsEffect.PropertyNames.Tension).Value=DoubleParam(doc.RootElement,"tension",10);
+                    token.GetProperty<Int32Property>(DentsEffect.PropertyNames.Quality).Value=IntParam(doc.RootElement,"quality",2);
+                    token.GetProperty<Int32Property>(DentsEffect.PropertyNames.Seed).Value=IntParam(doc.RootElement,"seed",0);
+                }
                 if(effect is BrightnessAndContrastAdjustment)
                 {
                     token.GetProperty<Int32Property>(BrightnessAndContrastAdjustment.PropertyNames.Brightness).Value=IntParam(doc.RootElement,"brightness",0);

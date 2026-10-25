@@ -57,6 +57,8 @@
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/DesaturateEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/InvertColorsEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/BulgeEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/DentsEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PerlinNoise2D.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PixelateEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PolarInversionEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/TileEffect.cs" />

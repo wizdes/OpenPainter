@@ -48,6 +48,8 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/GlowEffect.cs` | Used by Ink Sketch. |
 | `Effects/DesaturateEffect.cs` | Used by Pencil Sketch. |
 | `Effects/InvertColorsEffect.cs` | Used by Pencil Sketch. |
+| `Effects/DentsEffect.cs` | Original Perlin warp, with clock seed fixed in the dispatcher. |
+| `Effects/PerlinNoise2D.cs` | Original Perlin noise lookup and interpolation. |
 | `Effects/BulgeEffect.cs` | Original bulge warp. |
 | `Effects/PixelateEffect.cs` | Original four-corner pixelation. |
 | `Effects/PolarInversionEffect.cs` | Original polar inversion warp. |

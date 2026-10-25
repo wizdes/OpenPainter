@@ -9,6 +9,7 @@ fn prepare(doc: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
         halo: 0,
         gaussian: None,
         noise: None,
+        palette: None,
         channel_lut: None,
     })
 }

@@ -154,6 +154,7 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::PencilSketch
                 | GpuKernel::Pixelate
                 | GpuKernel::Bulge
+                | GpuKernel::Morphology
                 | GpuKernel::Twist
                 | GpuKernel::Vignette
                 | GpuKernel::Sharpen
@@ -227,6 +228,7 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Unfocus
                 | GpuKernel::Pixelate
                 | GpuKernel::Bulge
+                | GpuKernel::Morphology
                 | GpuKernel::Twist
                 | GpuKernel::Vignette => break,
                 GpuKernel::EdgeDetect

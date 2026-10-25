@@ -37,6 +37,7 @@ fn prepare(doc: &DocState, _: &SelectionState, params: &Value) -> Result<Prepare
             halo: 0,
             gaussian: None,
             noise: None,
+            palette: None,
             channel_lut: None,
         });
     }
@@ -96,6 +97,7 @@ fn prepare(doc: &DocState, _: &SelectionState, params: &Value) -> Result<Prepare
         halo: radius,
         gaussian: Some(std::sync::Arc::new(columns)),
         noise: None,
+        palette: None,
         channel_lut: None,
     })
 }
@@ -257,6 +259,7 @@ pub fn reference_rgba8_with_radius(width: u32, height: u32, bytes: &[u8], radius
         halo: radius as i32,
         gaussian: None,
         noise: None,
+        palette: None,
         channel_lut: None,
     };
     let params = json!({"radius":radius,"gamma":"linear","gamma_exponent":2.2,"quality":4});

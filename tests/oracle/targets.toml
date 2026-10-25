@@ -337,3 +337,46 @@ target = "legacy-3.36"
 reference = "tests/oracle/legacy336/effects/Unfocus_*.png"
 tolerance = "exact"
 docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.color.quantize"
+target = "own"
+tolerance = "deterministic provisional"
+docs = "https://paint.net/doc/latest/EffectsColorMenu.html"
+own_5_1 = "Median-cut or octree palette and ordered dithering; pending 5.1 capture"
+
+[[effect]]
+id = "effect.distort.crystalize"
+target = "own"
+tolerance = "deterministic provisional"
+docs = "https://paint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "Voronoi cells; pending 5.1 capture"
+
+[[effect]]
+id = "effect.distort.dents"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Dents_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsDistortMenu.html"
+
+[[effect]]
+id = "effect.distort.morphology"
+target = "own"
+tolerance = "deterministic provisional"
+docs = "https://paint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "Channel-wise rectangular extrema; pending 5.1 capture"
+
+[[effect]]
+id = "effect.object.drop_shadow"
+target = "own"
+tolerance = "deterministic provisional"
+docs = "https://paint.net/doc/latest/EffectsObjectMenu.html"
+own_5_1 = "Circular alpha blur, offset, source-over; pending 5.1 capture"
+
+[[effect]]
+id = "effect.layers.rotate_zoom"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Rotate_Zoom_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/RotateZoom.html"
+own_5_1 = "New tiling and sampling controls provisional until 5.1 capture"

@@ -109,8 +109,8 @@ class OracleOutputTests(unittest.TestCase):
         original = {entry['op'] for entry in core} - {
             'Fragment Blur', 'Median Blur', 'Motion Blur', 'Radial Blur', 'Zoom Blur'
         }
-        self.assertEqual(len(original), 32)
-        self.assertEqual(len({entry['op'] for entry in core}), 37)
+        self.assertEqual(len(original), 33)
+        self.assertEqual(len({entry['op'] for entry in core}), 38)
 
     def test_m40_effects_run_on_five_fixtures(self):
         entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
