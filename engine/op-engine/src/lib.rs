@@ -14,6 +14,7 @@ use op_tools::gradient::GradientSession;
 use op_tools::line::LineSession;
 use op_tools::r#move::{MoveKind, MoveOptions, MoveSession};
 use op_tools::shape::ShapeSession;
+use op_tools::text::TextSession;
 use op_tools::{BrushSettings, CloneSource, RecolorOptions, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
 use rayon::ThreadPool;
@@ -35,6 +36,7 @@ mod line_commands;
 pub mod live_stroke;
 mod shape_commands;
 mod shell_commands;
+mod text_commands;
 pub use gpu_effects::EngineOptions;
 pub use layer_commands::{BLEND_MODES, blend_name, content_key};
 pub use shell_commands::{effect_label, effects_list};
@@ -987,6 +989,7 @@ struct Actor {
     gradient_session: Option<(u64, GradientSession)>,
     line_session: Option<(u64, LineSession)>,
     shape_session: Option<(u64, ShapeSession)>,
+    text_session: Option<(u64, TextSession)>,
     published: Arc<ArcSwap<Published>>,
     read_only: Arc<AtomicBool>,
     events: Sender<Event>,
@@ -1064,9 +1067,38 @@ impl Actor {
         self.gradient_session = None;
         self.line_session = None;
         self.shape_session = None;
+        self.text_session = None;
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if id.starts_with("tool.text.") {
+            if self.line_session.is_some() {
+                self.line_finish()?;
+            }
+            if self.shape_session.is_some() {
+                self.shape_finish()?;
+            }
+            return self.text_command(id, &params);
+        }
+        if self.text_session.is_some() {
+            // Same rules as Line/Curve: Undo drops the open text, another tool finishes it.
+            if id == "edit.undo" {
+                self.text_session = None;
+                self.publish(None);
+                return Ok(());
+            }
+            if id == "layer.delete" {
+                self.text_session = None;
+                self.publish(None);
+            } else if id == "tool.select" || id.starts_with("tool.") {
+                self.text_finish()?;
+                if id == "tool.select" {
+                    return Ok(());
+                }
+            } else {
+                return Err(Error::Busy);
+            }
+        }
         if id.starts_with("tool.shape.") {
             return self.shape_command(id, &params);
         }
@@ -1181,6 +1213,7 @@ impl Actor {
             || self.gradient_session.is_some()
             || self.line_session.is_some()
             || self.shape_session.is_some()
+            || self.text_session.is_some()
         {
             return Err(Error::Busy);
         }
@@ -1287,6 +1320,7 @@ impl Actor {
                     || self.stroke.is_some()
                     || self.move_session.is_some()
                     || self.gradient_session.is_some()
+                    || self.text_session.is_some()
                 {
                     return Err(Error::Busy);
                 }
@@ -1374,6 +1408,7 @@ impl Actor {
                     || self.gradient_session.is_some()
                     || self.line_session.is_some()
                     || self.shape_session.is_some()
+                    || self.text_session.is_some()
                 {
                     return Err(Error::Busy);
                 }
@@ -1421,6 +1456,85 @@ impl Actor {
             _ => Err(bad("unknown shape command")),
         }
     }
+    fn text_finish(&mut self) -> Result<()> {
+        let Some((_, session)) = self.text_session.take() else {
+            return Ok(());
+        };
+        if session.base_revision != self.history.current_state().revision
+            || session.target_layer != self.active_id()
+        {
+            self.publish(None);
+            return Err(Error::Busy);
+        }
+        let state = session.finish().map_err(bad)?;
+        self.history.commit("Text", "tool.text.finish", state);
+        self.revision += 1;
+        self.publish(None);
+        self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+        self.event(EventKind::HistoryChanged, 0, json!({}));
+        Ok(())
+    }
+    fn text_command(&mut self, id: &str, params: &Value) -> Result<()> {
+        match id {
+            "tool.text.begin" => {
+                if self.read_only.load(Ordering::Acquire) {
+                    return Err(Error::ReadOnly);
+                }
+                if self.preview.is_some()
+                    || self.stroke.is_some()
+                    || self.move_session.is_some()
+                    || self.gradient_session.is_some()
+                    || self.line_session.is_some()
+                    || self.shape_session.is_some()
+                    || self.text_session.is_some()
+                {
+                    return Err(Error::Busy);
+                }
+                let b = text_commands::begin(params)?;
+                let session = TextSession::new(
+                    self.history.current_state().clone(),
+                    b.origin,
+                    b.style,
+                    b.runs,
+                    b.model,
+                )
+                .map_err(bad)?;
+                let state = session.preview().map_err(bad)?;
+                let sid = self.next_session.fetch_add(1, Ordering::Relaxed);
+                self.text_session = Some((sid, session));
+                self.publish(Some(state));
+                Ok(())
+            }
+            "tool.text.update" => {
+                let (_, session) = self
+                    .text_session
+                    .as_mut()
+                    .ok_or_else(|| bad("no text session"))?;
+                let update = text_commands::update(params, session.style)?;
+                session.update(update).map_err(bad)?;
+                let state = session.preview().map_err(bad)?;
+                self.publish(Some(state));
+                Ok(())
+            }
+            "tool.text.finish" => {
+                if self.read_only.load(Ordering::Acquire) {
+                    return Err(Error::ReadOnly);
+                }
+                if self.text_session.is_none() {
+                    return Err(bad("no text session"));
+                }
+                self.text_finish()
+            }
+            "tool.text.cancel" => {
+                if self.text_session.take().is_none() {
+                    return Err(bad("no text session"));
+                }
+                self.publish(None);
+                Ok(())
+            }
+            _ => Err(bad("unknown text command")),
+        }
+    }
     fn line_finish(&mut self) -> Result<()> {
         let Some((_, session)) = self.line_session.take() else {
             return Ok(());
@@ -1451,6 +1565,7 @@ impl Actor {
                     || self.gradient_session.is_some()
                     || self.line_session.is_some()
                     || self.shape_session.is_some()
+                    || self.text_session.is_some()
                 {
                     return Err(Error::Busy);
                 }
@@ -1613,6 +1728,7 @@ impl Actor {
             || self.stroke.is_some()
             || self.move_session.is_some()
             || self.gradient_session.is_some()
+            || self.text_session.is_some()
         {
             return Err(Error::Busy);
         }
@@ -1797,6 +1913,7 @@ impl Actor {
                     self.gradient_session = None;
                     self.line_session = None;
                     self.shape_session = None;
+                    self.text_session = None;
                     self.publish(None);
                     stopping = Some(reply);
                 }
@@ -2112,6 +2229,7 @@ impl Engine {
             stroke: None,
             move_session: None,
             gradient_session: None,
+            text_session: None,
             line_session: None,
             shape_session: None,
             published: published.clone(),
@@ -2205,6 +2323,7 @@ impl Engine {
                 if id.starts_with("tool.gradient.")
                     || id.starts_with("tool.line.")
                     || id.starts_with("tool.shape.")
+                    || id.starts_with("tool.text.")
                     || id == "tool.select"
                 {
                     return Ok(());

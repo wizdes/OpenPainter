@@ -4,6 +4,7 @@ pub mod gradient;
 mod heal;
 pub mod line;
 pub mod shape;
+pub mod text;
 // Clone and recolor arithmetic is ported from OpenPDN 3.36
 // src/tools/CloneStampTool.cs and src/tools/RecoloringTool.cs (MIT).
 // Copyright dotPDN LLC, Rick Brewster, Tom Jackson, and contributors.

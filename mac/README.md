@@ -64,6 +64,17 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `TabletLog.swift`: the JSON tablet log (`t`, `x`, `y`, `pressure`, `tilt`, `buttons`), a recorder (`MetalCanvasView.recorder`) and a replay that rebuilds tablet `NSEvent`s. `Tests/OpenPainterKitTests/tablet-logs/` holds the checked-in log.
 - Latency: `op_view_take_frame_stamps` gives each frame's GPU-done time (CLOCK_UPTIME_RAW, the clock of `NSEvent.timestamp`) and the preview serial it shows; `PenInputTests.testPenEventToFrameLatencyOn6000x4000` prints a `LATENCY` line with the median and p95.
 
+## Text tool (M46)
+
+The Mac side shapes text; the engine only composites what it is given, so the engine stays portable.
+
+- `Text/TextLayout.swift`: CoreText layout and raster. The result has coverage runs (one byte per pixel, painted with the primary color), color-glyph runs (premultiplied RGBA, such as color emoji), line metrics and baselines, grapheme cluster bounds, caret positions, the fonts used (cascade included), and the UTF-16 to UTF-8 offset mapping. Sizes are points at 96 / 72 pixels per point. A family that is not installed falls back to Helvetica and the status bar names it. Bold or italic that a family lacks is synthesized.
+- `Text/TextEditingModel.swift`: the text, caret and marked (composing) range in UTF-16. Moves and deletes go by grapheme cluster.
+- `Text/TextInputView.swift`: an `NSTextInputClient` view over the canvas while text is open. It draws the edit frame, the caret, the marked-text underline (thick under the input method's selected segment) and the move nub. `firstRect(forCharacterRange:)` puts the candidate window at the caret at any zoom.
+- `Shell/TextToolController.swift`: the session. A click starts text at that point (Left grows right, Center both ways, Right grows left). Each edit sends `tool.text.update` with the runs, origin, primary color, blend mode, text and caret (UTF-8 bytes).
+- Keys: Return makes a new line, but while an input method composes it only confirms the composition. Escape drops the composition only; with nothing composing it finishes the text, as paint.net 5 does (https://www.getpaint.net/doc/latest/TextTool.html; OpenPDN 3.36 too). Home and End go to the line ends. Escape, Command-Return, the Finish button, a click outside the text or another tool commits one "Text" history step; empty text commits nothing. Cancel has no key: the engine's `tool.text.cancel` drops the text with no history step and no pixel change. Undo while typing commits first, then undoes, so Redo brings the text back.
+- Engine: `tool.text.begin`, `.update`, `.finish`, `.cancel` (`engine/op-engine/src/text_commands.rs` lists the parameters; `engine/op-tools/src/text.rs` composites). The selection clips with its coverage.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
