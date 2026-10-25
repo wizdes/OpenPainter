@@ -233,6 +233,12 @@ public final class SaveOptionsController: NSWindowController, NSTextFieldDelegat
             o.gifDither = ditherBox.state == .on
             o.metadata = MetadataChoice.allCases[max(metadataPopup.indexOfSelectedItem, 0)]
         }
+        // show() leaves a field being typed in alone; a slider move must still
+        // reach the focused field, or Return (the field's action) would put the
+        // old number back (M28).
+        if (sender as AnyObject?) === qualitySlider, let editor = qualityField.currentEditor() {
+            editor.string = String(kind == .jpeg ? options.jpegQuality : options.quality)
+        }
     }
 
     private func applyField() {

@@ -193,6 +193,12 @@ paint.net's Save Configuration dialog (https://www.getpaint.net/doc/latest/FileM
 - Shortcut changes: Zoom to Window Cmd B, Zoom to Selection Shift-Cmd-B, Actual Size Cmd 0, Go to Top and Bottom Layer Option-Cmd-PageUp and PageDown, Brightness / Contrast Shift-Cmd-T, Invert Alpha Option-Cmd-I. File > Print and Help > Plugins are gone (not in v1).
 - `M55_PNG_DIR=<dir>` (as `TEST_RUNNER_M55_PNG_DIR`) makes `testRenderMenuSheets` draw every menu into `menus-light.png` and `menus-dark.png`.
 
+## Phase 2 end to end (M28)
+
+- `Tests/OpenPainterKitTests/Phase2EndToEndTests.swift` drives one flow through the real document class, window, menus, Crop tool options, effect dialogs, History panel and save sheet: open a JPEG with EXIF orientation 6 and a Display P3 profile, crop at 3:2 with a 4 degree straighten, Curves, Hue / Saturation, click History two steps back and one forward, Save As JPEG (quality 95, 4:2:2) and `.opaint`, reopen both. Each stage attaches the rendered window in light and dark (`XCTAttachment`; the Metal canvas cannot be captured, so the engine's composite is drawn into the canvas area). `OP_RENDER_DIR` (as `TEST_RUNNER_OP_RENDER_DIR`) also writes them as `m28-*.png`.
+- The same steps are the engine scenario `tests/scenarios/m28-phase2.json`, run with `opcli scenario <script.json> -o <out-dir>` (`engine/op-cli/src/scenario.rs`). `make -C mac test` builds `opcli` first (`scripts/build-opcli.sh`). After every stage the window's pixels equal opcli's run of the steps so far, byte for byte; the reopened `.opaint` equals opcli's (pixels, profile, resolution). Both JPEG saves use the engine's encoder, so the JPEG image data (from the first DQT marker on) is byte-equal and decodes to equal pixels; only the APP segments differ (the app keeps the source EXIF).
+- The app decodes JPEG with ImageIO and opcli with the engine's decoder; they differ by up to 3 levels on the fixture. So the scenario starts from ImageIO's decode, committed next to the JPEG as `.imageio.png` (`tests/fixtures/m28/make-fixture.swift` writes both). The test checks that the app's open gives exactly those bytes; opcli checks its own decode stays within the script's `decoder_max_diff`.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.

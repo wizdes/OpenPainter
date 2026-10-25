@@ -1,4 +1,6 @@
-//! Run one engine command on a PNG without the Mac app.
+//! Run one engine command on a PNG, or a scenario script (M28), without the
+//! Mac app.
+mod scenario;
 use op_engine::Engine;
 use op_formats::png::{DecodedImage, decode_png, encode_png};
 use serde_json::{Value, json};
@@ -6,10 +8,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
         println!("Usage: opcli run <png> <command-id> [json] -o <out.png>");
+        println!("       opcli scenario <script.json> -o <out-dir>");
         return Ok(());
     }
     if args[0] == "--version" || args[0] == "-V" {
         println!("opcli {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args[0] == "scenario" {
+        if args.len() != 4 || args[2] != "-o" {
+            return Err("usage: opcli scenario <script.json> -o <out-dir>".into());
+        }
+        let summary = scenario::run(args[1].as_ref(), args[3].as_ref())?;
+        println!("{summary}");
         return Ok(());
     }
     if args[0] != "run" || args.len() < 5 {

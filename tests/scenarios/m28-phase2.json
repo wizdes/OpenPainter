@@ -1,0 +1,48 @@
+{
+  "about": "M28 Phase 2 end to end. The same steps as Phase2EndToEndTests drives through the Mac window. Run: opcli scenario tests/scenarios/m28-phase2.json -o <out-dir>",
+  "input": {
+    "path": "../fixtures/m28/phase2-exif6-p3.jpg",
+    "pixels": "../fixtures/m28/phase2-exif6-p3.imageio.png",
+    "decoder_max_diff": 3,
+    "dpi": 96,
+    "ui": "File > Open the JPEG. The app decodes it with ImageIO, turned by EXIF orientation 6, Display P3 profile kept; the file states no resolution, so 96 pixels per inch. ImageIO's pixels are in the .imageio.png (make-fixture.swift); the engine's own JPEG decoder is within 3 levels of them"
+  },
+  "steps": [
+    {
+      "ui": "Image > Crop Tool, aspect 3:2, straighten 4 degrees, Crop",
+      "command": "image.crop_rect",
+      "params": {"x": 0, "y": 10, "width": 256, "height": 171, "angle": 4.0}
+    },
+    {
+      "ui": "Adjustments > Curves, Luminosity, the fixed S curve, OK",
+      "command": "effect.adjust.curves",
+      "params": {"ColorTransferMode": "Luminosity", "ControlPoints": [[[0, 0], [64, 44], [190, 222], [255, 255]]]}
+    },
+    {
+      "ui": "Adjustments > Hue / Saturation, hue 30, saturation 140, lightness -10, OK",
+      "command": "effect.adjust.hue_saturation",
+      "params": {"Hue": 30, "Saturation": 140, "Lightness": -10}
+    },
+    {
+      "ui": "History panel: click the Crop row (two steps back)",
+      "command": "history.jump",
+      "params": {"index": 1}
+    },
+    {
+      "ui": "History panel: click the Curves row (one step forward)",
+      "command": "history.jump",
+      "params": {"index": 2}
+    }
+  ],
+  "expect": {
+    "width": 256,
+    "height": 171,
+    "history_labels": ["Open", "Crop", "Curves", "Hue / Saturation"],
+    "history_index": 2
+  },
+  "outputs": [
+    {"path": "result.opaint", "format": "opaint"},
+    {"path": "result.png", "format": "png"},
+    {"path": "result.jpg", "format": "jpeg", "jpeg_quality": 95, "jpeg_subsampling": "422"}
+  ]
+}
