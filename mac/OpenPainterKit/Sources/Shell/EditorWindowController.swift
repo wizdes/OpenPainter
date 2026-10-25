@@ -16,6 +16,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public let statusBar = StatusBarView()
     public private(set) var commandButtons: [String: ShellButton] = [:]
     public private(set) var panelToggles: [PanelKind: ToggleButton] = [:]
+    /// Live brush strokes from the canvas (M38).
+    public private(set) var brush: BrushStrokeController!
     private var cursor: CGPoint?
     static let minimumSize = NSSize(width: 1100, height: 792)
 
@@ -97,10 +99,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     // MARK: Canvas
 
     private func wireCanvas() {
-        canvas.onStroke = { [weak self] points in
-            guard let self else { return }
-            self.stroke(points, secondary: self.canvas.pressUsesSecondary)
-        }
+        brush = BrushStrokeController(controller: self)
+        canvas.strokeSink = brush
         canvas.onClick = { [weak self] p in
             guard let self else { return }
             self.click(p, secondary: self.canvas.pressUsesSecondary, modifiers: self.canvas.pressModifiers)
@@ -128,6 +128,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         canvas.onFirstFrame = { LaunchClock.markReady() }
     }
 
+    /// A whole stroke in one `tool.stroke` command (scripts and tests; the
+    /// canvas sends live strokes through `brush`).
     func stroke(_ points: [CGPoint], secondary: Bool = false) {
         let tool = workspace.tools.tool
         guard tool.strokeName != nil, !points.isEmpty else { return }
@@ -171,9 +173,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             default: .inactive
             }
         if canvas.tool != mode { canvas.tool = mode }
-        container.strokeWidthPixels = workspace.tools.settings.brushWidth
-        container.strokeColor = t == .eraser
-            ? NSColor.white.withAlphaComponent(0.6) : workspace.tools.primary.nsColor
         editor.clearMessage()
         updateStatus()
     }

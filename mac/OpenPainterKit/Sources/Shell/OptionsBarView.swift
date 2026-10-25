@@ -1,5 +1,8 @@
 // The 36 pt tool-options row: the tool picker, then the current tool's options.
-// Brush tools: width with - and +, antialiasing, blend mode, opacity. Magic
+// Paintbrush: width with - and +, hardness, antialiasing, blend mode, opacity,
+// pen pressure for size and for opacity. Eraser: the same without blend mode.
+// Pencil (always 1 px, hard, aliased in paint.net): blend mode, opacity, pen
+// pressure for opacity. Magic
 // Wand and Paint Bucket: tolerance, mode, sampling, flood mode. Zoom and Pan:
 // none. Color Picker: sample size, layer or image, after click. At narrow sizes the row scrolls sideways instead of wrapping.
 import AppKit
@@ -17,6 +20,10 @@ public final class OptionsBarView: FilledView {
     public let antialias = NSButton(checkboxWithTitle: "On", target: nil, action: nil)
     public let blend = Labels.popup(ToolSettings.Blend.allCases.map(\.label))
     public let opacityField = Labels.field("100", width: 52, height: 28)
+    public let hardnessField = Labels.field("100", width: 52, height: 28)
+    /// Pen pressure toggles (M38).
+    public let pressureSize = NSButton(checkboxWithTitle: "Size", target: nil, action: nil)
+    public let pressureOpacity = NSButton(checkboxWithTitle: "Opacity", target: nil, action: nil)
     // Flood controls.
     public let toleranceField = Labels.field("50", width: 52, height: 28)
     public let selectionMode = Labels.popup(ToolSettings.SelectionMode.allCases.map(\.label))
@@ -56,11 +63,20 @@ public final class OptionsBarView: FilledView {
             stack.widthAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.widthAnchor),
         ])
         setUpPicker()
-        for f in [widthField, opacityField, toleranceField] {
+        for f in [widthField, opacityField, toleranceField, hardnessField] {
             f.target = self
             f.action = #selector(fieldChanged(_:))
-            f.setAccessibilityLabel(f === widthField ? "Brush width" : f === opacityField ? "Opacity" : "Tolerance")
+            f.setAccessibilityLabel(
+                f === widthField ? "Brush width" : f === opacityField ? "Opacity"
+                    : f === hardnessField ? "Hardness" : "Tolerance")
         }
+        for b in [pressureSize, pressureOpacity] {
+            b.target = self
+            b.action = #selector(controlChanged(_:))
+            b.font = Theme.font(12)
+        }
+        pressureSize.setAccessibilityLabel("Pen pressure changes the brush width")
+        pressureOpacity.setAccessibilityLabel("Pen pressure changes the opacity")
         antialias.target = self
         antialias.action = #selector(controlChanged(_:))
         antialias.setAccessibilityLabel("Antialiasing")
@@ -118,6 +134,9 @@ public final class OptionsBarView: FilledView {
         let s = tools.settings
         if widthField.currentEditor() == nil { widthField.stringValue = Self.number(s.brushWidth) }
         if opacityField.currentEditor() == nil { opacityField.stringValue = Self.number(s.opacity) }
+        if hardnessField.currentEditor() == nil { hardnessField.stringValue = Self.number(s.hardness) }
+        pressureSize.state = s.pressureSize ? .on : .off
+        pressureOpacity.state = s.pressureOpacity ? .on : .off
         if toleranceField.currentEditor() == nil { toleranceField.stringValue = Self.number(s.tolerance) }
         antialias.state = s.antialias ? .on : .off
         blend.selectItem(at: ToolSettings.Blend.allCases.firstIndex(of: s.blend) ?? 0)
@@ -154,14 +173,26 @@ public final class OptionsBarView: FilledView {
         switch set {
         case .none:
             add(Labels.label("This tool has no options."))
-        case .brush:
+        case .brush, .eraser:
             add(Labels.label("Brush width"), minus, widthField, plus, Labels.label("px"))
+            group()
+            add(Labels.label("Hardness"), hardnessField, Labels.label("%"))
             group()
             add(Labels.label("Antialiasing"), antialias)
             group()
+            if set == .brush {
+                add(Labels.label("Blend mode"), blend)
+                group()
+            }
+            add(Labels.label("Opacity"), opacityField, Labels.label("%"))
+            group()
+            add(Labels.label("Pen pressure"), pressureSize, pressureOpacity)
+        case .pencil:
             add(Labels.label("Blend mode"), blend)
             group()
             add(Labels.label("Opacity"), opacityField, Labels.label("%"))
+            group()
+            add(Labels.label("Pen pressure"), pressureOpacity)
         case .flood:
             add(Labels.label("Tolerance"), toleranceField, Labels.label("%"))
             group()
@@ -210,6 +241,8 @@ public final class OptionsBarView: FilledView {
             s.opacity = min(max(v, 0), 100)
         } else if sender === toleranceField, v.isFinite {
             s.tolerance = min(max(v, 0), 100)
+        } else if sender === hardnessField, v.isFinite {
+            s.hardness = min(max(v, 0), 100)
         }
         tools.settings = s
         sync()  // shows the clamped value, or the old one after bad input
@@ -218,6 +251,8 @@ public final class OptionsBarView: FilledView {
     @objc private func controlChanged(_ sender: Any?) {
         var s = tools.settings
         s.antialias = antialias.state == .on
+        s.pressureSize = pressureSize.state == .on
+        s.pressureOpacity = pressureOpacity.state == .on
         s.blend = ToolSettings.Blend.allCases[max(blend.indexOfSelectedItem, 0)]
         s.selectionMode = ToolSettings.SelectionMode.allCases[max(selectionMode.indexOfSelectedItem, 0)]
         s.sampling = ToolSettings.Sampling.allCases[max(sampling.indexOfSelectedItem, 0)]

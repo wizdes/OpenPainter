@@ -54,13 +54,23 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `Shell/LayerProperties.swift`: the Layer Properties sheet (name, visible, the 14 blend modes, opacity 0 to 255 as a slider and a field). The first change starts an engine preview session (`preview.begin` with `layer.properties`); later changes send `preview.update`, and the canvas shows the preview. OK sends `preview.commit` (one "Layer Properties" step); Cancel sends `preview.cancel`. Panel and menu layer commands are off while the sheet is up.
 - `Shell/HistoryPanel.swift`: one 27 pt row per step with an icon for its command (`history_commands` in `doc.info`). Undone steps use `muted` text and a redo arrow. A click runs `history.jump`.
 
+## Brush input and live strokes (M38)
+
+- `PenInput.swift`: the canvas turns each mouse, tablet or Force Touch trackpad event into a `PenSample` (document pixels, pressure, tilt, event time). A mouse is pressure 1. Tablet events (`NSEvent.subtype == .tabletPoint`) read the 16-bit tablet pressure field and `tilt`. A trackpad uses the last `pressureChange` pressure of the drag (the stroke tool sets `NSPressureConfiguration(.primaryGeneric)`, so there is no force click).
+- Mouse coalescing is off during a brush drag, so every pen sample arrives; it is restored on release or Escape.
+- `LiveStroke` collects the samples of one main run-loop turn and sends them in one `op_stroke_append` (`op_stroke_begin` at the press, `op_stroke_end` at the release: one history step named after the tool; Escape sends `op_stroke_cancel`, which leaves the bytes and the history as they were). The canvas shows the engine's preview; there is no stand-in line. `Shell/BrushStroke.swift` connects the canvas to the window's tool options.
+- The engine view uploads only the tiles a change touched (`region_uploads` in `op_view_info`) and wakes at once after an append.
+- Tool options (paint.net 5): Paintbrush has width, hardness, antialiasing, blend mode, opacity, and pen pressure for size and for opacity. Eraser has the same without blend mode. Pencil (always 1 px, hard, aliased) has blend mode, opacity and pen pressure for opacity.
+- `TabletLog.swift`: the JSON tablet log (`t`, `x`, `y`, `pressure`, `tilt`, `buttons`), a recorder (`MetalCanvasView.recorder`) and a replay that rebuilds tablet `NSEvent`s. `Tests/OpenPainterKitTests/tablet-logs/` holds the checked-in log.
+- Latency: `op_view_take_frame_stamps` gives each frame's GPU-done time (CLOCK_UPTIME_RAW, the clock of `NSEvent.timestamp`) and the preview serial it shows; `PenInputTests.testPenEventToFrameLatencyOn6000x4000` prints a `LATENCY` line with the median and p95.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
 
 | Focus | Cmd+A | Delete | Escape | Enter | Undo, Redo |
 | --- | --- | --- | --- | --- | --- |
-| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection (says "comes in a later version" for now) | Cancel a brush drag, else Deselect | Finish (nothing to finish yet) | Document history |
+| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection (says "comes in a later version" for now) | Cancel a brush drag (no change, no history step), else Deselect | Finish (nothing to finish yet) | Document history |
 | A panel with no text field editing | Same as the canvas: the panel forwards to the active document | Same | Same | Same | Same |
 | A text field or text view is editing (options row, status zoom, Colors hex) | Selects the field's text | Deletes text | Ends editing | Ends editing | The field's own undo |
 | A sheet or modal dialog is up | The dialog's field | The dialog | The dialog | The dialog's default button | The dialog; document commands are disabled |

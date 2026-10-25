@@ -25,6 +25,7 @@ use thiserror::Error;
 mod color_sample;
 mod image_commands;
 mod layer_commands;
+pub mod live_stroke;
 mod shell_commands;
 pub use layer_commands::{BLEND_MODES, blend_name, content_key};
 pub use shell_commands::{effect_label, effects_list};
@@ -870,6 +871,8 @@ enum Message {
     View(Sender<Published>),
     Identity(Sender<JobIdentity>),
     StrokeBegin(BrushSettings, u64, Sender<Result<u64>>),
+    /// A brush stroke with a hardness (M38 live strokes).
+    StrokeBeginHard(BrushSettings, f64, u64, Sender<Result<u64>>),
     StrokeBeginClone(
         BrushSettings,
         u64,
@@ -1151,6 +1154,23 @@ impl Actor {
         .map_err(bad)?;
         self.begin_stroke_session(session)
     }
+    fn stroke_begin_hard(
+        &mut self,
+        settings: BrushSettings,
+        hardness: f64,
+        seed: u64,
+    ) -> Result<u64> {
+        self.check_stroke_begin()?;
+        let mut session = StrokeSession::new(
+            self.history.current_state().clone(),
+            self.history.current_state().active_layer,
+            settings,
+            seed,
+        )
+        .map_err(bad)?;
+        session.set_hardness(hardness).map_err(bad)?;
+        self.begin_stroke_session(session)
+    }
     fn stroke_begin_clone(
         &mut self,
         settings: BrushSettings,
@@ -1411,6 +1431,9 @@ impl Actor {
                 Message::StrokeBegin(_, _, r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
+                Message::StrokeBeginHard(_, _, _, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
                 Message::StrokeBeginHeal(_, _, _, _, _, r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
@@ -1467,6 +1490,16 @@ impl Actor {
                     let result =
                         catch_unwind(AssertUnwindSafe(|| self.stroke_begin(settings, seed)))
                             .unwrap_or(Err(Error::Panic));
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
+                    let _ = r.send(result);
+                }
+                Message::StrokeBeginHard(settings, hardness, seed, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        self.stroke_begin_hard(settings, hardness, seed)
+                    }))
+                    .unwrap_or(Err(Error::Panic));
                     if result == Err(Error::Panic) {
                         self.mark_read_only();
                     }
@@ -1842,6 +1875,18 @@ impl Engine {
     /// Begins a brush preview on the active layer.
     pub fn stroke_begin(&self, id: u64, settings: BrushSettings, seed: u64) -> Result<u64> {
         self.call(id, |r| Message::StrokeBegin(settings, seed, r))?
+    }
+    /// Begins a Paintbrush, Eraser or Pencil stroke with a brush hardness (0..=1).
+    pub fn stroke_begin_hard(
+        &self,
+        id: u64,
+        settings: BrushSettings,
+        hardness: f64,
+        seed: u64,
+    ) -> Result<u64> {
+        self.call(id, |r| {
+            Message::StrokeBeginHard(settings, hardness, seed, r)
+        })?
     }
     /// Begin cloning. Pass the previous stroke's offset for aligned mode, or None to reset at the first sample.
     pub fn stroke_begin_clone(

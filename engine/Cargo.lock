@@ -1148,6 +1148,7 @@ dependencies = [
  "op-color",
  "op-engine",
  "op-gpu",
+ "op-tools",
  "parking_lot",
  "pollster",
  "serde_json",

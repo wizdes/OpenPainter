@@ -13,7 +13,9 @@
 //!   never blocks on the GPU. States that arrive between two frames are merged:
 //!   only the newest is drawn.
 //! - The render thread also redraws a view when its document's revision changes
-//!   (checked every 50 ms while idle).
+//!   (checked every 50 ms while idle). Live strokes wake it at once
+//!   (`doc_touched`), and a change that only touched some tiles uploads only
+//!   those tiles (M38).
 //! - `op_view_detach`, `op_doc_close` (for the document's views) and
 //!   `op_engine_free` return only after the view's in-flight frame has finished
 //!   and its layer has been released (ARCHITECTURE section 6).
@@ -92,6 +94,23 @@ pub struct OpViewInfo {
     pub frame_errors: u64,
     /// OpStatus of the last failed frame, or OP_OK.
     pub last_error: u32,
+    /// Changes uploaded as changed tiles only, not the whole image (M38).
+    pub region_uploads: u64,
+    /// Tiles uploaded by those partial uploads.
+    pub region_tiles: u64,
+}
+
+/// One presented frame, for latency measurements (M38). `time_ns` is
+/// CLOCK_UPTIME_RAW (the clock of `NSEvent.timestamp` and
+/// `ProcessInfo.systemUptime`) after the GPU finished the frame.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OpFrameStamp {
+    pub time_ns: u64,
+    /// The document revision the frame shows.
+    pub revision: u64,
+    /// The preview (`stroke.append` returns it) the frame shows; 0 for none.
+    pub preview_serial: u64,
 }
 
 /// Engine-wide view counters, for leak checks. All zero before the first attach.
@@ -150,6 +169,10 @@ struct Render {
     doc_uploads: u64,
     frame_errors: u64,
     last_error: OpStatus,
+    /// The snapshot whose pixels are on the GPU, for tile diffs.
+    shown: Option<Arc<op_engine::Published>>,
+    region_uploads: u64,
+    region_tiles: u64,
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -158,6 +181,7 @@ struct Render;
 struct FrameLog {
     frames: u64,
     times_ms: VecDeque<f64>,
+    stamps: VecDeque<OpFrameStamp>,
 }
 
 struct View {
@@ -420,18 +444,47 @@ fn render_one(host: &Host, v: &View) {
     };
     // A preview session (such as Layer Properties) shows its preview pixels.
     if r.doc_revision != Some(snap.revision) || r.doc_preview != snap.preview_serial {
-        let pixels = match snap.pixels(true) {
-            Ok(p) => p,
-            Err(e) => return fail(r, OpStatus::OP_ERR_INTERNAL, format!("pixels: {e}")),
-        };
-        let (w, h) = (snap.state.width, snap.state.height);
-        if let Err(e) = r
-            .renderer
-            .set_document(&gpu.device, &gpu.queue, w, h, &pixels)
-        {
-            return fail(r, OpStatus::OP_ERR_INTERNAL, format!("upload {w}x{h}: {e}"));
+        let shown = |p: &op_engine::Published| p.preview.clone().unwrap_or_else(|| p.state.clone());
+        let tiles = r
+            .shown
+            .as_ref()
+            .and_then(|old| op_engine::live_stroke::changed_tiles(&shown(old), &shown(&snap)));
+        if let Some(tiles) = tiles {
+            for coord in &tiles {
+                let (x, y, w, h, rgba) =
+                    match op_engine::live_stroke::tile_rgba(&shown(&snap), *coord) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            r.shown = None;
+                            return fail(r, OpStatus::OP_ERR_INTERNAL, format!("tile: {e}"));
+                        }
+                    };
+                if let Err(e) = r
+                    .renderer
+                    .update_document_region(&gpu.queue, x, y, w, h, &rgba)
+                {
+                    r.shown = None;
+                    return fail(r, OpStatus::OP_ERR_INTERNAL, format!("tile upload: {e}"));
+                }
+            }
+            r.region_uploads += 1;
+            r.region_tiles += tiles.len() as u64;
+        } else {
+            let pixels = match snap.pixels(true) {
+                Ok(p) => p,
+                Err(e) => return fail(r, OpStatus::OP_ERR_INTERNAL, format!("pixels: {e}")),
+            };
+            let (w, h) = (snap.state.width, snap.state.height);
+            if let Err(e) = r
+                .renderer
+                .set_document(&gpu.device, &gpu.queue, w, h, &pixels)
+            {
+                r.shown = None;
+                return fail(r, OpStatus::OP_ERR_INTERNAL, format!("upload {w}x{h}: {e}"));
+            }
+            r.doc_uploads += 1;
         }
-        r.doc_uploads += 1;
+        r.shown = Some(snap.clone());
         r.doc_revision = Some(snap.revision);
         r.doc_preview = snap.preview_serial;
         if r.doc_profile != snap.state.profile {
@@ -489,9 +542,18 @@ fn render_one(host: &Host, v: &View) {
         return fail(r, OpStatus::OP_ERR_INTERNAL, e.to_string());
     }
     let _ = gpu.device.poll(wgpu::PollType::wait_indefinitely());
+    let stamp = OpFrameStamp {
+        time_ns: uptime_ns(),
+        revision: r.doc_revision.unwrap_or(0),
+        preview_serial: r.doc_preview,
+    };
     drop(guard);
     let mut log = v.log.lock();
     log.frames += 1;
+    if log.stamps.len() == FRAME_LOG_CAP {
+        log.stamps.pop_front();
+    }
+    log.stamps.push_back(stamp);
     if log.times_ms.len() == FRAME_LOG_CAP {
         log.times_ms.pop_front();
     }
@@ -535,6 +597,37 @@ pub(crate) fn engine_freeing(p: *mut OpEngine) {
     for v in views {
         finish_view(&host, &v);
     }
+}
+
+/// The document's published pixels changed outside a command (a live stroke):
+/// its views draw at once instead of at the next 50 ms idle check.
+pub(crate) fn doc_touched(p: *mut OpEngine, doc: u64) {
+    let Some(host) = find_host(p) else { return };
+    let mut any = false;
+    for v in host.state.lock().views.values() {
+        if v.doc == doc {
+            v.dirty.store(true, Ordering::Release);
+            any = true;
+        }
+    }
+    if any {
+        host.wake.notify_all();
+    }
+}
+
+/// CLOCK_UPTIME_RAW in nanoseconds: the clock of `NSEvent.timestamp`.
+#[cfg(target_os = "macos")]
+pub(crate) fn uptime_ns() -> u64 {
+    unsafe extern "C" {
+        fn clock_gettime_nsec_np(clock_id: u32) -> u64;
+    }
+    const CLOCK_UPTIME_RAW: u32 = 8;
+    // SAFETY: reads a clock; no pointers involved.
+    unsafe { clock_gettime_nsec_np(CLOCK_UPTIME_RAW) }
+}
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn uptime_ns() -> u64 {
+    0
 }
 
 /// Called by `op_doc_close` before the document goes: detaches its views.
@@ -630,10 +723,14 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             doc_uploads: 0,
             frame_errors: 0,
             last_error: OpStatus::OP_OK,
+            shown: None,
+            region_uploads: 0,
+            region_tiles: 0,
         })),
         log: Mutex::new(FrameLog {
             frames: 0,
             times_ms: VecDeque::new(),
+            stamps: VecDeque::new(),
         }),
         frame_cv: Condvar::new(),
     });
@@ -799,6 +896,8 @@ fn fill_render_info(v: &View, info: &mut OpViewInfo) {
         info.doc_revision = r.doc_revision.unwrap_or(0);
         info.frame_errors = r.frame_errors;
         info.last_error = r.last_error as u32;
+        info.region_uploads = r.region_uploads;
+        info.region_tiles = r.region_tiles;
     }
 }
 #[cfg(not(target_os = "macos"))]
@@ -917,5 +1016,39 @@ pub extern "C" fn op_view_wait_frames(
             unsafe { *out_frames = log.frames };
         }
         status
+    })
+}
+
+/// Moves up to `cap` frame stamps (oldest first) out of the view's log into
+/// `out` and writes how many to `out_len`. The log keeps the newest 16384
+/// frames until read. Separate from `op_view_take_frame_times`: reading one
+/// does not drain the other.
+#[unsafe(no_mangle)]
+pub extern "C" fn op_view_take_frame_stamps(
+    p: *mut OpEngine,
+    view: u64,
+    out: *mut OpFrameStamp,
+    cap: usize,
+    out_len: *mut usize,
+) -> OpStatus {
+    guard(|| {
+        if out_len.is_null() || (out.is_null() && cap > 0) || cap > FRAME_LOG_CAP {
+            return OpStatus::OP_ERR_BAD_ARGUMENT;
+        }
+        if let Err(s) = engine(p) {
+            return s;
+        }
+        let Some(v) = find_host(p).and_then(|h| h.view(view)) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
+        let mut log = v.log.lock();
+        let n = cap.min(log.stamps.len());
+        for (i, t) in log.stamps.drain(..n).enumerate() {
+            // SAFETY: the caller passes `cap` writable stamps; i < n <= cap.
+            unsafe { *out.add(i) = t };
+        }
+        // SAFETY: checked non-null.
+        unsafe { *out_len = n };
+        OpStatus::OP_OK
     })
 }

@@ -9,7 +9,7 @@ import QuartzCore
 public enum CanvasTool: Int, Sendable {
     case pan = 0
     case zoom = 1
-    /// Drag paints: the points go to `onStroke` on mouse up.
+    /// Drag paints: samples go to `strokeSink` as they arrive (M38).
     case stroke = 2
     /// A click goes to `onClick` (Magic Wand, Paint Bucket).
     case click = 3
@@ -32,6 +32,9 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var tool: CanvasTool = .pan {
         didSet {
             updateCursor()
+            // Force Touch trackpads: a continuous pressure range for brushes,
+            // without the force click.
+            pressureConfiguration = tool == .stroke ? NSPressureConfiguration(pressureBehavior: .primaryGeneric) : nil
             onToolChange?(tool)
         }
     }
@@ -48,10 +51,10 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var onZoomRectangle: ((CGRect?) -> Void)?
     /// Called when an engine call fails (the message is also printed).
     public var onError: ((String) -> Void)?
-    /// A finished brush drag, in document pixels.
-    public var onStroke: (([CGPoint]) -> Void)?
-    /// The brush drag so far, in view points (nil when it ends), for a preview.
-    public var onStrokePreview: (([CGPoint]?) -> Void)?
+    /// Receives brush drags sample by sample (the main window's live stroke).
+    public weak var strokeSink: StrokeSink?
+    /// Tests and diagnostics: records every pen sample of brush drags.
+    public var recorder: TabletLogRecorder?
     /// A click with the `.click` tool, in document pixels.
     public var onClick: ((CGPoint) -> Void)?
     /// The pointer position in document pixels, nil when it leaves the canvas.
@@ -63,7 +66,13 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     /// True while the zoom is the Fit zoom: size, clear-rectangle and panel
     /// changes fit again. Any other zoom change clears it.
     public private(set) var isFitted = true
-    private var strokePoints: [CGPoint] = []
+    /// True while a brush drag is going to `strokeSink`.
+    public private(set) var penActive = false
+    /// The last Force Touch pressure of this drag; nil when none was reported.
+    private var trackpadPressure: Double?
+    /// Mouse coalescing as it was before the drag (it is off during a drag so
+    /// every pen sample arrives).
+    private var coalescingBefore: Bool?
     private var tracking: NSTrackingArea?
 
     /// Tests only: use these ICC bytes instead of the screen's (simulates a screen
@@ -362,10 +371,50 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         dragStart = p
         lastDrag = p
         if effectiveTool == .pan { NSCursor.closedHand.set() }
-        if effectiveTool == .stroke {
-            strokePoints = [p]
-            onStrokePreview?(strokePoints)
-        }
+        if effectiveTool == .stroke { beginPen(event, secondary: pressUsesSecondary) }
+    }
+
+    // MARK: Pen input (M38)
+
+    private func penSample(_ event: NSEvent) -> PenSample {
+        PenSample.from(event, point: viewport.documentPoint(atView: point(event)), trackpadPressure: trackpadPressure)
+    }
+
+    private func beginPen(_ event: NSEvent, secondary: Bool) {
+        if penActive { endPen(commit: false) }
+        trackpadPressure = nil
+        let s = penSample(event)
+        guard let strokeSink, strokeSink.strokeBegan(s, secondary: secondary) else { return }
+        penActive = true
+        coalescingBefore = NSEvent.isMouseCoalescingEnabled
+        NSEvent.isMouseCoalescingEnabled = false
+        recorder?.record(s, buttons: 1)
+    }
+
+    private func movePen(_ event: NSEvent) {
+        guard penActive else { return }
+        let s = penSample(event)
+        recorder?.record(s, buttons: 1)
+        strokeSink?.strokeMoved(s)
+    }
+
+    private func endPen(commit: Bool) {
+        guard penActive else { return }
+        penActive = false
+        if let before = coalescingBefore { NSEvent.isMouseCoalescingEnabled = before }
+        coalescingBefore = nil
+        trackpadPressure = nil
+        if commit { strokeSink?.strokeEnded() } else { strokeSink?.strokeCancelled() }
+    }
+
+    public override func tabletPoint(with event: NSEvent) {
+        if penActive { movePen(event) } else { super.tabletPoint(with: event) }
+    }
+
+    public override func pressureChange(with event: NSEvent) {
+        guard penActive else { return super.pressureChange(with: event) }
+        // Stage 0 is the release; stage 2 (force click) keeps the full pressure.
+        if event.stage >= 1 { trackpadPressure = min(max(Double(event.pressure), 0), 1) }
     }
 
     public override func updateTrackingAreas() {
@@ -386,13 +435,13 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         onCursor?(nil)
     }
 
-    /// Ends a brush drag without painting (Escape).
+    /// Ends a brush drag without painting (Escape). The engine drops the
+    /// stroke, so the image and its history stay as they were.
     public func cancelStroke() -> Bool {
-        guard !strokePoints.isEmpty else { return false }
-        strokePoints = []
+        guard penActive else { return false }
+        endPen(commit: false)
         dragStart = nil
         lastDrag = nil
-        onStrokePreview?(nil)
         return true
     }
 
@@ -407,9 +456,7 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         case .zoom:
             onZoomRectangle?(CGRect(x: start.x, y: start.y, width: p.x - start.x, height: p.y - start.y).standardized)
         case .stroke:
-            guard !strokePoints.isEmpty else { return }
-            strokePoints.append(p)
-            onStrokePreview?(strokePoints)
+            movePen(event)
         case .click, .inactive:
             break
         }
@@ -423,11 +470,10 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             onZoomRectangle?(nil)
             updateCursor()
         }
-        if effectiveTool == .stroke, dragStart != nil, !strokePoints.isEmpty {
-            let points = strokePoints.map { viewport.documentPoint(atView: $0) }
-            strokePoints = []
-            onStrokePreview?(nil)
-            onStroke?(points)
+        if penActive {
+            // The release position is not painted (as before: the drag samples are).
+            recorder?.record(penSample(event), buttons: 0)
+            endPen(commit: true)
             return
         }
         if effectiveTool == .click, let start = dragStart, hypot(p.x - start.x, p.y - start.y) < 4 {

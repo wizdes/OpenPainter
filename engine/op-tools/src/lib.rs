@@ -152,6 +152,9 @@ pub struct StrokeSession {
     dirty: BTreeSet<(i32, i32)>,
     pencil_visited: HashSet<(i32, i32)>,
     effect: StrokeEffect,
+    /// 1.0 is a hard edge (the default); lower values fade the dab from
+    /// `hardness * radius` out to the radius. Set before the first sample.
+    hardness: f64,
 }
 impl StrokeSession {
     pub fn new(base: DocState, layer: usize, settings: BrushSettings, seed: u64) -> Result<Self> {
@@ -287,7 +290,25 @@ impl StrokeSession {
             dirty: BTreeSet::new(),
             pencil_visited: HashSet::new(),
             effect,
+            hardness: 1.0,
         })
+    }
+    /// Sets the brush hardness, 0..=1 (1 keeps the hard edge). Only before the
+    /// first sample, so one stroke never mixes two dab shapes.
+    pub fn set_hardness(&mut self, hardness: f64) -> Result<()> {
+        if !hardness.is_finite() || !(0.0..=1.0).contains(&hardness) {
+            return Err(StrokeError::BadInput("hardness must be 0..1".into()));
+        }
+        if self.last.is_some() {
+            return Err(StrokeError::BadInput(
+                "hardness must be set before the first sample".into(),
+            ));
+        }
+        self.hardness = hardness;
+        Ok(())
+    }
+    pub fn hardness(&self) -> f64 {
+        self.hardness
     }
     pub fn clone_offset(&self) -> Option<(i32, i32)> {
         match self.effect {
@@ -575,6 +596,12 @@ impl StrokeSession {
                 } else {
                     f64::from(((px as f64 + 0.5 - x).hypot(py as f64 + 0.5 - y) <= radius) as u8)
                 };
+                let area = if self.hardness < 1.0 {
+                    let d = (px as f64 + 0.5 - x).hypot(py as f64 + 0.5 - y);
+                    area * soft_falloff(d / radius, self.hardness)
+                } else {
+                    area
+                };
                 if area > 0.0 {
                     self.mark(px, py, (area as f32) * opacity);
                 }
@@ -604,6 +631,18 @@ impl StrokeSession {
             self.dirty.insert((coord.x, coord.y));
         }
     }
+}
+/// Coverage factor at `t` = distance / radius for a soft brush: 1 inside
+/// `hardness`, a smoothstep down to 0 at the radius.
+fn soft_falloff(t: f64, hardness: f64) -> f64 {
+    if t <= hardness {
+        return 1.0;
+    }
+    if t >= 1.0 {
+        return 0.0;
+    }
+    let u = (t - hardness) / (1.0 - hardness);
+    1.0 - u * u * (3.0 - 2.0 * u)
 }
 fn primitive(x: f64, r: f64) -> f64 {
     let x = x.clamp(0.0, r);
