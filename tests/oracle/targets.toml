@@ -337,3 +337,34 @@ target = "legacy-3.36"
 reference = "tests/oracle/legacy336/effects/Unfocus_*.png"
 tolerance = "exact"
 docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.render.clouds"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Clouds_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsRenderMenu.html"
+own_5_1 = "color controls and blend modes need 5.1 capture"
+
+[[effect]]
+id = "effect.render.julia_fractal"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Julia_Fractal_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsRenderMenu.html"
+own_5_1 = "Blend Mode is provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.render.mandelbrot_fractal"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Mandelbrot_Fractal_*.png"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsRenderMenu.html"
+own_5_1 = "Blend Mode is provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.render.turbulence"
+target = "own"
+reference = "provisional seeded colored value noise; paint.net 5.1 capture pending"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsRenderMenu.html"

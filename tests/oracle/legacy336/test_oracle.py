@@ -109,8 +109,20 @@ class OracleOutputTests(unittest.TestCase):
         original = {entry['op'] for entry in core} - {
             'Fragment Blur', 'Median Blur', 'Motion Blur', 'Radial Blur', 'Zoom Blur'
         }
-        self.assertEqual(len(original), 32)
-        self.assertEqual(len({entry['op'] for entry in core}), 37)
+        self.assertEqual(len(original), 34)
+        self.assertEqual(len({entry['op'] for entry in core}), 39)
+
+    def test_render_fractals_run_on_all_fixtures_and_variants(self):
+        entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
+        for name, variant in (('Julia Fractal', 'factor_max'),
+                              ('Mandelbrot Fractal', 'inverted')):
+            for label in ('default', variant):
+                rendered = [entry for entry in entries if entry['op'] == name
+                            and f'_{label}_' in entry['output']
+                            and entry['status'] == 'ok']
+                self.assertEqual(sorted(pathlib.Path(row['input']).stem
+                                        for row in rendered), sorted(EFFECT_FIXTURES),
+                                 f'{name} {label}')
 
     def test_m40_effects_run_on_five_fixtures(self):
         entries = json.loads((ORACLE / 'effects/manifest.json').read_text())

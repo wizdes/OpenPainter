@@ -161,6 +161,8 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::AddNoise
                 | GpuKernel::Glow
                 | GpuKernel::SoftenPortrait
+                | GpuKernel::Turbulence
+                | GpuKernel::Clouds
         );
         let mut expected = bytes.clone();
         for pixel in expected.chunks_exact_mut(4) {
@@ -240,6 +242,8 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 GpuKernel::ReduceNoise => break,
                 GpuKernel::AddNoise => break,
                 GpuKernel::Glow | GpuKernel::SoftenPortrait => break,
+                GpuKernel::Turbulence => break,
+                GpuKernel::Clouds => break,
             }
         }
         if blur {
@@ -285,6 +289,36 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
         } else {
             assert_eq!(actual, expected, "{}", spec.id);
         }
+    }
+}
+
+#[test]
+fn turbulence_seeded_gpu_exact() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (31, 17);
+    let input = vec![37u8; width as usize * height as usize * 4];
+    for seed in [0, 1, 0x51ed270b] {
+        let before = gpu.dispatch_count();
+        let actual = gpu.effect_turbulence(width, height, &input, seed).unwrap();
+        let expected = op_ops::effects::turbulence::reference_rgba8(width, height, seed);
+        assert_eq!(actual, expected, "seed {seed}");
+        assert_eq!(gpu.dispatch_count(), before + 1);
+    }
+}
+
+#[test]
+fn clouds_seeded_gpu_exact() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (31, 17);
+    let input = vec![37u8; width as usize * height as usize * 4];
+    for seed in [0, 1, 255] {
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_clouds_seeded(width, height, &input, seed)
+            .unwrap();
+        let expected = op_ops::effects::clouds::reference_rgba8(width, height, seed);
+        assert_eq!(actual, expected, "seed {seed}");
+        assert_eq!(gpu.dispatch_count(), before + 1);
     }
 }
 

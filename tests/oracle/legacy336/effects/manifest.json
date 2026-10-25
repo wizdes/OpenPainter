@@ -3362,62 +3362,132 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "JuliaFractalEffect",
+    "op": "Julia Fractal",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_default_impulse_64.png",
+    "output_sha256": "d3eb14d8f973654fae30d8b026240ba84a2a9fdf6c858162609ca426c0a4be7d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "JuliaFractalEffect",
+    "op": "Julia Fractal",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_default_partial_alpha_64.png",
+    "output_sha256": "d3eb14d8f973654fae30d8b026240ba84a2a9fdf6c858162609ca426c0a4be7d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "JuliaFractalEffect",
+    "op": "Julia Fractal",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_default_plasma_512x384.png",
+    "output_sha256": "190255e9a2e1841aaeafb54427b1c0c66fa1c0eeba2bef9015d9eaf68d1f6ad4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "JuliaFractalEffect",
+    "op": "Julia Fractal",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_default_plasma_alpha_512x384.png",
+    "output_sha256": "190255e9a2e1841aaeafb54427b1c0c66fa1c0eeba2bef9015d9eaf68d1f6ad4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "JuliaFractalEffect",
+    "op": "Julia Fractal",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_default_alpha_edge_64.png",
+    "output_sha256": "d3eb14d8f973654fae30d8b026240ba84a2a9fdf6c858162609ca426c0a4be7d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Julia Fractal",
+    "parameters": {
+      "factor": 10
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_factor_max_impulse_64.png",
+    "output_sha256": "bc9ef46b9edb4308d7b6fa437c43f5faf03da8716a7342977fc5548346189c94",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Julia Fractal",
+    "parameters": {
+      "factor": 10
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_factor_max_partial_alpha_64.png",
+    "output_sha256": "bc9ef46b9edb4308d7b6fa437c43f5faf03da8716a7342977fc5548346189c94",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Julia Fractal",
+    "parameters": {
+      "factor": 10
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_factor_max_plasma_512x384.png",
+    "output_sha256": "9de576bc3c8ef7e4db890a1405367d1f749e5e95dd3fb44ddfc80acb33783502",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Julia Fractal",
+    "parameters": {
+      "factor": 10
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_factor_max_plasma_alpha_512x384.png",
+    "output_sha256": "9de576bc3c8ef7e4db890a1405367d1f749e5e95dd3fb44ddfc80acb33783502",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Julia Fractal",
+    "parameters": {
+      "factor": 10
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Julia_Fractal_factor_max_alpha_edge_64.png",
+    "output_sha256": "bc9ef46b9edb4308d7b6fa437c43f5faf03da8716a7342977fc5548346189c94",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
@@ -3692,62 +3762,132 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MandelbrotFractalEffect",
+    "op": "Mandelbrot Fractal",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_default_impulse_64.png",
+    "output_sha256": "be550ba32795204aa9094243c0aabe10f64669d95b4e63a0962ccea9db98727f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MandelbrotFractalEffect",
+    "op": "Mandelbrot Fractal",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_default_partial_alpha_64.png",
+    "output_sha256": "be550ba32795204aa9094243c0aabe10f64669d95b4e63a0962ccea9db98727f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MandelbrotFractalEffect",
+    "op": "Mandelbrot Fractal",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_default_plasma_512x384.png",
+    "output_sha256": "f015fe9b97e6260d2a6186c05b174c5866621938a995db1fa8f2c862043b3e11",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MandelbrotFractalEffect",
+    "op": "Mandelbrot Fractal",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_default_plasma_alpha_512x384.png",
+    "output_sha256": "f015fe9b97e6260d2a6186c05b174c5866621938a995db1fa8f2c862043b3e11",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MandelbrotFractalEffect",
+    "op": "Mandelbrot Fractal",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_default_alpha_edge_64.png",
+    "output_sha256": "be550ba32795204aa9094243c0aabe10f64669d95b4e63a0962ccea9db98727f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Mandelbrot Fractal",
+    "parameters": {
+      "invert_colors": true
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_inverted_impulse_64.png",
+    "output_sha256": "dd08fb8ab676006f1e9355d83c4f309e86d79a2eea183fba3cfe345341c80973",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Mandelbrot Fractal",
+    "parameters": {
+      "invert_colors": true
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_inverted_partial_alpha_64.png",
+    "output_sha256": "dd08fb8ab676006f1e9355d83c4f309e86d79a2eea183fba3cfe345341c80973",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Mandelbrot Fractal",
+    "parameters": {
+      "invert_colors": true
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_inverted_plasma_512x384.png",
+    "output_sha256": "16b5d1ac0d66172178ce995713c0e2658f8b4a9d6073667bf8c463a7ecc4e5c6",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Mandelbrot Fractal",
+    "parameters": {
+      "invert_colors": true
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_inverted_plasma_alpha_512x384.png",
+    "output_sha256": "16b5d1ac0d66172178ce995713c0e2658f8b4a9d6073667bf8c463a7ecc4e5c6",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Mandelbrot Fractal",
+    "parameters": {
+      "invert_colors": true
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Mandelbrot_Fractal_inverted_alpha_edge_64.png",
+    "output_sha256": "dd08fb8ab676006f1e9355d83c4f309e86d79a2eea183fba3cfe345341c80973",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",

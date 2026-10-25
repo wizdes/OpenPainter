@@ -30,6 +30,7 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/PosterizeAdjustment.cs` | Original posterize effect class. |
 | `Effects/GaussianBlurEffect.cs` | Original tent-kernel Gaussian effect class. |
 | `Effects/FragmentEffect.cs` | Original fragment sample offsets and blend. |
+| `Effects/JuliaFractalEffect.cs` | Original Julia iteration, sample grid, and byte output. |
 | `Effects/LocalHistogramEffect.cs` | Original circular histograms for Median. |
 | `Effects/UnfocusEffect.cs` | Original alpha-weighted circular Unfocus blur. |
 | `Effects/SurfaceBlurEffect.cs` | Original edge-preserving Surface Blur source, excluded from the 3.36 application project. |
@@ -63,6 +64,7 @@ The project file lists each source file directly. No source files from `.pdn-src
 
 `Shims/Utility.cs` also carries `GetRgssOffsets` for legacy warp antialiasing and contains verbatim numeric methods from `Core/Utility.cs` with the Windows UI methods removed. Its header records the source revision and changes.
 `Shims/AddNoiseEffect.cs`, `Shims/FrostedGlassEffect.cs`, and `Shims/CloudsEffect.cs` copy their named effect files. Each replaces only a clock-derived random seed with a fixed value. Their headers name the source and exact change.
+`Shims/MandelbrotFractalEffect.cs` copies its named effect file and adds the legacy default `false` argument to a BooleanProperty constructor. The oracle stub requires that argument; the pixel math is unchanged.
 
 ## Stubbed types
 

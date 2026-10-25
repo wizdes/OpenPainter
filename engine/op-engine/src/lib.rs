@@ -704,10 +704,13 @@ fn specs() -> Vec<CommandSpec> {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
             "effect.adjust.invert_alpha" => run_invert_alpha,
-            _ => match shell_commands::effect_runner(index) {
-                Some(run) => run,
-                None => continue,
-            },
+            _ => shell_commands::effect_runner(index).unwrap_or_else(|| {
+                panic!(
+                    "effect {} at registry index {index} has no runner slot; \
+                     grow RUNNERS in shell_commands.rs",
+                    effect.id
+                )
+            }),
         };
         entries.push(CommandSpec {
             id: effect.id,

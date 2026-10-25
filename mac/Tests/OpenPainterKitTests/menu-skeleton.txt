@@ -159,10 +159,10 @@ Effects > Photo > Vignette
 Effects > Photo > ---
 Effects > Photo > Straighten (off)
 Effects > Render
-Effects > Render > Clouds (off)
-Effects > Render > Julia Fractal (off)
-Effects > Render > Mandelbrot Fractal (off)
-Effects > Render > Turbulence (off)
+Effects > Render > Clouds
+Effects > Render > Julia Fractal
+Effects > Render > Mandelbrot Fractal
+Effects > Render > Turbulence
 Effects > Stylize
 Effects > Stylize > Edge Detect
 Effects > Stylize > Emboss

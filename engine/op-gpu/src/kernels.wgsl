@@ -353,6 +353,70 @@ fn effect_add_noise(@builtin(global_invocation_id) id: vec3<u32>) {
   let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + delta, vec3<i32>(0), vec3<i32>(255)));
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
 }
+@compute @workgroup_size(16, 16)
+fn effect_clouds(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let gray = u32(acc[id.y * p.width + id.x].x);
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(gray, gray, gray, 255u));
+}
+fn turbulence_hash(x: i32, y: i32, channel: u32, seed: u32) -> i32 {
+  var n = u32(x) * 374761393u ^ u32(y) * 668265263u ^ channel * 1442695041u ^ seed;
+  n = (n ^ (n >> 13u)) * 1274126177u;
+  return i32((n ^ (n >> 16u)) >> 17u) - 16384;
+}
+fn turbulence_smooth(fraction: i32) -> i32 {
+  let f = u32(fraction);
+  let square = (f * f + 32768u) >> 16u;
+  let cube = (square * f + 32768u) >> 16u;
+  return i32(3u * square - 2u * cube);
+}
+fn turbulence_lerp(a: i32, b: i32, fraction: i32) -> i32 {
+  return a + ((b - a) * fraction + 32768) / 65536;
+}
+fn turbulence_noise(x: i32, y: i32, frequency: i32, period: i32, channel: u32, seed: u32) -> i32 {
+  let sx = x * frequency;
+  let sy = y * frequency;
+  let gx = sx / period;
+  let gy = sy / period;
+  let fx = turbulence_smooth((sx % period) * 65536 / period);
+  let fy = turbulence_smooth((sy % period) * 65536 / period);
+  let upper = turbulence_lerp(turbulence_hash(gx, gy, channel, seed), turbulence_hash(gx+1, gy, channel, seed), fx);
+  let lower = turbulence_lerp(turbulence_hash(gx, gy+1, channel, seed), turbulence_hash(gx+1, gy+1, channel, seed), fx);
+  return turbulence_lerp(upper, lower, fy);
+}
+@compute @workgroup_size(16, 16)
+fn effect_turbulence(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let octaves = i32(p.mode & 15u);
+  let period = i32((p.mode >> 4u) & 1023u);
+  let size = i32((p.mode >> 14u) & 127u);
+  let turbulence = (p.mode & (1u << 21u)) != 0u;
+  let blend = (p.mode & (1u << 22u)) != 0u;
+  var out = vec4<u32>(0u, 0u, 0u, 255u);
+  for (var channel = 0u; channel < 3u; channel++) {
+    var sum = 0;
+    var weight = 0;
+    var amplitude = 256;
+    var frequency = 1;
+    for (var octave = 0; octave < octaves; octave++) {
+      let value = turbulence_noise(i32(id.x), i32(id.y), frequency, period, channel, p.opacity);
+      sum += select(value, abs(value), turbulence) * amplitude;
+      weight += amplitude;
+      frequency *= 2;
+      amplitude = amplitude * size / 100;
+    }
+    let avg = sum / weight;
+    var value = 0;
+    if turbulence { value = (avg * 255 + 8192) / 16384; }
+    else { value = ((avg + 16384) * 255 + 16384) / 32768; }
+    out[channel] = u32(clamp(value, 0, 255));
+  }
+  if blend {
+    let original = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+    out = vec4<u32>((out.rgb + original.rgb) / vec3<u32>(2u), original.a);
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), out);
+}
 fn photo_scale(a: i32, b: i32) -> i32 {
   let value = a * b + 128;
   return (value + (value >> 8)) >> 8;
