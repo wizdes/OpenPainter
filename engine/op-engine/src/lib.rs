@@ -23,7 +23,9 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 mod image_commands;
+mod layer_commands;
 mod shell_commands;
+pub use layer_commands::{BLEND_MODES, blend_name, content_key};
 pub use shell_commands::{effect_label, effects_list};
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -152,6 +154,9 @@ pub enum Outcome {
     HistoryUndo,
     HistoryRedo,
     HistoryJump(usize),
+    /// Replaces the current step's state with no new history step and no
+    /// change to the dirty flag (choosing the active layer).
+    Replace(DocState),
 }
 fn always(_: &DocState) -> bool {
     true
@@ -691,6 +696,7 @@ fn specs() -> Vec<CommandSpec> {
     ];
     entries.extend(image_commands::specs());
     entries.extend(shell_commands::specs());
+    entries.extend(layer_commands::specs());
     for (index, effect) in effect::registered().into_iter().enumerate() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
@@ -719,6 +725,8 @@ fn spec(id: &str) -> Result<CommandSpec> {
 #[derive(Clone)]
 pub struct HistorySummary {
     pub labels: Vec<String>,
+    /// The command id of each step, for the History panel's icons.
+    pub commands: Vec<String>,
     pub index: usize,
     pub dirty: bool,
 }
@@ -728,6 +736,9 @@ pub struct Published {
     pub history: HistorySummary,
     pub revision: u64,
     pub preview: Option<DocState>,
+    /// Changes whenever a different preview is shown; 0 with no preview. Views
+    /// redraw when `(revision, preview_serial)` changes.
+    pub preview_serial: u64,
 }
 impl Published {
     pub fn info(&self) -> Value {
@@ -737,7 +748,7 @@ impl Published {
                 .unwrap_or_else(|e| format!("Invalid ICC profile: {e}")),
             None => "sRGB".into(),
         };
-        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision,"profile_description":profile_description})
+        json!({"width":self.state.width,"height":self.state.height,"layers":self.state.layers.iter().map(|l|json!({"id":l.id.0,"name":l.name,"visible":l.visible,"opacity":l.opacity,"blend":blend_name(l.blend),"revision":content_key(l)})).collect::<Vec<_>>(),"active_layer":self.state.active_layer,"history_labels":self.history.labels,"history_commands":self.history.commands,"history_index":self.history.index,"dirty":self.history.dirty,"revision":self.revision,"profile_description":profile_description})
     }
     pub fn pixels(&self, preview: bool) -> Result<Vec<u8>> {
         let state = if preview {
@@ -907,6 +918,8 @@ struct Actor {
     pool: Arc<ThreadPool>,
     next_session: Arc<AtomicU64>,
     pending_jobs: usize,
+    /// The last `Published::preview_serial` handed out.
+    preview_serial: AtomicU64,
 }
 impl Actor {
     fn view(&self, preview: Option<DocState>) -> Published {
@@ -917,10 +930,18 @@ impl Actor {
                 labels: (0..h.len())
                     .map(|i| h.label(i).unwrap().to_owned())
                     .collect(),
+                commands: (0..h.len())
+                    .map(|i| h.command_id(i).unwrap().to_owned())
+                    .collect(),
                 index: h.current_index(),
                 dirty: h.is_dirty(),
             },
             revision: self.revision,
+            preview_serial: if preview.is_some() {
+                self.preview_serial.fetch_add(1, Ordering::Relaxed) + 1
+            } else {
+                0
+            },
             preview,
         }
     }
@@ -988,7 +1009,9 @@ impl Actor {
                 let label = match id {
                     "effect.adjust.invert_colors" | "image.invert_colors" => "Invert Colors".into(),
                     "effect.adjust.invert_alpha" => "Invert Alpha".into(),
-                    _ => shell_commands::history_label(id, &params).unwrap_or_else(|| id.into()),
+                    _ => shell_commands::history_label(id, &params)
+                        .or_else(|| layer_commands::history_label(id, &params))
+                        .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);
                 true
@@ -997,6 +1020,10 @@ impl Actor {
             Outcome::HistoryRedo => self.history.redo(),
             Outcome::HistoryJump(index) => {
                 self.history.jump(index).map_err(bad)?;
+                true
+            }
+            Outcome::Replace(state) => {
+                self.history.replace_current(state);
                 true
             }
         };
@@ -1647,11 +1674,13 @@ impl Engine {
             state,
             history: HistorySummary {
                 labels: vec!["Open".into()],
+                commands: vec!["document.open".into()],
                 index: 0,
                 dirty: false,
             },
             revision: 0,
             preview: None,
+            preview_serial: 0,
         }));
         let read_only = Arc::new(AtomicBool::new(false));
         let (tx, rx) = unbounded();
@@ -1670,6 +1699,7 @@ impl Engine {
             pool: self.pool.clone(),
             next_session: self.next_session.clone(),
             pending_jobs: 0,
+            preview_serial: AtomicU64::new(0),
         };
         let join = std::thread::spawn(move || actor.run(rx));
         self.docs.lock().insert(
@@ -1907,6 +1937,7 @@ impl Engine {
             "doc.selection" => {
                 serde_json::to_vec(&shell_commands::selection_info(&s.state)).map_err(internal)
             }
+            "layer.thumbnail" => layer_commands::thumbnail(&s.state, &params),
             "commands.list" => {
                 let ids: Vec<_> = specs()
                     .iter()

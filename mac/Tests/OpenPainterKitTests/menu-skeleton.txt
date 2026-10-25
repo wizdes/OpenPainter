@@ -78,9 +78,9 @@ Image > Flatten [⇧⌘F]
 Layers
 Layers > Add New Layer [⇧⌘N]
 Layers > Delete Layer [⇧⌘⌫]
-Layers > Duplicate Layer [⇧⌘D] (off)
-Layers > Merge Layer Down (off)
-Layers > Toggle Layer Visibility (off)
+Layers > Duplicate Layer [⇧⌘D]
+Layers > Merge Layer Down
+Layers > Toggle Layer Visibility
 Layers > Import From File… (off)
 Layers > ---
 Layers > Flip Horizontal (off)
@@ -94,11 +94,11 @@ Layers > Go to Layer Below [⌥PageDown]
 Layers > Go to Bottom Layer [⌥End]
 Layers > ---
 Layers > Move Layer to Top (off)
-Layers > Move Layer Up (off)
-Layers > Move Layer Down (off)
+Layers > Move Layer Up
+Layers > Move Layer Down
 Layers > Move Layer to Bottom (off)
 Layers > ---
-Layers > Layer Properties… [F4] (off)
+Layers > Layer Properties… [F4]
 Adjustments
 Adjustments > Auto-Level [⇧⌘L]
 Adjustments > Black and White [⇧⌘G]

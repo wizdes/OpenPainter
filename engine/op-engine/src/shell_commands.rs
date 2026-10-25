@@ -38,7 +38,8 @@ fn set_active(_: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
     if index >= s.layers.len() {
         return Err(bad("layer index out of range"));
     }
-    Ok(Outcome::State(s.set_active_layer(index).map_err(bad)?))
+    // Not an edit: no history step, and the dirty flag stays.
+    Ok(Outcome::Replace(s.set_active_layer(index).map_err(bad)?))
 }
 fn parse_color(hex: &str) -> Result<[u8; 4]> {
     if hex.len() != 8 || !hex.is_ascii() {
@@ -256,7 +257,6 @@ pub(super) fn history_label(id: &str, params: &Value) -> Option<String> {
     match id {
         "selection.select_all" => Some("Select All".into()),
         "selection.deselect" => Some("Deselect".into()),
-        "layer.set_active" => Some("Select Layer".into()),
         "tool.stroke" => Some(
             stroke_tool(params["tool"].as_str().unwrap_or("paintbrush"))
                 .label()

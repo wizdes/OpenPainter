@@ -228,10 +228,12 @@ public final class SwatchPair: NSView {
 }
 
 // MARK: Rows for Layers and History
+// (The Layers and History panels themselves are in LayersPanel.swift and
+// HistoryPanel.swift.)
 
 /// One list row: a 2 pt edge and a diamond when current, muted text when
 /// `dimmed` (undone History steps), and an optional leading symbol.
-public final class PanelRow: NSView {
+public class PanelRow: NSView {
     public let index: Int
     public let titleLabel = NSTextField(labelWithString: "")
     public let detailLabel = NSTextField(labelWithString: "")
@@ -372,130 +374,4 @@ public class RowListPanelView: NSView {
     func scrollToCurrent() {
         if let r = rows.first(where: \.isCurrent) { list.scrollToVisible(r.frame) }
     }
-}
-
-/// Layers shell: lists the layers (top layer first) and makes a clicked layer
-/// active. Add and Delete work; the rest of the Layers panel comes in M20.
-@MainActor
-public final class LayersPanelView: RowListPanelView {
-    weak var workspace: Workspace?
-    public private(set) var addButton: ShellButton!
-    public private(set) var deleteButton: ShellButton!
-
-    init(workspace: Workspace) {
-        self.workspace = workspace
-        super.init(rowHeight: 49)
-        addButton = ShellButton(symbol: "plus", label: "Add New Layer", size: 24, pointSize: 13, target: self,
-                                action: #selector(add(_:)))
-        deleteButton = ShellButton(symbol: "trash", label: "Delete Layer", size: 24, pointSize: 13, target: self,
-                                   action: #selector(remove(_:)))
-        actions.addArrangedSubview(addButton)
-        actions.addArrangedSubview(deleteButton)
-        for (symbol, label) in [("plus.square.on.square", "Duplicate Layer"), ("arrow.down.to.line", "Merge Layer Down"),
-                                ("arrow.up", "Move Layer Up"), ("arrow.down", "Move Layer Down"),
-                                ("gearshape", "Layer Properties")] {
-            let b = ShellButton(symbol: symbol, label: label, tooltip: "\(label) (comes later)", size: 24,
-                                pointSize: 13, target: nil, action: nil)
-            b.isEnabled = false
-            actions.addArrangedSubview(b)
-        }
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("not used") }
-
-    func reload() {
-        guard let e = workspace?.active else {
-            setRows([])
-            addButton.isEnabled = false
-            deleteButton.isEnabled = false
-            return
-        }
-        let layers = e.info.layers
-        // Top layer first, like paint.net.
-        let rows = layers.indices.reversed().map { i in
-            let l = layers[i]
-            let row = PanelRow(index: i, title: l.name, detail: l.visible ? "Visible" : "Hidden",
-                               symbol: l.visible ? "eye" : "eye.slash", height: 49)
-            row.isCurrent = i == e.info.activeLayer
-            row.onClick = { [weak self] index in self?.select(index) }
-            return row
-        }
-        setRows(rows)
-        addButton.isEnabled = e.isEnabled("layer.add")
-        deleteButton.isEnabled = e.isEnabled("layer.delete")
-    }
-
-    func select(_ index: Int) {
-        guard let e = workspace?.active, index != e.info.activeLayer else { return }
-        e.run("layer.set_active", ["index": index])
-    }
-
-    @objc func add(_ sender: Any?) { workspace?.active?.windowController?.addLayer() }
-    @objc func remove(_ sender: Any?) { workspace?.active?.run("layer.delete") }
-}
-
-/// History shell: one row per step; click jumps there. Undone steps keep
-/// secondary text and a redo arrow. Undo and Redo buttons sit below.
-@MainActor
-public final class HistoryPanelView: RowListPanelView {
-    weak var workspace: Workspace?
-    public private(set) var undoButton: NSButton!
-    public private(set) var redoButton: NSButton!
-
-    init(workspace: Workspace) {
-        self.workspace = workspace
-        super.init(rowHeight: 27)
-        undoButton = NSButton(title: "Undo", image: NSImage(systemSymbolName: "arrow.uturn.backward", accessibilityDescription: nil)!,
-                              target: self, action: #selector(undo(_:)))
-        redoButton = NSButton(title: "Redo", image: NSImage(systemSymbolName: "arrow.uturn.forward", accessibilityDescription: nil)!,
-                              target: self, action: #selector(redo(_:)))
-        redoButton.imagePosition = .imageTrailing
-        for b in [undoButton!, redoButton!] {
-            b.isBordered = false
-            b.font = Theme.font(12)
-            b.contentTintColor = Theme.ink
-            b.heightAnchor.constraint(equalToConstant: 24).isActive = true
-        }
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        actions.addArrangedSubview(undoButton)
-        actions.addArrangedSubview(spacer)
-        actions.addArrangedSubview(redoButton)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("not used") }
-
-    func reload() {
-        guard let e = workspace?.active else {
-            setRows([])
-            undoButton.isEnabled = false
-            redoButton.isEnabled = false
-            return
-        }
-        let current = e.info.historyIndex
-        let rows = e.info.historyLabels.enumerated().map { i, label in
-            let undone = i > current
-            let row = PanelRow(index: i, title: label, detail: nil,
-                               symbol: undone ? "arrow.uturn.forward" : (i == 0 ? "photo" : "circle.fill"), height: 27)
-            row.isCurrent = i == current
-            row.dimmed = undone
-            row.setAccessibilityValue(undone ? "undone" : (i == current ? "current" : "done"))
-            row.onClick = { [weak self] index in self?.jump(index) }
-            return row
-        }
-        setRows(rows)
-        undoButton.isEnabled = current > 0
-        redoButton.isEnabled = current + 1 < e.info.historyLabels.count
-        scrollToCurrent()
-    }
-
-    func jump(_ index: Int) {
-        guard let e = workspace?.active, index != e.info.historyIndex else { return }
-        e.run("history.jump", ["index": index])
-    }
-
-    @objc func undo(_ sender: Any?) { workspace?.active?.run("edit.undo") }
-    @objc func redo(_ sender: Any?) { workspace?.active?.run("edit.redo") }
 }

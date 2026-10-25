@@ -38,6 +38,13 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `MenuSkeleton`: the menu bar in paint.net 5.1 order. Its header lists where Mac keys replace paint.net keys. `Tests/OpenPainterKitTests/menu-skeleton.txt` is the checked-in item list; change it together with the menu.
 - The fit rectangle is the stage less the shown panels (left and right reserves) less 16 pt. Fit recomputes when the window resizes or a panel moves, shows or hides. A zoom the user chose stays.
 
+## Layers and History panels (M20)
+
+- `Shell/LayersPanel.swift`: one 49 pt row per layer, top layer first: a 40 x 40 pt thumbnail, the name, a detail line (Hidden, blend mode, opacity) when it is not plain, the 24 x 24 pt eye, and the active row's 2 pt edge and diamond. The action row runs Add New, Delete, Duplicate, Merge Down, Move Up, Move Down and Properties. Dragging a row runs one `layer.move`. Clicking a row runs `layer.set_active`, which replaces the current history step's state: no new step and no change to the Edited state.
+- Thumbnails come from the engine query `layer.thumbnail` (`{"id","max"}`: width, height, the layer's content key, then RGBA). `LayerThumbnailCache` keys them by document, layer id and that content key (`revision` in `doc.info` layers), so an edit makes a new one and a History jump back reuses the old one.
+- `Shell/LayerProperties.swift`: the Layer Properties sheet (name, visible, the 14 blend modes, opacity 0 to 255 as a slider and a field). The first change starts an engine preview session (`preview.begin` with `layer.properties`); later changes send `preview.update`, and the canvas shows the preview. OK sends `preview.commit` (one "Layer Properties" step); Cancel sends `preview.cancel`. Panel and menu layer commands are off while the sheet is up.
+- `Shell/HistoryPanel.swift`: one 27 pt row per step with an icon for its command (`history_commands` in `doc.info`). Undone steps use `muted` text and a redo arrow. A click runs `history.jump`.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
