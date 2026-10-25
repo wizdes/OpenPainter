@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant};
 
+mod fuzz;
+
 #[derive(Clone, Copy)]
 enum Status {
     Pass,
@@ -132,6 +134,56 @@ fn deep_steps(tier: &str) -> Vec<CommandStep> {
     steps
 }
 
+/// M57 robustness checks of the checkpoint tier: one minute of fuzzing per
+/// reader (`cargo xtask fuzz`, the 10-minute run is by hand), the 200 MP
+/// document and the full-disk test (a 20 MB disk image it detaches by its own
+/// device path; macOS only).
+fn robustness_steps(tier: &str) -> Vec<CommandStep> {
+    if tier != "checkpoint" {
+        return Vec::new();
+    }
+    vec![
+        CommandStep::cargo(
+            &[
+                "run",
+                "--quiet",
+                "-p",
+                "xtask",
+                "--",
+                "fuzz",
+                "--seconds",
+                "60",
+            ],
+            &[],
+        ),
+        CommandStep::cargo(
+            &[
+                "test",
+                "-p",
+                "op-engine",
+                "--release",
+                "--test",
+                "huge_document",
+                "--",
+                "--ignored",
+            ],
+            &[],
+        ),
+        CommandStep::cargo(
+            &[
+                "test",
+                "-p",
+                "op-engine",
+                "--test",
+                "low_disk",
+                "--",
+                "--ignored",
+            ],
+            &[],
+        ),
+    ]
+}
+
 fn run_step(steps: &mut Vec<Step>, step: &CommandStep, engine: &Path, repo: &Path) {
     let dir = if step.in_repo { repo } else { engine };
     run_with(
@@ -147,6 +199,13 @@ fn run_step(steps: &mut Vec<Step>, step: &CommandStep, engine: &Path, repo: &Pat
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("fuzz") {
+        let engine = engine_dir(
+            std::env::var_os("CARGO_MANIFEST_DIR"),
+            env!("CARGO_MANIFEST_DIR"),
+        );
+        return fuzz::main(&engine, &args[1..]);
+    }
     if args.len() != 3 || args[0] != "check" || args[1] != "--tier" {
         eprintln!("Usage: cargo xtask check --tier fast|milestone|checkpoint");
         return ExitCode::from(2);
@@ -183,8 +242,8 @@ fn main() -> ExitCode {
     } else {
         skip(&mut steps, "Swift build", "mac/project.yml is absent");
     }
-    for step in deep_steps(tier) {
-        run_step(&mut steps, &step, &engine, repo);
+    for step in deep_steps(tier).iter().chain(&robustness_steps(tier)) {
+        run_step(&mut steps, step, &engine, repo);
     }
     if matches!(tier, "milestone" | "checkpoint") {
         let scenario_dir = repo.join("tests/scenarios");
@@ -415,6 +474,49 @@ mod tests {
         );
         assert!(steps[1].in_repo && steps[1].skip_if_missing);
         assert!(!steps.iter().any(|step| step.args.contains(&"tile_bench")));
+    }
+
+    #[test]
+    fn checkpoint_tier_runs_the_m57_robustness_steps() {
+        assert!(robustness_steps("fast").is_empty());
+        assert!(robustness_steps("milestone").is_empty());
+        let steps = robustness_steps("checkpoint");
+        let args: Vec<Vec<&str>> = steps.iter().map(|s| s.args.clone()).collect();
+        assert_eq!(
+            args,
+            [
+                vec![
+                    "run",
+                    "--quiet",
+                    "-p",
+                    "xtask",
+                    "--",
+                    "fuzz",
+                    "--seconds",
+                    "60"
+                ],
+                vec![
+                    "test",
+                    "-p",
+                    "op-engine",
+                    "--release",
+                    "--test",
+                    "huge_document",
+                    "--",
+                    "--ignored"
+                ],
+                vec![
+                    "test",
+                    "-p",
+                    "op-engine",
+                    "--test",
+                    "low_disk",
+                    "--",
+                    "--ignored"
+                ],
+            ]
+        );
+        assert!(steps.iter().all(|s| !s.in_repo && !s.skip_if_missing));
     }
 
     #[test]

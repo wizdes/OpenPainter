@@ -42,6 +42,8 @@ public struct EngineEvent: Sendable {
         case layersChanged = 3
         case jobFinished = 4
         case progress = 5
+        /// M57: a recovery record was written (`ok`, `revision`), failed (`error`) or cleared.
+        case recovery = 6
     }
     public let kind: Kind
     public let doc: UInt64

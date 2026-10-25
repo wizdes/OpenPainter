@@ -143,6 +143,38 @@ pub fn encode_png(image: &DecodedImage) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+/// `encode_png` straight into `out`, 64 rows at a time, asking `stop` between
+/// bands (M57: a recovery writer that was told to stop does not finish a
+/// long encode first). The bytes decode to the same pixels as `encode_png`'s.
+pub fn encode_png_to<W: std::io::Write>(
+    out: W,
+    image: &DecodedImage,
+    stop: impl Fn() -> bool,
+) -> Result<()> {
+    let len = image_len(image.width, image.height)?;
+    if image.pixels.len() != len {
+        return Err(err("RGBA pixel count mismatch"));
+    }
+    let mut info = png::Info::with_size(image.width, image.height);
+    info.color_type = png::ColorType::Rgba;
+    info.bit_depth = png::BitDepth::Eight;
+    info.icc_profile = image.icc.as_deref().map(Cow::Borrowed);
+    let encoder = png::Encoder::with_info(out, info).map_err(err)?;
+    let mut writer = encoder.write_header().map_err(err)?;
+    {
+        let mut stream = writer.stream_writer().map_err(err)?;
+        let band = image.width as usize * 4 * 64;
+        for chunk in image.pixels.chunks(band) {
+            if stop() {
+                return Err(err("save cancelled"));
+            }
+            std::io::Write::write_all(&mut stream, chunk).map_err(err)?;
+        }
+        stream.finish().map_err(err)?;
+    }
+    Ok(())
+}
+
 /// The resolution in pixels per inch from a PNG's pHYs chunk (M50), when the
 /// chunk gives meters as its unit. Pixels per meter × 0.0254 = pixels per
 /// inch. The writer stores round(dpi / 0.0254), so when a whole number of dpi

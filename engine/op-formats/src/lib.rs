@@ -31,3 +31,19 @@ pub(crate) fn checked_len(w: u32, h: u32) -> Result<usize> {
     }
     Ok(n as usize)
 }
+
+/// M57 fuzz entry for the EXIF IFD reader (the TIFF-structure walk used for
+/// TIFF EXIF): parses `bytes`, writes the entries back out and parses that.
+/// Returns whether the first parse succeeded. Not part of the file API.
+#[doc(hidden)]
+pub fn fuzz_exif_ifd(bytes: &[u8]) -> bool {
+    match exif_ifd::parse(bytes) {
+        Ok(entries) => {
+            if let Ok(out) = exif_ifd::serialize(&entries) {
+                let _ = exif_ifd::parse(&out);
+            }
+            true
+        }
+        Err(_) => false,
+    }
+}

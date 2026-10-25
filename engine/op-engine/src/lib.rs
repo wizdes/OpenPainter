@@ -39,6 +39,7 @@ mod line_commands;
 pub mod live_stroke;
 mod mask_commands;
 mod profile_query;
+pub mod recovery;
 pub mod save_export;
 mod select_crop_commands;
 mod selection_commands;
@@ -884,6 +885,8 @@ pub enum EventKind {
     LayersChanged,
     JobFinished,
     Progress,
+    /// M57: a recovery record was written, failed or was cleared.
+    Recovery,
 }
 #[derive(Clone, Debug)]
 pub struct Event {
@@ -2186,6 +2189,8 @@ pub struct Engine {
     events_tx: Sender<Event>,
     event_join: Mutex<Option<JoinHandle<()>>>,
     gpu: Arc<gpu_effects::GpuShared>,
+    /// M57 recovery writers and the last file error per document.
+    recovery: recovery::Registry,
 }
 impl Engine {
     /// An engine with options from the environment (`OP_FORCE_CPU=1` turns the GPU off).
@@ -2219,6 +2224,7 @@ impl Engine {
             events_tx: tx,
             event_join: Mutex::new(Some(join)),
             gpu: gpu_effects::GpuShared::new(options),
+            recovery: recovery::Registry::default(),
         })
     }
     pub fn import_pixels(
@@ -2616,6 +2622,15 @@ impl Engine {
                 params.get("merged").and_then(Value::as_bool) == Some(true),
             ),
             "clipboard.profile_icc" => clipboard_commands::profile_icc(&s.state),
+            "doc.recovery" => serde_json::to_vec(
+                &self
+                    .recovery_status(id)
+                    .map_or(json!({"enabled":false}), |r| r.to_json()),
+            )
+            .map_err(internal),
+            "doc.last_file_error" => {
+                serde_json::to_vec(&json!({"error":self.last_file_error(id)})).map_err(internal)
+            }
             "doc.selection" => {
                 serde_json::to_vec(&shell_commands::selection_info(shown)).map_err(internal)
             }
@@ -2651,6 +2666,8 @@ impl Engine {
         }
     }
     pub fn close(&self, id: u64) -> Result<()> {
+        // A clean close deletes the document's recovery record (M57).
+        self.recovery.stop(id, true);
         let d = self.docs.lock().remove(&id).ok_or(Error::NoSuchDoc)?;
         let (tx, rx) = crossbeam_channel::bounded(1);
         d.tx.send(Message::Stop(tx)).map_err(internal)?;
@@ -2701,6 +2718,8 @@ impl Drop for Engine {
         for id in ids {
             let _ = self.close(id);
         }
+        // Stopped recovery writers finish (or abandon) their last write.
+        self.recovery_join();
         let (replacement, _) = unbounded();
         let tx = std::mem::replace(&mut self.events_tx, replacement);
         drop(tx);

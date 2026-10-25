@@ -35,13 +35,83 @@ pub type Result<T> = std::result::Result<T, Error>;
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
+/// Keeps a ZIP writer's I/O error (such as a full disk) as I/O, with its text.
+fn zip_err(error: zip::result::ZipError) -> Error {
+    match error {
+        zip::result::ZipError::Io(e) => Error::Io(e),
+        other => Error::Invalid(other.to_string()),
+    }
+}
 fn other(error: impl std::fmt::Display) -> Error {
     invalid(error.to_string())
 }
 
 /// Save one document by replacing the target only after the complete ZIP is synced.
 pub fn save_opaint(doc: &DocState, path: impl AsRef<Path>) -> Result<()> {
-    save_impl(doc, path.as_ref(), |_| Ok(()), false)
+    save_impl(doc, path.as_ref(), |_| Ok(()), false, SaveHooks::default())
+}
+
+/// Robustness hooks for one save (M57): an injected disk-full failure and a
+/// callback after every write, so tests can fail or pause a save part way.
+#[derive(Default)]
+pub struct SaveHooks<'a> {
+    /// The write that would pass this many bytes fails with ENOSPC ("No space
+    /// left on device"), as a full disk would.
+    pub fail_after_bytes: Option<u64>,
+    /// Called after each write with the bytes written so far.
+    pub on_write: Option<&'a mut dyn FnMut(u64)>,
+    /// When set, the next write fails ("cancelled"): the save stops and the
+    /// old file stays (M57: a recovery writer that was told to stop).
+    pub cancel: Option<&'a std::sync::atomic::AtomicBool>,
+}
+
+/// `save_opaint` with `hooks`. The target is still replaced only after the
+/// complete ZIP is synced, so a failed or killed save leaves the old file.
+pub fn save_opaint_with_hooks(
+    doc: &DocState,
+    path: impl AsRef<Path>,
+    hooks: SaveHooks<'_>,
+) -> Result<()> {
+    save_impl(doc, path.as_ref(), |_| Ok(()), false, hooks)
+}
+
+/// The temp file a save writes, with the hooks applied to every write.
+struct HookedFile<'a> {
+    file: File,
+    written: u64,
+    hooks: SaveHooks<'a>,
+}
+impl Write for HookedFile<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self
+            .hooks
+            .cancel
+            .is_some_and(|c| c.load(std::sync::atomic::Ordering::SeqCst))
+        {
+            // Not ErrorKind::Interrupted: write_all retries those forever.
+            return Err(std::io::Error::other("save cancelled"));
+        }
+        if let Some(limit) = self.hooks.fail_after_bytes
+            && self.written + buf.len() as u64 > limit
+        {
+            // ENOSPC is 28 on macOS and Linux.
+            return Err(std::io::Error::from_raw_os_error(28));
+        }
+        let n = self.file.write(buf)?;
+        self.written += n as u64;
+        if let Some(callback) = self.hooks.on_write.as_mut() {
+            callback(self.written);
+        }
+        Ok(n)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file.flush()
+    }
+}
+impl std::io::Seek for HookedFile<'_> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.file.seek(pos)
+    }
 }
 
 fn save_impl(
@@ -49,6 +119,7 @@ fn save_impl(
     path: &Path,
     mut checkpoint: impl FnMut(usize) -> Result<()>,
     keep_temp: bool,
+    hooks: SaveHooks<'_>,
 ) -> Result<()> {
     let parent = path
         .parent()
@@ -70,28 +141,36 @@ fn save_impl(
             Err(e) => return Err(e.into()),
         }
     };
+    // M57 review: a stop request is also checked while layers are built and
+    // between encodes, not only when bytes are written.
+    let cancel = hooks.cancel;
+    let stop = || cancelled(cancel);
     let result = (|| {
-        let mut zip = ZipWriter::new(file);
+        let mut zip = ZipWriter::new(HookedFile {
+            file,
+            written: 0,
+            hooks,
+        });
         let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
         let deflated = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-        zip.start_file("mimetype", stored).map_err(other)?;
+        zip.start_file("mimetype", stored).map_err(zip_err)?;
         zip.write_all(MIME)?;
         checkpoint(1)?;
         let xml = make_xml(doc)?;
-        zip.start_file("stack.xml", deflated).map_err(other)?;
+        zip.start_file("stack.xml", deflated).map_err(zip_err)?;
         zip.write_all(xml.as_bytes())?;
         checkpoint(2)?;
         for (index, _) in doc.layers.iter().enumerate() {
-            let image = layer_image(doc, index)?;
-            let png = encode_png(&image).map_err(other)?;
+            stop()?;
+            let image = layer_image(doc, index, cancel)?;
             zip.start_file(format!("data/layer{index}.png"), deflated)
-                .map_err(other)?;
-            zip.write_all(&png)?;
+                .map_err(zip_err)?;
+            write_png(&mut zip, &image, cancel)?;
             checkpoint(3 + index)?;
         }
         if let Some(profile) = &doc.profile {
             zip.start_file("data/profile.icc", deflated)
-                .map_err(other)?;
+                .map_err(zip_err)?;
             zip.write_all(profile)?;
         }
         if let SelectionState::Active(SelectionSource::Coverage(mask)) = &doc.selection {
@@ -110,18 +189,21 @@ fn save_impl(
             })
             .map_err(other)?;
             zip.start_file("data/selection.png", deflated)
-                .map_err(other)?;
+                .map_err(zip_err)?;
             zip.write_all(&png)?;
         }
-        let merged = composite(doc)?;
-        zip.start_file("mergedimage.png", deflated).map_err(other)?;
-        zip.write_all(&encode_png(&merged).map_err(other)?)?;
+        stop()?;
+        let merged = composite(doc, cancel)?;
+        stop()?;
+        zip.start_file("mergedimage.png", deflated)
+            .map_err(zip_err)?;
+        write_png(&mut zip, &merged, cancel)?;
         let thumb = thumbnail(&merged);
         zip.start_file("Thumbnails/thumbnail.png", deflated)
-            .map_err(other)?;
+            .map_err(zip_err)?;
         zip.write_all(&encode_png(&thumb).map_err(other)?)?;
-        let file = zip.finish().map_err(other)?;
-        file.sync_all()?;
+        let file = zip.finish().map_err(zip_err)?;
+        file.file.sync_all()?;
         checkpoint(usize::MAX)?;
         if !keep_temp {
             fs::rename(&temp, path)?;
@@ -135,10 +217,40 @@ fn save_impl(
     result
 }
 
-fn layer_image(doc: &DocState, index: usize) -> Result<DecodedImage> {
+/// Encodes `image` as PNG straight into the open ZIP entry, stopping between
+/// row bands once `cancel` is set.
+fn write_png<W: Write>(
+    out: W,
+    image: &DecodedImage,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<()> {
+    crate::png::encode_png_to(out, image, || cancelled(cancel).is_err()).map_err(|e| {
+        if cancelled(cancel).is_err() {
+            Error::Io(std::io::Error::other("save cancelled"))
+        } else {
+            other(e)
+        }
+    })
+}
+
+/// Err("save cancelled") once `cancel` is set.
+fn cancelled(cancel: Option<&std::sync::atomic::AtomicBool>) -> Result<()> {
+    if cancel.is_some_and(|c| c.load(std::sync::atomic::Ordering::SeqCst)) {
+        Err(Error::Io(std::io::Error::other("save cancelled")))
+    } else {
+        Ok(())
+    }
+}
+
+fn layer_image(
+    doc: &DocState,
+    index: usize,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<DecodedImage> {
     let len = image_len(doc.width, doc.height)?;
     let mut pixels = vec![0; len];
     for ty in 0..doc.height.div_ceil(TILE_SIZE as u32) {
+        cancelled(cancel)?;
         for tx in 0..doc.width.div_ceil(TILE_SIZE as u32) {
             let tile = doc
                 .read_tile(
@@ -302,8 +414,17 @@ pub fn load_opaint_with_store(
     path: impl AsRef<Path>,
     store: Arc<TileStore>,
 ) -> Result<LoadedOpaint> {
-    let path = path.as_ref();
-    let mut zip = ZipArchive::new(File::open(path)?).map_err(other)?;
+    load_opaint_from_reader(File::open(path.as_ref())?, store)
+}
+/// Load a native file held in memory (the M57 fuzz target reads this way).
+pub fn load_opaint_from_bytes(bytes: &[u8], store: Arc<TileStore>) -> Result<LoadedOpaint> {
+    load_opaint_from_reader(std::io::Cursor::new(bytes), store)
+}
+fn load_opaint_from_reader<R: Read + std::io::Seek>(
+    reader: R,
+    store: Arc<TileStore>,
+) -> Result<LoadedOpaint> {
+    let mut zip = ZipArchive::new(reader).map_err(other)?;
     if zip.is_empty() {
         return Err(invalid("missing mimetype"));
     }
@@ -506,7 +627,11 @@ fn check_path(path: &str) -> Result<()> {
     }
     Ok(())
 }
-fn read_entry(zip: &mut ZipArchive<File>, name: &str, limit: u64) -> Result<Vec<u8>> {
+fn read_entry<R: Read + std::io::Seek>(
+    zip: &mut ZipArchive<R>,
+    name: &str,
+    limit: u64,
+) -> Result<Vec<u8>> {
     let entry = zip.by_name(name).map_err(other)?;
     if entry.size() > limit {
         return Err(invalid(format!("{name} exceeds size limit")));
@@ -618,9 +743,13 @@ fn parse_paths(value: &Value) -> Result<Vec<Vec<(f64, f64)>>> {
     Ok(result)
 }
 
-fn composite(doc: &DocState) -> Result<DecodedImage> {
+fn composite(
+    doc: &DocState,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<DecodedImage> {
     let mut output = vec![0; image_len(doc.width, doc.height)?];
     for ty in 0..doc.height.div_ceil(TILE_SIZE as u32) {
+        cancelled(cancel)?;
         for tx in 0..doc.width.div_ceil(TILE_SIZE as u32) {
             let mut acc = vec![[0.0_f32; 4]; TILE_SIZE * TILE_SIZE];
             for (i, layer) in doc.layers.iter().enumerate().rev() {
@@ -776,10 +905,11 @@ mod tests {
                 }
             },
             false,
+            SaveHooks::default(),
         );
         assert!(error.is_err());
         assert_eq!(fs::read(&path).unwrap(), old);
-        save_impl(&doc, &path, |_| Ok(()), true).unwrap();
+        save_impl(&doc, &path, |_| Ok(()), true, SaveHooks::default()).unwrap();
         assert_eq!(fs::read(&path).unwrap(), old);
         assert!(
             fs::read_dir(dir.path()).unwrap().any(|e| e
@@ -789,5 +919,135 @@ mod tests {
                 .ends_with(".tmp"))
         );
         assert!(load_opaint(&path).is_ok());
+    }
+
+    #[test]
+    fn a_disk_full_save_keeps_the_old_file_and_reports_enospc() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store, 300, 300, 72.0).unwrap();
+        let path = dir.path().join("full.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let old = fs::read(&path).unwrap();
+        let mut writes = 0;
+        let mut count = |_bytes: u64| writes += 1;
+        let error = save_opaint_with_hooks(
+            &doc.add_layer(1, "two").unwrap(),
+            &path,
+            SaveHooks {
+                fail_after_bytes: Some(200),
+                on_write: Some(&mut count),
+                cancel: None,
+            },
+        )
+        .unwrap_err();
+        match &error {
+            Error::Io(e) => assert_eq!(e.raw_os_error(), Some(28)),
+            other => panic!("expected an I/O error, got {other}"),
+        }
+        assert!(error.to_string().contains("No space left on device"));
+        assert!(writes > 0);
+        assert_eq!(fs::read(&path).unwrap(), old);
+        let names: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".tmp"))
+            .collect();
+        assert!(names.is_empty(), "{names:?}");
+        assert_eq!(load_opaint(&path).unwrap().layers.len(), 1);
+    }
+
+    #[test]
+    fn a_file_in_memory_loads_like_the_same_file_on_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store.clone(), 5, 3, 72.0)
+            .unwrap()
+            .add_layer(1, "b")
+            .unwrap();
+        let path = dir.path().join("m.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let loaded = load_opaint_from_bytes(&fs::read(&path).unwrap(), store).unwrap();
+        assert_eq!(loaded.doc.layers.len(), 2);
+        assert_eq!(loaded.doc.layers[1].name, "b");
+        let empty = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        assert!(load_opaint_from_bytes(b"PK\x03\x04 nonsense", empty).is_err());
+    }
+
+    #[test]
+    fn a_cancelled_save_stops_and_keeps_the_old_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store, 300, 300, 72.0).unwrap();
+        let path = dir.path().join("c.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let old = fs::read(&path).unwrap();
+        let cancel = std::sync::atomic::AtomicBool::new(true);
+        let error = save_opaint_with_hooks(
+            &doc.add_layer(1, "b").unwrap(),
+            &path,
+            SaveHooks {
+                cancel: Some(&cancel),
+                ..SaveHooks::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("save cancelled"), "{error}");
+        assert_eq!(fs::read(&path).unwrap(), old);
+    }
+
+    #[test]
+    fn a_cancel_during_layer_building_stops_the_save_without_waiting_for_the_encode() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::new(dir.path(), 1 << 30).unwrap());
+        let mut doc = DocState::new(store, 4096, 4096, 72.0).unwrap();
+        let mut x = 7_u32;
+        for ty in 0..16 {
+            for tx in 0..16 {
+                let tile: Vec<u8> = (0..crate::opaint::TILE_SIZE * crate::opaint::TILE_SIZE * 4)
+                    .map(|_| {
+                        x ^= x << 13;
+                        x ^= x >> 17;
+                        x ^= x << 5;
+                        x as u8
+                    })
+                    .collect();
+                doc = doc
+                    .write_tile(
+                        0,
+                        TileCoord { x: tx, y: ty },
+                        TileData::try_from(tile).unwrap(),
+                    )
+                    .unwrap();
+            }
+        }
+        let path = dir.path().join("big.opaint");
+        // What the first write waits for: building and encoding layer 0.
+        let start = std::time::Instant::now();
+        let _png = encode_png(&layer_image(&doc, 0, None).unwrap()).unwrap();
+        let layer = start.elapsed();
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let c2 = cancel.clone();
+        let setter = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            c2.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        let start = std::time::Instant::now();
+        let error = save_opaint_with_hooks(
+            &doc,
+            &path,
+            SaveHooks {
+                cancel: Some(&cancel),
+                ..SaveHooks::default()
+            },
+        )
+        .unwrap_err();
+        let took = start.elapsed();
+        setter.join().unwrap();
+        assert!(error.to_string().contains("save cancelled"), "{error}");
+        assert!(
+            took < layer / 2,
+            "cancel took {took:?}; building and encoding a layer takes {layer:?}"
+        );
     }
 }

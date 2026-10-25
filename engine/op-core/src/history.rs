@@ -129,6 +129,11 @@ impl History {
     pub fn mark_saved(&mut self) {
         self.saved = Some(self.steps[self.current].identity);
     }
+    /// No step is the saved one, so the document shows as unsaved until the
+    /// next save (M57: a document recovered after a crash).
+    pub fn mark_unsaved(&mut self) {
+        self.saved = None;
+    }
     pub fn is_dirty(&self) -> bool {
         self.saved != Some(self.steps[self.current].identity)
     }

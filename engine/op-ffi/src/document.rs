@@ -152,3 +152,20 @@ pub extern "C" fn op_doc_replace(p: *mut OpEngine, doc: u64, source: u64) -> OpS
         }
     })
 }
+
+/// M57: no history step is the saved one, so `doc.info` reports `dirty`
+/// until the next save. The app calls it when NSDocument's save failed after
+/// the engine had already written (and marked) its temporary copy.
+#[unsafe(no_mangle)]
+pub extern "C" fn op_doc_mark_unsaved(p: *mut OpEngine, doc: u64) -> OpStatus {
+    guard(|| {
+        let e = match engine(p) {
+            Ok(e) => e,
+            Err(s) => return s,
+        };
+        match e.core().mark_unsaved(doc) {
+            Ok(()) => OpStatus::OP_OK,
+            Err(x) => status(x),
+        }
+    })
+}

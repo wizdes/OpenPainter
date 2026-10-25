@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PainterDocument.prepareEngine()
         // M58: OP_LAUNCH_PROBE=first-effect times the first GPU effect after OP_READY.
         LaunchClock.afterReady = { LaunchProbe.runIfAsked(engine: AppEngine.shared) }
+        // M57: crash recovery records in ~/Library/Application Support/OpenPainter/Recovery.
+        RecoveryCenter.root = RecoveryCenter.defaultRoot
         let workspace = Workspace(engine: AppEngine.shared, tools: ToolState.shared)
         Workspace.shared = workspace
         // M17: files dropped on a canvas or the image strip open one at a time, in order.
@@ -53,6 +55,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
+
+    /// M57: closed images' recovery writers finish deleting their copies
+    /// (each close already moved its folder out of the way); wait at most 2 s.
+    func applicationWillTerminate(_ notification: Notification) {
+        AppEngine.shared.waitForRecoveryWriters(timeout: .seconds(2))
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         var args = Array(CommandLine.arguments.dropFirst())
@@ -83,7 +91,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         for f in files { open(URL(fileURLWithPath: f)) }
-        DispatchQueue.main.async { self.showStartWindowIfIdle() }
+        DispatchQueue.main.async {
+            self.showStartWindowIfIdle()
+            // M57: images a crash left unsaved: one sheet with Recover and Discard.
+            Task { @MainActor [weak self] in
+                await RecoveryCenter.offerAtLaunch(controller: NSDocumentController.shared, on: self?.startWindow,
+                                                   onFinished: { [weak self] in
+                    // The start window goes once a recovered image is open.
+                    guard !NSDocumentController.shared.documents.isEmpty else { return }
+                    self?.startWindow?.close()
+                    self?.startWindow = nil
+                })
+            }
+        }
         // M58: Sparkle starts only once M60 sets the release public key.
         UpdateMenuTarget.shared.startIfSetUp()
     }

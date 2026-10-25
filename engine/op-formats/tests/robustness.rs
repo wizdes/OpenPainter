@@ -21,3 +21,32 @@ fn tiff_with_empty_sample_format_is_an_error() {
     bytes[entry + 4..entry + 8].copy_from_slice(&0u32.to_le_bytes());
     assert!(decode(&bytes).is_err());
 }
+
+/// M57 fuzzing (`cargo xtask fuzz webp`): WebP files under 1 KB whose RIFF
+/// chunk sizes claim gigabytes. image-webp 0.2 allocated the claimed size
+/// (2 to 4 GB) before reading, which aborts the process under a memory limit.
+/// `decode` must refuse them before the codec allocates.
+#[test]
+fn webp_chunks_larger_than_the_file_are_refused_before_decoding() {
+    for name in [
+        "webp-oversized-chunk-1.bin",
+        "webp-oversized-chunk-2.bin",
+        "webp-oversized-chunk-3.bin",
+        // M57 review: an animated WebP whose ANMF frame holds an ICCP
+        // subchunk claiming 2.25 GiB; the outer chunks all fit.
+        "webp-anmf-nested-chunk.bin",
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fuzz-found")
+            .join(name);
+        let bytes = std::fs::read(&path).unwrap();
+        let Err(error) = decode(&bytes) else {
+            panic!("{name} decoded")
+        };
+        let error = error.to_string();
+        assert!(
+            error.contains("WebP chunk is larger than the file"),
+            "{name}: {error}"
+        );
+    }
+}
