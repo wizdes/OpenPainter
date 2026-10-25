@@ -189,7 +189,14 @@ pub fn magic_wand(
     mode: CombineMode,
 ) -> Result<DocState, String> {
     let mask = detect_region(doc, layer, seed, options)?;
-    let base = Selection::new(doc.selection.clone());
+    // With no selection, every mode combines with an empty selection (as
+    // `selection.rectangle` does): Add and Invert give the region, Subtract
+    // and Intersect give nothing. `Selection::none()` rasterizes as all
+    // covered, which made Add select the whole canvas.
+    let base = match doc.selection {
+        SelectionState::None => Selection::empty(),
+        _ => Selection::new(doc.selection.clone()),
+    };
     let selected = base.combine(
         &Selection::active_coverage(mask),
         mode,

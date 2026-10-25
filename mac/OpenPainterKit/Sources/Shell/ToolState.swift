@@ -88,7 +88,8 @@ public enum PaintTool: String, CaseIterable, Sendable {
     /// Tools that work in this version. The rest are selectable and say "coming soon".
     public var isFunctional: Bool {
         switch self {
-        case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket, .colorPicker, .text, .rectangleSelect: true
+        case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket, .colorPicker, .text, .rectangleSelect,
+             .ellipseSelect, .lassoSelect: true
         default: false
         }
     }
@@ -126,6 +127,10 @@ public enum PaintTool: String, CaseIterable, Sendable {
         case .magicWand: return "Magic Wand: click to select a region of similar color"
         case .rectangleSelect:
             return "Rectangle Select: drag a rectangle; Command adds, Option subtracts, Shift makes a square"
+        case .ellipseSelect:
+            return "Ellipse Select: drag an ellipse; Command adds, Option subtracts, Shift makes a circle"
+        case .lassoSelect:
+            return "Lasso Select: drag around an area; Command adds, Option subtracts"
         case .paintBucket: return "Paint Bucket: click to fill with the primary color, right-click for the secondary"
         case .colorPicker: return "Color Picker: click sets the primary color, right-click the secondary; Command-click samples the image"
         case .text: return "Text: click to type; Escape, Finish, a click outside or another tool commits"

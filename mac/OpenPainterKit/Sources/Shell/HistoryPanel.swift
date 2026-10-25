@@ -20,6 +20,12 @@ public enum HistoryStep {
         case "layer.set_visible": return "eye"
         case "layer.properties": return "slider.horizontal.3"
         case "selection.select_all", "selection.deselect", "move.selection": return "rectangle.dashed"
+        // M29 selection tools and Edit menu commands.
+        case "selection.rectangle", "selection.invert", "selection.expand", "selection.paste": return "rectangle.dashed"
+        case "selection.ellipse": return "circle.dashed"
+        case "selection.lasso": return "lasso"
+        case "selection.erase": return "eraser"
+        case "selection.fill": return "drop.fill"
         // Live strokes (M38) name their step after the tool.
         case "tool.stroke", "Paintbrush", "Eraser", "Pencil": return "paintbrush.pointed"
         case "tool.magic_wand": return "wand.and.stars"

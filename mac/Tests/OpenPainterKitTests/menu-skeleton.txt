@@ -37,12 +37,18 @@ Edit > Paste [⌘V] (off)
 Edit > Paste into New Layer [⇧⌘V] (off)
 Edit > Paste into New Image [⌥⌘V] (off)
 Edit > ---
-Edit > Copy Selection (off)
-Edit > Paste Selection (off)
+Edit > Copy Selection [⌥⇧⌘C]
+Edit > Paste Selection
+Edit > Paste Selection > Replace [⌥⇧⌘V]
+Edit > Paste Selection > Add (Union)
+Edit > Paste Selection > Subtract
+Edit > Paste Selection > Intersect
+Edit > Paste Selection > Invert ("xor")
 Edit > ---
-Edit > Erase Selection [⌫] (off)
-Edit > Fill Selection [⇧⌫] (off)
-Edit > Invert Selection [⌘I] (off)
+Edit > Erase Selection [⌫]
+Edit > Fill Selection [⇧⌫]
+Edit > Invert Selection [⌘I]
+Edit > Expand Selection…
 Edit > Select All [⌘A]
 Edit > Deselect [⌘D]
 Edit > ---

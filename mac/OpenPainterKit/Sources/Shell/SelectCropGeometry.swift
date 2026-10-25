@@ -71,6 +71,23 @@ public enum SelectGeometry {
         return toolbar
     }
 
+    /// True when a lasso's points enclose some area: three or more points and
+    /// a nonzero shoelace area (a click or a straight scribble does not).
+    public static func isArea(_ points: [CGPoint]) -> Bool {
+        guard points.count >= 3 else { return false }
+        var twice: CGFloat = 0
+        for (i, a) in points.enumerated() {
+            let b = points[(i + 1) % points.count]
+            twice += a.x * b.y - b.x * a.y
+        }
+        return abs(twice) / 2 >= 0.5
+    }
+
+    /// `selection.lasso` points: "x y x y ..." in document pixels.
+    public static func lassoText(_ points: [CGPoint]) -> String {
+        points.map { "\(Double($0.x)) \(Double($0.y))" }.joined(separator: " ")
+    }
+
     static func clampPoint(_ p: CGPoint, _ canvas: CGSize) -> CGPoint {
         CGPoint(x: min(max(p.x, 0), canvas.width), y: min(max(p.y, 0), canvas.height))
     }

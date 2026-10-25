@@ -93,6 +93,13 @@ The Mac side shapes text; the engine only composites what it is given, so the en
 - `Shell/SelectCropGeometry.swift`: the drag, handle, preset and rotation math.
 - A size change (crop, resize, canvas size, 90 degree rotation) refits the canvas to the new image size.
 
+## Ellipse Select, Lasso Select and the Edit menu selection items (M29)
+
+- Ellipse Select reuses Rectangle Select in `Shell/SelectCropTool.swift`: the same modes and keys, the same styles, Shift for a circle, and the same eight handles. A release sends one `selection.ellipse`; a handle drag sends it with `amend`, which replaces that same step.
+- Lasso Select: the drag's points (at least a quarter pixel apart) go in one `selection.lasso`; the engine closes the shape back to the first point and uses the even-odd rule. A click, or a drag that encloses no area, sends nothing (a click in Replace mode deselects). paint.net's pages name only a freeform lasso, so there is no Polygon mode.
+- `Shell/SelectionEditActions.swift`: Erase Selection (Delete; transparent pixels, then deselect), Fill Selection (Shift-Delete; the primary color, the selection stays), Expand Selection… (a sheet; a negative number shrinks), Copy Selection (Option-Shift-Command-C; paint.net's `{"polygonList": [...]}` JSON text from the `doc.selection_polygons` query) and the Paste Selection submenu (one item per combine mode; Replace is Option-Shift-Command-V). Invert Selection (Command-I) is the engine command `selection.invert`. Each changing item is one history step, and each item is off when it would do nothing. Enter deselects, as in paint.net.
+- Every selection tool and Paste Selection combine with an empty selection when nothing is selected, and new shapes are clipped to the canvas.
+
 ## File formats and drag and drop (M17)
 
 The engine decodes PNG itself. ImageIO decodes HEIC, HEIF, AVIF and every Camera RAW type that `CGImageSourceCopyTypeIdentifiers()` lists (30 on macOS 27). Swift hands the engine straight 8-bit RGBA and the ICC profile through `op_import_pixels`.
@@ -110,7 +117,7 @@ Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the acti
 
 | Focus | Cmd+A | Delete | Escape | Enter | Undo, Redo |
 | --- | --- | --- | --- | --- | --- |
-| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection (says "comes in a later version" for now) | Cancel a brush drag or a Rectangle Select drag, or turn off the Crop tool (no change, no history step), else Deselect | Finish the Crop tool (crop), else nothing | Document history |
+| Canvas, or any control that is not a text field (strip item, toolbar button) | Select All pixels | Erase Selection; Shift-Delete is Fill Selection (M29) | Cancel a brush drag or a Rectangle Select drag, or turn off the Crop tool (no change, no history step), else Deselect | Finish the Crop tool (crop), else Deselect (M29) | Document history |
 | A panel with no text field editing | Same as the canvas: the panel forwards to the active document | Same | Same | Same | Same |
 | A text field or text view is editing (options row, status zoom, Colors hex) | Selects the field's text | Deletes text | Ends editing | Ends editing | The field's own undo |
 | A sheet or modal dialog is up | The dialog's field | The dialog | The dialog | The dialog's default button | The dialog; document commands are disabled |

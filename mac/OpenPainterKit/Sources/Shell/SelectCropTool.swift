@@ -1,4 +1,6 @@
-// Rectangle Select and the Crop tool on the canvas (M23). The canvas sends
+// Rectangle Select and the Crop tool on the canvas (M23), and Ellipse Select
+// and Lasso Select (M29), which reuse Rectangle Select's modes, keys, styles
+// and handles. The canvas sends
 // the pointer here (`CanvasTool.overlay`); this controller turns drags into
 // engine commands and draws the overlay.
 //
@@ -8,6 +10,16 @@
 // handles; dragging one changes the rectangle and replaces that same step
 // (`amend`), so a finished selection stays one step. A click without a drag
 // deselects (Replace mode). Escape cancels a drag, else deselects.
+//
+// Ellipse Select (M29) is Rectangle Select with `selection.ellipse`: the drag
+// box is the ellipse's bounding box, Shift keeps a circle, the styles and the
+// eight handles are the same, and a handle drag amends the same step. Lasso
+// Select (M29) collects the drag's points and the release sends one
+// `selection.lasso`; the engine closes the shape back to the first point.
+// paint.net's Lasso and Ellipse pages
+// (https://www.getpaint.net/doc/latest/LassoSelectionTool.html,
+// https://www.getpaint.net/doc/latest/EllipseSelectionTool.html) name only a
+// freeform lasso, so there is no Polygon mode.
 //
 // Crop tool (Image > Crop Tool): a frame over the image with aspect presets
 // and a straighten angle. The frame is drawn turned by the angle on the
@@ -40,6 +52,9 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
     /// The rectangle of the last finished Rectangle Select step (its handles show).
     public private(set) var editRect: CGRect?
     private var editMode = ToolSettings.SelectionMode.replace
+    /// The command of the step whose handles show (`selection.rectangle` or `selection.ellipse`).
+    private var editCommand = "selection.rectangle"
+    private var lastTool: PaintTool?
     private var editRevision: Int?
     /// True while a `selection.rectangle` this controller sent is running.
     public private(set) var busy = false
@@ -47,6 +62,7 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
 
     private enum Drag {
         case drawing(start: CGPoint, mode: ToolSettings.SelectionMode)
+        case lasso([CGPoint], mode: ToolSettings.SelectionMode)
         case handle(RectHandle, CGRect)
         case cropNew(CGPoint)
         case cropMove(CGPoint, CGRect)
@@ -73,6 +89,12 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
     var canvas: MetalCanvasView { controller.canvas }
     var tools: ToolState { controller.workspace.tools }
     var canvasSize: CGSize { CGSize(width: editor.info.width, height: editor.info.height) }
+    /// Rectangle and Ellipse Select: a drag box with styles and handles.
+    var boxTool: Bool { tools.tool == .rectangleSelect || tools.tool == .ellipseSelect }
+    /// Every tool this controller draws for.
+    var selectTool: Bool { boxTool || tools.tool == .lassoSelect }
+    /// The engine command for a box drag with the current tool.
+    var boxCommand: String { tools.tool == .ellipseSelect ? "selection.ellipse" : "selection.rectangle" }
 
     init(controller: EditorWindowController) {
         self.controller = controller
@@ -129,6 +151,9 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
             + ratioViews + [Labels.gap(8)] + sizeViews
     }
 
+    /// The options-row views for Lasso Select (no styles).
+    var lassoViews: [NSView] { [Labels.label("Selection mode"), modePopup] }
+
     /// The options-row views while the Crop tool is on.
     var cropViews: [NSView] {
         [Labels.label("Crop: aspect"), aspectPopup, Labels.gap(8), Labels.label("Straighten"), angleSlider,
@@ -151,7 +176,8 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
 
     private func showOptions() {
         let bar = controller.optionsBar
-        let want: [NSView]? = cropActive ? cropViews : tools.tool == .rectangleSelect ? rectViews : nil
+        let want: [NSView]? =
+            cropActive ? cropViews : boxTool ? rectViews : tools.tool == .lassoSelect ? lassoViews : nil
         if want.map({ $0.map(ObjectIdentifier.init) }) != bar.customOptions.map({ $0.map(ObjectIdentifier.init) }) {
             bar.customOptions = want
         }
@@ -195,11 +221,15 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
     private func toolsChanged() {
         // Picking a tool ends the Crop tool without cropping.
         if cropActive, tools.tool != toolWhenCropBegan { endCrop() }
-        if tools.tool != .rectangleSelect {
+        if tools.tool != lastTool {
+            // Handles belong to the tool that made them.
+            lastTool = tools.tool
             editRect = nil
             drag = nil
             overlay.pending = nil
+            overlay.pendingLasso = nil
         }
+        overlay.pendingEllipse = tools.tool == .ellipseSelect
         showOptions()
         updateHandles()
     }
@@ -237,7 +267,7 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
     }
 
     private func updateHandles() {
-        overlay.handleRect = tools.tool == .rectangleSelect && !cropActive && style != .fixedSize ? editRect : nil
+        overlay.handleRect = boxTool && !cropActive && style != .fixedSize ? editRect : nil
         if cropActive {
             let corners = CropGeometry.corners(cropFrame, angle: cropAngle, canvas: canvasSize)
             let handles = RectHandle.allCases.map {
@@ -261,6 +291,7 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
         if drag != nil {
             drag = nil
             overlay.pending = nil
+            overlay.pendingLasso = nil
             updateHandles()
             return true
         }
@@ -276,24 +307,40 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
 
     // MARK: Rectangle Select
 
-    /// Sends one Rectangle Select step (or replaces the current one).
-    public func commit(_ rect: CGRect, mode: ToolSettings.SelectionMode, amend: Bool) {
+    /// Sends one Rectangle or Ellipse Select step (or replaces the current
+    /// one). `command` defaults to the current tool's.
+    public func commit(_ rect: CGRect, mode: ToolSettings.SelectionMode, amend: Bool, command: String? = nil) {
         busy = true
+        let command = command ?? boxCommand
         let params: [String: any Sendable] = [
             "x": Double(rect.minX), "y": Double(rect.minY), "width": Double(rect.width),
             "height": Double(rect.height), "combine": mode.rawValue, "amend": amend,
         ]
         Task { @MainActor [weak self] in
             guard let self else { return }
-            let status = await self.editor.runAndWait("selection.rectangle", params)
+            let status = await self.editor.runAndWait(command, params)
             self.busy = false
             if status == "ok" {
                 self.editRect = rect
                 self.editMode = mode
+                self.editCommand = command
                 self.editRevision = self.editor.info.revision
             } else {
                 self.editRect = nil
             }
+            self.updateHandles()
+        }
+    }
+
+    /// Sends one Lasso Select step for the points of a drag (document pixels).
+    public func commitLasso(_ points: [CGPoint], mode: ToolSettings.SelectionMode) {
+        busy = true
+        editRect = nil
+        let text = SelectGeometry.lassoText(points)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await self.editor.runAndWait("selection.lasso", ["points": text, "combine": mode.rawValue])
+            self.busy = false
             self.updateHandles()
         }
     }
@@ -308,12 +355,17 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
 
     public func pointerDown(document p: CGPoint, view v: CGPoint, modifiers: NSEvent.ModifierFlags, right: Bool) {
         if cropActive { return cropDown(p, view: v) }
-        guard tools.tool == .rectangleSelect, !busy else { return }
+        guard selectTool, !busy else { return }
+        let mode = SelectGeometry.mode(modifiers: modifiers, right: right, toolbar: tools.settings.selectionMode)
+        if tools.tool == .lassoSelect {
+            drag = .lasso([p], mode: mode)
+            overlay.pendingLasso = [p]
+            return
+        }
         if let r = editRect, style != .fixedSize, let h = SelectGeometry.handle(at: v, viewRect: viewRect(r)) {
             drag = .handle(h, r)
             return
         }
-        let mode = SelectGeometry.mode(modifiers: modifiers, right: right, toolbar: tools.settings.selectionMode)
         drag = .drawing(start: p, mode: mode)
         if style == .fixedSize { pointerDragged(document: p, view: v, modifiers: modifiers) }
     }
@@ -328,6 +380,11 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
             overlay.pending = SelectGeometry.resize(
                 r, handle: h, to: p, ratio: modifiers.contains(.shift) ? r.width / max(r.height, 1) : fixedRatio,
                 canvas: canvasSize)
+        case let .lasso(points, mode):
+            // Keep points at least a quarter pixel apart.
+            if let last = points.last, hypot(p.x - last.x, p.y - last.y) < 0.25 { return }
+            drag = .lasso(points + [p], mode: mode)
+            overlay.pendingLasso = points + [p]
         case .cropNew, .cropMove, .cropHandle:
             cropDragged(p)
         case nil:
@@ -341,6 +398,7 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
         let d = drag
         drag = nil
         overlay.pending = nil
+        overlay.pendingLasso = nil
         switch d {
         case let .drawing(_, mode):
             if let rect, rect.width >= 1, rect.height >= 1 {
@@ -351,7 +409,13 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
             }
         case .handle:
             if let rect, rect.width >= 1, rect.height >= 1, rect != editRect {
-                commit(rect, mode: editMode, amend: true)
+                commit(rect, mode: editMode, amend: true, command: editCommand)
+            }
+        case let .lasso(points, mode):
+            if SelectGeometry.isArea(points) {
+                commitLasso(points, mode: mode)
+            } else if mode == .replace, editor.selection != nil {
+                editor.run("selection.deselect")
             }
         case .cropNew, .cropMove, .cropHandle:
             break
