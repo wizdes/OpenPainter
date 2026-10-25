@@ -593,3 +593,73 @@ fn hundred_attach_detach_cycles_leave_no_leaks() {
     assert!(after.frames_total >= base.frames_total + 101);
     op_engine_free(e);
 }
+
+/// M56: the canvas surround color. It starts as the mid grey, refuses
+/// components outside 0..=1, stale ids and a null engine, and a good color is
+/// stored and drawn with no frame error.
+#[test]
+fn background_color_is_checked_stored_and_drawn() {
+    let e = engine();
+    assert_eq!(
+        op_view_set_background(ptr::null_mut(), 1, 0.5, 0.5, 0.5),
+        OpStatus::OP_ERR_BAD_ARGUMENT
+    );
+    assert_eq!(
+        op_view_set_background(e, 1, 0.5, 0.5, 0.5),
+        OpStatus::OP_ERR_NO_SUCH_DOC,
+        "no view host yet"
+    );
+    if !gpu_tests() {
+        op_engine_free(e);
+        return;
+    }
+    let d = doc(e, 40, 30);
+    let layer = Layer::metal();
+    let v = attach(e, d, &layer);
+    let grey = 160.0 / 255.0;
+    let i = info(e, v);
+    assert_eq!(
+        (i.background_red, i.background_green, i.background_blue),
+        (grey, grey, grey),
+        "the default surround"
+    );
+    for (r, g, b) in [
+        (-0.01, 0.5, 0.5),
+        (0.5, 1.01, 0.5),
+        (0.5, 0.5, f64::NAN),
+        (f64::INFINITY, 0.0, 0.0),
+    ] {
+        assert_eq!(
+            op_view_set_background(e, v, r, g, b),
+            OpStatus::OP_ERR_BAD_ARGUMENT,
+            "{r} {g} {b}"
+        );
+    }
+    let i = info(e, v);
+    assert_eq!(i.background_red, grey, "a refused color changes nothing");
+    assert_eq!(
+        op_view_set_background(e, v + 1000, 0.1, 0.2, 0.3),
+        OpStatus::OP_ERR_NO_SUCH_DOC
+    );
+    assert_eq!(op_view_set(e, v, &state(1.0, &[])), OpStatus::OP_OK);
+    let before = wait(e, v, 1);
+    // The dark `stage` token, #252525.
+    let dark = 0x25 as f64 / 255.0;
+    assert_eq!(
+        op_view_set_background(e, v, dark, dark, dark),
+        OpStatus::OP_OK
+    );
+    let after = wait(e, v, before + 1);
+    assert!(after > before, "a new color draws a new frame");
+    let i = info(e, v);
+    assert_eq!(
+        (i.background_red, i.background_green, i.background_blue),
+        (dark as f32, dark as f32, dark as f32)
+    );
+    assert_eq!(i.frame_errors, 0);
+    // Black and white are the ends of the range.
+    assert_eq!(op_view_set_background(e, v, 0.0, 0.0, 0.0), OpStatus::OP_OK);
+    assert_eq!(op_view_set_background(e, v, 1.0, 1.0, 1.0), OpStatus::OP_OK);
+    assert_eq!(op_view_detach(e, v), OpStatus::OP_OK);
+    op_engine_free(e);
+}

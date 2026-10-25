@@ -65,6 +65,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         workspace.observe(self) { [weak self] in self?.workspaceChanged() }
         editor.observe(self) { [weak self] in self?.editorChanged() }
         statusBar.onZoom = { [weak self] z in self?.zoomFromStatus(z) }
+        wireViewSettings()  // M56: rulers, units, pixel grid, appearance
         toolChanged()
         editorChanged()
     }
@@ -115,6 +116,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         }
         canvas.onCursor = { [weak self] p in
             self?.cursor = p
+            self?.container.rulerCursor = p
             self?.updateStatus()
         }
         canvas.onToolKey = { [weak self] c in
@@ -214,6 +216,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     private func editorChanged() {
         window?.title = editor.name
         canvas.setDocumentSize(CGSize(width: editor.info.width, height: editor.info.height))
+        viewDocumentChanged()
         if window?.isDocumentEdited != editor.info.dirty { window?.isDocumentEdited = editor.info.dirty }
         updateCommandStates()
         updateStatus()
@@ -235,7 +238,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             "redo": canRedo,
         ]
         for (k, on) in ids { commandButtons[k]?.isEnabled = on }
-        (commandButtons["grid"] as? ToggleButton)?.isOn = canvas.pixelGrid
+        updateViewStates()
     }
 
     private func zoomFromStatus(_ z: Double?) {
@@ -295,7 +298,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         canvas.setViewport(v)
     }
 
-    @objc public func setUnits(_ sender: Any?) {}
+    @objc public func setUnits(_ sender: Any?) { chooseUnits(sender) }
 
     // Canvas commands reach the canvas even when another view has focus.
     @objc func zoomIn(_ sender: Any?) { canvas.zoomIn(sender) }
@@ -309,6 +312,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
 
     public func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let busy = FocusRouter.target(in: window) == .dialog
+        if let on = validateViewItem(item) { return on }
         switch item.action {
         case #selector(runCommand(_:)):
             guard let id = item.representedObject as? String else { return false }
@@ -331,9 +335,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         case #selector(ImageSizeActions.showCropTool(_:)): return !busy && !selectCrop.cropActive
         case #selector(ImageSizeActions.showResizeImage(_:)), #selector(ImageSizeActions.showCanvasSize(_:)):
             return !busy
-        case #selector(setUnits(_:)):
-            item.state = .on
-            return true
         case #selector(togglePixelGrid(_:)):
             item.state = canvas.pixelGrid ? .on : .off
             return true
@@ -389,7 +390,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             [("undo", "arrow.uturn.backward", "Undo", "⌘Z", #selector(undoClicked(_:))),
              ("redo", "arrow.uturn.forward", "Redo", "⇧⌘Z", #selector(redoClicked(_:)))],
             [("grid", "grid", "Pixel Grid", "⌘'", #selector(togglePixelGrid(_:))),
-             ("rulers", "ruler", "Rulers", "", nil)],
+             ("rulers", "ruler", "Rulers", "", #selector(toggleRulers(_:)))],
         ]
         let outer = NSStackView()
         outer.translatesAutoresizingMaskIntoConstraints = false
@@ -402,7 +403,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             inner.spacing = 6
             for c in g {
                 let tip = c.shortcut.isEmpty ? c.label : "\(c.label) (\(c.shortcut))"
-                let b: ShellButton = c.key == "grid"
+                let b: ShellButton = c.key == "grid" || c.key == "rulers"
                     ? ToggleButton(symbol: c.symbol, label: c.label, tooltip: tip, target: self, action: c.action)
                     : ShellButton(symbol: c.symbol, label: c.label, tooltip: c.action == nil ? "\(tip), comes later" : tip,
                                   target: self, action: c.action)

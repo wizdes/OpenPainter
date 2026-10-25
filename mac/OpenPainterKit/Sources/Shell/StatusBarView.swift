@@ -21,19 +21,26 @@ public final class StatusBarView: FilledView {
 
     /// Called with a new zoom (field, slider) or nil for Fit.
     public var onZoom: ((Double?) -> Void)?
+    /// Called when the units popup picks a unit (M56).
+    public var onUnit: ((MeasurementUnit) -> Void)?
+    /// The units the values are shown in, and the document's pixels per inch.
+    public var unit: MeasurementUnit = .pixels {
+        didSet { units.selectItem(at: MeasurementUnit.allCases.firstIndex(of: unit) ?? 0) }
+    }
+    public var dpi: Double = 96
 
     public init() {
         super.init(fill: Theme.chrome, dividers: [.top])
         frame = NSRect(x: 0, y: 0, width: 1100, height: Theme.statusHeight)
         fitButton = textButton("Fit", #selector(fit(_:)))
         actualButton = textButton("100%", #selector(actual(_:)))
-        units.addItems(withTitles: ["px", "in", "cm"])
-        units.item(at: 1)?.isEnabled = false
-        units.item(at: 2)?.isEnabled = false
+        units.addItems(withTitles: MeasurementUnit.allCases.map(\.abbreviation))
         units.autoenablesItems = false
         units.font = Theme.font(12)
         units.controlSize = .small
-        units.toolTip = "Units (inches and centimeters come later)"
+        units.toolTip = "Units: pixels, inches or centimeters (View menu)"
+        units.target = self
+        units.action = #selector(unitChosen(_:))
         units.setAccessibilityLabel("Units")
         zoomField.target = self
         zoomField.action = #selector(zoomTyped(_:))
@@ -96,9 +103,11 @@ public final class StatusBarView: FilledView {
 
     /// Updates every value. `cursor` and `selection` are in document pixels.
     public func update(selection: CGRect?, cursor: CGPoint?, imageSize: CGSize, zoom: Double, hint text: String) {
-        selectionValue.stringValue = selection.map { "\(Int($0.width)) × \(Int($0.height)) px" } ?? "None"
-        cursorValue.stringValue = cursor.map { "\(Int($0.x.rounded(.down))), \(Int($0.y.rounded(.down)))" } ?? "–"
-        imageValue.stringValue = "\(Int(imageSize.width)) × \(Int(imageSize.height)) px"
+        let u = unit, d = dpi
+        func v(_ px: CGFloat) -> String { u.format(u.value(ofPixels: Double(px), dpi: d)) }
+        selectionValue.stringValue = selection.map { "\(v($0.width)) × \(v($0.height)) \(u.abbreviation)" } ?? "None"
+        cursorValue.stringValue = cursor.map { "\(v($0.x)), \(v($0.y))" } ?? "–"
+        imageValue.stringValue = "\(v(imageSize.width)) × \(v(imageSize.height)) \(u.abbreviation)"
         if zoomField.currentEditor() == nil { zoomField.stringValue = ZoomPresets.label(zoom) }
         slider.doubleValue = log(zoom)
         hint.stringValue = text
@@ -108,6 +117,12 @@ public final class StatusBarView: FilledView {
     public func setProfile(short: String, full: String) {
         if profileValue.stringValue != short { profileValue.stringValue = short }
         profileValue.toolTip = full
+    }
+
+    @objc private func unitChosen(_ sender: NSPopUpButton) {
+        let i = sender.indexOfSelectedItem
+        guard i >= 0, i < MeasurementUnit.allCases.count else { return }
+        onUnit?(MeasurementUnit.allCases[i])
     }
 
     @objc private func fit(_ sender: Any?) { onZoom?(nil) }

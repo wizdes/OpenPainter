@@ -4,7 +4,7 @@
 OpenPainter
 OpenPainter > About OpenPainter
 OpenPainter > ---
-OpenPainter > Settings… [⌘,] (off)
+OpenPainter > Settings… [⌘,]
 OpenPainter > ---
 OpenPainter > Hide OpenPainter [⌘H]
 OpenPainter > Hide Others [⌥⌘H]
@@ -53,13 +53,39 @@ View > Zoom Out [⌘-]
 View > Zoom to Window [⌘0]
 View > Zoom to Selection
 View > Actual Size [⌥⌘0]
+View > Zoom Presets
+View > Zoom Presets > 3200%
+View > Zoom Presets > 2400%
+View > Zoom Presets > 1600%
+View > Zoom Presets > 1200%
+View > Zoom Presets > 800%
+View > Zoom Presets > 700%
+View > Zoom Presets > 600%
+View > Zoom Presets > 500%
+View > Zoom Presets > 400%
+View > Zoom Presets > 300%
+View > Zoom Presets > 200%
+View > Zoom Presets > 100%
+View > Zoom Presets > 66%
+View > Zoom Presets > 50%
+View > Zoom Presets > 33%
+View > Zoom Presets > 25%
+View > Zoom Presets > 16%
+View > Zoom Presets > 12%
+View > Zoom Presets > 8%
+View > Zoom Presets > 6%
+View > Zoom Presets > 5%
+View > Zoom Presets > 4%
+View > Zoom Presets > 3%
+View > Zoom Presets > 2%
+View > Zoom Presets > 1%
 View > ---
 View > Pixel Grid [⌘']
-View > Rulers (off)
+View > Rulers [⌥⌘R]
 View > ---
 View > Pixels
-View > Inches (off)
-View > Centimeters (off)
+View > Inches
+View > Centimeters
 Image
 Image > Crop to Selection [⇧⌘X]
 Image > Crop Tool

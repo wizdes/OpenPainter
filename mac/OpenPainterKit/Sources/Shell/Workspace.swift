@@ -23,6 +23,8 @@ public final class Workspace {
     public private(set) lazy var menuTarget = PanelMenuTarget(panels: panels)
     /// Opens one file as a document (M17 drag and drop). The app sets it.
     public var fileOpener: FileOpener?
+    /// Appearance, units, rulers and pixel grid (M56), in the panel store's defaults.
+    public let settings: AppSettings
     private var observers: [(AnyObject?, () -> Void)] = []
     private var eventTask: Task<Void, Never>?
 
@@ -32,6 +34,7 @@ public final class Workspace {
         let tools = tools ?? ToolState()
         self.tools = tools
         panels = PanelManager(store: store, hidesOnDeactivate: hidesPanelsOnDeactivate)
+        settings = AppSettings(defaults: store.defaults)
         do {
             effects = try engine.effects()
         } catch {
@@ -50,6 +53,8 @@ public final class Workspace {
         panels.stage = { [weak self] in self?.active?.windowController?.stageInScreen }
         panels.onChange = { [weak self] in self?.notify() }
         wireColors()
+        settings.applyAppearance()
+        settings.observe(self) { [weak self] in self?.settings.applyAppearance() }
     }
 
     /// Reads engine events and refreshes the editor they name. Call once.
