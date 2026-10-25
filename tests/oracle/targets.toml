@@ -302,3 +302,38 @@ target = "own"
 reference = "provisional elliptical darkening; paint.net 5.1 capture pending"
 tolerance = "exact"
 docs = "https://paint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[effect]]
+id = "effect.blur.bokeh"
+target = "own"
+reference = "provisional circular gamma-weighted average; paint.net 5.1 capture pending"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.sketch"
+target = "own"
+reference = "provisional sampled luminance quantile; paint.net 5.1 capture pending"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.square"
+target = "own"
+reference = "provisional square gamma-weighted average; paint.net 5.1 capture pending"
+tolerance = "1/255 per channel"
+docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.surface"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Surface_Blur_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"
+
+[[effect]]
+id = "effect.blur.unfocus"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Unfocus_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsBlursMenu.html"

@@ -226,6 +226,11 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Vignette => [0, 0, (50 << 16) | 50],
             op_ops::effect::GpuKernel::Sharpen => [2, 0, 0],
             op_ops::effect::GpuKernel::ReduceNoise => [10, 400, 0],
+            op_ops::effect::GpuKernel::Bokeh => [4, 0, 10],
+            op_ops::effect::GpuKernel::Sketch => [4, 50, 5],
+            op_ops::effect::GpuKernel::Square => [4, 0, 0],
+            op_ops::effect::GpuKernel::Surface => [6, 15, 0],
+            op_ops::effect::GpuKernel::Unfocus => [4, 0, 0],
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
@@ -420,6 +425,23 @@ impl GpuContext {
             op_ops::effect::GpuKernel::ReduceNoise => {
                 (0..=200).contains(&values[0]) && (0..=1000).contains(&values[1])
             }
+            op_ops::effect::GpuKernel::Bokeh => {
+                (0..=200).contains(&values[0])
+                    && (-100..=100).contains(&values[1])
+                    && (1..=10).contains(&values[2])
+            }
+            op_ops::effect::GpuKernel::Sketch => {
+                (0..=200).contains(&values[0])
+                    && (0..=100).contains(&values[1])
+                    && (1..=10).contains(&values[2])
+            }
+            op_ops::effect::GpuKernel::Square => {
+                (0..=200).contains(&values[0]) && (-100..=100).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::Surface => {
+                (1..=100).contains(&values[0]) && (1..=100).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::Unfocus => (1..=200).contains(&values[0]),
             _ => true,
         };
         if !valid {
@@ -504,6 +526,11 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Motion => "effect_motion",
             op_ops::effect::GpuKernel::Radial => "effect_radial",
             op_ops::effect::GpuKernel::Zoom => "effect_zoom",
+            op_ops::effect::GpuKernel::Bokeh => "effect_bokeh",
+            op_ops::effect::GpuKernel::Sketch => "effect_sketch",
+            op_ops::effect::GpuKernel::Square => "effect_square",
+            op_ops::effect::GpuKernel::Surface => "effect_surface",
+            op_ops::effect::GpuKernel::Unfocus => "effect_unfocus",
             op_ops::effect::GpuKernel::EdgeDetect => "effect_edge_detect",
             op_ops::effect::GpuKernel::Emboss => "effect_emboss",
             op_ops::effect::GpuKernel::Relief => "effect_relief",

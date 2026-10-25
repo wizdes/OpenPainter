@@ -61,6 +61,11 @@ impl GpuOp for EffectOp {
         if matches!(
             self.kernel,
             GpuKernel::Fragment
+                | GpuKernel::Bokeh
+                | GpuKernel::Sketch
+                | GpuKernel::Square
+                | GpuKernel::Surface
+                | GpuKernel::Unfocus
                 | GpuKernel::Median
                 | GpuKernel::Motion
                 | GpuKernel::Radial

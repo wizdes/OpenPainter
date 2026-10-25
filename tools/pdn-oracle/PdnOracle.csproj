@@ -39,6 +39,8 @@
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/GaussianBlurEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/FragmentEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/LocalHistogramEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/UnfocusEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/SurfaceBlurEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/MedianEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/MotionBlurEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/RadialBlurEffect.cs" />

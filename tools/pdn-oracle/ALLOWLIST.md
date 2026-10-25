@@ -31,6 +31,8 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/GaussianBlurEffect.cs` | Original tent-kernel Gaussian effect class. |
 | `Effects/FragmentEffect.cs` | Original fragment sample offsets and blend. |
 | `Effects/LocalHistogramEffect.cs` | Original circular histograms for Median. |
+| `Effects/UnfocusEffect.cs` | Original alpha-weighted circular Unfocus blur. |
+| `Effects/SurfaceBlurEffect.cs` | Original edge-preserving Surface Blur source, excluded from the 3.36 application project. |
 | `Effects/MedianEffect.cs` | Original Median radius and percentile effect. |
 | `Effects/MotionBlurEffect.cs` | Original linear samples and bilinear interpolation. |
 | `Effects/RadialBlurEffect.cs` | Original fixed-point rotation blur. |
