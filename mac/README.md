@@ -164,6 +164,14 @@ paint.net's Save Configuration dialog (https://www.getpaint.net/doc/latest/FileM
 - `Shell/SettingsWindow.swift`: OpenPainter > Settings… (Cmd+,), one page with those four settings. It works with no document open.
 - Appearance: the setting sets `NSApp.appearance`; panels, dialogs and the shell follow through the dynamic `Theme` tokens. The canvas surround is the `stage` token, sent to the engine with `op_view_set_background` whenever the canvas's appearance changes (`op_view_info` reports it back).
 
+## Menus complete (M55)
+
+- `tests/catalog/paintnet-5.1-menus.toml` lists every paint.net 5.1 menu item in order, from paint.net's public docs (not the M02 5.1.12 capture), with its Windows key, our Mac key, our command and its status (v1, mac, not in v1, pending).
+- `tools/catalog/compare-menus.py` compares the live menu bar (`mac/build/menu-live.tsv`, written by `MenuCatalogTests` on every test run) with the catalog and prints every difference; `--strict` also fails on pending items. `MenuCatalogTests` runs the same check in process.
+- Effects follow paint.net's submenu order; Median Blur sits in Blurs (its engine category stays Noise). `MenuIcons.swift` gives an SF Symbol to every item paint.net shows an icon for; `MenuStates.swift` holds the enabled rules and the Layers items Import From File, Move Layer to Top and Move Layer to Bottom; `PlatformServices/SaveAll.swift` is File > Save All.
+- Shortcut changes: Zoom to Window Cmd B, Zoom to Selection Shift-Cmd-B, Actual Size Cmd 0, Go to Top and Bottom Layer Option-Cmd-PageUp and PageDown, Brightness / Contrast Shift-Cmd-T, Invert Alpha Option-Cmd-I. File > Print and Help > Plugins are gone (not in v1).
+- `M55_PNG_DIR=<dir>` (as `TEST_RUNNER_M55_PNG_DIR`) makes `testRenderMenuSheets` draw every menu into `menus-light.png` and `menus-dark.png`.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
@@ -195,8 +203,9 @@ Zoom steps are paint.net's `ScaleFactor` presets (1% to 3200%), ported from Open
 | --- | --- | --- |
 | Zoom In | Ctrl + | Cmd = |
 | Zoom Out | Ctrl - | Cmd - |
-| Zoom to Window | Ctrl B (3.36) or Ctrl 0 | Cmd 0 |
-| Actual Size | Ctrl Shift A (3.36) | Cmd Option 0 |
+| Zoom to Window | Ctrl B | Cmd B (M55; was Cmd 0) |
+| Zoom to Selection | Ctrl Shift B | Cmd Shift B |
+| Actual Size | Ctrl 0 | Cmd 0 (M55; was Cmd Option 0) |
 | Pixel Grid | none | Cmd ' |
 | Zoom with the wheel | Ctrl + wheel | Cmd + wheel, or pinch |
 | Zoom tool | Z; click in, right-click out, drag a rectangle | Z; click in, Option-click (or right-click) out, drag a rectangle |

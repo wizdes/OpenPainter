@@ -1,0 +1,2116 @@
+# paint.net 5.1 menus, item by item, in menu order, and where each one lives in
+# OpenPainter's Mac menu bar (M55).
+#
+# SOURCE: paint.net's public documentation (https://www.getpaint.net/doc/latest/,
+# fetched 2026-10-25): the File, Edit, View, Image, Layers, Adjustments and
+# Effects menu pages, each Effects submenu page, the Menu Bar and Help Menu pages,
+# the menu screenshots on those pages, and the Keyboard & Mouse Commands page.
+# It is NOT the 5.1.12 capture that M02 plans (the Windows PC was not reachable).
+# M02 can later confirm or replace it. The docs pages are dated 2023 to 2025.
+#
+# Fields of each [[item]]:
+#   pdn      paint.net path, titles as the docs show them ("" for a Mac-only item)
+#   win      paint.net's Windows shortcut ("" for none)
+#   mac      the item's path in OpenPainter's menu bar ("" when it is not there)
+#   key      OpenPainter's shortcut, in MenuSkeleton.describe notation ("" for none)
+#   command  our command: an engine command or effect id ("layer.flip_vertical"),
+#            or the AppKit action selector ("saveAllDocuments:"); "" for a
+#            submenu or an item that is off
+#   icon     true when paint.net shows an icon; the Mac item then has an SF Symbol
+#   status   v1        built; the item is in the menu and works
+#            mac       a Mac-only item (Apple HIG or an OpenPainter addition)
+#            not in v1 left out, with the reason from docs/PLAN.md "Not in this version"
+#            pending   paint.net has it but no merged milestone builds it yet; it is
+#                      in the menu and off when `mac` is set, else absent
+#   reason   why an item is not in v1, pending or Mac-only
+#   note     anything else (why a shortcut differs, when the item is off)
+#   source   the page the item comes from
+#
+# Shortcut rule: paint.net's Ctrl becomes Cmd and Alt becomes Option. Where that
+# clashes with a standard Mac key, the Mac key wins (the note says which).
+# Items keep paint.net's order inside each menu; Mac-only items sit where the Mac
+# menu has them. tools/catalog/compare-menus.py and MenuCatalogTests check the
+# live menu bar against this file.
+
+# Shortcuts two visible items may share. paint.net 5.1's own menus share none
+# (Image and Layers both have Flip and Rotate 180 items, with no keys), so the
+# list is empty. The hidden Option-Cmd-digit panel twins are not visible items.
+shared_shortcuts = []
+
+[[item]]
+pdn = ""
+win = ""
+mac = "OpenPainter"
+key = ""
+command = ""
+icon = false
+status = "mac"
+reason = "The Mac application menu (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = "Help > About"
+win = ""
+mac = "OpenPainter > About OpenPainter"
+key = ""
+command = "orderFrontStandardAboutPanel:"
+icon = true
+status = "v1"
+note = "paint.net's Help menu item About; on the Mac it is the first item of the application menu"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = "Settings"
+win = ""
+mac = "OpenPainter > Settings…"
+key = "⌘,"
+command = "showSettings:"
+icon = true
+status = "v1"
+note = "paint.net has a Settings icon on its menu bar (Alt+X opens it); the Mac puts Settings in the application menu with Cmd+,"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "OpenPainter > Hide OpenPainter"
+key = "⌘H"
+command = "hide:"
+icon = false
+status = "mac"
+reason = "Standard Mac application menu item (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "OpenPainter > Hide Others"
+key = "⌥⌘H"
+command = "hideOtherApplications:"
+icon = false
+status = "mac"
+reason = "Standard Mac application menu item (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "OpenPainter > Show All"
+key = ""
+command = "unhideAllApplications:"
+icon = false
+status = "mac"
+reason = "Standard Mac application menu item (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = "File"
+win = ""
+mac = "File"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > New..."
+win = "Ctrl+N"
+mac = "File > New…"
+key = "⌘N"
+command = "newDocument:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Open..."
+win = "Ctrl+O"
+mac = "File > Open…"
+key = "⌘O"
+command = "openDocument:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Open Recent"
+win = ""
+mac = "File > Open Recent"
+key = ""
+command = ""
+icon = false
+status = "v1"
+note = "The recent files themselves are listed by macOS above Clear Menu"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Open Recent > Clear this list"
+win = ""
+mac = "File > Open Recent > Clear Menu"
+key = ""
+command = "clearRecentDocuments:"
+icon = true
+status = "v1"
+note = "Mac standard title (Apple HIG); paint.net shows a red cross icon"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Acquire"
+win = ""
+mac = "File > Acquire"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Acquire > From Scanner"
+win = ""
+mac = "File > Acquire > From Scanner or Camera…"
+key = ""
+command = ""
+icon = false
+status = "pending"
+reason = "No milestone builds scanner or camera import yet (Windows WIA in paint.net; ImageCaptureCore or Continuity Camera on the Mac); needs a user decision"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Save"
+win = "Ctrl+S"
+mac = "File > Save"
+key = "⌘S"
+command = "saveDocument:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Save As..."
+win = "Ctrl+Shift+S"
+mac = "File > Save As…"
+key = "⇧⌘S"
+command = "saveDocumentAs:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "File > Save a Copy…"
+key = ""
+command = "saveDocumentTo:"
+icon = false
+status = "mac"
+reason = "Mac document command (M19, Apple HIG File menu)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = "File > Save All"
+win = "Ctrl+Alt+S"
+mac = "File > Save All"
+key = "⌥⌘S"
+command = "saveAllDocuments:"
+icon = true
+status = "v1"
+note = "Off when no open image has unsaved changes, as in paint.net"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "File > Revert to Saved"
+key = ""
+command = "revertDocumentToSaved:"
+icon = false
+status = "mac"
+reason = "Mac document command (M19, Apple HIG File menu)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = "File > Print..."
+win = "Ctrl+P"
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "not in v1"
+reason = "docs/PLAN.md, Not in this version: Printing"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Close"
+win = "Ctrl+W"
+mac = "File > Close"
+key = "⌘W"
+command = "performClose:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "File > Exit"
+win = "Alt+F4"
+mac = "OpenPainter > Quit OpenPainter"
+key = "⌘Q"
+command = "terminate:"
+icon = true
+status = "v1"
+note = "On the Mac, Quit is the last item of the application menu"
+source = "https://www.getpaint.net/doc/latest/FileMenu.html"
+
+[[item]]
+pdn = "Edit"
+win = ""
+mac = "Edit"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Undo"
+win = "Ctrl+Z"
+mac = "Edit > Undo"
+key = "⌘Z"
+command = "undo:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Redo"
+win = "Ctrl+Y"
+mac = "Edit > Redo"
+key = "⇧⌘Z"
+command = "redo:"
+icon = true
+status = "v1"
+note = "Mac standard Redo key"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Cut"
+win = "Ctrl+X"
+mac = "Edit > Cut"
+key = "⌘X"
+command = ""
+icon = true
+status = "pending"
+reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Copy"
+win = "Ctrl+C"
+mac = "Edit > Copy"
+key = "⌘C"
+command = ""
+icon = true
+status = "pending"
+reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Copy Merged"
+win = "Ctrl+Shift+C"
+mac = "Edit > Copy Merged"
+key = "⇧⌘C"
+command = ""
+icon = true
+status = "pending"
+reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste"
+win = "Ctrl+V"
+mac = "Edit > Paste"
+key = "⌘V"
+command = ""
+icon = true
+status = "pending"
+reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste into New Layer"
+win = "Ctrl+Shift+V"
+mac = "Edit > Paste into New Layer"
+key = "⇧⌘V"
+command = ""
+icon = true
+status = "pending"
+reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste into New Image"
+win = "Ctrl+Alt+V"
+mac = "Edit > Paste into New Image"
+key = "⌥⌘V"
+command = ""
+icon = true
+status = "pending"
+reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Copy Selection"
+win = "Ctrl+Alt+Shift+C"
+mac = "Edit > Copy Selection"
+key = "⌥⇧⌘C"
+command = "copySelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste Selection"
+win = ""
+mac = "Edit > Paste Selection"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste Selection > Replace"
+win = "Ctrl+Alt+Shift+V"
+mac = "Edit > Paste Selection > Replace"
+key = "⌥⇧⌘V"
+command = "pasteSelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste Selection > Add (union)"
+win = ""
+mac = "Edit > Paste Selection > Add (union)"
+key = ""
+command = "pasteSelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste Selection > Exclude"
+win = ""
+mac = "Edit > Paste Selection > Exclude"
+key = ""
+command = "pasteSelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste Selection > Intersect"
+win = ""
+mac = "Edit > Paste Selection > Intersect"
+key = ""
+command = "pasteSelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Paste Selection > Invert (\"xor\")"
+win = ""
+mac = "Edit > Paste Selection > Invert (\"xor\")"
+key = ""
+command = "pasteSelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Erase Selection"
+win = "Delete"
+mac = "Edit > Erase Selection"
+key = "⌫"
+command = "eraseSelection:"
+icon = true
+status = "v1"
+note = "The Mac Delete key (backspace)"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Fill Selection"
+win = "Backspace"
+mac = "Edit > Fill Selection"
+key = "⇧⌫"
+command = "fillSelection:"
+icon = true
+status = "v1"
+note = "Windows Backspace and Mac Delete are the same key, so Fill takes Shift-Delete"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Invert Selection"
+win = "Ctrl+I"
+mac = "Edit > Invert Selection"
+key = "⌘I"
+command = "selection.invert"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Edit > Expand Selection…"
+key = ""
+command = "showExpandSelection:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M29): grow or shrink the selection"
+source = "docs/MILESTONES.md M29"
+
+[[item]]
+pdn = "Edit > Select All"
+win = "Ctrl+A"
+mac = "Edit > Select All"
+key = "⌘A"
+command = "selectAll:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = "Edit > Deselect"
+win = "Ctrl+D"
+mac = "Edit > Deselect"
+key = "⌘D"
+command = "selection.deselect"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EditMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Edit > Content-Aware Fill"
+key = ""
+command = "effect.fill.content_aware"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M52); paint.net 5.1's docs do not list it"
+source = "docs/MILESTONES.md M52"
+
+[[item]]
+pdn = "View"
+win = ""
+mac = "View"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html"
+
+[[item]]
+pdn = "View > Zoom In"
+win = "Ctrl++"
+mac = "View > Zoom In"
+key = "⌘="
+command = "zoomIn:"
+icon = true
+status = "v1"
+note = "Cmd+= is the Mac zoom-in key (the + key without Shift)"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "View > Zoom Out"
+win = "Ctrl+-"
+mac = "View > Zoom Out"
+key = "⌘-"
+command = "zoomOut:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "View > Zoom to Window"
+win = "Ctrl+B"
+mac = "View > Zoom to Window"
+key = "⌘B"
+command = "zoomToWindow:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "View > Zoom to Selection"
+win = "Ctrl+Shift+B"
+mac = "View > Zoom to Selection"
+key = "⇧⌘B"
+command = "zoomToSelection:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "View > Actual Size"
+win = "Ctrl+0"
+mac = "View > Actual Size"
+key = "⌘0"
+command = "actualSize:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets"
+key = ""
+command = ""
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56): paint.net's preset zooms as a submenu"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 3200%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 2400%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 1600%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 1200%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 800%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 700%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 600%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 500%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 400%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 300%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 200%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 100%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 66%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 50%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 33%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 25%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 16%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 12%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 8%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 6%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 5%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 4%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 3%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 2%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "View > Zoom Presets > 1%"
+key = ""
+command = "zoomToPreset:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M56)"
+source = "docs/MILESTONES.md M56"
+
+[[item]]
+pdn = "View > Pixel Grid"
+win = ""
+mac = "View > Pixel Grid"
+key = "⌘'"
+command = "togglePixelGrid:"
+icon = true
+status = "v1"
+note = "paint.net has no key for it; Cmd+' is OpenPainter's (M09)"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html"
+
+[[item]]
+pdn = "View > Rulers"
+win = ""
+mac = "View > Rulers"
+key = "⌥⌘R"
+command = "toggleRulers:"
+icon = true
+status = "v1"
+note = "paint.net's docs give no key; Option-Cmd-R is OpenPainter's (M56)"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html"
+
+[[item]]
+pdn = "View > Pixels"
+win = ""
+mac = "View > Pixels"
+key = ""
+command = "setUnits:"
+icon = false
+status = "v1"
+note = "A check mark shows the current unit"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html"
+
+[[item]]
+pdn = "View > Inches"
+win = ""
+mac = "View > Inches"
+key = ""
+command = "setUnits:"
+icon = false
+status = "v1"
+note = "A check mark shows the current unit"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html"
+
+[[item]]
+pdn = "View > Centimeters"
+win = ""
+mac = "View > Centimeters"
+key = ""
+command = "setUnits:"
+icon = false
+status = "v1"
+note = "A check mark shows the current unit"
+source = "https://www.getpaint.net/doc/latest/ViewMenu.html"
+
+[[item]]
+pdn = "Image"
+win = ""
+mac = "Image"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Crop to Selection"
+win = "Ctrl+Shift+X"
+mac = "Image > Crop to Selection"
+key = "⇧⌘X"
+command = "image.crop_to_selection"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Image > Crop Tool"
+key = ""
+command = "showCropTool:"
+icon = false
+status = "mac"
+reason = "OpenPainter addition (M23): a crop rectangle with handles"
+source = "docs/MILESTONES.md M23"
+
+[[item]]
+pdn = "Image > Resize..."
+win = "Ctrl+R"
+mac = "Image > Resize…"
+key = "⌘R"
+command = "showResizeImage:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Canvas Size..."
+win = "Ctrl+Shift+R"
+mac = "Image > Canvas Size…"
+key = "⇧⌘R"
+command = "showCanvasSize:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Flip Horizontal"
+win = ""
+mac = "Image > Flip Horizontal"
+key = ""
+command = "image.flip_horizontal"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Flip Vertical"
+win = ""
+mac = "Image > Flip Vertical"
+key = ""
+command = "image.flip_vertical"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Rotate 90° Clockwise"
+win = "Ctrl+H"
+mac = "Image > Rotate 90° Clockwise"
+key = ""
+command = "image.rotate_90_cw"
+icon = true
+status = "v1"
+note = "No Mac key: Cmd+H is Hide OpenPainter"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Rotate 90° Counter-Clockwise"
+win = "Ctrl+G"
+mac = "Image > Rotate 90° Counter-Clockwise"
+key = "⌘G"
+command = "image.rotate_90_ccw"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Rotate 180°"
+win = ""
+mac = "Image > Rotate 180°"
+key = "⌘J"
+command = "image.rotate_180"
+icon = true
+status = "v1"
+note = "paint.net has no own key (Ctrl+H twice); Cmd+J is OpenPainter's (M14)"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Image > Color Profile..."
+win = ""
+mac = "Image > Color Profile…"
+key = ""
+command = "showColorProfile:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Image > Flatten"
+win = "Ctrl+Shift+F"
+mac = "Image > Flatten"
+key = "⇧⌘F"
+command = "image.flatten"
+icon = true
+status = "v1"
+note = "Off when the image has one layer"
+source = "https://www.getpaint.net/doc/latest/ImageMenu.html"
+
+[[item]]
+pdn = "Layers"
+win = ""
+mac = "Layers"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Add New Layer"
+win = "Ctrl+Shift+N"
+mac = "Layers > Add New Layer"
+key = "⇧⌘N"
+command = "addLayer:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Delete Layer"
+win = "Ctrl+Shift+Del"
+mac = "Layers > Delete Layer"
+key = "⇧⌘⌫"
+command = "layer.delete"
+icon = true
+status = "v1"
+note = "Off when the image has one layer"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Duplicate Layer"
+win = "Ctrl+Shift+D"
+mac = "Layers > Duplicate Layer"
+key = "⇧⌘D"
+command = "layer.duplicate"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Merge Layer Down"
+win = "Ctrl+M"
+mac = "Layers > Merge Layer Down"
+key = ""
+command = "layer.merge_down"
+icon = true
+status = "v1"
+note = "No Mac key: Cmd+M is Minimize"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Toggle Layer Visibility"
+win = "Ctrl+,"
+mac = "Layers > Toggle Layer Visibility"
+key = ""
+command = "toggleLayerVisibility:"
+icon = true
+status = "v1"
+note = "No Mac key: Cmd+, is Settings"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Layers > Import From File..."
+win = ""
+mac = "Layers > Import From File…"
+key = ""
+command = "importLayerFromFile:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Flip Horizontal"
+win = ""
+mac = "Layers > Flip Horizontal"
+key = ""
+command = "layer.flip_horizontal"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Flip Vertical"
+win = ""
+mac = "Layers > Flip Vertical"
+key = ""
+command = "layer.flip_vertical"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Rotate 180°"
+win = ""
+mac = "Layers > Rotate 180°"
+key = ""
+command = "layer.rotate_180"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Rotate / Zoom..."
+win = "Ctrl+Shift+Z"
+mac = "Layers > Rotate / Zoom…"
+key = ""
+command = "effect.layers.rotate_zoom"
+icon = true
+status = "v1"
+note = "No Mac key: Shift-Cmd-Z is Redo"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Go to Top Layer"
+win = "Ctrl+Alt+PgUp"
+mac = "Layers > Go to Top Layer"
+key = "⌥⌘PageUp"
+command = "goToLayer:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Go to Layer Above"
+win = "Alt+PgUp"
+mac = "Layers > Go to Layer Above"
+key = "⌥PageUp"
+command = "goToLayer:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Go to Layer Below"
+win = "Alt+PgDn"
+mac = "Layers > Go to Layer Below"
+key = "⌥PageDown"
+command = "goToLayer:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Go to Bottom Layer"
+win = "Ctrl+Alt+PgDn"
+mac = "Layers > Go to Bottom Layer"
+key = "⌥⌘PageDown"
+command = "goToLayer:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Move Layer to Top"
+win = ""
+mac = "Layers > Move Layer to Top"
+key = ""
+command = "moveLayerToTop:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Move Layer Up"
+win = ""
+mac = "Layers > Move Layer Up"
+key = ""
+command = "layer.move_up"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Move Layer Down"
+win = ""
+mac = "Layers > Move Layer Down"
+key = ""
+command = "layer.move_down"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Move Layer to Bottom"
+win = ""
+mac = "Layers > Move Layer to Bottom"
+key = ""
+command = "moveLayerToBottom:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Layers > Layer Properties..."
+win = "F4"
+mac = "Layers > Layer Properties…"
+key = "F4"
+command = "showLayerProperties:"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/LayersMenu.html"
+
+[[item]]
+pdn = "Adjustments"
+win = ""
+mac = "Adjustments"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html"
+
+[[item]]
+pdn = "Adjustments > Auto-Level"
+win = "Ctrl+Shift+L"
+mac = "Adjustments > Auto-Level"
+key = "⇧⌘L"
+command = "effect.adjust.auto_level"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Black and White"
+win = "Ctrl+Shift+G"
+mac = "Adjustments > Black and White"
+key = "⇧⌘G"
+command = "effect.adjust.black_and_white"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Brightness / Contrast..."
+win = "Ctrl+Shift+T"
+mac = "Adjustments > Brightness / Contrast"
+key = "⇧⌘T"
+command = "effect.adjust.brightness_contrast"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Curves..."
+win = "Ctrl+Shift+M"
+mac = "Adjustments > Curves"
+key = "⇧⌘M"
+command = "effect.adjust.curves"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Exposure..."
+win = ""
+mac = "Adjustments > Exposure"
+key = ""
+command = "effect.adjust.exposure"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Highlights / Shadows..."
+win = ""
+mac = "Adjustments > Highlights / Shadows"
+key = ""
+command = "effect.adjust.highlights_shadows"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Hue / Saturation..."
+win = "Ctrl+Shift+U"
+mac = "Adjustments > Hue / Saturation"
+key = "⇧⌘U"
+command = "effect.adjust.hue_saturation"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Invert Alpha"
+win = "Ctrl+Alt+I"
+mac = "Adjustments > Invert Alpha"
+key = "⌥⌘I"
+command = "effect.adjust.invert_alpha"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Invert Colors"
+win = "Ctrl+Shift+I"
+mac = "Adjustments > Invert Colors"
+key = "⇧⌘I"
+command = "effect.adjust.invert_colors"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Levels..."
+win = "Ctrl+L"
+mac = "Adjustments > Levels"
+key = "⌘L"
+command = "effect.adjust.levels"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Posterize..."
+win = "Ctrl+Shift+P"
+mac = "Adjustments > Posterize"
+key = "⇧⌘P"
+command = "effect.adjust.posterize"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Sepia"
+win = "Ctrl+Shift+E"
+mac = "Adjustments > Sepia"
+key = "⇧⌘E"
+command = "effect.adjust.sepia"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Adjustments > Temperature and Tint..."
+win = ""
+mac = "Adjustments > Temperature and Tint"
+key = ""
+command = "effect.adjust.temperature_tint"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/AdjustmentsMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Effects"
+win = ""
+mac = "Effects"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsMenu.html"
+
+[[item]]
+pdn = "Effects > Repeat <last effect>"
+win = "Ctrl+F"
+mac = "Effects > Repeat Effect"
+key = "⌘F"
+command = "repeatEffect:"
+icon = true
+status = "v1"
+note = "Titled \"Repeat <effect name>\" once an effect has run, with that effect's icon; off before"
+source = "https://www.getpaint.net/doc/latest/EffectsMenu.html"
+
+[[item]]
+pdn = "Effects > Plugin Errors..."
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "not in v1"
+reason = "docs/PLAN.md, Not in this version: A public plugin API, scripting, batch processing"
+source = "https://www.getpaint.net/doc/latest/EffectsMenu.html"
+
+[[item]]
+pdn = "Effects > Artistic"
+win = ""
+mac = "Effects > Artistic"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[item]]
+pdn = "Effects > Artistic > Ink Sketch..."
+win = ""
+mac = "Effects > Artistic > Ink Sketch"
+key = ""
+command = "effect.artistic.ink_sketch"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[item]]
+pdn = "Effects > Artistic > Oil Painting..."
+win = ""
+mac = "Effects > Artistic > Oil Painting"
+key = ""
+command = "effect.artistic.oil_painting"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[item]]
+pdn = "Effects > Artistic > Pencil Sketch..."
+win = ""
+mac = "Effects > Artistic > Pencil Sketch"
+key = ""
+command = "effect.artistic.pencil_sketch"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs"
+win = ""
+mac = "Effects > Blurs"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Bokeh Blur..."
+win = ""
+mac = "Effects > Blurs > Bokeh Blur"
+key = ""
+command = "effect.blur.bokeh"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Fragment Blur..."
+win = ""
+mac = "Effects > Blurs > Fragment Blur"
+key = ""
+command = "effect.blur.fragment"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Gaussian Blur..."
+win = ""
+mac = "Effects > Blurs > Gaussian Blur"
+key = ""
+command = "effect.blur.gaussian"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Median Blur..."
+win = ""
+mac = "Effects > Blurs > Median Blur"
+key = ""
+command = "effect.blur.median"
+icon = true
+status = "v1"
+note = "Engine category stays Noise (op-ops); the menu follows paint.net 5.1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Motion Blur..."
+win = ""
+mac = "Effects > Blurs > Motion Blur"
+key = ""
+command = "effect.blur.motion"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Radial Blur..."
+win = ""
+mac = "Effects > Blurs > Radial Blur"
+key = ""
+command = "effect.blur.radial"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Sketch Blur..."
+win = ""
+mac = "Effects > Blurs > Sketch Blur"
+key = ""
+command = "effect.blur.sketch"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Square Blur..."
+win = ""
+mac = "Effects > Blurs > Square Blur"
+key = ""
+command = "effect.blur.square"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Surface Blur..."
+win = ""
+mac = "Effects > Blurs > Surface Blur"
+key = ""
+command = "effect.blur.surface"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Unfocus..."
+win = ""
+mac = "Effects > Blurs > Unfocus"
+key = ""
+command = "effect.blur.unfocus"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Blurs > Zoom Blur..."
+win = ""
+mac = "Effects > Blurs > Zoom Blur"
+key = ""
+command = "effect.blur.zoom"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsBlursMenu.html"
+
+[[item]]
+pdn = "Effects > Color"
+win = ""
+mac = "Effects > Color"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsColorMenu.html"
+
+[[item]]
+pdn = "Effects > Color > Quantize..."
+win = ""
+mac = "Effects > Color > Quantize"
+key = ""
+command = "effect.color.quantize"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsColorMenu.html"
+
+[[item]]
+pdn = "Effects > Distort"
+win = ""
+mac = "Effects > Distort"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Bulge..."
+win = ""
+mac = "Effects > Distort > Bulge"
+key = ""
+command = "effect.distort.bulge"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Crystalize..."
+win = ""
+mac = "Effects > Distort > Crystalize"
+key = ""
+command = "effect.distort.crystalize"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Dents..."
+win = ""
+mac = "Effects > Distort > Dents"
+key = ""
+command = "effect.distort.dents"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Frosted Glass..."
+win = ""
+mac = "Effects > Distort > Frosted Glass"
+key = ""
+command = "effect.distort.frosted_glass"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Morphology..."
+win = ""
+mac = "Effects > Distort > Morphology"
+key = ""
+command = "effect.distort.morphology"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Pixelate..."
+win = ""
+mac = "Effects > Distort > Pixelate"
+key = ""
+command = "effect.distort.pixelate"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Polar Inversion..."
+win = ""
+mac = "Effects > Distort > Polar Inversion"
+key = ""
+command = "effect.distort.polar_inversion"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Tile Reflection..."
+win = ""
+mac = "Effects > Distort > Tile Reflection"
+key = ""
+command = "effect.distort.tile_reflection"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Distort > Twist..."
+win = ""
+mac = "Effects > Distort > Twist"
+key = ""
+command = "effect.distort.twist"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+
+[[item]]
+pdn = "Effects > Noise"
+win = ""
+mac = "Effects > Noise"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsNoiseMenu.html"
+
+[[item]]
+pdn = "Effects > Noise > Add Noise..."
+win = ""
+mac = "Effects > Noise > Add Noise"
+key = ""
+command = "effect.noise.add"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsNoiseMenu.html"
+
+[[item]]
+pdn = "Effects > Noise > Reduce Noise..."
+win = ""
+mac = "Effects > Noise > Reduce Noise"
+key = ""
+command = "effect.noise.reduce"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsNoiseMenu.html"
+
+[[item]]
+pdn = "Effects > Object"
+win = ""
+mac = "Effects > Object"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsObjectMenu.html"
+
+[[item]]
+pdn = "Effects > Object > Drop Shadow..."
+win = ""
+mac = "Effects > Object > Drop Shadow"
+key = ""
+command = "effect.object.drop_shadow"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsObjectMenu.html"
+
+[[item]]
+pdn = "Effects > Photo"
+win = ""
+mac = "Effects > Photo"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Photo > Glow..."
+win = ""
+mac = "Effects > Photo > Glow"
+key = ""
+command = "effect.photo.glow"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Photo > Red Eye Removal..."
+win = ""
+mac = "Effects > Photo > Red Eye Removal"
+key = ""
+command = "effect.photo.red_eye_removal"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Photo > Sharpen..."
+win = ""
+mac = "Effects > Photo > Sharpen"
+key = ""
+command = "effect.photo.sharpen"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Photo > Soften Portrait..."
+win = ""
+mac = "Effects > Photo > Soften Portrait"
+key = ""
+command = "effect.photo.soften_portrait"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Photo > Straighten..."
+win = ""
+mac = "Effects > Photo > Straighten"
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "M41 (Noise and Photo) did not build Straighten; no milestone owns it now"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Photo > Vignette..."
+win = ""
+mac = "Effects > Photo > Vignette"
+key = ""
+command = "effect.photo.vignette"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsPhotoMenu.html"
+
+[[item]]
+pdn = "Effects > Render"
+win = ""
+mac = "Effects > Render"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsRenderMenu.html"
+
+[[item]]
+pdn = "Effects > Render > Clouds..."
+win = ""
+mac = "Effects > Render > Clouds"
+key = ""
+command = "effect.render.clouds"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsRenderMenu.html"
+
+[[item]]
+pdn = "Effects > Render > Julia Fractal..."
+win = ""
+mac = "Effects > Render > Julia Fractal"
+key = ""
+command = "effect.render.julia_fractal"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsRenderMenu.html"
+
+[[item]]
+pdn = "Effects > Render > Mandelbrot Fractal..."
+win = ""
+mac = "Effects > Render > Mandelbrot Fractal"
+key = ""
+command = "effect.render.mandelbrot_fractal"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsRenderMenu.html"
+
+[[item]]
+pdn = "Effects > Render > Turbulence..."
+win = ""
+mac = "Effects > Render > Turbulence"
+key = ""
+command = "effect.render.turbulence"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsRenderMenu.html"
+
+[[item]]
+pdn = "Effects > Stylize"
+win = ""
+mac = "Effects > Stylize"
+key = ""
+command = ""
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[item]]
+pdn = "Effects > Stylize > Edge Detect..."
+win = ""
+mac = "Effects > Stylize > Edge Detect"
+key = ""
+command = "effect.stylize.edge_detect"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[item]]
+pdn = "Effects > Stylize > Emboss..."
+win = ""
+mac = "Effects > Stylize > Emboss"
+key = ""
+command = "effect.stylize.emboss"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[item]]
+pdn = "Effects > Stylize > Outline..."
+win = ""
+mac = "Effects > Stylize > Outline"
+key = ""
+command = "effect.stylize.outline"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[item]]
+pdn = "Effects > Stylize > Relief..."
+win = ""
+mac = "Effects > Stylize > Relief"
+key = ""
+command = "effect.stylize.relief"
+icon = true
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Window"
+key = ""
+command = ""
+icon = false
+status = "mac"
+reason = "Standard Mac Window menu (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = "Utility window icon: Tools"
+win = "F5"
+mac = "Window > Tools"
+key = "F5"
+command = "togglePanel:"
+icon = false
+status = "v1"
+note = "paint.net shows these as menu-bar icons; here they are Window menu items, also Option-Cmd-1 to 4"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Utility window icon: History"
+win = "F6"
+mac = "Window > History"
+key = "F6"
+command = "togglePanel:"
+icon = false
+status = "v1"
+note = "paint.net shows these as menu-bar icons; here they are Window menu items, also Option-Cmd-1 to 4"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Utility window icon: Layers"
+win = "F7"
+mac = "Window > Layers"
+key = "F7"
+command = "togglePanel:"
+icon = false
+status = "v1"
+note = "paint.net shows these as menu-bar icons; here they are Window menu items, also Option-Cmd-1 to 4"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Utility window icon: Colors"
+win = "F8"
+mac = "Window > Colors"
+key = "F8"
+command = "togglePanel:"
+icon = false
+status = "v1"
+note = "paint.net shows these as menu-bar icons; here they are Window menu items, also Option-Cmd-1 to 4"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Utility windows: reset (Ctrl+Shift+click)"
+win = ""
+mac = "Window > Reset Panel Layout"
+key = ""
+command = "resetPanelLayout:"
+icon = false
+status = "v1"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Window > Minimize"
+key = "⌘M"
+command = "performMiniaturize:"
+icon = false
+status = "mac"
+reason = "Standard Mac Window menu item (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Window > Zoom"
+key = ""
+command = "performZoom:"
+icon = false
+status = "mac"
+reason = "Standard Mac Window menu item (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Window > Bring All to Front"
+key = ""
+command = "arrangeInFront:"
+icon = false
+status = "mac"
+reason = "Standard Mac Window menu item (Apple HIG)"
+source = "https://developer.apple.com/design/human-interface-guidelines/the-menu-bar"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Help"
+key = ""
+command = ""
+icon = false
+status = "mac"
+reason = "Standard Mac Help menu (Apple HIG); paint.net opens its Help menu from a menu-bar icon"
+source = "https://www.getpaint.net/doc/latest/MenuBar.html"
+
+[[item]]
+pdn = "Help > Documentation"
+win = "F1"
+mac = "Help > OpenPainter Help"
+key = "⌘?"
+command = ""
+icon = true
+status = "pending"
+reason = "Needs OpenPainter's own web pages; no milestone owns them yet"
+note = "Cmd+? is the Mac Help key"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html https://www.getpaint.net/doc/latest/KeyboardMouseCommands.html"
+
+[[item]]
+pdn = "Help > paint.net Website"
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "Needs OpenPainter's own web pages; no milestone owns them yet"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = "Help > paint.net Search..."
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "Needs OpenPainter's own web pages; no milestone owns them yet"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = "Help > Donate"
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "OpenPainter takes no donations yet; needs a user decision"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = "Help > Forum"
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "Needs OpenPainter's own web pages; no milestone owns them yet"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = "Help > Tutorials"
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "Needs OpenPainter's own web pages; no milestone owns them yet"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = "Help > Plugins"
+win = ""
+mac = ""
+key = ""
+command = ""
+icon = true
+status = "not in v1"
+reason = "docs/PLAN.md, Not in this version: A public plugin API, scripting, batch processing"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"
+
+[[item]]
+pdn = ""
+win = ""
+mac = "Help > Check for Updates…"
+key = ""
+command = ""
+icon = false
+status = "pending"
+reason = "M58 (Sparkle update feed) builds it"
+source = "docs/MILESTONES.md M58"
+
+[[item]]
+pdn = "Help > Send feedback or bug report..."
+win = ""
+mac = "Help > Send Feedback…"
+key = ""
+command = ""
+icon = true
+status = "pending"
+reason = "Needs OpenPainter's own web pages; no milestone owns them yet"
+source = "https://www.getpaint.net/doc/latest/HelpMenu.html"

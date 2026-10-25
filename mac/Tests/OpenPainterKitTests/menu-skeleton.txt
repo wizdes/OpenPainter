@@ -22,10 +22,8 @@ File > ---
 File > Save [⌘S]
 File > Save As… [⇧⌘S]
 File > Save a Copy…
-File > Save All [⌥⌘S] (off)
+File > Save All [⌥⌘S]
 File > Revert to Saved
-File > ---
-File > Print… [⌘P] (off)
 File > ---
 File > Close [⌘W]
 Edit
@@ -42,8 +40,8 @@ Edit > ---
 Edit > Copy Selection [⌥⇧⌘C]
 Edit > Paste Selection
 Edit > Paste Selection > Replace [⌥⇧⌘V]
-Edit > Paste Selection > Add (Union)
-Edit > Paste Selection > Subtract
+Edit > Paste Selection > Add (union)
+Edit > Paste Selection > Exclude
 Edit > Paste Selection > Intersect
 Edit > Paste Selection > Invert ("xor")
 Edit > ---
@@ -58,9 +56,9 @@ Edit > Content-Aware Fill
 View
 View > Zoom In [⌘=]
 View > Zoom Out [⌘-]
-View > Zoom to Window [⌘0]
-View > Zoom to Selection
-View > Actual Size [⌥⌘0]
+View > Zoom to Window [⌘B]
+View > Zoom to Selection [⇧⌘B]
+View > Actual Size [⌘0]
 View > Zoom Presets
 View > Zoom Presets > 3200%
 View > Zoom Presets > 2400%
@@ -116,33 +114,33 @@ Layers > Delete Layer [⇧⌘⌫]
 Layers > Duplicate Layer [⇧⌘D]
 Layers > Merge Layer Down
 Layers > Toggle Layer Visibility
-Layers > Import From File… (off)
+Layers > Import From File…
 Layers > ---
-Layers > Flip Horizontal (off)
-Layers > Flip Vertical (off)
-Layers > Rotate 180° (off)
+Layers > Flip Horizontal
+Layers > Flip Vertical
+Layers > Rotate 180°
 Layers > Rotate / Zoom…
 Layers > ---
-Layers > Go to Top Layer [⌥Home]
+Layers > Go to Top Layer [⌥⌘PageUp]
 Layers > Go to Layer Above [⌥PageUp]
 Layers > Go to Layer Below [⌥PageDown]
-Layers > Go to Bottom Layer [⌥End]
+Layers > Go to Bottom Layer [⌥⌘PageDown]
 Layers > ---
-Layers > Move Layer to Top (off)
+Layers > Move Layer to Top
 Layers > Move Layer Up
 Layers > Move Layer Down
-Layers > Move Layer to Bottom (off)
+Layers > Move Layer to Bottom
 Layers > ---
 Layers > Layer Properties… [F4]
 Adjustments
 Adjustments > Auto-Level [⇧⌘L]
 Adjustments > Black and White [⇧⌘G]
-Adjustments > Brightness / Contrast
+Adjustments > Brightness / Contrast [⇧⌘T]
 Adjustments > Curves [⇧⌘M]
 Adjustments > Exposure
 Adjustments > Highlights / Shadows
 Adjustments > Hue / Saturation [⇧⌘U]
-Adjustments > Invert Alpha
+Adjustments > Invert Alpha [⌥⌘I]
 Adjustments > Invert Colors [⇧⌘I]
 Adjustments > Levels [⌘L]
 Adjustments > Posterize [⇧⌘P]
@@ -156,16 +154,17 @@ Effects > Artistic > Ink Sketch
 Effects > Artistic > Oil Painting
 Effects > Artistic > Pencil Sketch
 Effects > Blurs
+Effects > Blurs > Bokeh Blur
 Effects > Blurs > Fragment Blur
 Effects > Blurs > Gaussian Blur
+Effects > Blurs > Median Blur
 Effects > Blurs > Motion Blur
 Effects > Blurs > Radial Blur
-Effects > Blurs > Zoom Blur
-Effects > Blurs > Bokeh Blur
 Effects > Blurs > Sketch Blur
 Effects > Blurs > Square Blur
 Effects > Blurs > Surface Blur
 Effects > Blurs > Unfocus
+Effects > Blurs > Zoom Blur
 Effects > Color
 Effects > Color > Quantize
 Effects > Distort
@@ -180,7 +179,6 @@ Effects > Distort > Tile Reflection
 Effects > Distort > Twist
 Effects > Noise
 Effects > Noise > Add Noise
-Effects > Noise > Median
 Effects > Noise > Reduce Noise
 Effects > Object
 Effects > Object > Drop Shadow
@@ -189,9 +187,8 @@ Effects > Photo > Glow
 Effects > Photo > Red Eye Removal
 Effects > Photo > Sharpen
 Effects > Photo > Soften Portrait
-Effects > Photo > Vignette
-Effects > Photo > ---
 Effects > Photo > Straighten (off)
+Effects > Photo > Vignette
 Effects > Render
 Effects > Render > Clouds
 Effects > Render > Julia Fractal
@@ -216,10 +213,6 @@ Window > ---
 Window > Bring All to Front
 Help
 Help > OpenPainter Help [⌘?] (off)
-Help > ---
-Help > Tutorials (off)
-Help > Forum (off)
-Help > Plugins (off)
 Help > ---
 Help > Check for Updates… (off)
 Help > Send Feedback… (off)
