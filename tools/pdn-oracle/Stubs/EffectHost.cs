@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 
 namespace System.Windows.Forms { public class Control { } }
 namespace PaintDotNet.IndirectUI {
@@ -35,6 +36,13 @@ namespace PaintDotNet.PropertySystem {
         public PropertyCollection(IEnumerable<Property> values) { foreach(var p in values)Values[p.Name]=p; }
         public PropertyCollection(IEnumerable<Property> values,IEnumerable<PropertyCollectionRule> rules):this(values) { }
         public static PropertyCollection CreateEmpty()=>new(Array.Empty<Property>());
+        public dynamic this[object name]=>Values[name];
+        public PropertyCollection Clone()=>new(Values.Values.Select(p=>(Property)(p switch {
+            Int32Property i=>new Int32Property(i.Name,i.Value,int.MinValue,int.MaxValue),
+            DoubleProperty d=>new DoubleProperty(d.Name,d.Value,double.MinValue,double.MaxValue),
+            BooleanProperty b=>new BooleanProperty(b.Name,b.Value),
+            _=>throw new NotSupportedException($"Cannot clone {p.GetType().Name}")
+        })));
     }
 }
 namespace PaintDotNet {
@@ -50,7 +58,7 @@ namespace PaintDotNet.Effects {
     using PaintDotNet.IndirectUI;
     using PaintDotNet.PropertySystem;
     [Flags] public enum EffectFlags { None=0, Configurable=1 }
-    public static class SubmenuNames { public const string Blurs="Blurs"; public const string Distort="Distort"; public const string Render="Render"; public const string Noise="Noise"; }
+    public static class SubmenuNames { public const string Blurs="Blurs"; public const string Distort="Distort"; public const string Render="Render"; public const string Noise="Noise"; public const string Artistic="Artistic"; public const string Stylize="Stylize"; public const string Photo="Photo"; }
     public enum EffectCategory { Adjustment }
     [AttributeUsage(AttributeTargets.Class)] public sealed class EffectCategoryAttribute : Attribute {
         public EffectCategoryAttribute(EffectCategory category) { }
@@ -59,6 +67,7 @@ namespace PaintDotNet.Effects {
         private readonly PropertyCollection properties;
         public PropertyBasedEffectConfigToken(PropertyCollection properties){this.properties=properties;}
         public T GetProperty<T>(object name) where T:Property=>(T)properties.Values[name];
+        public void SetPropertyValue(object name,object value) { switch(properties.Values[name]) { case Int32Property i: i.Value=Convert.ToInt32(value); break; case DoubleProperty d: d.Value=Convert.ToDouble(value); break; default: throw new NotSupportedException(); } }
     }
     public abstract class PropertyBasedEffect {
         public static ControlInfo CreateDefaultConfigUI(PropertyCollection properties)=>new();
@@ -74,6 +83,9 @@ namespace PaintDotNet.Effects {
         protected virtual void OnSetRenderInfo(PropertyBasedEffectConfigToken token,RenderArgs dst,RenderArgs src){DstArgs=dst;SrcArgs=src;}
         protected abstract void OnRender(Rectangle[] rois,int startIndex,int length);
         public PropertyBasedEffectConfigToken CreateToken()=>new(OnCreatePropertyCollection());
+        public PropertyCollection CreatePropertyCollection()=>OnCreatePropertyCollection();
+        public void SetRenderInfo(PropertyBasedEffectConfigToken token,RenderArgs dst,RenderArgs src)=>OnSetRenderInfo(token,dst,src);
+        public void Render(Rectangle[] rois,int startIndex,int length)=>OnRender(rois,startIndex,length);
         public void Render(PropertyBasedEffectConfigToken token,Surface dst,Surface src){OnSetRenderInfo(token,new(dst),new(src));OnRender(new[]{dst.Bounds},0,1);}
     }
 }

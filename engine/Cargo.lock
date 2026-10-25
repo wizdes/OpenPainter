@@ -1187,6 +1187,7 @@ dependencies = [
  "op-testkit",
  "pollster",
  "proptest",
+ "serde_json",
  "thiserror 2.0.21",
  "wgpu",
 ]

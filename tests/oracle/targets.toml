@@ -154,3 +154,54 @@ id = "effect.adjust.highlights_shadows"
 target = "own"
 reference = "provisional tone weighted shift; https://paint.net/doc/latest/AdjustmentsMenu.html; 5.1 capture pending"
 tolerance = "exact"
+
+[[effect]]
+id = "effect.artistic.ink_sketch"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Ink_Sketch_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[effect]]
+id = "effect.artistic.oil_painting"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Oil_Painting_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[effect]]
+id = "effect.artistic.pencil_sketch"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Pencil_Sketch_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsArtisticMenu.html"
+
+[[effect]]
+id = "effect.stylize.edge_detect"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Edge_Detect_*.png"
+tolerance = "exact"
+own_5_1 = "Strength, Blurring, Algorithm, Overlay Edges are provisional; 5.1 capture pending"
+docs = "https://paint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[effect]]
+id = "effect.stylize.emboss"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Emboss_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[effect]]
+id = "effect.stylize.outline"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Outline_*.png"
+tolerance = "exact"
+own_5_1 = "Quality is provisional; 5.1 capture pending"
+docs = "https://paint.net/doc/latest/EffectsStylizeMenu.html"
+
+[[effect]]
+id = "effect.stylize.relief"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Relief_*.png"
+tolerance = "exact"
+docs = "https://paint.net/doc/latest/EffectsStylizeMenu.html"

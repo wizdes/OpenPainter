@@ -35,6 +35,17 @@ The project file lists each source file directly. No source files from `.pdn-src
 | `Effects/MotionBlurEffect.cs` | Original linear samples and bilinear interpolation. |
 | `Effects/RadialBlurEffect.cs` | Original fixed-point rotation blur. |
 | `Effects/ZoomBlurEffect.cs` | Original fixed-point zoom blur. |
+| `Effects/InkSketchEffect.cs` | Original Ink Sketch convolution and Glow composition; MIT credit stays in source. |
+| `Effects/OilPaintingEffect.cs` | Original local color binning. |
+| `Effects/PencilSketchEffect.cs` | Original blur and color dodge composition. |
+| `Effects/EdgeDetectEffect.cs` | Original directional color convolution. |
+| `Effects/EmbossEffect.cs` | Original grayscale directional convolution. |
+| `Effects/OutlineEffect.cs` | Original local histogram thresholds. |
+| `Effects/ReliefEffect.cs` | Original directional relief convolution. |
+| `Effects/ColorDifferenceEffect.cs` | Shared Edge Detect and Relief convolution. |
+| `Effects/GlowEffect.cs` | Used by Ink Sketch. |
+| `Effects/DesaturateEffect.cs` | Used by Pencil Sketch. |
+| `Effects/InvertColorsEffect.cs` | Used by Pencil Sketch. |
 
 `Shims/Utility.cs` contains verbatim numeric methods from `Core/Utility.cs` with the Windows UI methods removed. Its header records the source revision and changes.
 `Shims/AddNoiseEffect.cs`, `Shims/FrostedGlassEffect.cs`, and `Shims/CloudsEffect.cs` copy their named effect files. Each replaces only a clock-derived random seed with a fixed value. Their headers name the source and exact change.

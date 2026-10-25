@@ -116,14 +116,14 @@ internal static class Program
         File.WriteAllBytes(path,mask);
         Record(dir,"FloodToolBase",new{seed=new[]{x,y},tolerance_percent=percent,t,contiguous,width=surface.Width,height=surface.Height},input,path);
     }
-    private static readonly string[] EffectNames={"Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Add Noise","Frosted Glass","Clouds"};
+    private static readonly string[] EffectNames={"Ink Sketch","Oil Painting","Pencil Sketch","Edge Detect","Emboss","Outline","Relief","Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Add Noise","Frosted Glass","Clouds"};
     private static void EffectsAll()
     {
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         foreach(string old in Directory.GetFiles(dir,"*.png"))File.Delete(old);
         entries.Clear();
-        string sourceDir=Path.Combine(Root,".pdn-src/src/Effects");
-        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect"};
+        string sourceDir=Path.Combine(Environment.GetEnvironmentVariable("OpenPdnSourceRoot")??Path.Combine(Root,".pdn-src"),"src/Effects");
+        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect","InkSketchEffect","OilPaintingEffect","PencilSketchEffect","EdgeDetectEffect","EmbossEffect","OutlineEffect","ReliefEffect"};
         var abstractHelpers=new HashSet<string>(StringComparer.Ordinal){"InternalPropertyBasedEffect","PropertyBasedEffect","ConvolutionFilterEffect","LocalHistogramEffect"};
         var names=EffectNames.Concat(Directory.EnumerateFiles(sourceDir,"*Effect.cs")
             .Select(Path.GetFileNameWithoutExtension).Where(n=>n!="Effect"&&!represented.Contains(n)&&!abstractHelpers.Contains(n)))
@@ -197,7 +197,7 @@ internal static class Program
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         string manifest=Path.Combine(dir,"manifest.json");
         if(save&&entries.Count==0&&File.Exists(manifest))entries=JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(manifest))??new();
-        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds";
+        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief";
         foreach(string fixture in EffectFixtures)
         {
             string input=F(fixture);
@@ -213,7 +213,7 @@ internal static class Program
                 continue;
             }
             var src=Png.Read(input);
-            if(name is "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds")
+            if(name is "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief")
             {
                 using var sourceSurface=SurfaceOf(src);
                 using var destSurface=new Surface(src.Width,src.Height);
@@ -228,6 +228,13 @@ internal static class Program
                     "Zoom Blur"=>new ZoomBlurEffect(),
                     "Add Noise"=>new AddNoiseEffect(),
                     "Frosted Glass"=>new FrostedGlassEffect(),
+                    "Ink Sketch"=>new InkSketchEffect(),
+                    "Oil Painting"=>new OilPaintingEffect(),
+                    "Pencil Sketch"=>new PencilSketchEffect(),
+                    "Edge Detect"=>new EdgeDetectEffect(),
+                    "Emboss"=>new EmbossEffect(),
+                    "Outline"=>new OutlineEffect(),
+                    "Relief"=>new ReliefEffect(),
                     _=>new CloudsEffect()
                 };
                 var token=effect.CreateToken();
@@ -290,6 +297,13 @@ internal static class Program
                     token.GetProperty<DoubleProperty>(CloudsEffect.PropertyNames.Power).Value=DoubleParam(doc.RootElement,"power",0.5);
                     token.GetProperty<Int32Property>(CloudsEffect.PropertyNames.Seed).Value=IntParam(doc.RootElement,"seed",0);
                 }
+                if(effect is InkSketchEffect) { token.GetProperty<Int32Property>(InkSketchEffect.PropertyNames.InkOutline).Value=IntParam(doc.RootElement,"ink_outline",50); token.GetProperty<Int32Property>(InkSketchEffect.PropertyNames.Coloring).Value=IntParam(doc.RootElement,"coloring",50); }
+                if(effect is OilPaintingEffect) { token.GetProperty<Int32Property>(OilPaintingEffect.PropertyNames.BrushSize).Value=IntParam(doc.RootElement,"brush_size",3); token.GetProperty<Int32Property>(OilPaintingEffect.PropertyNames.Coarseness).Value=IntParam(doc.RootElement,"coarseness",50); }
+                if(effect is PencilSketchEffect) { token.GetProperty<Int32Property>(PencilSketchEffect.PropertyNames.PencilTipSize).Value=IntParam(doc.RootElement,"pencil_tip_size",2); token.GetProperty<Int32Property>(PencilSketchEffect.PropertyNames.ColorRange).Value=IntParam(doc.RootElement,"range",0); }
+                if(effect is EdgeDetectEffect) token.GetProperty<DoubleProperty>(EdgeDetectEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",45);
+                if(effect is EmbossEffect) token.GetProperty<DoubleProperty>(EmbossEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",0);
+                if(effect is ReliefEffect) token.GetProperty<DoubleProperty>(ReliefEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",45);
+                if(effect is OutlineEffect) { token.GetProperty<Int32Property>(OutlineEffect.PropertyNames.Thickness).Value=IntParam(doc.RootElement,"thickness",3); token.GetProperty<Int32Property>(OutlineEffect.PropertyNames.Intensity).Value=IntParam(doc.RootElement,"intensity",50); }
                 effect.Render(token,destSurface,sourceSurface);
                 bool patched=name is "Add Noise" or "Frosted Glass" or "Clouds";
                 string note=name=="Clouds"?"Instance seed fixed to 0x5a; primary black and secondary white; pixel math unchanged.":patched?"Random seed fixed to 0x51ed270b; pixel math unchanged.":"Direct OpenPDN effect class with UI and property stubs.";

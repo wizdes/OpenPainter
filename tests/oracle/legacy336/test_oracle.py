@@ -109,8 +109,18 @@ class OracleOutputTests(unittest.TestCase):
         original = {entry['op'] for entry in core} - {
             'Fragment Blur', 'Median Blur', 'Motion Blur', 'Radial Blur', 'Zoom Blur'
         }
-        self.assertEqual(len(original), 13)
-        self.assertEqual(len({entry['op'] for entry in core}), 18)
+        self.assertEqual(len(original), 20)
+        self.assertEqual(len({entry['op'] for entry in core}), 25)
+
+    def test_m40_effects_run_on_five_fixtures(self):
+        entries = json.loads((ORACLE / 'effects/manifest.json').read_text())
+        for name in ('Ink Sketch', 'Oil Painting', 'Pencil Sketch', 'Edge Detect',
+                     'Emboss', 'Outline', 'Relief'):
+            outputs = [entry for entry in entries if entry['op'] == name
+                       and entry['status'] == 'ok' and entry['parameters'] == {}]
+            self.assertEqual(len(outputs), len(EFFECT_FIXTURES), name)
+            self.assertEqual({pathlib.Path(entry['input']).stem for entry in outputs},
+                             set(EFFECT_FIXTURES), name)
 
     def test_effects_keep_hidden_color_fixture_bytes(self):
         # alpha_edge_64 holds straight color under zero alpha, so its outputs exist and are hashed.
