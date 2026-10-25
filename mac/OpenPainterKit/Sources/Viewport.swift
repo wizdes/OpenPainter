@@ -10,6 +10,12 @@ public struct Viewport: Equatable, Sendable {
     public private(set) var zoom: Double
     /// View position of the document's top-left corner.
     public private(set) var origin: CGPoint
+    /// The part of the view not covered by floating panels (view points). A
+    /// document smaller than the view is centered here instead of in the whole
+    /// view, as far as the view's edges allow. Nil means the whole view.
+    public var clearRect: CGRect? {
+        didSet { clampOrigin() }
+    }
 
     public init(documentSize: CGSize, viewSize: CGSize, zoom: Double = 1) {
         self.documentSize = documentSize
@@ -36,13 +42,17 @@ public struct Viewport: Equatable, Sendable {
     /// On each axis: a document smaller than the view is centered; a larger one
     /// cannot be scrolled past its edges.
     public mutating func clampOrigin() {
-        func axis(_ o: CGFloat, _ content: CGFloat, _ view: CGFloat) -> CGFloat {
-            if content <= view { return ((view - content) / 2).rounded() }
+        func axis(_ o: CGFloat, _ content: CGFloat, _ view: CGFloat, _ mid: CGFloat?) -> CGFloat {
+            if content <= view {
+                guard let mid else { return ((view - content) / 2).rounded() }
+                return min(max((mid - content / 2).rounded(), 0), view - content)
+            }
             return min(0, max(view - content, o))
         }
+        let c = clearRect.map { CGPoint(x: $0.midX, y: $0.midY) }
         origin = CGPoint(
-            x: axis(origin.x, contentSize.width, viewSize.width),
-            y: axis(origin.y, contentSize.height, viewSize.height))
+            x: axis(origin.x, contentSize.width, viewSize.width, c?.x),
+            y: axis(origin.y, contentSize.height, viewSize.height, c?.y))
     }
 
     public mutating func resize(to size: CGSize) {
@@ -95,7 +105,14 @@ public struct Viewport: Equatable, Sendable {
 
     /// View > Zoom to Window.
     public mutating func zoomToFit() {
-        zoom = ZoomPresets.fit(document: documentSize, view: viewSize)
+        if let r = clearRect {
+            // The clear rectangle already holds the 16 pt image margins; fit()
+            // takes 10 pt off again, so give it those back.
+            let size = CGSize(width: min(r.width + 10, viewSize.width), height: min(r.height + 10, viewSize.height))
+            zoom = ZoomPresets.fit(document: documentSize, view: size)
+        } else {
+            zoom = ZoomPresets.fit(document: documentSize, view: viewSize)
+        }
         clampOrigin()
     }
 

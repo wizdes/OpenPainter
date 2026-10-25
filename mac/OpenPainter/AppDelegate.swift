@@ -29,7 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         _ = PainterDocumentController()  // becomes NSDocumentController.shared
         PainterDocument.prepareEngine()
-        NSApp.mainMenu = MainMenu.build()
+        let workspace = Workspace(engine: AppEngine.shared, tools: ToolState.shared)
+        Workspace.shared = workspace
+        workspace.startEvents()
+        NSApp.mainMenu = MainMenu.build(workspace)
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { _ in MainActor.assumeIsolated { Workspace.shared?.panels.screensChanged() } }
         NSApp.setActivationPolicy(.regular)
     }
 
@@ -119,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startTrace(_ doc: NSDocument?, _ error: (any Error)?, _ path: String) {
         guard let doc = doc as? PainterDocument,
-            let wc = doc.windowControllers.first as? DocumentWindowController
+            let wc = doc.windowControllers.first as? EditorWindowController
         else {
             FileHandle.standardError.write(Data("TRACE could not open \(path): \(String(describing: error))\n".utf8))
             exit(2)

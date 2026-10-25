@@ -236,6 +236,30 @@ public final class Engine: @unchecked Sendable {
         return Data(bytes: ptr, count: Int(out.len))
     }
 
+    /// One registered effect from the `effects.list` catalog query.
+    public struct EffectInfo: Equatable, Sendable {
+        public let id: String
+        public let label: String
+        public let category: String
+
+        public init(id: String, label: String, category: String) {
+            self.id = id
+            self.label = label
+            self.category = category
+        }
+    }
+
+    /// `effects.list`: every registered effect, in registry order. Needs no document.
+    public func effects() throws -> [EffectInfo] {
+        let data = try query(doc: 0, id: "effects.list", json: Data("{}".utf8))
+        let list = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
+        return list.map {
+            EffectInfo(
+                id: $0["id"] as? String ?? "", label: $0["label"] as? String ?? "",
+                category: $0["category"] as? String ?? "")
+        }
+    }
+
     fileprivate func closeDoc(_ doc: UInt64) throws {
         try withHandle { h in try check(op_doc_close(h, doc)) }
     }
@@ -272,6 +296,23 @@ public final class Document: Sendable {
     public func info() throws -> [String: Any] {
         let data = try engine.query(doc: id, id: "doc.info", json: Data())
         return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
+    /// Any `op_query` on this document, decoded as JSON.
+    public func query(_ queryID: String, _ params: [String: any Sendable] = [:]) throws -> Any {
+        let json = try JSONSerialization.data(withJSONObject: params)
+        let data = try engine.query(doc: id, id: queryID, json: json)
+        return try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+    }
+
+    /// `commands.list`: every command id and whether it is enabled now.
+    public func enabledCommands() throws -> [String: Bool] {
+        let list = try query("commands.list") as? [[String: Any]] ?? []
+        var out: [String: Bool] = [:]
+        for c in list {
+            if let id = c["id"] as? String { out[id] = c["enabled"] as? Bool ?? false }
+        }
+        return out
     }
 
     /// The flattened composite as RGBA8, row by row.

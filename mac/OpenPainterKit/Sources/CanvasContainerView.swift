@@ -11,6 +11,9 @@ public final class CanvasContainerView: NSView {
     private let overlay = ZoomRectangleView()
     /// Called after every viewport change (for a zoom label).
     public var onViewportChange: ((Viewport) -> Void)?
+    /// The brush preview's width in document pixels and its color.
+    public var strokeWidthPixels: Double = 2
+    public var strokeColor: NSColor = .black
 
     public init(document: Document, documentSize: CGSize) {
         canvas = MetalCanvasView(document: document, documentSize: documentSize)
@@ -26,6 +29,12 @@ public final class CanvasContainerView: NSView {
         addSubview(overlay)
         canvas.onViewportChange = { [weak self] v in self?.viewportChanged(v) }
         canvas.onZoomRectangle = { [weak self] r in self?.overlay.rectangle = r }
+        canvas.onStrokePreview = { [weak self] points in
+            guard let self else { return }
+            self.overlay.strokeWidth = self.strokeWidthPixels * self.canvas.viewport.zoom
+            self.overlay.strokeColor = self.strokeColor
+            self.overlay.stroke = points
+        }
     }
 
     @available(*, unavailable)
@@ -85,11 +94,28 @@ final class ZoomRectangleView: NSView {
     var rectangle: CGRect? {
         didSet { needsDisplay = true }
     }
+    /// The brush drag in progress, drawn as a line until the engine paints it.
+    var stroke: [CGPoint]? {
+        didSet { needsDisplay = true }
+    }
+    var strokeWidth: Double = 2
+    var strokeColor: NSColor = .black
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func draw(_ dirtyRect: NSRect) {
+        if let points = stroke, let first = points.first {
+            let path = NSBezierPath()
+            path.move(to: first)
+            for p in points.dropFirst() { path.line(to: p) }
+            if points.count == 1 { path.line(to: CGPoint(x: first.x + 0.01, y: first.y)) }
+            path.lineWidth = max(1, strokeWidth)
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            strokeColor.setStroke()
+            path.stroke()
+        }
         guard let r = rectangle else { return }
         let path = NSBezierPath(rect: r.insetBy(dx: 0.5, dy: 0.5))
         path.lineWidth = 1
