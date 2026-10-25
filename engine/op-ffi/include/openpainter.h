@@ -95,6 +95,26 @@ typedef struct OpPointerEvent {
 } OpPointerEvent;
 
 /**
+ * GPU pipelines made since the process started, by kind (op-gpu
+ * `pipeline_stats`). The app prints these on its `OP_READY` line; launch
+ * must make no effect pipeline before the canvas is ready.
+ */
+typedef struct OpPipelineCounts {
+  /**
+   * Compute pipelines for effect and resampling kernels.
+   */
+  uint64_t effect;
+  /**
+   * Canvas view render pipelines (one per attached view).
+   */
+  uint64_t view;
+  /**
+   * Mip builder render pipelines (made at the first draw below 100%).
+   */
+  uint64_t mip;
+} OpPipelineCounts;
+
+/**
  * One pointer sample in document pixels. `pressure` is 0..1 (1 for a mouse);
  * `tilt_x` and `tilt_y` are -1..1 (0 for a mouse); `time_ms` must not go back.
  */
@@ -418,6 +438,11 @@ enum OpStatus op_move_finish(struct OpEngine *p, uint64_t doc);
  * OP_ERR_BAD_ARGUMENT when no move runs.
  */
 enum OpStatus op_move_cancel(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Reads the process-wide pipeline counts. Needs no engine.
+ */
+enum OpStatus op_gpu_pipeline_counts(struct OpPipelineCounts *out);
 
 /**
  * Starts a Paintbrush, Eraser or Pencil stroke on the active layer. `json`:

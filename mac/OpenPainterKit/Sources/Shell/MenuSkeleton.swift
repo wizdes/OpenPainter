@@ -330,11 +330,11 @@ public enum MenuSkeleton {
             ]),
             // paint.net's Help menu (HelpMenu.html) links to its web pages;
             // OpenPainter's pages do not exist yet, so these stay off. Plugins
-            // is not in v1; Check for Updates comes with M58.
+            // is not in v1. Check for Updates (M58) uses Sparkle (Updates.swift).
             .submenu("Help", [
                 i("OpenPainter Help", "?"),
                 .separator,
-                i("Check for Updates…"),
+                .item("Check for Updates…", "", [], .selector(#selector(UpdateMenuActions.checkForUpdates(_:)))),
                 i("Send Feedback…"),
             ]),
         ]
@@ -381,6 +381,8 @@ public enum MenuSkeleton {
                        let tag = SelectionClipboard.pasteTitles.firstIndex(of: title) { item.tag = tag }
                     // Settings… works with no document window (M56).
                     if s == #selector(SettingsMenuActions.showSettings(_:)) { item.target = SettingsMenuTarget.shared }
+                    // Check for Updates… works with no document window (M58).
+                    if s == #selector(UpdateMenuActions.checkForUpdates(_:)) { item.target = UpdateMenuTarget.shared }
                 case let .command(id):
                     item.action = #selector(EditorMenuActions.runCommand(_:))
                     item.representedObject = id

@@ -1,9 +1,15 @@
-// Cold launch time: printed once as "OP_READY <ms>" for scripts/launch-time.sh.
+// Cold launch time: printed once as "OP_READY <ms> effect=<n> view=<n> mip=<n>"
+// for scripts/launch-time.sh. <ms> is milliseconds since the process started;
+// the counts are the GPU pipelines made before the canvas was ready (M58:
+// launch must make no effect pipeline; op_gpu_pipeline_counts).
 import Darwin
+import EngineBridge
 import Foundation
 
 public enum LaunchClock {
     nonisolated(unsafe) private static var printed = false
+    /// Runs once, right after the OP_READY line (the app starts LaunchProbe here).
+    nonisolated(unsafe) public static var afterReady: (() -> Void)?
 
     /// Milliseconds since the kernel started this process (includes dyld and
     /// everything before main).
@@ -21,11 +27,19 @@ public enum LaunchClock {
         return Double(now.tv_sec - start.tv_sec) * 1000 + Double(now.tv_usec - start.tv_usec) / 1000
     }
 
-    /// Prints "OP_READY <ms>" the first time it is called. Main thread only.
+    /// Prints the OP_READY line the first time it is called. Main thread only.
     public static func markReady() {
         guard !printed else { return }
         printed = true
         let ms = millisecondsSinceProcessStart()
-        FileHandle.standardOutput.write(Data(String(format: "OP_READY %.1f\n", ms).utf8))
+        var line = String(format: "OP_READY %.1f", ms)
+        do {
+            line += " \(try PipelineCounts.now())"
+        } catch {
+            line += " pipelines=unknown(\(error))"
+        }
+        FileHandle.standardOutput.write(Data((line + "\n").utf8))
+        afterReady?()
+        afterReady = nil
     }
 }

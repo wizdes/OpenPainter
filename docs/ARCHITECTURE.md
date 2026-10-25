@@ -202,9 +202,9 @@ void      op_pixels_free(OpPixelBuffer*);
 
 ## 9. Speed and size
 
-- Rust builds as a staticlib, arm64 only, thin LTO, stripped, `panic=unwind` (needed for `catch_unwind`). wgpu uses the Metal backend only on Mac.
+- Rust builds as a staticlib, arm64 only, fat LTO (M58 measured it 1.2 MB smaller than thin at the same launch time; `cargo rustc --crate-type staticlib`, because with the rlib crate type also listed cargo runs no LTO), stripped, `panic=unwind` (needed for `catch_unwind`). wgpu uses the Metal backend only on Mac.
 - Expected: engine about 12 MB, Swift app about 6 MB, assets about 3 MB. Bundle about 22 to 30 MB against a 75 MB limit.
-- Lazy work: the window shows first; wgpu device and compositor pipelines start on a background thread; effect pipelines compile on first use; lcms2 transforms are cached on demand; fonts are listed the first time the Text tool is chosen; Vision loads only for Remove Background.
+- Lazy work: the window shows first; wgpu device and compositor pipelines start on a background thread; effect pipelines compile on first use and the mip builder on the first draw below 100% (M58 counts them: `op_gpu_pipeline_counts`, printed on the `OP_READY` line); lcms2 transforms are cached on demand; fonts are listed the first time the Text tool is chosen; Vision loads only for Remove Background.
 - Budgets in `perf/budgets.toml`: cold launch < 3 s (aim < 1 s), open a 24 MP JPEG < 1.5 s, Gaussian r=10 at 24 MP < 0.5 s on GPU, pan and zoom ≥ 60 fps, brush latency < 16 ms, bundle < 75 MB. A checkpoint fails when a number is more than 10% worse than the stored baseline from the same machine.
 
 ## 10. Top risks

@@ -14,7 +14,11 @@ unsafe_op_in_unsafe_fn = "deny"
 all = "warn"
 
 [profile.release]
-lto = "thin"
+# M58 measured both on the app (mac/scripts/build-engine.sh builds the staticlib
+# alone so LTO runs): fat LTO makes OpenPainterKit 8.3 MB instead of 9.5 MB
+# (bundle 10.7 MB instead of 11.9 MB) at the same launch time; an engine-only
+# rebuild takes about 48 s instead of 38 s.
+lto = "fat"
 codegen-units = 1
 strip = true
 panic = "unwind"

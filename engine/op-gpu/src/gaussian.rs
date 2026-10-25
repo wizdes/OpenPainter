@@ -39,6 +39,7 @@ fn pipeline(gpu: &GpuContext, label: &'static str, source: &'static str) -> wgpu
             label: Some(label),
             source: wgpu::ShaderSource::Wgsl(source.into()),
         });
+    crate::pipeline_stats::note_effect();
     gpu.device
         .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some(label),

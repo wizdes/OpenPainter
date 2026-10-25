@@ -1,0 +1,13 @@
+# Perf baseline for scripts/perf-check.sh (M58). Recorded by
+# `scripts/perf-check.sh --record-baseline`; regressions are measured against
+# these numbers on the same machine only.
+machine = "Mac14,3 Apple M2"
+recorded = "2026-10-25T08:55Z"
+commit = "e68008d"
+runs = 20
+cache_purged = 0
+launch_median_ms = 1601.7
+launch_p95_ms = 2513.2
+first_effect_median_ms = 1621.9
+first_effect_p95_ms = 2552.7
+app_bundle_mb = 10.75

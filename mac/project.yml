@@ -12,6 +12,11 @@ options:
 packages:
   EngineBridge:
     path: EngineBridge
+  # M58: the update feed (https://sparkle-project.org/documentation/, "If you
+  # use Swift Package Manager"). Pinned; 2.10.0 was released 2026-09-13.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -25,6 +30,22 @@ settings:
     ENABLE_HARDENED_RUNTIME: NO
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     DEAD_CODE_STRIPPING: YES
+  # M58: Release is built for size and launch time. Whole-module Swift
+  # optimization, dead-code stripping, symbols stripped at build time (not only
+  # on install), debug info kept in a separate dSYM, and no debug dylib (Xcode
+  # can split an app into a stub plus OpenPainter.debug.dylib).
+  configs:
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+      SWIFT_OPTIMIZATION_LEVEL: -O
+      DEAD_CODE_STRIPPING: YES
+      DEPLOYMENT_POSTPROCESSING: YES
+      STRIP_INSTALLED_PRODUCT: YES
+      COPY_PHASE_STRIP: YES
+      STRIP_SWIFT_SYMBOLS: YES
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      ENABLE_DEBUG_DYLIB: NO
+      ENABLE_TESTABILITY: NO
 targets:
   OpenPainterKit:
     type: framework
@@ -34,6 +55,10 @@ targets:
     dependencies:
       - package: EngineBridge
         product: EngineBridge
+      # Linked here (Updates.swift); the app bundle carries the framework.
+      - package: Sparkle
+        product: Sparkle
+        embed: false
       - sdk: Metal.framework
       - sdk: QuartzCore.framework
       - sdk: CoreGraphics.framework
@@ -44,8 +69,12 @@ targets:
         LIBRARY_SEARCH_PATHS: $(SRCROOT)/../engine/target/release
         OTHER_LDFLAGS: [-lop_ffi, -liconv, -lobjc]
         SKIP_INSTALL: YES
+      configs:
+        Release:
+          # A framework keeps its exported symbols; only local ones go.
+          STRIP_STYLE: non-global
     preBuildScripts:
-      - name: Build engine (cargo build -p op-ffi --release)
+      - name: Build engine (cargo rustc -p op-ffi --release --crate-type staticlib)
         script: exec "$SRCROOT/scripts/build-engine.sh"
         basedOnDependencyAnalysis: false
         outputFiles:
@@ -57,6 +86,11 @@ targets:
       - path: OpenPainter
     dependencies:
       - target: OpenPainterKit
+      # Xcode copies Sparkle.framework into Contents/Frameworks for a package
+      # product by itself (`embed: true` makes XcodeGen add a second, broken
+      # copy step for "Sparkle-product").
+      - package: Sparkle
+        product: Sparkle
     info:
       path: OpenPainter/Info.plist
       properties:
@@ -69,6 +103,18 @@ targets:
         NSHighResolutionCapable: true
         LSApplicationCategoryType: public.app-category.graphics-design
         NSHumanReadableCopyright: "OpenPainter. Zoom steps from Paint.NET 3.36 (MIT)."
+        # M58: Sparkle 2 updates (OpenPainterKit Shell/Updates.swift).
+        # The feed is a placeholder that M60 publishes.
+        SUFeedURL: https://yili.dev/projects/openpainter/appcast.xml
+        # The EdDSA public key that checks every update. Deliberately empty:
+        # the release key pair is a credential, made only at M60 with the
+        # user's OK. While it is empty the updater never starts and
+        # Help > Check for Updates says "Updates are not set up yet".
+        SUPublicEDKey: ""
+        # The appcast and every archive must be EdDSA-signed (Sparkle docs,
+        # "Signing feeds"); M60 signs both with the release key.
+        SURequireSignedFeed: true
+        SUVerifyUpdateBeforeExtraction: true
         # M19: every format OpenPainter writes is an Editor type (Save, Save
         # As, Save a Copy). WebP and AVIF are written only where
         # CGImageDestinationCopyTypeIdentifiers lists them;
@@ -150,6 +196,10 @@ targets:
       - path: Tests/OpenPainterKitTests
     dependencies:
       - target: OpenPainterKit
+      # UpdateFeedTests drive Sparkle's own updater against a local feed.
+      - package: Sparkle
+        product: Sparkle
+        embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.yili.OpenPainterKitTests

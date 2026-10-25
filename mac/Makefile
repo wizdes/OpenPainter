@@ -1,7 +1,8 @@
 # Build, test and measure the Mac app. Run from the repo root as `make -C mac`.
 #   make -C mac            the Rust staticlib, the Xcode project, then the app (Release)
 #   make -C mac test       the XCTests (unit tests, view tests and the 30 s trace gate)
-#   make -C mac launch-time  scripts/launch-time.sh on the Release app
+#   make -C mac launch-time  scripts/launch-time.sh --first-effect on the Release app
+#   (scripts/perf-check.sh runs every speed and size gate, M58)
 #   make -C mac trace      `OpenPainter --trace` on a generated 6000x4000 PNG
 # Order: engine (cargo build -p op-ffi --release) -> xcodegen -> xcodebuild.
 DERIVED := build/DerivedData
@@ -24,7 +25,7 @@ test: engine project
 	$(XCB) -configuration Debug test
 
 launch-time: app
-	../scripts/launch-time.sh $(APP)
+	../scripts/launch-time.sh --first-effect $(APP)
 
 trace: app
 	$(APP)/Contents/MacOS/OpenPainter --make-trace-png build/trace-6000x4000.png

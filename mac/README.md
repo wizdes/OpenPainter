@@ -4,7 +4,7 @@ The app is an XcodeGen project (`mac/project.yml`). The `.xcodeproj` is generate
 
 ## Build order
 
-1. The Rust staticlib `engine/target/release/libop_ffi.a` (and its header `engine/op-ffi/include/openpainter.h`). `mac/scripts/build-engine.sh` runs `cargo build -p op-ffi --release` with a clean environment and `MACOSX_DEPLOYMENT_TARGET=15.0`.
+1. The Rust staticlib `engine/target/release/libop_ffi.a` (and its header `engine/op-ffi/include/openpainter.h`). `mac/scripts/build-engine.sh` runs `cargo rustc -p op-ffi --release --crate-type staticlib` with a clean environment and `MACOSX_DEPLOYMENT_TARGET=15.0` (M58: building only the staticlib is what makes cargo run LTO).
 2. `xcodegen generate --spec mac/project.yml`.
 3. `xcodebuild`: the `EngineBridge` package, the `OpenPainterKit` framework, then the `OpenPainter` app.
 
@@ -14,7 +14,8 @@ The app is an XcodeGen project (`mac/project.yml`). The `.xcodeproj` is generate
 | --- | --- |
 | `make -C mac` | Engine, project, Release app at `mac/build/DerivedData/Build/Products/Release/OpenPainter.app` |
 | `make -C mac test` | All XCTests, including the 30 s trace gate |
-| `make -C mac launch-time` | `scripts/launch-time.sh` on the Release app (median of 5 cold launches) |
+| `make -C mac launch-time` | `scripts/launch-time.sh --first-effect` on the Release app (median and p95 of 20 launches) |
+| `scripts/perf-check.sh` | Fresh Release build, then the size, launch, lazy-pipeline and regression checks (M58) |
 | `make -C mac trace` | Writes a 6000x4000 PNG to `mac/build/`, then runs `OpenPainter --trace` on it |
 
 Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
@@ -172,6 +173,16 @@ paint.net's Save Configuration dialog (https://www.getpaint.net/doc/latest/FileM
 - Shortcut changes: Zoom to Window Cmd B, Zoom to Selection Shift-Cmd-B, Actual Size Cmd 0, Go to Top and Bottom Layer Option-Cmd-PageUp and PageDown, Brightness / Contrast Shift-Cmd-T, Invert Alpha Option-Cmd-I. File > Print and Help > Plugins are gone (not in v1).
 - `M55_PNG_DIR=<dir>` (as `TEST_RUNNER_M55_PNG_DIR`) makes `testRenderMenuSheets` draw every menu into `menus-light.png` and `menus-dark.png`.
 
+## Speed, size and updates (M58)
+
+- Release build settings (`project.yml` `configs: Release`): whole-module Swift optimization, dead-code stripping, symbols stripped at build time (`DEPLOYMENT_POSTPROCESSING`; the app strips all symbols, `OpenPainterKit` only local ones), debug info in a dSYM, no debug dylib.
+- Rust: `build-engine.sh` builds only the staticlib so the release profile's LTO runs (with `rlib` also in op-ffi's crate types, cargo skipped LTO and the archive was 73 MB).
+- Lazy GPU work: the effect device starts on the first effect (`op-engine` `gpu_effects.rs`), each effect kernel compiles on its first dispatch, and the mip builder pipeline is made at the first draw below 100%. Launch makes only the view pipeline. `op_gpu_pipeline_counts` (op-gpu `pipeline_stats.rs`) counts what was made; `LaunchPerfTests` and `scripts/launch-time.sh` check that no effect pipeline exists at `OP_READY`.
+- `scripts/launch-time.sh`: 20 launches with `tests/fixtures/plasma_512x384.png`, median and p95 from process start to `OP_READY` (a usable canvas) and, with `--first-effect`, to `OP_FIRST_EFFECT`. It purges the file cache only when `sudo -n` needs no password; otherwise it says the cache was not purged.
+- `scripts/perf-check.sh`: builds the Release app fresh, then fails on any of: bundle over `app_bundle_mb`, launch median over `cold_launch_ms`, an effect pipeline before `OP_READY`, a first effect off the GPU, or launch median or bundle size more than `regression_pct` over `perf/baseline.toml` (recorded on the same machine with `--record-baseline`).
+- Updates: Sparkle 2.10.0 through Swift Package Manager. `Shell/Updates.swift` is Help > Check for Updates…. `Info.plist` sets `SUFeedURL` to the placeholder `https://yili.dev/projects/openpainter/appcast.xml` (M60 publishes it), `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction`, and leaves `SUPublicEDKey` empty: the release key pair is a credential made at M60 with the user's OK. While it is empty the updater never starts and the menu item says "Updates are not set up yet".
+- `UpdateFeedTests` make a throwaway key pair in a temporary folder, sign a fake update and the appcast with Sparkle's `sign_update` (from `build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/`), serve them on 127.0.0.1 and run Sparkle's `SPUUpdater` against them. `OP_M58_PNG_DIR=<dir>` (as `TEST_RUNNER_OP_M58_PNG_DIR`) draws the "not set up" alert in light and dark.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
@@ -218,4 +229,5 @@ Zoom to Window fits the document inside the view less 10 points and never goes a
 - `OpenPainter <file.png> ...` opens the files.
 - `OpenPainter --trace <file.png>` opens the file in a 960 x 600 point window, runs the 30 s trace, prints one `TRACE ...` line and exits with 0 (gate passed) or 1.
 - `OpenPainter --make-trace-png <out.png>` writes the 6000 x 4000 trace image and exits.
-- The app prints `OP_READY <ms>` (milliseconds since the process started) when the first document frame is presented, or when the empty start window is shown.
+- The app prints `OP_READY <ms> effect=<n> view=<n> mip=<n>` when the first document frame is presented, or when the empty start window is shown. `<ms>` is milliseconds since the process started; the counts are the GPU pipelines made so far (M58).
+- With `OP_LAUNCH_PROBE=first-effect` in the environment, the app then runs one 64 x 64 Gaussian blur on the GPU and prints `OP_FIRST_EFFECT <ms> gpu=<0|1>` (or `OP_FIRST_EFFECT_FAILED <reason>`).

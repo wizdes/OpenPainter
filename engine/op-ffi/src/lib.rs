@@ -13,11 +13,13 @@ use std::thread::JoinHandle;
 mod document;
 mod export;
 mod move_tool;
+mod perf;
 mod stroke;
 mod view;
 pub use document::*;
 pub use export::*;
 pub use move_tool::*;
+pub use perf::*;
 pub use stroke::*;
 pub use view::*;
 

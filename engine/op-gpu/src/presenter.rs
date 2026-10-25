@@ -153,8 +153,9 @@ pub struct ViewRenderer {
     /// Pyramid levels 1.. (premultiplied), built on first use below 100%.
     mips: Option<wgpu::Texture>,
     dummy_mips: wgpu::Texture,
-    mip_pipeline: wgpu::RenderPipeline,
-    mip_layout: wgpu::BindGroupLayout,
+    /// The mip builder pipeline and its bindings, made the first time a
+    /// pyramid is built (M58: only the view pipeline is made at attach).
+    mip_pipeline: Option<(wgpu::RenderPipeline, wgpu::BindGroupLayout)>,
     /// Uniforms for the mip pass: [source straight, source premultiplied].
     mip_params: [wgpu::Buffer; 2],
     mip_builds: u64,
@@ -220,6 +221,7 @@ impl ViewRenderer {
             bind_group_layouts: &[&layout],
             push_constant_ranges: &[],
         });
+        crate::pipeline_stats::note_view();
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("view renderer"),
             layout: Some(&pipeline_layout),
@@ -252,7 +254,6 @@ impl ViewRenderer {
             mapped_at_creation: false,
         });
         let lut = Self::lut_buffer(device, 16);
-        let (mip_pipeline, mip_layout) = Self::mip_pipeline(device);
         let mip_params = [0u32, 1].map(|premul| {
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("mip params"),
@@ -289,8 +290,7 @@ impl ViewRenderer {
             bind_group: None,
             mips: None,
             dummy_mips,
-            mip_pipeline,
-            mip_layout,
+            mip_pipeline: None,
             mip_params,
             mip_builds: 0,
             mips_stale: false,
@@ -333,6 +333,7 @@ impl ViewRenderer {
             bind_group_layouts: &[&layout],
             push_constant_ranges: &[],
         });
+        crate::pipeline_stats::note_mip();
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("mip builder"),
             layout: Some(&pipeline_layout),
@@ -376,6 +377,12 @@ impl ViewRenderer {
         if levels <= 1 {
             return;
         }
+        if self.mip_pipeline.is_none() {
+            self.mip_pipeline = Some(Self::mip_pipeline(device));
+        }
+        let Some((mip_pipeline, mip_layout)) = self.mip_pipeline.as_ref() else {
+            return;
+        };
         let refresh = self.mips.take();
         let fresh = refresh.is_none();
         let mips = refresh.unwrap_or_else(|| {
@@ -411,7 +418,7 @@ impl ViewRenderer {
             let dst = single(&mips, k);
             let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("mip builder"),
-                layout: &self.mip_layout,
+                layout: mip_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -438,7 +445,7 @@ impl ViewRenderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&self.mip_pipeline);
+            pass.set_pipeline(mip_pipeline);
             pass.set_bind_group(0, &bind, &[]);
             pass.draw(0..3, 0..1);
         }

@@ -2,6 +2,7 @@
 pub mod gaussian;
 #[cfg(target_os = "macos")]
 pub mod layer;
+pub mod pipeline_stats;
 pub mod presenter;
 use std::sync::{
     Arc,
@@ -1159,6 +1160,7 @@ impl GpuContext {
                 compilation_options: Default::default(),
                 cache: None,
             });
+        pipeline_stats::note_effect();
         self.pipelines.insert(entry, pipeline.clone());
         pipeline
     }
