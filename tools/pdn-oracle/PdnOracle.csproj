@@ -4,42 +4,56 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Nullable>disable</Nullable><LangVersion>latest</LangVersion>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <PropertyGroup>
+    <OpenPdnSourceRoot Condition="'$(OpenPdnSourceRoot)' == ''">$(MSBuildProjectDirectory)/../../.pdn-src</OpenPdnSourceRoot>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Png.cs" />
     <Compile Include="Stubs/*.cs" />
     <Compile Include="Shims/*.cs" />
     <Compile Include="Generated/FloodExtract.cs" />
-    <Compile Include="../../.pdn-src/src/Core/ColorBgra.cs" />
-    <Compile Include="../../.pdn-src/src/Base/IDeferredSerializable.cs" />
-    <Compile Include="../../.pdn-src/src/Base/DeferredFormatter.cs" />
-    <Compile Include="../../.pdn-src/src/Core/Scanline.cs" />
-    <Compile Include="../../.pdn-src/src/Core/RgbColor.cs" />
-    <Compile Include="../../.pdn-src/src/Core/Surface.cs" />
-    <Compile Include="../../.pdn-src/src/Core/MemoryBlock.cs" />
-    <Compile Include="../../.pdn-src/src/Core/PixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/IPixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/UnaryPixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/BinaryPixelOp.cs" />
-    <Compile Include="../../.pdn-src/src/Core/UnaryPixelOps.cs" />
-    <Compile Include="../../.pdn-src/src/Core/BinaryPixelOps.cs" />
-    <Compile Include="../../.pdn-src/src/Core/HsvColor.cs" />
-    <Compile Include="../../.pdn-src/src/Core/Histogram.cs" />
-    <Compile Include="../../.pdn-src/src/Core/HistogramRGB.cs" />
-    <Compile Include="../../.pdn-src/src/Core/SplineInterpolator.cs" />
-    <Compile Include="../../.pdn-src/src/Core/ResamplingAlgorithm.cs" />
-    <Compile Include="../../.pdn-src/src/Data/UserBlendOps.cs" />
-    <Compile Include="../../.pdn-src/src/Data/UserBlendOp.cs" />
-    <Compile Include="../../.pdn-src/src/Data/UserBlendOps.Generated.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/BrightnessAndContrastAdjustment.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/PosterizeAdjustment.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/GaussianBlurEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/FragmentEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/LocalHistogramEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/MedianEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/MotionBlurEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/RadialBlurEffect.cs" />
-    <Compile Include="../../.pdn-src/src/Effects/ZoomBlurEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/ColorBgra.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Base/IDeferredSerializable.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Base/DeferredFormatter.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/Scanline.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/RgbColor.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/Surface.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/MemoryBlock.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/PixelOp.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/IPixelOp.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/UnaryPixelOp.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/BinaryPixelOp.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/UnaryPixelOps.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/BinaryPixelOps.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/HsvColor.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/Histogram.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/HistogramRGB.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/SplineInterpolator.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Core/ResamplingAlgorithm.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Data/UserBlendOps.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Data/UserBlendOp.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Data/UserBlendOps.Generated.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/BrightnessAndContrastAdjustment.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PosterizeAdjustment.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/GaussianBlurEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/FragmentEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/LocalHistogramEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/MedianEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/MotionBlurEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/RadialBlurEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/ZoomBlurEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/ColorDifferenceEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/EdgeDetectEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/EmbossEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/OutlineEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/ReliefEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/OilPaintingEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/InkSketchEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PencilSketchEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/GlowEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/DesaturateEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/InvertColorsEffect.cs" />
   </ItemGroup>
   <Target Name="ExtractLegacyFlood" BeforeTargets="CoreCompile">
     <Exec Command="python3 &quot;$(MSBuildProjectDirectory)/extract-flood.py&quot;" />

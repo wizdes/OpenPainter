@@ -179,6 +179,13 @@ pub enum GpuKernel {
     Motion,
     Radial,
     Zoom,
+    EdgeDetect,
+    Emboss,
+    Relief,
+    OilPainting,
+    Outline,
+    InkSketch,
+    PencilSketch,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -304,12 +311,19 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::posterize::spec(),
         crate::effects::sepia::spec(),
         crate::effects::temperature_tint::spec(),
+        crate::effects::ink_sketch::spec(),
+        crate::effects::oil_painting::spec(),
+        crate::effects::pencil_sketch::spec(),
         crate::effects::fragment::spec(),
         crate::effects::gaussian_blur::spec(),
         crate::effects::median_blur::spec(),
         crate::effects::motion_blur::spec(),
         crate::effects::radial_blur::spec(),
         crate::effects::zoom_blur::spec(),
+        crate::effects::edge_detect::spec(),
+        crate::effects::emboss::spec(),
+        crate::effects::outline::spec(),
+        crate::effects::relief::spec(),
         crate::effects::content_aware::spec(),
     ]
 }

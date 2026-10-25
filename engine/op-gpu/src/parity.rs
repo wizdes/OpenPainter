@@ -38,6 +38,13 @@ impl GpuOp for EffectOp {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom
+                | GpuKernel::EdgeDetect
+                | GpuKernel::Emboss
+                | GpuKernel::Relief
+                | GpuKernel::OilPainting
+                | GpuKernel::Outline
+                | GpuKernel::InkSketch
+                | GpuKernel::PencilSketch
         ) {
             return op_ops::effect::reference_rgba8(
                 self.effect_id,

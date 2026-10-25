@@ -4,6 +4,229 @@ struct Params { width: u32, height: u32, mode: u32, opacity: u32, masked: u32 }
 @group(0) @binding(2) var<uniform> p: Params;
 @group(0) @binding(3) var output_tex: texture_storage_2d<rgba8uint, write>;
 @group(0) @binding(4) var coverage_tex: texture_2d<u32>;
+
+fn stylize_3x3(pos: vec2<i32>, kind: u32) -> vec4<u32> {
+  var rgb = vec3<f32>(0.0);
+  var gray = 0.0;
+  for (var fy=0; fy<3; fy++) {
+    for (var fx=0; fx<3; fx++) {
+      let xy = pos + vec2<i32>(fx-1, fy-1);
+      if xy.x < 0 || xy.y < 0 || xy.x >= i32(p.width) || xy.y >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, xy, 0);
+      let w = acc[fy*3+fx].x;
+      if kind == 1u {
+        let intensity = (7471u*c.b + 38470u*c.g + 19595u*c.r) >> 16u;
+        gray += w * f32(intensity);
+      } else { rgb += w * vec3<f32>(c.rgb); }
+    }
+  }
+  if kind == 1u {
+    let value = u32(clamp(i32(gray)+128,0,255));
+    return vec4<u32>(value,value,value,255u);
+  }
+  return vec4<u32>(vec3<u32>(clamp(vec3<i32>(rgb),vec3<i32>(0),vec3<i32>(255))),255u);
+}
+@compute @workgroup_size(16, 16)
+fn effect_edge_detect(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  textureStore(output_tex,vec2<i32>(id.xy),stylize_3x3(vec2<i32>(id.xy),0u));
+}
+@compute @workgroup_size(16, 16)
+fn effect_emboss(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  textureStore(output_tex,vec2<i32>(id.xy),stylize_3x3(vec2<i32>(id.xy),1u));
+}
+@compute @workgroup_size(16, 16)
+fn effect_relief(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  textureStore(output_tex,vec2<i32>(id.xy),stylize_3x3(vec2<i32>(id.xy),2u));
+}
+@compute @workgroup_size(16, 16)
+fn effect_oil_painting(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  var counts: array<u32,256>;
+  var sums: array<vec4<u32>,256>;
+  let radius = i32(p.mode);
+  let coarse = p.opacity;
+  for (var dy = -radius; dy <= radius; dy++) {
+    let sy = i32(id.y) + dy;
+    if sy < 0 || sy >= i32(p.height) { continue; }
+    for (var dx = -radius; dx <= radius; dx++) {
+      let sx = i32(id.x) + dx;
+      if sx < 0 || sx >= i32(p.width) { continue; }
+      let color = textureLoad(input_tex,vec2<i32>(sx,sy),0);
+      let intensity = (7471u*color.b + 38470u*color.g + 19595u*color.r) >> 16u;
+      let n = intensity * coarse + 0x80u;
+      let bin = ((n >> 8u) + n) >> 8u;
+      counts[bin] += 1u;
+      sums[bin] += color;
+    }
+  }
+  var chosen = 0u;
+  var best = 0u;
+  for (var bin=0u; bin<=coarse; bin++) {
+    if counts[bin] > best { chosen=bin; best=counts[bin]; }
+  }
+  textureStore(output_tex,vec2<i32>(id.xy),sums[chosen]/max(best,1u));
+}
+@compute @workgroup_size(16, 16)
+fn effect_outline(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  var hist: array<array<u32,256>,4>;
+  let radius = i32(p.mode);
+  let intensity = i32(p.opacity);
+  let cutoff = ((radius*2+1)*(radius*2+1)+2)/4;
+  var area = 0;
+  for (var dy=-radius; dy<=radius; dy++) {
+    let sy = i32(id.y)+dy;
+    if sy<0 || sy>=i32(p.height) { continue; }
+    for (var dx=-radius; dx<=radius; dx++) {
+      let sx = i32(id.x)+dx;
+      if sx<0 || sx>=i32(p.width) || dx*dx+dy*dy>cutoff { continue; }
+      let color = textureLoad(input_tex,vec2<i32>(sx,sy),0);
+      hist[0][color.r] += 1u;
+      hist[1][color.g] += 1u;
+      hist[2][color.b] += 1u;
+      hist[3][color.a] += 1u;
+      area += 1;
+    }
+  }
+  let low = area*(100-intensity)/200;
+  let high = area*(100+intensity)/200;
+  var out = vec4<u32>(0u);
+  for (var c=0; c<4; c++) {
+    var first = 0;
+    let skip_channel = select(c,2,c==3);
+    while first<255 && hist[skip_channel][first]==0u { first+=1; }
+    var count = 0;
+    while first<255 && count<low { count += i32(hist[c][first]); first+=1; }
+    var last=first;
+    while last<255 && count<high { count += i32(hist[c][last]); last+=1; }
+    out[c] = select(u32(255-(last-first)),u32(last),c==3);
+  }
+  textureStore(output_tex,vec2<i32>(id.xy),out);
+}
+fn artistic_intensity(color: vec4<u32>) -> u32 {
+  return (7471u*color.b + 38470u*color.g + 19595u*color.r) >> 16u;
+}
+fn legacy_scale(a: u32, b: u32) -> u32 {
+  let n = a*b + 0x80u;
+  return ((n >> 8u) + n) >> 8u;
+}
+fn legacy_blend(lhs: vec4<u32>, rhs: vec4<u32>, mode: u32) -> vec4<u32> {
+  let y = legacy_scale(lhs.a, 255u-rhs.a);
+  let total = y+rhs.a;
+  if total == 0u { return vec4<u32>(0u); }
+  let x = legacy_scale(lhs.a,rhs.a);
+  let z = rhs.a-x;
+  var out = vec4<u32>(0u);
+  for (var c=0; c<3; c++) {
+    let a = lhs[c];
+    let b = rhs[c];
+    var blend = min(a,b);
+    if mode == 0u { blend = a+b-legacy_scale(a,b); }
+    if mode == 2u {
+      if b == 255u { blend=255u; } else { blend=min(255u,a*255u/(255u-b)); }
+    }
+    out[c] = (a*y+b*z+blend*x)/total;
+  }
+  out.a=total;
+  return out;
+}
+fn legacy_gaussian(pos: vec2<i32>, radius: i32) -> vec4<u32> {
+  var wa_sum=0;
+  var wc_sum=0;
+  var sums=vec4<i32>(0);
+  for (var dx=-radius; dx<=radius; dx++) {
+    let xx=pos.x+dx;
+    if xx<0 || xx>=i32(p.width) { continue; }
+    let wx=16*(radius+1-abs(dx));
+    var wa_col=0;
+    var wc_col=0;
+    var col=vec4<i32>(0);
+    for (var dy=-radius; dy<=radius; dy++) {
+      let yy=pos.y+dy;
+      if yy<0 || yy>=i32(p.height) { continue; }
+      let color=textureLoad(input_tex,vec2<i32>(xx,yy),0);
+      let wy=16*(radius+1-abs(dy));
+      wa_col+=wy;
+      let alpha_weight=wy*(i32(color.a)+i32(color.a>>7u));
+      wc_col+=alpha_weight;
+      col+=(alpha_weight>>8)*vec4<i32>(color);
+    }
+    wa_sum+=wx*wa_col;
+    wc_sum+=wx*wc_col;
+    sums+=wx*col;
+  }
+  wc_sum=wc_sum>>8;
+  if wa_sum==0 || wc_sum==0 { return vec4<u32>(0u); }
+  return vec4<u32>(
+    u32(clamp(sums.r/wc_sum,0,255)),
+    u32(clamp(sums.g/wc_sum,0,255)),
+    u32(clamp(sums.b/wc_sum,0,255)),
+    u32(clamp(sums.a/wa_sum,0,255)));
+}
+fn legacy_bc(pixel: vec4<u32>, brightness: i32, contrast: i32) -> vec4<u32> {
+  let i=i32(artistic_intensity(pixel));
+  var multiply=1;
+  var divide=1;
+  if contrast<0 { multiply=contrast+100; divide=100; }
+  if contrast>0 { multiply=100; divide=100-contrast; }
+  var out=pixel;
+  if divide==0 {
+    let value=select(0u,255u,i+brightness>=128);
+    out=vec4<u32>(vec3<u32>(value),pixel.a);
+  } else {
+    var shift=0;
+    if divide==100 { shift=(i-127)*multiply/divide+127-i+brightness; }
+    else { shift=(i-127+brightness)*multiply/divide+127-i; }
+    out=vec4<u32>(vec3<u32>(clamp(vec3<i32>(pixel.rgb)+vec3<i32>(shift),vec3<i32>(0),vec3<i32>(255))),pixel.a);
+  }
+  return out;
+}
+@compute @workgroup_size(16, 16)
+fn effect_pencil_sketch(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x>=p.width || id.y>=p.height { return; }
+  let pos=vec2<i32>(id.xy);
+  let original=textureLoad(input_tex,pos,0);
+  let blurred=legacy_gaussian(pos,i32(p.mode));
+  let range=bitcast<i32>(p.opacity);
+  let adjusted=legacy_bc(blurred,range,-range);
+  let inverted=vec4<u32>(vec3<u32>(255u)-adjusted.rgb,adjusted.a);
+  let gray=artistic_intensity(inverted);
+  let source_gray=artistic_intensity(original);
+  let result=legacy_blend(vec4<u32>(vec3<u32>(source_gray),original.a),
+    vec4<u32>(vec3<u32>(gray),adjusted.a),2u);
+  textureStore(output_tex,pos,result);
+}
+@compute @workgroup_size(16, 16)
+fn effect_ink_sketch(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x>=p.width || id.y>=p.height { return; }
+  let pos=vec2<i32>(id.xy);
+  let original=textureLoad(input_tex,pos,0);
+  let blurred=legacy_gaussian(pos,6);
+  let coloring=i32(p.opacity);
+  let adjust=-(coloring-50)*2;
+  let adjusted=legacy_bc(blurred,adjust,adjust);
+  let background=legacy_blend(original,adjusted,0u);
+  var sums=vec3<i32>(0);
+  for (var fy=0; fy<5; fy++) {
+    let sy=pos.y+fy-2;
+    if sy<0 || sy>=i32(p.height) { continue; }
+    for (var fx=0; fx<5; fx++) {
+      let sx=pos.x+fx-2;
+      if sx<0 || sx>=i32(p.width) { continue; }
+      var weight=-1;
+      if fx==2 && fy==2 { weight=30; }
+      if fx==2 && fy==4 { weight=-5; }
+      sums+=vec3<i32>(textureLoad(input_tex,vec2<i32>(sx,sy),0).rgb)*weight;
+    }
+  }
+  let rgb=vec3<u32>(clamp(sums,vec3<i32>(0),vec3<i32>(255)));
+  let line=select(0u,255u,i32(artistic_intensity(vec4<u32>(rgb,255u)))>i32(p.mode)*255/100);
+  let result=legacy_blend(vec4<u32>(vec3<u32>(line),255u),background,1u);
+  textureStore(output_tex,pos,result);
+}
 @compute @workgroup_size(16, 16)
 fn resample_nearest(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }

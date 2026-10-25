@@ -188,6 +188,11 @@ impl GpuContext {
         let values = match kernel {
             op_ops::effect::GpuKernel::Posterize => [16, 16, 16],
             op_ops::effect::GpuKernel::Sepia => [50, 0, 0],
+            op_ops::effect::GpuKernel::OilPainting => [3, 50, 0],
+            op_ops::effect::GpuKernel::Outline => [3, 50, 0],
+            op_ops::effect::GpuKernel::InkSketch => [50, 50, 0],
+            op_ops::effect::GpuKernel::PencilSketch => [2, 0, 0],
+            op_ops::effect::GpuKernel::EdgeDetect | op_ops::effect::GpuKernel::Relief => [45, 0, 0],
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
@@ -213,6 +218,21 @@ impl GpuContext {
                 values.iter().all(|value| (2..=64).contains(value))
             }
             op_ops::effect::GpuKernel::Sepia => (0..=100).contains(&values[0]),
+            op_ops::effect::GpuKernel::OilPainting => {
+                (1..=8).contains(&values[0]) && (3..=255).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::Outline => {
+                (1..=200).contains(&values[0]) && (0..=100).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::InkSketch => {
+                (0..=99).contains(&values[0]) && (0..=100).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::PencilSketch => {
+                (1..=20).contains(&values[0]) && (-20..=20).contains(&values[1])
+            }
+            op_ops::effect::GpuKernel::EdgeDetect
+            | op_ops::effect::GpuKernel::Emboss
+            | op_ops::effect::GpuKernel::Relief => (-180..=180).contains(&values[0]),
             _ => true,
         };
         if !valid {
@@ -220,7 +240,46 @@ impl GpuContext {
         }
         let input = self.upload(width, height, bytes)?;
         let output = self.texture(width, height);
-        let acc = self.accumulator(width, height);
+        let acc = if matches!(
+            kernel,
+            op_ops::effect::GpuKernel::EdgeDetect
+                | op_ops::effect::GpuKernel::Emboss
+                | op_ops::effect::GpuKernel::Relief
+        ) {
+            let angle = (values[0] as f64).to_radians();
+            let delta = std::f64::consts::FRAC_PI_4;
+            let center = if kernel == op_ops::effect::GpuKernel::Relief {
+                1.0
+            } else {
+                0.0
+            };
+            let weights = [
+                [
+                    (angle + delta).cos(),
+                    (angle + 2.0 * delta).cos(),
+                    (angle + 3.0 * delta).cos(),
+                ],
+                [angle.cos(), center, (angle + 4.0 * delta).cos()],
+                [
+                    (angle - delta).cos(),
+                    (angle - 2.0 * delta).cos(),
+                    (angle - 3.0 * delta).cos(),
+                ],
+            ];
+            let values: Vec<[f32; 4]> = weights
+                .into_iter()
+                .flatten()
+                .map(|weight| [weight as f32, 0.0, 0.0, 0.0])
+                .collect();
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("stylize precomputed weights"),
+                    contents: bytemuck::cast_slice(&values),
+                    usage: wgpu::BufferUsages::STORAGE,
+                })
+        } else {
+            self.accumulator(width, height)
+        };
         let params = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -258,6 +317,13 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Motion => "effect_motion",
             op_ops::effect::GpuKernel::Radial => "effect_radial",
             op_ops::effect::GpuKernel::Zoom => "effect_zoom",
+            op_ops::effect::GpuKernel::EdgeDetect => "effect_edge_detect",
+            op_ops::effect::GpuKernel::Emboss => "effect_emboss",
+            op_ops::effect::GpuKernel::Relief => "effect_relief",
+            op_ops::effect::GpuKernel::OilPainting => "effect_oil_painting",
+            op_ops::effect::GpuKernel::Outline => "effect_outline",
+            op_ops::effect::GpuKernel::InkSketch => "effect_ink_sketch",
+            op_ops::effect::GpuKernel::PencilSketch => "effect_pencil_sketch",
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

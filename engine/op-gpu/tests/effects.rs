@@ -51,6 +51,13 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom
+                | GpuKernel::EdgeDetect
+                | GpuKernel::Emboss
+                | GpuKernel::Relief
+                | GpuKernel::OilPainting
+                | GpuKernel::Outline
+                | GpuKernel::InkSketch
+                | GpuKernel::PencilSketch
         );
         let mut expected = bytes.clone();
         for pixel in expected.chunks_exact_mut(4) {
@@ -96,13 +103,27 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom => break,
+                GpuKernel::EdgeDetect
+                | GpuKernel::Emboss
+                | GpuKernel::Relief
+                | GpuKernel::OilPainting
+                | GpuKernel::Outline
+                | GpuKernel::InkSketch
+                | GpuKernel::PencilSketch => break,
             }
         }
         if blur {
             expected = op_ops::effect::reference_rgba8(spec.id, width, height, &bytes).unwrap();
         }
         if blur {
-            let tolerance = if matches!(kernel, GpuKernel::Gaussian | GpuKernel::Motion) {
+            let tolerance = if matches!(
+                kernel,
+                GpuKernel::Gaussian
+                    | GpuKernel::Motion
+                    | GpuKernel::EdgeDetect
+                    | GpuKernel::Emboss
+                    | GpuKernel::Relief
+            ) {
                 1
             } else {
                 0
@@ -121,6 +142,133 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
             );
         } else {
             assert_eq!(actual, expected, "{}", spec.id);
+        }
+    }
+}
+
+#[test]
+fn m40_artistic_gpu_parameter_endpoints_match_cpu() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (5u32, 3u32);
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| {
+            [
+                (i * 53) as u8,
+                (i * 71) as u8,
+                (i * 19) as u8,
+                ((i % 4) * 85) as u8,
+            ]
+        })
+        .collect();
+    for (id, kernel, key1, key2, endpoints) in [
+        (
+            "effect.artistic.ink_sketch",
+            GpuKernel::InkSketch,
+            "ink_outline",
+            "coloring",
+            [[0, 0], [99, 100]],
+        ),
+        (
+            "effect.artistic.oil_painting",
+            GpuKernel::OilPainting,
+            "brush_size",
+            "coarseness",
+            [[1, 3], [8, 255]],
+        ),
+        (
+            "effect.artistic.pencil_sketch",
+            GpuKernel::PencilSketch,
+            "pencil_tip_size",
+            "range",
+            [[1, -20], [20, 20]],
+        ),
+        (
+            "effect.stylize.outline",
+            GpuKernel::Outline,
+            "thickness",
+            "intensity",
+            [[1, 0], [200, 100]],
+        ),
+    ] {
+        let spec = effect::find(id).unwrap();
+        for values in endpoints {
+            let mut params = spec.default_params();
+            params[key1] = serde_json::json!(values[0]);
+            params[key2] = serde_json::json!(values[1]);
+            let prep = effect::Prepared {
+                width: width as i32,
+                height: height as i32,
+                ..effect::Prepared::default()
+            };
+            let sample = |x: i32, y: i32| -> [u8; 4] {
+                if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+                    return [0; 4];
+                }
+                let i = (y as usize * width as usize + x as usize) * 4;
+                bytes[i..i + 4].try_into().unwrap()
+            };
+            let mut expected = Vec::new();
+            for y in 0..height as i32 {
+                for x in 0..width as i32 {
+                    expected.extend_from_slice(&(spec.render_cpu)(&sample, x, y, &prep, &params));
+                }
+            }
+            let actual = gpu
+                .effect_kernel_with_params(kernel, width, height, &bytes, [values[0], values[1], 0])
+                .unwrap();
+            assert_eq!(actual, expected, "{id} {values:?}");
+        }
+    }
+}
+
+#[test]
+fn m40_stylize_gpu_angle_endpoints_match_cpu() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    let (width, height) = (5u32, 3u32);
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| {
+            [
+                (i * 53) as u8,
+                (i * 71) as u8,
+                (i * 19) as u8,
+                ((i % 4) * 85) as u8,
+            ]
+        })
+        .collect();
+    let sample = |x: i32, y: i32| -> [u8; 4] {
+        if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+            return [0; 4];
+        }
+        let i = (y as usize * width as usize + x as usize) * 4;
+        bytes[i..i + 4].try_into().unwrap()
+    };
+    for (id, kernel) in [
+        ("effect.stylize.edge_detect", GpuKernel::EdgeDetect),
+        ("effect.stylize.emboss", GpuKernel::Emboss),
+        ("effect.stylize.relief", GpuKernel::Relief),
+    ] {
+        let spec = effect::find(id).unwrap();
+        for angle in [-180, 0, 45, 180] {
+            let mut params = spec.default_params();
+            params["angle"] = serde_json::json!(angle as f64);
+            let prep = effect::Prepared {
+                width: width as i32,
+                height: height as i32,
+                ..effect::Prepared::default()
+            };
+            let mut expected = Vec::new();
+            for y in 0..height as i32 {
+                for x in 0..width as i32 {
+                    expected.extend_from_slice(&(spec.render_cpu)(&sample, x, y, &prep, &params));
+                }
+            }
+            let actual = gpu
+                .effect_kernel_with_params(kernel, width, height, &bytes, [angle, 0, 0])
+                .unwrap();
+            assert!(
+                actual.iter().zip(expected).all(|(a, b)| a.abs_diff(b) <= 1),
+                "{id} {angle}"
+            );
         }
     }
 }

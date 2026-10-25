@@ -1,8 +1,10 @@
 """Copy the unmodified OpenPDN 3.36 flood detection methods into the oracle."""
 from pathlib import Path
+import os
 
 root = Path(__file__).resolve().parents[2]
-source = (root / '.pdn-src/src/tools/FloodToolBase.cs').read_text()
+source_root = Path(os.environ.get('OpenPdnSourceRoot', str(root / '.pdn-src')))
+source = (source_root / 'src/tools/FloodToolBase.cs').read_text()
 start = source.index('        private static bool CheckColor(')
 end = source.index('        protected abstract void OnFillRegionComputed', start)
 body = source[start:end]
