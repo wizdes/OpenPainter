@@ -462,7 +462,7 @@ fn join(mask: &mut [u8], a: Point, b: Point, c: Point, o: LineOptions, w: u32, h
     }
     add_polygon(mask, shape, w, h, o.antialias);
 }
-fn rasterize(path: &[Point], o: LineOptions, w: u32, h: u32) -> Vec<u8> {
+pub fn rasterize(path: &[Point], o: LineOptions, w: u32, h: u32) -> Vec<u8> {
     let mut mask = vec![0; w as usize * h as usize];
     if path.len() < 2 {
         return mask;
@@ -562,6 +562,23 @@ fn rasterize(path: &[Point], o: LineOptions, w: u32, h: u32) -> Vec<u8> {
             w,
             h,
             o.antialias,
+        );
+    }
+    mask
+}
+
+/// Strokes a closed path, including the join where its last edge meets its first.
+pub fn rasterize_closed(path: &[Point], options: LineOptions, w: u32, h: u32) -> Vec<u8> {
+    let mut mask = rasterize(path, options, w, h);
+    if options.dash == Dash::Solid && path.len() >= 4 && path.first() == path.last() {
+        join(
+            &mut mask,
+            path[path.len() - 2],
+            path[0],
+            path[1],
+            options,
+            w,
+            h,
         );
     }
     mask
