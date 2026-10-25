@@ -158,6 +158,10 @@ pub struct ViewRenderer {
     /// Uniforms for the mip pass: [source straight, source premultiplied].
     mip_params: [wgpu::Buffer; 2],
     mip_builds: u64,
+    /// The document changed after the pyramid was built (a partial upload):
+    /// the next draw below 100% refills the existing pyramid.
+    mips_stale: bool,
+    mip_refreshes: u64,
 }
 
 impl ViewRenderer {
@@ -289,6 +293,8 @@ impl ViewRenderer {
             mip_layout,
             mip_params,
             mip_builds: 0,
+            mips_stale: false,
+            mip_refreshes: 0,
         }
     }
 
@@ -363,26 +369,31 @@ impl ViewRenderer {
     /// Builds pyramid levels 1.. for the current document, once per document.
     fn ensure_mips(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder) {
         let Some(doc) = self.doc.as_ref() else { return };
-        if self.mips.is_some() {
+        if self.mips.is_some() && !self.mips_stale {
             return;
         }
         let levels = pyramid_levels(doc.width, doc.height);
         if levels <= 1 {
             return;
         }
-        let mips = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("document mips"),
-            size: wgpu::Extent3d {
-                width: (doc.width / 2).max(1),
-                height: (doc.height / 2).max(1),
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: levels - 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Uint,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
+        let refresh = self.mips.take();
+        let fresh = refresh.is_none();
+        let mips = refresh.unwrap_or_else(|| {
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("document mips"),
+                size: wgpu::Extent3d {
+                    width: (doc.width / 2).max(1),
+                    height: (doc.height / 2).max(1),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: levels - 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Uint,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            })
         });
         let single = |t: &wgpu::Texture, level: u32| {
             t.create_view(&wgpu::TextureViewDescriptor {
@@ -432,8 +443,65 @@ impl ViewRenderer {
             pass.draw(0..3, 0..1);
         }
         self.mips = Some(mips);
-        self.mip_builds += 1;
-        self.bind_group = None;
+        self.mips_stale = false;
+        if fresh {
+            self.mip_builds += 1;
+            self.bind_group = None;
+        } else {
+            self.mip_refreshes += 1;
+        }
+    }
+
+    /// How many times an existing pyramid was refilled after a partial upload.
+    pub fn mip_refreshes(&self) -> u64 {
+        self.mip_refreshes
+    }
+
+    /// Replaces a rectangle of the current document with straight, encoded RGBA8
+    /// rows (`width * 4` bytes each). The texture is kept; mips refill on the
+    /// next draw below 100%. Fails when no document is set or the rectangle is
+    /// outside it.
+    pub fn update_document_region(
+        &mut self,
+        queue: &wgpu::Queue,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+    ) -> Result<()> {
+        let doc = self.doc.as_ref().ok_or(GpuError::InvalidImage)?;
+        if width == 0
+            || height == 0
+            || x.checked_add(width).is_none_or(|r| r > doc.width)
+            || y.checked_add(height).is_none_or(|b| b > doc.height)
+            || (width as u64) * (height as u64) * 4 != rgba.len() as u64
+        {
+            return Err(GpuError::InvalidImage);
+        }
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &doc.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d { x, y, z: 0 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            rgba,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width * 4),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        if self.mips.is_some() {
+            self.mips_stale = true;
+        }
+        Ok(())
     }
 
     fn lut_buffer(device: &wgpu::Device, size: u64) -> wgpu::Buffer {
@@ -502,6 +570,7 @@ impl ViewRenderer {
             height,
         });
         self.mips = None;
+        self.mips_stale = false;
         self.bind_group = None;
         Ok(())
     }

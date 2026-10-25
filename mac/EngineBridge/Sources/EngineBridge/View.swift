@@ -56,6 +56,9 @@ public struct CanvasViewInfo: Sendable {
     public let docUploads: UInt64
     public let frameErrors: UInt64
     public let lastError: EngineError?
+    /// Changes uploaded as changed tiles only (live strokes), and those tiles.
+    public let regionUploads: UInt64
+    public let regionTiles: UInt64
 
     init(_ i: OpViewInfo) {
         state = CanvasViewState(
@@ -78,6 +81,8 @@ public struct CanvasViewInfo: Sendable {
         docUploads = i.doc_uploads
         frameErrors = i.frame_errors
         lastError = EngineError(OpStatus(rawValue: i.last_error))
+        regionUploads = i.region_uploads
+        regionTiles = i.region_tiles
     }
 }
 

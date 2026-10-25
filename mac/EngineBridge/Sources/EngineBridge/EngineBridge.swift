@@ -134,7 +134,10 @@ final class EventSink: Sendable {
 
 /// One engine instance. Its events arrive on `events`, in order.
 public final class Engine: @unchecked Sendable {
-    private let lock = NSLock()
+    /// Recursive: `op_view_detach` releases a CAMetalLayer, which flushes the Core
+    /// Animation transaction on this thread; that can lay out another canvas,
+    /// which calls `op_view_set` from inside the detach call (M38 found the hang).
+    private let lock = NSRecursiveLock()
     private var handle: OpaquePointer?
     private let sinkRef: Unmanaged<EventSink>
     let sink: EventSink

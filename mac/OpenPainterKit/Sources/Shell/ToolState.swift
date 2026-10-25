@@ -103,11 +103,13 @@ public enum PaintTool: String, CaseIterable, Sendable {
         }
     }
 
-    public enum OptionSet: Sendable { case none, brush, flood, picker }
+    public enum OptionSet: Sendable { case none, brush, eraser, pencil, flood, picker }
 
     public var options: OptionSet {
         switch self {
-        case .paintbrush, .eraser, .pencil: .brush
+        case .paintbrush: .brush
+        case .eraser: .eraser
+        case .pencil: .pencil
         case .magicWand, .paintBucket: .flood
         case .colorPicker: .picker
         default: .none
@@ -161,6 +163,12 @@ public struct ToolSettings: Equatable, Sendable {
     public var blend = Blend.normal
     /// Opacity percent, 0...100.
     public var opacity: Double = 100
+    /// Brush hardness percent, 0...100 (Paintbrush and Eraser; 100 is a hard edge).
+    public var hardness: Double = 100
+    /// Pen pressure changes the brush width (Paintbrush and Eraser).
+    public var pressureSize = false
+    /// Pen pressure changes the opacity (Paintbrush, Eraser and Pencil).
+    public var pressureOpacity = false
     /// Tolerance percent, 0...100 (paint.net default 50%).
     public var tolerance: Double = 50
     public var floodMode = FloodMode.contiguous
@@ -300,6 +308,23 @@ public final class ToolState {
             "antialias": settings.antialias,
             "blend": settings.blend.rawValue,
         ]
+    }
+
+    /// Options for a live stroke (`op_stroke_begin`): the `tool.stroke` options
+    /// plus hardness and the pen pressure toggles. The Pencil has no width,
+    /// hardness or antialiasing in paint.net: it always draws 1 px, hard,
+    /// aliased. The Eraser has no blend mode.
+    public func liveStrokeParams(tool: PaintTool, secondary useSecondary: Bool = false) -> [String: any Sendable] {
+        var p = strokeParams(tool: tool, secondary: useSecondary)
+        p["hardness"] = tool == .pencil ? 1.0 : settings.hardness / 100
+        p["pressure_size"] = tool != .pencil && settings.pressureSize
+        p["pressure_opacity"] = settings.pressureOpacity
+        if tool == .pencil {
+            p["width"] = 1.0
+            p["antialias"] = false
+        }
+        if tool == .eraser { p["blend"] = ToolSettings.Blend.normal.rawValue }
+        return p
     }
 
     /// Parameters for `tool.magic_wand` or `tool.paint_bucket` at a document pixel.

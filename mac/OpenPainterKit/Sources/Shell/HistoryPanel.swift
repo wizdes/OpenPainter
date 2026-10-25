@@ -20,7 +20,8 @@ public enum HistoryStep {
         case "layer.set_visible": return "eye"
         case "layer.properties": return "slider.horizontal.3"
         case "selection.select_all", "selection.deselect", "move.selection": return "rectangle.dashed"
-        case "tool.stroke": return "paintbrush.pointed"
+        // Live strokes (M38) name their step after the tool.
+        case "tool.stroke", "Paintbrush", "Eraser", "Pencil": return "paintbrush.pointed"
         case "tool.magic_wand": return "wand.and.stars"
         case "tool.paint_bucket": return "drop"
         case "image.crop_to_selection", "image.auto_crop": return "crop"

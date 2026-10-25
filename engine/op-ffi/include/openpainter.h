@@ -95,6 +95,19 @@ typedef struct OpPointerEvent {
 } OpPointerEvent;
 
 /**
+ * One pointer sample in document pixels. `pressure` is 0..1 (1 for a mouse);
+ * `tilt_x` and `tilt_y` are -1..1 (0 for a mouse); `time_ms` must not go back.
+ */
+typedef struct OpStrokeSample {
+  double x;
+  double y;
+  double pressure;
+  double tilt_x;
+  double tilt_y;
+  uint64_t time_ms;
+} OpStrokeSample;
+
+/**
  * Where and how a view shows its document. Sizes and positions are in points;
  * the drawable is `width_pt * scale` by `height_pt * scale` pixels.
  */
@@ -172,6 +185,14 @@ typedef struct OpViewInfo {
    * OpStatus of the last failed frame, or OP_OK.
    */
   uint32_t last_error;
+  /**
+   * Changes uploaded as changed tiles only, not the whole image (M38).
+   */
+  uint64_t region_uploads;
+  /**
+   * Tiles uploaded by those partial uploads.
+   */
+  uint64_t region_tiles;
 } OpViewInfo;
 
 /**
@@ -191,6 +212,23 @@ typedef struct OpViewCounters {
   uint64_t validation_errors;
   uint64_t frames_total;
 } OpViewCounters;
+
+/**
+ * One presented frame, for latency measurements (M38). `time_ns` is
+ * CLOCK_UPTIME_RAW (the clock of `NSEvent.timestamp` and
+ * `ProcessInfo.systemUptime`) after the GPU finished the frame.
+ */
+typedef struct OpFrameStamp {
+  uint64_t time_ns;
+  /**
+   * The document revision the frame shows.
+   */
+  uint64_t revision;
+  /**
+   * The preview (`stroke.append` returns it) the frame shows; 0 for none.
+   */
+  uint64_t preview_serial;
+} OpFrameStamp;
 
 struct OpEngine *op_engine_new(const struct OpConfig *_config, OpEventFn event_fn, void *user);
 
@@ -257,6 +295,39 @@ enum OpStatus op_pointer(struct OpEngine *_p,
                          uintptr_t _len);
 
 /**
+ * Starts a Paintbrush, Eraser or Pencil stroke on the active layer. `json`:
+ * `{"tool","width","color":"rrggbbaa","opacity":0..255,"antialias","blend",
+ * "hardness":0..1,"pressure_size","pressure_opacity"}`. Returns OP_ERR_BUSY
+ * while another stroke, a preview or a move runs on the document, and
+ * OP_ERR_BAD_ARGUMENT for bad options.
+ */
+enum OpStatus op_stroke_begin(struct OpEngine *p, uint64_t doc, const uint8_t *json, uintptr_t len);
+
+/**
+ * Adds samples to the document's stroke and publishes the new preview; the
+ * document's canvas views draw it at once. Writes the preview's serial (the
+ * `preview_serial` of the frame stamps that show it) to `out_serial` when it
+ * is not null. A bad sample changes nothing and returns OP_ERR_BAD_ARGUMENT.
+ */
+enum OpStatus op_stroke_append(struct OpEngine *p,
+                               uint64_t doc,
+                               const struct OpStrokeSample *samples,
+                               uintptr_t count,
+                               uint64_t *out_serial);
+
+/**
+ * Commits the document's stroke as one history step named after the tool.
+ * Returns OP_ERR_BUSY (and drops the stroke) when the document changed under it.
+ */
+enum OpStatus op_stroke_end(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Drops the document's stroke; the document and its history stay as they were.
+ * Returns OP_ERR_BAD_ARGUMENT when no stroke runs.
+ */
+enum OpStatus op_stroke_cancel(struct OpEngine *p, uint64_t doc);
+
+/**
  * Attaches a view of `doc` to a `CAMetalLayer`. The engine retains the layer
  * until the view is detached. Nothing is drawn until the first `op_view_set`.
  * Returns OP_ERR_NO_SUCH_DOC for an unknown document, OP_ERR_BAD_ARGUMENT for a
@@ -311,5 +382,17 @@ enum OpStatus op_view_wait_frames(struct OpEngine *p,
                                   uint64_t min_frames,
                                   uint32_t timeout_ms,
                                   uint64_t *out_frames);
+
+/**
+ * Moves up to `cap` frame stamps (oldest first) out of the view's log into
+ * `out` and writes how many to `out_len`. The log keeps the newest 16384
+ * frames until read. Separate from `op_view_take_frame_times`: reading one
+ * does not drain the other.
+ */
+enum OpStatus op_view_take_frame_stamps(struct OpEngine *p,
+                                        uint64_t view,
+                                        struct OpFrameStamp *out,
+                                        uintptr_t cap,
+                                        uintptr_t *out_len);
 
 #endif  /* OPENPAINTER_H */
