@@ -158,6 +158,8 @@ paint.net's Save Configuration dialog (https://www.getpaint.net/doc/latest/FileM
 
 - Every open image has a recovery folder `~/Library/Application Support/OpenPainter/Recovery/<uuid>/` (`PlatformServices/RecoveryCenter.swift`; the app sets `RecoveryCenter.root` at launch, tests set their own and it is off by default). The engine writes a record on its own thread 30 s after the last change, or at the latest 2 minutes after the first unrecorded change (format and write order: docs/ARCHITECTURE.md, "Recovery records"). A clean save, an undo back to the saved step and a close delete it.
 - At launch, `RecoveryCenter.offerAtLaunch` lists the records no running app owns in one sheet (`Shell/RecoverySheet.swift`): the original file name, when it was recorded, the size and layer count, with Recover and Discard per image and Decide Later. Recover opens the image marked unsaved with its original file as its file; a damaged record shows why and can only be discarded.
+- The launch scan and Recover's read and decode run off the main thread; the row shows a spinner while it recovers. When the record folder cannot be made, the status bar says so and the image tries again every write interval.
+- A step becomes the saved one only when AppKit's whole save succeeded (the save's completion), so a save that fails in its last step keeps the unsaved mark and the recovery record.
 - A failed save (disk full, no permission) shows the reason in plain words in NSDocument's error sheet and in the status bar; the open image, its history and the last saved file stay as they were. A failed recovery write shows in the status bar each time and in one sheet (`ImageDocument.recoveryErrorPrompt`) until a write works again.
 
 ## View menu, Settings and appearance (M56)

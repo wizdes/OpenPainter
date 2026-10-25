@@ -2679,6 +2679,8 @@ impl Drop for Engine {
         for id in ids {
             let _ = self.close(id);
         }
+        // Stopped recovery writers finish (or abandon) their last write.
+        self.recovery_join();
         let (replacement, _) = unbounded();
         let tx = std::mem::replace(&mut self.events_tx, replacement);
         drop(tx);

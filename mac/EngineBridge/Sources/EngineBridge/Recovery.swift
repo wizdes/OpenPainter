@@ -48,7 +48,7 @@ public struct RecoveryTiming: Sendable, Equatable {
     var json: [String: Any] {
         ["settle_ms": Self.ms(settle), "max_interval_ms": Self.ms(maxInterval)]
     }
-    static func ms(_ d: Duration) -> Int64 {
+    public static func ms(_ d: Duration) -> Int64 {
         d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000
     }
 }

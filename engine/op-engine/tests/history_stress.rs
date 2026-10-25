@@ -259,6 +259,29 @@ fn a_thousand_random_steps_undo_back_to_the_original_inside_the_budget() {
     );
     assert!(peak_spilled > 0, "history should have paged out: {stats:?}");
     assert!(longest >= 100, "the history should grow long");
+    // From the newest step, undo one step at a time until no step is left;
+    // every step on the way equals that step as made, and the end equals the
+    // original.
+    let newest = made.len() - 1;
+    engine
+        .dispatch(doc, "history.jump", json!({"index": newest}))
+        .unwrap();
+    assert_eq!(doc_hash(&engine.snapshot(doc).unwrap().state), made[newest]);
+    let mut undos = 0;
+    loop {
+        let index = engine.snapshot(doc).unwrap().history.index;
+        if index == 0 {
+            break;
+        }
+        engine.dispatch(doc, "edit.undo", json!({})).unwrap();
+        undos += 1;
+        let snap = engine.snapshot(doc).unwrap();
+        assert_eq!(snap.history.index, index - 1, "undo {undos}");
+        assert_eq!(doc_hash(&snap.state), made[index - 1], "undo {undos}");
+    }
+    assert_eq!(undos, newest);
+    assert!(undos >= 50, "only {undos} undos");
+    assert_eq!(doc_hash(&engine.snapshot(doc).unwrap().state), original);
     engine
         .dispatch(doc, "history.jump", json!({"index": 0}))
         .unwrap();

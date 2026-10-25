@@ -23,8 +23,9 @@ public final class RecoverySheetController: NSWindowController {
     let scroll = NSScrollView()
     let list = FilledView(fill: Theme.panel)
 
-    /// Opens the record's image; throws when it cannot (the row shows why).
-    public var onRecover: (@MainActor (RecoveryRecord) throws -> Void)?
+    /// Opens the record's image off the main thread; throws when it cannot
+    /// (the row shows why). The row shows a spinner meanwhile.
+    public var onRecover: (@MainActor (RecoveryRecord) async throws -> Void)?
     public var onDiscard: (@MainActor (RecoveryRecord) throws -> Void)?
     public var onClose: (@MainActor () -> Void)?
 
@@ -119,12 +120,19 @@ public final class RecoverySheetController: NSWindowController {
     }
 
     @objc public func recover(_ sender: Any?) {
-        guard let row = row(of: sender) else { return }
-        do {
-            try onRecover?(row.record)
-            remove(row.record)
-        } catch {
-            row.show(problem: "This image could not be recovered: \(error.localizedDescription)")
+        guard let row = row(of: sender), !row.busy else { return }
+        row.setBusy(true)
+        let action = onRecover
+        let record = row.record
+        Task { @MainActor [weak self, weak row] in
+            do {
+                try await action?(record)
+                row?.setBusy(false)
+                self?.remove(record)
+            } catch {
+                row?.setBusy(false)
+                row?.show(problem: "This image could not be recovered: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -175,6 +183,9 @@ public final class RecoveryRow: FilledView {
     public let nameLabel: NSTextField
     public let detailLabel: NSTextField
     public let recoverButton = NSButton(title: "Recover", target: nil, action: nil)
+    /// Shown while Recover opens the image.
+    public let spinner = NSProgressIndicator()
+    public private(set) var busy = false
     public let discardButton = NSButton(title: "Discard", target: nil, action: nil)
 
     init(record: RecoveryRecord, last: Bool) {
@@ -195,6 +206,12 @@ public final class RecoveryRow: FilledView {
         add(nameLabel, 16, 10, w - 16 - 200 - 8, 16)
         add(detailLabel, 16, 30, w - 16 - 200 - 8, 16)
         add(recoverButton, w - 16 - 88 - 8 - 88, 16, 88, 24)
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.isHidden = true
+        spinner.setAccessibilityLabel("Recovering \(nameLabel.stringValue)")
+        add(spinner, w - 16 - 88 - 8 - 88 - 8 - 16, 20, 16, 16)
         add(discardButton, w - 16 - 88, 16, 88, 24)
     }
 
@@ -205,6 +222,14 @@ public final class RecoveryRow: FilledView {
         v.translatesAutoresizingMaskIntoConstraints = true
         v.frame = NSRect(x: x, y: y, width: w, height: h)
         addSubview(v)
+    }
+
+    func setBusy(_ on: Bool) {
+        busy = on
+        spinner.isHidden = !on
+        if on { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
+        recoverButton.isEnabled = !on && record.valid
+        discardButton.isEnabled = !on
     }
 
     func show(problem: String) {

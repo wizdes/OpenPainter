@@ -167,7 +167,7 @@ impl Engine {
         })?;
         // M57: the error text for the app (`doc.last_file_error`), and a clean
         // save lets the recovery writer delete its record at once.
-        self.note_file_result(id, &result);
+        self.note_file_result(id, &result, mark_saved);
         result
     }
 
@@ -182,7 +182,7 @@ impl Engine {
     /// mark stays.
     pub fn mark_saved(&self, id: u64, revision: u64) -> Result<()> {
         let result = self.call(id, |r| Message::File(FileOp::MarkSaved(revision), r))?;
-        self.note_file_result(id, &result);
+        self.note_file_result(id, &result, true);
         result
     }
 

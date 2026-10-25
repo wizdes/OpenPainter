@@ -60,6 +60,9 @@ pub struct SaveHooks<'a> {
     pub fail_after_bytes: Option<u64>,
     /// Called after each write with the bytes written so far.
     pub on_write: Option<&'a mut dyn FnMut(u64)>,
+    /// When set, the next write fails ("cancelled"): the save stops and the
+    /// old file stays (M57: a recovery writer that was told to stop).
+    pub cancel: Option<&'a std::sync::atomic::AtomicBool>,
 }
 
 /// `save_opaint` with `hooks`. The target is still replaced only after the
@@ -80,6 +83,14 @@ struct HookedFile<'a> {
 }
 impl Write for HookedFile<'_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self
+            .hooks
+            .cancel
+            .is_some_and(|c| c.load(std::sync::atomic::Ordering::SeqCst))
+        {
+            // Not ErrorKind::Interrupted: write_all retries those forever.
+            return Err(std::io::Error::other("save cancelled"));
+        }
         if let Some(limit) = self.hooks.fail_after_bytes
             && self.written + buf.len() as u64 > limit
         {
@@ -886,6 +897,7 @@ mod tests {
             SaveHooks {
                 fail_after_bytes: Some(200),
                 on_write: Some(&mut count),
+                cancel: None,
             },
         )
         .unwrap_err();
@@ -920,5 +932,27 @@ mod tests {
         assert_eq!(loaded.doc.layers[1].name, "b");
         let empty = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
         assert!(load_opaint_from_bytes(b"PK\x03\x04 nonsense", empty).is_err());
+    }
+
+    #[test]
+    fn a_cancelled_save_stops_and_keeps_the_old_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store, 300, 300, 72.0).unwrap();
+        let path = dir.path().join("c.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let old = fs::read(&path).unwrap();
+        let cancel = std::sync::atomic::AtomicBool::new(true);
+        let error = save_opaint_with_hooks(
+            &doc.add_layer(1, "b").unwrap(),
+            &path,
+            SaveHooks {
+                cancel: Some(&cancel),
+                ..SaveHooks::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("save cancelled"), "{error}");
+        assert_eq!(fs::read(&path).unwrap(), old);
     }
 }

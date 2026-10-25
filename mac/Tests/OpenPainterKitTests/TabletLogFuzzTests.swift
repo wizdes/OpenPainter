@@ -2,8 +2,10 @@
 // (`TabletLog.decode`), so the engine's `cargo xtask fuzz` cannot reach it.
 // Random mutations of the recorded log (bit flips, cuts, inserted bytes,
 // spliced JSON fragments and edge numbers) must each read or throw within
-// 1 s, and a log that reads must replay into stroke samples. The run lasts
-// OP_FUZZ_SECONDS (default 5 s in the normal suite; the M57 report ran 600).
+// 1 s, and a log that reads must replay into stroke samples. Each input runs
+// on its own thread with a 1 s deadline, and the process's memory footprint
+// must not grow by more than 2 GiB (M57 review item 10). The run lasts OP_FUZZ_SECONDS
+// (default 5 s in the normal suite).
 import Foundation
 @testable import OpenPainterKit
 import XCTest
@@ -54,18 +56,30 @@ final class TabletLogFuzzTests: XCTestCase {
         var corpus = [Array(seed)]
         var cases = 0, ok = 0, slowest = 0.0
         let deadline = Date().addingTimeInterval(seconds)
+        let baseline = FuzzLimits.footprint()
         while Date() < deadline {
             var data = corpus[rng.below(corpus.count)]
             Self.mutate(&data, &rng)
+            let input = Data(data)
             let start = Date()
-            if let log = try? TabletLog.decode(Data(data)) {
-                ok += 1
+            guard let read = FuzzLimits.run(input, deadline: 1.0, { input -> Bool in
+                guard let log = try? TabletLog.decode(input) else { return false }
                 _ = TabletLog.strokeSamples(log.samples)
+                return true
+            }) else {
+                XCTFail("case \(cases) passed the 1 s limit; input saved to \(FuzzLimits.save(input, "tabletlog"))")
+                return
+            }
+            if read {
+                ok += 1
                 if corpus.count < 64 { corpus.append(data) }
             }
-            let took = Date().timeIntervalSince(start)
-            slowest = max(slowest, took)
-            XCTAssertLessThan(took, 1.0, "case \(cases) took \(took) s")
+            slowest = max(slowest, Date().timeIntervalSince(start))
+            let grown = FuzzLimits.footprint() &- baseline
+            guard FuzzLimits.footprint() < baseline || grown < FuzzLimits.memoryCap else {
+                XCTFail("case \(cases) grew memory by \(grown >> 20) MiB")
+                return
+            }
             cases += 1
         }
         print("TABLETLOG_FUZZ cases \(cases) ok \(ok) crashes 0 slowest \(Int(slowest * 1000)) ms in \(Int(seconds)) s")

@@ -78,6 +78,7 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 }
             })),
             fail_after_bytes: None,
+            ..RecordHooks::default()
         },
     };
     let engine = Engine::with_options(

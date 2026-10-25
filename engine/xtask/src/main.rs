@@ -134,6 +134,56 @@ fn deep_steps(tier: &str) -> Vec<CommandStep> {
     steps
 }
 
+/// M57 robustness checks of the checkpoint tier: one minute of fuzzing per
+/// reader (`cargo xtask fuzz`, the 10-minute run is by hand), the 200 MP
+/// document and the full-disk test (a 20 MB disk image it detaches by its own
+/// device path; macOS only).
+fn robustness_steps(tier: &str) -> Vec<CommandStep> {
+    if tier != "checkpoint" {
+        return Vec::new();
+    }
+    vec![
+        CommandStep::cargo(
+            &[
+                "run",
+                "--quiet",
+                "-p",
+                "xtask",
+                "--",
+                "fuzz",
+                "--seconds",
+                "60",
+            ],
+            &[],
+        ),
+        CommandStep::cargo(
+            &[
+                "test",
+                "-p",
+                "op-engine",
+                "--release",
+                "--test",
+                "huge_document",
+                "--",
+                "--ignored",
+            ],
+            &[],
+        ),
+        CommandStep::cargo(
+            &[
+                "test",
+                "-p",
+                "op-engine",
+                "--test",
+                "low_disk",
+                "--",
+                "--ignored",
+            ],
+            &[],
+        ),
+    ]
+}
+
 fn run_step(steps: &mut Vec<Step>, step: &CommandStep, engine: &Path, repo: &Path) {
     let dir = if step.in_repo { repo } else { engine };
     run_with(
@@ -192,8 +242,8 @@ fn main() -> ExitCode {
     } else {
         skip(&mut steps, "Swift build", "mac/project.yml is absent");
     }
-    for step in deep_steps(tier) {
-        run_step(&mut steps, &step, &engine, repo);
+    for step in deep_steps(tier).iter().chain(&robustness_steps(tier)) {
+        run_step(&mut steps, step, &engine, repo);
     }
     if matches!(tier, "milestone" | "checkpoint") {
         let scenario_dir = repo.join("tests/scenarios");
@@ -423,6 +473,49 @@ mod tests {
         );
         assert!(steps[1].in_repo && steps[1].skip_if_missing);
         assert!(!steps.iter().any(|step| step.args.contains(&"tile_bench")));
+    }
+
+    #[test]
+    fn checkpoint_tier_runs_the_m57_robustness_steps() {
+        assert!(robustness_steps("fast").is_empty());
+        assert!(robustness_steps("milestone").is_empty());
+        let steps = robustness_steps("checkpoint");
+        let args: Vec<Vec<&str>> = steps.iter().map(|s| s.args.clone()).collect();
+        assert_eq!(
+            args,
+            [
+                vec![
+                    "run",
+                    "--quiet",
+                    "-p",
+                    "xtask",
+                    "--",
+                    "fuzz",
+                    "--seconds",
+                    "60"
+                ],
+                vec![
+                    "test",
+                    "-p",
+                    "op-engine",
+                    "--release",
+                    "--test",
+                    "huge_document",
+                    "--",
+                    "--ignored"
+                ],
+                vec![
+                    "test",
+                    "-p",
+                    "op-engine",
+                    "--test",
+                    "low_disk",
+                    "--",
+                    "--ignored"
+                ],
+            ]
+        );
+        assert!(steps.iter().all(|s| !s.in_repo && !s.skip_if_missing));
     }
 
     #[test]

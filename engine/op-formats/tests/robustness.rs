@@ -32,6 +32,9 @@ fn webp_chunks_larger_than_the_file_are_refused_before_decoding() {
         "webp-oversized-chunk-1.bin",
         "webp-oversized-chunk-2.bin",
         "webp-oversized-chunk-3.bin",
+        // M57 review: an animated WebP whose ANMF frame holds an ICCP
+        // subchunk claiming 2.25 GiB; the outer chunks all fit.
+        "webp-anmf-nested-chunk.bin",
     ] {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fuzz-found")

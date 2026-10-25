@@ -804,9 +804,10 @@ fn encode_tiff(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     let _ = enc;
     Ok(out.into_inner())
 }
-/// Every RIFF chunk must fit inside the file. image-webp allocates a chunk's
-/// claimed size before reading it, so a tiny file claiming gigabytes would
-/// abort the process (M57 fuzzing).
+/// Every RIFF chunk must fit inside the file, and every chunk nested in an
+/// animation frame (ANMF: a 16-byte frame header, then chunks) must fit inside
+/// its frame. image-webp allocates a chunk's claimed size before reading it,
+/// so a tiny file claiming gigabytes would abort the process (M57 fuzzing).
 fn check_webp_chunks(bytes: &[u8]) -> Result<()> {
     const TOO_BIG: Error = Error::Invalid("WebP chunk is larger than the file");
     let u32at = |p: usize| -> Option<usize> {
@@ -816,18 +817,21 @@ fn check_webp_chunks(bytes: &[u8]) -> Result<()> {
     if riff > bytes.len() - 8 {
         return Err(TOO_BIG);
     }
-    let end = 8 + riff;
-    let mut p = 12;
-    while p + 8 <= end {
-        let size = u32at(p + 4).ok_or(Error::Invalid("WebP header"))?;
-        let next = (p + 8)
-            .checked_add(size)
-            .and_then(|n| n.checked_add(size & 1))
-            .ok_or(TOO_BIG)?;
-        if p + 8 + size > end {
-            return Err(TOO_BIG);
+    // (start, end) of chunk lists still to check.
+    let mut lists = vec![(12_usize, 8 + riff)];
+    while let Some((mut p, end)) = lists.pop() {
+        while p + 8 <= end {
+            let size = u32at(p + 4).ok_or(Error::Invalid("WebP header"))?;
+            let data = p + 8;
+            let stop = data.checked_add(size).ok_or(TOO_BIG)?;
+            if stop > end {
+                return Err(TOO_BIG);
+            }
+            if &bytes[p..p + 4] == b"ANMF" && size >= 16 {
+                lists.push((data + 16, stop));
+            }
+            p = stop.checked_add(size & 1).ok_or(TOO_BIG)?;
         }
-        p = next;
     }
     Ok(())
 }

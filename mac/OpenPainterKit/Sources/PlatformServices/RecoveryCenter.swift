@@ -34,18 +34,24 @@ public enum RecoveryCenter {
     /// The recovery sheet while it is open.
     @MainActor public private(set) static var sheet: RecoverySheetController?
 
-    /// At launch: when records exist, shows the sheet (over `window` when
-    /// given). `onRecovered` runs after each recovered image opens, and
-    /// `onFinished` when the sheet closes.
+    /// The same list, read off the main thread (the scan checksums every
+    /// snapshot; M57 review item 7).
+    public static func pendingRecordsInBackground() async -> [RecoveryRecord] {
+        await Task.detached { pendingRecords() }.value
+    }
+
+    /// At launch: lists the records off the main thread and, when there are
+    /// any, shows the sheet (over `window` when given). `onRecovered` runs
+    /// after each recovered image opens, and `onFinished` when the sheet closes.
     @MainActor @discardableResult
     public static func offerAtLaunch(controller: NSDocumentController, on window: NSWindow? = nil,
                                      onRecovered: (@MainActor (ImageDocument) -> Void)? = nil,
-                                     onFinished: (@MainActor () -> Void)? = nil) -> RecoverySheetController? {
-        let records = pendingRecords()
+                                     onFinished: (@MainActor () -> Void)? = nil) async -> RecoverySheetController? {
+        let records = await pendingRecordsInBackground()
         guard !records.isEmpty, sheet == nil else { return nil }
         let s = RecoverySheetController(records: records)
         s.onRecover = { record in
-            let doc = try ImageDocument.recover(record, controller: controller)
+            let doc = try await ImageDocument.recover(record, controller: controller)
             onRecovered?(doc)
         }
         s.onDiscard = { record in try Engine.discardRecovery(dir: record.dir) }

@@ -142,21 +142,25 @@ fn a_clean_save_and_undo_to_saved_delete_the_record_and_close_deletes_the_folder
     wait(|| e.recovery_status(doc).unwrap().acknowledged);
     e.dispatch(doc, "edit.undo", json!({})).unwrap();
     wait(|| (!dir.join(recovery::MANIFEST).exists()).then_some(()));
-    let snapshots = std::fs::read_dir(&dir)
-        .unwrap()
-        .filter(|f| {
-            f.as_ref()
-                .unwrap()
-                .file_name()
-                .to_string_lossy()
-                .starts_with("snapshot-")
-        })
-        .count();
-    assert_eq!(snapshots, 0);
+    // The manifest goes first, the snapshots right after (M57 review item 5).
+    wait(|| {
+        let snapshots = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter(|f| {
+                f.as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("snapshot-")
+            })
+            .count();
+        (snapshots == 0).then_some(())
+    });
     e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
     wait(|| e.recovery_status(doc).unwrap().acknowledged);
     e.close(doc).unwrap();
-    assert!(!dir.exists());
+    // Close returns at once (M57 review item 6); the folder goes right after.
+    wait(|| (!dir.exists()).then_some(()));
 }
 
 #[test]
@@ -204,7 +208,8 @@ fn a_crashed_documents_record_is_found_and_recovers_unsaved_at_its_revision() {
     // Discard of a live record is refused; after a close the folder is gone.
     assert!(recovery::discard(&dir).is_err());
     e2.close(rec).unwrap();
-    assert!(!dir.exists());
+    // Close returns at once (M57 review item 6); the folder goes right after.
+    wait(|| (!dir.exists()).then_some(()));
     drop(e);
 }
 
@@ -244,6 +249,7 @@ fn a_failed_record_write_keeps_the_previous_record_and_reports_the_error() {
         hooks: RecordHooks {
             on_stage: None,
             fail_after_bytes: Some(1000),
+            ..RecordHooks::default()
         },
         ..fast()
     };
@@ -350,6 +356,7 @@ fn a_record_write_never_blocks_commands_or_queries() {
                 }
             })),
             fail_after_bytes: None,
+            ..RecordHooks::default()
         },
         ..fast()
     };

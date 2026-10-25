@@ -131,7 +131,15 @@ fn the_latest_acknowledged_revision_recovers_whenever_the_process_is_killed() {
                 "round {round} {stage}: recovered pixels differ"
             );
             engine.close(doc).unwrap();
-            assert!(!dir.exists());
+            // Close returns at once (M57 review item 6); the folder goes right after.
+            let start = std::time::Instant::now();
+            while dir.exists() {
+                assert!(
+                    start.elapsed() < Duration::from_secs(10),
+                    "{stage}: folder stays"
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            }
         }
     }
 }

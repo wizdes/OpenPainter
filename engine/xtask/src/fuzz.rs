@@ -14,12 +14,23 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, ExitCode, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
-pub const TARGETS: [&str; 10] = [
-    "png", "bmp", "jpeg", "gif", "tiff", "webp", "opaint", "stackxml", "exif", "icc",
+pub const TARGETS: [&str; 12] = [
+    "png", "bmp", "jpeg", "gif", "tiff", "webp", "opaint", "stackxml", "exif", "icc", "manifest",
+    "command",
 ];
+
+/// Targets read by op-engine's worker (the recovery manifest reader and the
+/// command JSON path); the rest by op-formats' worker.
+pub const ENGINE_TARGETS: [&str; 2] = ["manifest", "command"];
+
+/// A worker whose resident size passes this is killed (C allocations, such
+/// as LittleCMS's, do not pass through the worker's capped Rust allocator).
+pub const RSS_LIMIT_KIB: u64 = 2 << 20;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Options {
@@ -144,13 +155,15 @@ pub struct Tally {
     pub crashes: u64,
     pub hangs: u64,
     pub aborts: u64,
+    /// Workers killed by the resident-size watchdog.
+    pub oom: u64,
     pub caught_in_dependency: u64,
     pub restarts: u64,
     pub slowest: Duration,
 }
 impl Tally {
     pub fn failed(&self) -> bool {
-        self.crashes + self.hangs + self.aborts > 0
+        self.crashes + self.hangs + self.aborts + self.oom > 0
     }
 }
 
@@ -158,6 +171,59 @@ struct Worker {
     child: Child,
     stdin: ChildStdin,
     replies: Receiver<u8>,
+    killed_for_memory: Arc<AtomicBool>,
+}
+
+/// The memory `pid` uses in KiB (None: the process is gone). On macOS this
+/// is the physical footprint (resident plus compressed memory, as Activity
+/// Monitor shows), read with `proc_pid_rusage`; elsewhere `ps`'s resident size.
+pub fn rss_kib(pid: u32) -> Option<u64> {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn proc_pid_rusage(pid: i32, flavor: i32, buffer: *mut u64) -> i32;
+        }
+        // rusage_info_v0: a 16-byte uuid, then u64 fields; phys_footprint is
+        // the 8th field (index 9 counting the uuid as two).
+        let mut info = [0_u64; 32];
+        let ok = unsafe { proc_pid_rusage(pid as i32, 0, info.as_mut_ptr()) } == 0;
+        if !ok {
+            return None;
+        }
+        // A finished child that was not waited for still answers; ps says
+        // whether it is a zombie.
+        let state = Command::new("ps")
+            .args(["-o", "state=", "-p", &pid.to_string()])
+            .output()
+            .ok()?;
+        let state = String::from_utf8_lossy(&state.stdout);
+        if state.trim().is_empty() || state.trim().starts_with('Z') {
+            return None;
+        }
+        Some(info[9] / 1024)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let out = Command::new("ps")
+            .args(["-o", "rss=", "-p", &pid.to_string()])
+            .output()
+            .ok()?;
+        String::from_utf8_lossy(&out.stdout).trim().parse().ok()
+    }
+}
+
+/// Kills `pid` (SIGKILL) once its resident size passes `limit_kib`.
+fn watch_memory(pid: u32, limit_kib: u64, flag: Arc<AtomicBool>) {
+    std::thread::spawn(move || {
+        while let Some(kib) = rss_kib(pid) {
+            if kib > limit_kib {
+                flag.store(true, Ordering::SeqCst);
+                let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
 }
 
 fn frames(bytes: &[u8]) -> Vec<Vec<u8>> {
@@ -186,6 +252,8 @@ fn spawn(worker: &Path, target: &str, log: &Path) -> std::io::Result<Worker> {
     let stdin = child.stdin.take().expect("piped stdin");
     let mut stdout = child.stdout.take().expect("piped stdout");
     let (tx, replies) = mpsc::channel();
+    let killed_for_memory = Arc::new(AtomicBool::new(false));
+    watch_memory(child.id(), RSS_LIMIT_KIB, killed_for_memory.clone());
     std::thread::spawn(move || {
         let mut b = [0_u8; 1];
         while stdout.read_exact(&mut b).is_ok() {
@@ -198,6 +266,7 @@ fn spawn(worker: &Path, target: &str, log: &Path) -> std::io::Result<Worker> {
         child,
         stdin,
         replies,
+        killed_for_memory,
     })
 }
 
@@ -293,9 +362,14 @@ pub fn fuzz_target(
             Err(RecvTimeoutError::Disconnected) => {
                 let mut dead = w.take().expect("worker");
                 let status = dead.child.wait().map_err(|e| e.to_string())?;
-                t.aborts += 1;
                 t.restarts += 1;
-                save(out, "abort", t.cases, &data);
+                if dead.killed_for_memory.load(Ordering::SeqCst) {
+                    t.oom += 1;
+                    save(out, "oom", t.cases, &data);
+                } else {
+                    t.aborts += 1;
+                    save(out, "abort", t.cases, &data);
+                }
                 eprintln!("fuzz {target}: worker ended ({status}) on case {}", t.cases);
             }
         }
@@ -328,20 +402,26 @@ pub fn main(engine: &Path, args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let built = Command::new("cargo")
-        .args(["build", "-p", "op-formats", "--example", "fuzz_worker"])
-        .current_dir(engine)
-        .status();
-    if !matches!(built, Ok(s) if s.success()) {
-        eprintln!("fuzz: building fuzz_worker failed");
-        return ExitCode::FAILURE;
+    for (package, example) in [
+        ("op-formats", "fuzz_worker"),
+        ("op-engine", "fuzz_engine_worker"),
+    ] {
+        let built = Command::new("cargo")
+            .args(["build", "-p", package, "--example", example])
+            .current_dir(engine)
+            .status();
+        if !matches!(built, Ok(s) if s.success()) {
+            eprintln!("fuzz: building {example} failed");
+            return ExitCode::FAILURE;
+        }
     }
     let target_dir =
         std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| engine.join("target"), PathBuf::from);
-    let worker = target_dir.join("debug/examples/fuzz_worker");
+    let formats_worker = target_dir.join("debug/examples/fuzz_worker");
+    let engine_worker = target_dir.join("debug/examples/fuzz_engine_worker");
     let out_root = target_dir.join("fuzz");
     println!(
-        "fuzz: {} targets, {} s each, {} at a time, seed {}, {} ms per input, heap cap 2 GiB",
+        "fuzz: {} targets, {} s each, {} at a time, seed {}, {} ms per input, heap cap 2 GiB, resident-size watchdog 2 GiB",
         o.targets.len(),
         o.seconds,
         o.jobs,
@@ -353,7 +433,12 @@ pub fn main(engine: &Path, args: &[String]) -> ExitCode {
         let handles: Vec<_> = chunk
             .iter()
             .map(|target| {
-                let (worker, out, target) = (worker.clone(), out_root.join(target), target.clone());
+                let worker = if ENGINE_TARGETS.contains(&target.as_str()) {
+                    engine_worker.clone()
+                } else {
+                    formats_worker.clone()
+                };
+                let (out, target) = (out_root.join(target), target.clone());
                 let (seconds, seed, timeout) = (o.seconds, o.seed, o.timeout);
                 std::thread::spawn(move || {
                     let r = fuzz_target(&worker, &target, &out, seconds, seed, timeout);
@@ -367,13 +452,14 @@ pub fn main(engine: &Path, args: &[String]) -> ExitCode {
                 Ok(t) => {
                     failed |= t.failed();
                     println!(
-                        "{target:8} cases {:9} ok {:8} err {:9} | crashes {} hangs {} aborts {} | caught-in-dependency {} | slowest {:.1} ms | {}",
+                        "{target:8} cases {:9} ok {:8} err {:9} | crashes {} hangs {} aborts {} oom {} | caught-in-dependency {} | slowest {:.1} ms | {}",
                         t.cases,
                         t.ok,
                         t.err,
                         t.crashes,
                         t.hangs,
                         t.aborts,
+                        t.oom,
                         t.caught_in_dependency,
                         t.slowest.as_secs_f64() * 1e3,
                         if t.failed() {
@@ -411,6 +497,20 @@ mod tests {
         assert_eq!((o.seconds, o.targets.clone()), (5, vec!["icc".to_owned()]));
         assert!(parse_args(&["nope".into()]).is_err());
         assert!(parse_args(&["--seconds".into()]).is_err());
+    }
+
+    #[test]
+    fn the_memory_watchdog_reads_a_live_process_and_none_after_it_ends() {
+        let mut child = Command::new("sleep").arg("5").spawn().unwrap();
+        let kib = rss_kib(child.id()).unwrap();
+        assert!(kib > 0 && kib < RSS_LIMIT_KIB);
+        let flag = Arc::new(AtomicBool::new(false));
+        // A 1 KiB limit: the watchdog kills it at once.
+        watch_memory(child.id(), 1, flag.clone());
+        let status = child.wait().unwrap();
+        assert!(!status.success());
+        assert!(flag.load(Ordering::SeqCst));
+        assert_eq!(rss_kib(child.id()), None);
     }
 
     #[test]

@@ -94,6 +94,26 @@ fn a_200_megapixel_document_paints_blurs_undoes_and_saves_under_the_memory_cap()
     engine.stroke_append(doc, &samples).unwrap();
     engine.stroke_commit(doc).unwrap();
     lap("brush stroke corner to corner", t);
+    // M57 review: a recovery record of the 200 MP document.
+    let record = dir.path().join("Recovery").join("huge");
+    engine
+        .recovery_attach(
+            doc,
+            &record,
+            None,
+            op_engine::recovery::RecoveryOptions {
+                settle: std::time::Duration::from_secs(3600),
+                max_interval: std::time::Duration::from_secs(3600),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let t = Instant::now();
+    let rev = engine.recovery_flush(doc).unwrap();
+    lap("Recovery record write", t);
+    let manifest = op_engine::recovery::read_record(&record).unwrap();
+    assert_eq!(Some(manifest.revision), rev);
+    assert_eq!((manifest.width, manifest.height), (WIDTH, HEIGHT));
     let painted = engine.snapshot(doc).unwrap().state.clone();
     let probe = TileCoord { x: 32, y: 24 };
     let painted_tile = painted.read_tile(0, probe).unwrap();

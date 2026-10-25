@@ -86,13 +86,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             self.showStartWindowIfIdle()
             // M57: images a crash left unsaved: one sheet with Recover and Discard.
-            RecoveryCenter.offerAtLaunch(controller: NSDocumentController.shared, on: self.startWindow,
-                                         onFinished: { [weak self] in
-                // The start window goes once a recovered image is open.
-                guard !NSDocumentController.shared.documents.isEmpty else { return }
-                self?.startWindow?.close()
-                self?.startWindow = nil
-            })
+            Task { @MainActor [weak self] in
+                await RecoveryCenter.offerAtLaunch(controller: NSDocumentController.shared, on: self?.startWindow,
+                                                   onFinished: { [weak self] in
+                    // The start window goes once a recovered image is open.
+                    guard !NSDocumentController.shared.documents.isEmpty else { return }
+                    self?.startWindow?.close()
+                    self?.startWindow = nil
+                })
+            }
         }
     }
 

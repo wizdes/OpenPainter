@@ -26,9 +26,10 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -62,6 +63,8 @@ pub struct RecordHooks {
     pub on_stage: Option<Arc<dyn Fn(RecordStage) + Send + Sync>>,
     /// The snapshot write fails with ENOSPC once it would pass this many bytes.
     pub fail_after_bytes: Option<u64>,
+    /// While true, the folder sync right after the manifest rename fails.
+    pub fail_dir_sync_after_manifest: Option<Arc<AtomicBool>>,
 }
 
 /// When the writer writes.
@@ -101,6 +104,18 @@ pub struct Manifest {
     pub height: u32,
     pub layers: usize,
     pub pid: u32,
+    /// The original file's size and modification time when the document was
+    /// last opened or saved: a file that differs now was saved after this
+    /// record's base, so the record is older than the file.
+    #[serde(default)]
+    pub base_file: Option<FileStamp>,
+}
+
+/// A file's size and modification time.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FileStamp {
+    pub size: u64,
+    pub modified_ns: u64,
 }
 
 /// One record found by `scan`.
@@ -108,17 +123,22 @@ pub struct Manifest {
 pub struct RecordInfo {
     pub uuid: String,
     pub dir: PathBuf,
-    /// None when the record cannot be used (`problem` says why).
+    /// None when the manifest or snapshot cannot be read (`problem` says why).
     pub manifest: Option<Manifest>,
+    /// Why the record cannot be recovered, if it cannot.
     pub problem: Option<String>,
 }
 impl RecordInfo {
+    /// The record can be recovered: it reads, and it is not older than its file.
+    pub fn is_valid(&self) -> bool {
+        self.manifest.is_some() && self.problem.is_none()
+    }
     pub fn to_json(&self) -> serde_json::Value {
         let m = self.manifest.as_ref();
         json!({
             "uuid": self.uuid,
             "dir": self.dir.to_string_lossy(),
-            "valid": m.is_some(),
+            "valid": self.is_valid(),
             "problem": self.problem,
             "revision": m.map(|m| m.revision),
             "original_url": m.and_then(|m| m.original_url.clone()),
@@ -169,9 +189,67 @@ fn sync_dir(dir: &Path) -> std::io::Result<()> {
     File::open(dir)?.sync_all()
 }
 
-/// Writes `bytes` to a temp file in `dir`, syncs it, renames it to `name` and
-/// syncs the folder.
-fn write_file_atomic(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
+fn parent_of(dir: &Path) -> &Path {
+    dir.parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
+}
+
+/// The local path of a `file://` URL (percent escapes decoded).
+fn url_path(url: &str) -> Option<PathBuf> {
+    let rest = url.strip_prefix("file://")?;
+    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+    let bytes = rest.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(v) = u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).ok()?, 16)
+        {
+            out.push(v);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    use std::os::unix::ffi::OsStrExt;
+    Some(PathBuf::from(std::ffi::OsStr::from_bytes(&out)))
+}
+
+/// The size and modification time of the file at `url` now (None: no file).
+pub fn stamp_of(url: Option<&str>) -> Option<FileStamp> {
+    let meta = fs::metadata(url_path(url?)?).ok()?;
+    let modified = meta
+        .modified()
+        .ok()?
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    Some(FileStamp {
+        size: meta.len(),
+        modified_ns: u64::try_from(modified).unwrap_or(u64::MAX),
+    })
+}
+
+/// Why `m` must not be recovered over its file, if it must not: the file was
+/// saved (here before a crash, or by another app) after the record's base.
+pub fn older_than_file(m: &Manifest) -> Option<String> {
+    let url = m.original_url.as_deref()?;
+    let now = stamp_of(Some(url))?;
+    if m.base_file == Some(now) {
+        None
+    } else {
+        Some(
+            "The file was saved after this copy was made, so this copy is older than the file."
+                .into(),
+        )
+    }
+}
+
+/// Writes `bytes` to a synced temp file in `dir` and returns its path.
+fn write_temp(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
     let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let temp = dir.join(format!(".{name}.{}.{n}.tmp", std::process::id()));
     let result = (|| {
@@ -189,41 +267,90 @@ fn write_file_atomic(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<Pa
     Ok(temp)
 }
 
+/// The state a clean save and the writer share for one document.
+#[derive(Default)]
+pub(crate) struct Shared {
+    /// Bumped by each clean save; a write that began before it never commits.
+    epoch: u64,
+    original: Option<String>,
+    base: Option<FileStamp>,
+    /// True while a record's manifest is in the folder.
+    on_disk: bool,
+}
+
+/// How a record write ended without an error.
+pub enum WriteOutcome {
+    Committed(Manifest),
+    /// Abandoned before the commit: the document was saved meanwhile, or the
+    /// writer was stopped. The previous record (if any) is untouched.
+    Abandoned,
+}
+
+/// A failed record write. `committed` is true when the manifest was renamed
+/// into place before the failure (a folder sync that failed): that record
+/// stays, and is readable.
+pub struct WriteError {
+    pub text: String,
+    pub committed: bool,
+}
+
 /// Writes one record of `state` at `revision` into `dir` (the protocol in the
-/// module comment). Returns the committed manifest.
-pub fn write_record(
+/// module comment). The folder must exist and be locked by the caller.
+fn write_record(
     dir: &Path,
     state: &op_core::doc::DocState,
     revision: u64,
-    original_url: Option<&str>,
+    shared: &Mutex<Shared>,
+    cancel: &AtomicBool,
     hooks: &RecordHooks,
-) -> std::result::Result<Manifest, String> {
+) -> std::result::Result<WriteOutcome, WriteError> {
+    let fail = |text: String| WriteError {
+        text,
+        committed: false,
+    };
     let stage = |s: RecordStage| {
         if let Some(f) = &hooks.on_stage {
             f(s)
         }
     };
-    fs::create_dir_all(dir).map_err(|e| io_text("cannot make", dir, e))?;
+    let epoch = shared.lock().epoch;
     stage(RecordStage::Begin);
     let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let name = format!("snapshot-{revision}-{}-{n}.opaint", std::process::id());
     let path = dir.join(&name);
     let mut on_write = |bytes: u64| stage(RecordStage::SnapshotBytes(bytes));
-    op_formats::opaint::save_opaint_with_hooks(
+    let saved = op_formats::opaint::save_opaint_with_hooks(
         state,
         &path,
         op_formats::opaint::SaveHooks {
             fail_after_bytes: hooks.fail_after_bytes,
             on_write: Some(&mut on_write),
+            cancel: Some(cancel),
         },
-    )
-    .map_err(|e| io_text("cannot write", &path, e))?;
+    );
+    if cancel.load(Ordering::SeqCst) {
+        let _ = fs::remove_file(&path);
+        return Ok(WriteOutcome::Abandoned);
+    }
+    saved.map_err(|e| fail(io_text("cannot write", &path, e)))?;
     stage(RecordStage::SnapshotDone);
-    let (bytes, crc) = file_crc(&path).map_err(|e| io_text("cannot read", &path, e))?;
+    let drop_snapshot = |e: WriteError| {
+        let _ = fs::remove_file(&path);
+        e
+    };
+    let (bytes, crc) =
+        file_crc(&path).map_err(|e| drop_snapshot(fail(io_text("cannot read", &path, e))))?;
+    let target = dir.join(MANIFEST);
+    let guard = shared.lock();
+    if guard.epoch != epoch || cancel.load(Ordering::SeqCst) {
+        drop(guard);
+        let _ = fs::remove_file(&path);
+        return Ok(WriteOutcome::Abandoned);
+    }
     let manifest = Manifest {
         format: FORMAT,
         revision,
-        original_url: original_url.map(str::to_owned),
+        original_url: guard.original.clone(),
         time_unix: now_unix(),
         snapshot: name.clone(),
         snapshot_bytes: bytes,
@@ -232,43 +359,74 @@ pub fn write_record(
         height: state.height,
         layers: state.layers.len(),
         pid: std::process::id(),
+        base_file: guard.base,
     };
-    let text = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
-    let target = dir.join(MANIFEST);
-    let commit = (|| {
-        let temp = write_file_atomic(dir, MANIFEST, &text)?;
-        stage(RecordStage::ManifestTemp);
-        if let Err(e) = fs::rename(&temp, &target) {
-            let _ = fs::remove_file(&temp);
-            return Err(e);
+    let text =
+        serde_json::to_vec_pretty(&manifest).map_err(|e| drop_snapshot(fail(e.to_string())))?;
+    let temp = write_temp(dir, MANIFEST, &text)
+        .map_err(|e| drop_snapshot(fail(io_text("cannot write", &target, e))))?;
+    stage(RecordStage::ManifestTemp);
+    if let Err(e) = fs::rename(&temp, &target) {
+        let _ = fs::remove_file(&temp);
+        return Err(drop_snapshot(fail(io_text("cannot write", &target, e))));
+    }
+    let mut guard = guard;
+    guard.on_disk = true;
+    // From here on the manifest names `name`: it is never deleted on error.
+    let synced = match &hooks.fail_dir_sync_after_manifest {
+        Some(f) if f.load(Ordering::SeqCst) => {
+            Err(std::io::Error::other("injected folder sync failure"))
         }
-        sync_dir(dir)
-    })();
-    if let Err(e) = commit {
-        // The old manifest still names the old snapshot; drop the new one.
-        let _ = fs::remove_file(&path);
-        return Err(io_text("cannot write", &target, e));
+        _ => sync_dir(dir),
+    };
+    drop(guard);
+    if let Err(e) = synced {
+        return Err(WriteError {
+            text: io_text("cannot sync", dir, e),
+            committed: true,
+        });
     }
     stage(RecordStage::Committed);
-    remove_stale(dir, Some(&name));
-    Ok(manifest)
+    // A leftover old snapshot is harmless (the manifest names the new one);
+    // the next write tries again.
+    if let Err(e) = remove_stale(dir, Some(&name)) {
+        eprintln!("op-engine: {e}");
+    }
+    Ok(WriteOutcome::Committed(manifest))
 }
 
-/// Deletes snapshots other than `keep` and leftover temp files.
-fn remove_stale(dir: &Path, keep: Option<&str>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
+/// Deletes snapshots other than `keep` and leftover temp files. Returns the
+/// first error.
+fn remove_stale(dir: &Path, keep: Option<&str>) -> std::result::Result<(), String> {
+    let entries = fs::read_dir(dir).map_err(|e| io_text("cannot list", dir, e))?;
+    let mut first = Ok(());
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         let stale_snapshot = name.starts_with("snapshot-") && Some(name.as_str()) != keep;
         let temp = name.starts_with('.') && name.ends_with(".tmp");
         if (stale_snapshot || temp)
             && let Err(e) = fs::remove_file(entry.path())
+            && first.is_ok()
         {
-            eprintln!("op-engine: cannot delete {}: {e}", entry.path().display());
+            first = Err(io_text("cannot delete", &entry.path(), e));
         }
     }
+    first
+}
+
+/// Deletes the manifest first, then the snapshots. On an error the record is
+/// still there (or at least not half-gone) and the error is returned.
+fn delete_record(dir: &Path, shared: &mut Shared) -> std::result::Result<bool, String> {
+    let manifest = dir.join(MANIFEST);
+    let existed = match fs::remove_file(&manifest) {
+        Ok(()) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => return Err(io_text("cannot delete", &manifest, e)),
+    };
+    sync_dir(dir).map_err(|e| io_text("cannot sync", dir, e))?;
+    shared.on_disk = false;
+    remove_stale(dir, None)?;
+    Ok(existed)
 }
 
 fn file_crc(path: &Path) -> std::io::Result<(u64, u32)> {
@@ -287,19 +445,35 @@ fn file_crc(path: &Path) -> std::io::Result<(u64, u32)> {
     Ok((total, hasher.finalize()))
 }
 
+/// The most manifest bytes a reader accepts.
+const MAX_MANIFEST: u64 = 64 * 1024;
+
+/// Checks a manifest's bytes (format, snapshot name). The fuzz target reads here.
+pub fn parse_manifest(text: &[u8]) -> std::result::Result<Manifest, String> {
+    if text.len() as u64 > MAX_MANIFEST {
+        return Err("the manifest is too large".into());
+    }
+    let manifest: Manifest =
+        serde_json::from_slice(text).map_err(|e| format!("bad manifest: {e}"))?;
+    if manifest.format != FORMAT {
+        return Err(format!("unknown record format {}", manifest.format));
+    }
+    let name = &manifest.snapshot;
+    if name.contains('/') || name.contains('\0') || !name.starts_with("snapshot-") {
+        return Err("bad snapshot name in the manifest".into());
+    }
+    Ok(manifest)
+}
+
 /// Reads and checks the committed record in `dir`: the manifest parses, has a
 /// known format, and its snapshot has the recorded size and CRC-32.
 pub fn read_record(dir: &Path) -> std::result::Result<Manifest, String> {
     let path = dir.join(MANIFEST);
-    let text = fs::read(&path).map_err(|e| io_text("cannot read", &path, e))?;
-    let manifest: Manifest =
-        serde_json::from_slice(&text).map_err(|e| io_text("bad manifest", &path, e))?;
-    if manifest.format != FORMAT {
-        return Err(format!("unknown record format {}", manifest.format));
-    }
-    if manifest.snapshot.contains('/') || !manifest.snapshot.starts_with("snapshot-") {
-        return Err("bad snapshot name in the manifest".into());
-    }
+    let mut text = Vec::new();
+    File::open(&path)
+        .and_then(|f| f.take(MAX_MANIFEST + 1).read_to_end(&mut text))
+        .map_err(|e| io_text("cannot read", &path, e))?;
+    let manifest = parse_manifest(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let snapshot = dir.join(&manifest.snapshot);
     let (bytes, crc) = file_crc(&snapshot).map_err(|e| io_text("cannot read", &snapshot, e))?;
     if bytes != manifest.snapshot_bytes || crc != manifest.snapshot_crc32 {
@@ -311,26 +485,101 @@ pub fn read_record(dir: &Path) -> std::result::Result<Manifest, String> {
     Ok(manifest)
 }
 
-/// Takes the folder's lock without waiting. None when a live process holds it.
-fn try_lock(dir: &Path) -> std::result::Result<Option<File>, String> {
-    fs::create_dir_all(dir).map_err(|e| io_text("cannot make", dir, e))?;
-    let path = dir.join(LOCK);
-    let file = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(&path)
-        .map_err(|e| io_text("cannot open", &path, e))?;
-    match file.try_lock() {
-        Ok(()) => Ok(Some(file)),
-        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
-        Err(std::fs::TryLockError::Error(e)) => Err(io_text("cannot lock", &path, e)),
+fn same_file(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
+    a.dev() == b.dev() && a.ino() == b.ino()
+}
+
+/// A record folder's lock (`owner.lock`, flock). While it is held no other
+/// attach, scan or discard touches the folder, and the folder is deleted only
+/// while it is held (renamed to a tombstone first).
+pub(crate) struct FolderLock {
+    file: File,
+    dir: PathBuf,
+}
+
+impl FolderLock {
+    /// Takes the lock, waiting up to `wait` while another holder (such as a
+    /// scan) has it. With `create`, makes the folder (and syncs its parent).
+    /// None: still held by someone else, or (without `create`) no folder.
+    fn take(dir: &Path, create: bool, wait: Duration) -> std::result::Result<Option<Self>, String> {
+        let start = Instant::now();
+        let path = dir.join(LOCK);
+        loop {
+            if !dir.is_dir() {
+                if !create {
+                    return Ok(None);
+                }
+                fs::create_dir_all(dir).map_err(|e| io_text("cannot make", dir, e))?;
+                sync_dir(parent_of(dir)).map_err(|e| io_text("cannot sync", parent_of(dir), e))?;
+            }
+            let file = match OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .write(true)
+                .open(&path)
+            {
+                Ok(f) => f,
+                // The folder went away between the check and the open.
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(io_text("cannot open", &path, e)),
+            };
+            match file.try_lock() {
+                Ok(()) => {}
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    if start.elapsed() >= wait {
+                        return Ok(None);
+                    }
+                    std::thread::sleep(Duration::from_millis(2));
+                    continue;
+                }
+                Err(std::fs::TryLockError::Error(e)) => {
+                    return Err(io_text("cannot lock", &path, e));
+                }
+            }
+            let lock = Self {
+                file,
+                dir: dir.to_path_buf(),
+            };
+            // The folder may have been renamed away (deleted) while we waited.
+            if lock.held() {
+                return Ok(Some(lock));
+            }
+        }
+    }
+
+    /// The lock file at the folder's path is still the one we hold.
+    fn held(&self) -> bool {
+        match (fs::metadata(self.dir.join(LOCK)), self.file.metadata()) {
+            (Ok(a), Ok(b)) => same_file(&a, &b),
+            _ => false,
+        }
+    }
+
+    /// Deletes the folder while still holding its lock: renames it to a
+    /// hidden tombstone (so the path is free at once), then deletes that.
+    fn delete_folder(self) -> std::result::Result<(), String> {
+        if !self.held() {
+            return Ok(());
+        }
+        let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let name = self
+            .dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let parent = parent_of(&self.dir).to_path_buf();
+        let tomb = parent.join(format!(".{name}.deleted-{}-{n}", std::process::id()));
+        fs::rename(&self.dir, &tomb).map_err(|e| io_text("cannot delete", &self.dir, e))?;
+        let _ = sync_dir(&parent);
+        let result = fs::remove_dir_all(&tomb).map_err(|e| io_text("cannot delete", &tomb, e));
+        drop(self.file);
+        result
     }
 }
 
 /// Lists the records under `root` that no live process owns: each one is a
 /// document that did not close cleanly. A folder with no manifest at all (a
-/// crash before the first record) is cleaned up and not listed.
+/// crash before the first record) and leftover tombstones are deleted.
 pub fn scan(root: &Path) -> Vec<RecordInfo> {
     let mut out = Vec::new();
     let Ok(entries) = fs::read_dir(root) else {
@@ -347,7 +596,16 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let lock = match try_lock(&dir) {
+        if uuid.starts_with('.') {
+            if uuid.contains(".deleted-")
+                && let Ok(Some(lock)) = FolderLock::take(&dir, false, Duration::ZERO)
+            {
+                drop(lock);
+                let _ = fs::remove_dir_all(&dir);
+            }
+            continue;
+        }
+        let lock = match FolderLock::take(&dir, false, Duration::ZERO) {
             Ok(Some(lock)) => lock,
             Ok(None) => continue,
             Err(problem) => {
@@ -361,14 +619,16 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
             }
         };
         if !dir.join(MANIFEST).exists() {
-            drop(lock);
-            if let Err(e) = fs::remove_dir_all(&dir) {
-                eprintln!("op-engine: cannot delete {}: {e}", dir.display());
+            if let Err(e) = lock.delete_folder() {
+                eprintln!("op-engine: {e}");
             }
             continue;
         }
         let (manifest, problem) = match read_record(&dir) {
-            Ok(m) => (Some(m), None),
+            Ok(m) => {
+                let stale = older_than_file(&m);
+                (Some(m), stale)
+            }
             Err(p) => (None, Some(p)),
         };
         drop(lock);
@@ -387,12 +647,10 @@ pub fn discard(dir: &Path) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
-    match try_lock(dir).map_err(internal)? {
+    match FolderLock::take(dir, false, Duration::from_millis(200)).map_err(internal)? {
+        None if !dir.exists() => Ok(()),
         None => Err(Error::Busy),
-        Some(lock) => {
-            drop(lock);
-            fs::remove_dir_all(dir).map_err(|e| internal(io_text("cannot delete", dir, e)))
-        }
+        Some(lock) => lock.delete_folder().map_err(internal),
     }
 }
 
@@ -401,64 +659,97 @@ enum Ctl {
     Flush(Sender<std::result::Result<Option<u64>, String>>),
     /// Look at the document now (after a save).
     Wake,
-    SetOriginal(Option<String>),
-    /// Stop; with `true`, delete the record (a clean close).
+    /// Stop; with `true`, delete the record folder (a clean close).
     Stop(bool),
 }
 
 pub(crate) struct Writer {
     tx: Sender<Ctl>,
-    join: Option<JoinHandle<()>>,
     status: Arc<Mutex<RecoveryStatus>>,
+    shared: Arc<Mutex<Shared>>,
+    cancel: Arc<AtomicBool>,
+    events: Sender<Event>,
+    join: Option<JoinHandle<()>>,
 }
 
 #[derive(Default)]
 pub(crate) struct Registry {
     writers: Mutex<HashMap<u64, Writer>>,
     errors: Mutex<HashMap<u64, String>>,
+    /// Writer threads told to stop; Engine's drop waits for them.
+    retired: Mutex<Vec<JoinHandle<()>>>,
 }
 
 struct WriterState {
     doc: u64,
     dir: PathBuf,
-    original: Option<String>,
     published: Arc<ArcSwap<Published>>,
     options: RecoveryOptions,
     status: Arc<Mutex<RecoveryStatus>>,
+    shared: Arc<Mutex<Shared>>,
+    cancel: Arc<AtomicBool>,
     events: Sender<Event>,
     /// The revision the record on disk holds, written in this session.
     written: Option<u64>,
-    /// True while a record (from any session) exists in `dir`.
-    on_disk: bool,
     seen: u64,
     last_change: Option<Instant>,
     first_unrecorded: Option<Instant>,
-    _lock: File,
+    /// After a failed clean-up, the next try waits until then.
+    retry_clear_at: Option<Instant>,
+    lock: Option<FolderLock>,
+}
+
+fn event_to(events: &Sender<Event>, doc: u64, json: serde_json::Value) {
+    let _ = events.send(Event {
+        kind: EventKind::Recovery,
+        doc,
+        ticket: 0,
+        json,
+    });
 }
 
 impl WriterState {
+    fn fail(&mut self, e: String) -> String {
+        let mut status = self.status.lock();
+        status.error = Some(e.clone());
+        status.failures += 1;
+        drop(status);
+        self.event(json!({"ok":false,"error":e}));
+        e
+    }
+
     fn write_now(&mut self) -> std::result::Result<Option<u64>, String> {
         let snap = self.published.load_full();
         if !snap.history.dirty {
-            self.clear();
-            return Ok(None);
+            return self.clear().map(|()| None);
         }
         if self.written == Some(snap.revision) {
             return Ok(Some(snap.revision));
+        }
+        match &self.lock {
+            Some(lock) if lock.held() => {}
+            _ => {
+                // Never recreate a folder this writer no longer owns.
+                self.lock = None;
+                return Err(self.fail(format!(
+                    "the recovery folder {} was removed",
+                    self.dir.display()
+                )));
+            }
         }
         let result = write_record(
             &self.dir,
             &snap.state,
             snap.revision,
-            self.original.as_deref(),
+            &self.shared,
+            &self.cancel,
             &self.options.hooks,
         );
-        let mut status = self.status.lock();
         match result {
-            Ok(m) => {
+            Ok(WriteOutcome::Committed(m)) => {
                 self.written = Some(m.revision);
-                self.on_disk = true;
                 self.first_unrecorded = None;
+                let mut status = self.status.lock();
                 status.acknowledged = Some(m.revision);
                 status.error = None;
                 status.writes += 1;
@@ -466,39 +757,46 @@ impl WriterState {
                 self.event(json!({"ok":true,"revision":m.revision}));
                 Ok(Some(m.revision))
             }
-            Err(e) => {
-                status.error = Some(e.clone());
-                status.failures += 1;
+            Ok(WriteOutcome::Abandoned) => Ok(None),
+            Err(e) => Err(self.fail(e.text)),
+        }
+    }
+
+    /// The document is clean (saved): its record is no longer needed. On an
+    /// error the record stays tracked and the clean-up is tried again later.
+    fn clear(&mut self) -> std::result::Result<(), String> {
+        self.first_unrecorded = None;
+        if !self.shared.lock().on_disk {
+            self.written = None;
+            return Ok(());
+        }
+        if self.retry_clear_at.is_some_and(|t| Instant::now() < t) {
+            return Err("waiting to retry the clean-up".into());
+        }
+        let deleted = {
+            let mut shared = self.shared.lock();
+            delete_record(&self.dir, &mut shared)
+        };
+        match deleted {
+            Ok(_) => {
+                self.retry_clear_at = None;
+                self.written = None;
+                let mut status = self.status.lock();
+                status.acknowledged = None;
+                status.error = None;
                 drop(status);
-                self.event(json!({"ok":false,"error":e}));
-                Err(e)
+                self.event(json!({"ok":true,"revision":null,"cleared":true}));
+                Ok(())
+            }
+            Err(e) => {
+                self.retry_clear_at = Some(Instant::now() + self.options.settle);
+                Err(self.fail(e))
             }
         }
     }
 
-    /// The document is clean (saved): its record is no longer needed.
-    fn clear(&mut self) {
-        if self.on_disk {
-            // The status changes first, so nobody sees the record gone while
-            // its revision is still reported as acknowledged.
-            self.status.lock().acknowledged = None;
-            let _ = fs::remove_file(self.dir.join(MANIFEST));
-            remove_stale(&self.dir, None);
-            let _ = sync_dir(&self.dir);
-            self.on_disk = false;
-            self.written = None;
-            self.event(json!({"ok":true,"revision":null,"cleared":true}));
-        }
-        self.first_unrecorded = None;
-    }
-
     fn event(&self, json: serde_json::Value) {
-        let _ = self.events.send(Event {
-            kind: EventKind::Recovery,
-            doc: self.doc,
-            ticket: 0,
-            json,
-        });
+        event_to(&self.events, self.doc, json);
     }
 
     /// Notes a new revision and writes when edits settled or waited too long.
@@ -513,10 +811,8 @@ impl WriterState {
             }
         }
         if !snap.history.dirty {
-            if self.on_disk {
-                self.clear();
-            }
-            self.first_unrecorded = None;
+            drop(snap);
+            let _ = self.clear();
             return;
         }
         if self.written == Some(snap.revision) {
@@ -546,23 +842,21 @@ impl WriterState {
                     let _ = reply.send(self.write_now());
                 }
                 Ok(Ctl::Wake) => self.tick(),
-                Ok(Ctl::SetOriginal(url)) => {
-                    self.original = url;
-                    // The next record carries the new file name.
-                    self.written = None;
-                }
                 Ok(Ctl::Stop(delete)) => {
-                    if delete {
-                        self.on_disk = true;
-                        self.clear();
-                        drop(self._lock);
-                        if let Err(e) = fs::remove_dir_all(&self.dir) {
-                            eprintln!("op-engine: cannot delete {}: {e}", self.dir.display());
-                        }
+                    if delete
+                        && let Some(lock) = self.lock.take()
+                        && let Err(e) = lock.delete_folder()
+                    {
+                        eprintln!("op-engine: {e}");
                     }
                     return;
                 }
-                Err(RecvTimeoutError::Timeout) => self.tick(),
+                Err(RecvTimeoutError::Timeout) => {
+                    if self.cancel.load(Ordering::SeqCst) {
+                        continue;
+                    }
+                    self.tick()
+                }
                 Err(RecvTimeoutError::Disconnected) => return,
             }
         }
@@ -570,30 +864,90 @@ impl WriterState {
 }
 
 impl Registry {
+    /// Tells the writer to stop and returns at once. The writer abandons a
+    /// write in progress (the last good record stays, or the folder goes when
+    /// `delete`), then deletes the folder if asked.
     pub(crate) fn stop(&self, doc: u64, delete: bool) {
+        self.stop_impl(doc, delete, false);
+    }
+
+    fn stop_impl(&self, doc: u64, delete: bool, wait: bool) {
         let writer = self.writers.lock().remove(&doc);
         if let Some(mut w) = writer {
+            w.cancel.store(true, Ordering::SeqCst);
             let _ = w.tx.send(Ctl::Stop(delete));
-            if let Some(join) = w.join.take() {
-                let _ = join.join();
+            if wait {
+                if let Some(join) = w.join.take() {
+                    let _ = join.join();
+                }
+            } else if let Some(join) = w.join.take() {
+                let mut retired = self.retired.lock();
+                retired.retain(|j| !j.is_finished());
+                retired.push(join);
             }
         }
         self.errors.lock().remove(&doc);
     }
+
+    /// Waits for every stopped writer (the engine is going away).
+    pub(crate) fn join_retired(&self) {
+        let handles: Vec<_> = self.retired.lock().drain(..).collect();
+        for h in handles {
+            let _ = h.join();
+        }
+    }
+
     fn send(&self, doc: u64, ctl: Ctl) -> bool {
         match self.writers.lock().get(&doc) {
             Some(w) => w.tx.send(ctl).is_ok(),
             None => false,
         }
     }
+
+    /// A clean save happened: no record older than it may stay or appear.
+    /// Under the shared lock: the save epoch moves on (a write in progress
+    /// abandons its commit), the base file stamp is taken again, and the
+    /// record is deleted before the caller returns.
+    fn saved(&self, doc: u64) {
+        let writers = self.writers.lock();
+        let Some(w) = writers.get(&doc) else {
+            return;
+        };
+        let dir = w.status.lock().dir.clone();
+        let mut shared = w.shared.lock();
+        shared.epoch += 1;
+        shared.base = stamp_of(shared.original.as_deref());
+        if !shared.on_disk {
+            return;
+        }
+        match delete_record(&dir, &mut shared) {
+            Ok(_) => {
+                drop(shared);
+                w.status.lock().acknowledged = None;
+                event_to(
+                    &w.events,
+                    doc,
+                    json!({"ok":true,"revision":null,"cleared":true}),
+                );
+            }
+            Err(e) => {
+                drop(shared);
+                let mut status = w.status.lock();
+                status.error = Some(e.clone());
+                status.failures += 1;
+                drop(status);
+                event_to(&w.events, doc, json!({"ok":false,"error":e}));
+            }
+        }
+        let _ = w.tx.send(Ctl::Wake);
+    }
 }
 
 impl Engine {
     /// Turns on recovery records for `doc` in `dir` (one folder per document,
     /// `<root>/<doc-uuid>`). `original_url` is the file the document came from,
-    /// if any. Calling it again for the same document only updates the URL.
-    /// `adopt`: the document's current content is already the record in `dir`
-    /// (a recovered document), so nothing is written until the next edit.
+    /// if any. Calling it again for the same document only updates the URL
+    /// (and the file stamp records are compared with).
     pub fn recovery_attach(
         &self,
         doc: u64,
@@ -601,7 +955,8 @@ impl Engine {
         original_url: Option<String>,
         options: RecoveryOptions,
     ) -> Result<()> {
-        self.recovery_attach_impl(doc, dir.as_ref(), original_url, options, false)
+        let base = stamp_of(original_url.as_deref());
+        self.recovery_attach_impl(doc, dir.as_ref(), original_url, base, options, false)
     }
 
     fn recovery_attach_impl(
@@ -609,6 +964,7 @@ impl Engine {
         doc: u64,
         dir: &Path,
         original_url: Option<String>,
+        base: Option<FileStamp>,
         options: RecoveryOptions,
         adopt: bool,
     ) -> Result<()> {
@@ -620,10 +976,13 @@ impl Engine {
                     "recovery is already on for this document in another folder",
                 ));
             }
-            let _ = w.tx.send(Ctl::SetOriginal(original_url));
+            let mut shared = w.shared.lock();
+            shared.original = original_url;
+            shared.base = base;
             return Ok(());
         }
-        let lock = try_lock(dir)
+        // A scan may hold the folder for a moment; wait for it.
+        let lock = FolderLock::take(dir, true, Duration::from_secs(2))
             .map_err(internal)?
             .ok_or_else(|| bad("another process owns this recovery folder"))?;
         let on_disk = dir.join(MANIFEST).exists();
@@ -633,20 +992,28 @@ impl Engine {
             acknowledged: adopt.then_some(current.revision),
             ..Default::default()
         }));
+        let shared = Arc::new(Mutex::new(Shared {
+            epoch: 0,
+            original: original_url,
+            base,
+            on_disk,
+        }));
+        let cancel = Arc::new(AtomicBool::new(false));
         let state = WriterState {
             doc,
             dir: dir.to_path_buf(),
-            original: original_url,
             published: d.published.clone(),
             options,
             status: status.clone(),
+            shared: shared.clone(),
+            cancel: cancel.clone(),
             events: self.events_tx.clone(),
             written: adopt.then_some(current.revision),
-            on_disk,
             seen: current.revision,
             last_change: None,
             first_unrecorded: None,
-            _lock: lock,
+            retry_clear_at: None,
+            lock: Some(lock),
         };
         drop(current);
         let (tx, rx) = unbounded();
@@ -658,8 +1025,11 @@ impl Engine {
             doc,
             Writer {
                 tx,
-                join: Some(join),
                 status,
+                shared,
+                cancel,
+                events: self.events_tx.clone(),
+                join: Some(join),
             },
         );
         Ok(())
@@ -667,7 +1037,8 @@ impl Engine {
 
     /// Opens the record in `dir` as a new document marked unsaved, and keeps
     /// writing its records into the same folder, so the old record stays until
-    /// a newer one replaces it. Returns the document id and the manifest.
+    /// a newer one replaces it. Refuses a damaged record and one older than
+    /// its file. Returns the document id and the manifest.
     pub fn recovery_open(
         &self,
         dir: impl AsRef<Path>,
@@ -675,10 +1046,20 @@ impl Engine {
     ) -> Result<(u64, Manifest)> {
         let dir = dir.as_ref();
         let manifest = read_record(dir).map_err(bad)?;
+        if let Some(problem) = older_than_file(&manifest) {
+            return Err(bad(problem));
+        }
         let doc = self.open_opaint(dir.join(&manifest.snapshot))?;
         let opened = (|| {
             self.mark_unsaved(doc)?;
-            self.recovery_attach_impl(doc, dir, manifest.original_url.clone(), options, true)
+            self.recovery_attach_impl(
+                doc,
+                dir,
+                manifest.original_url.clone(),
+                manifest.base_file,
+                options,
+                true,
+            )
         })();
         if let Err(e) = opened {
             let _ = self.close(doc);
@@ -707,8 +1088,16 @@ impl Engine {
             .map(|w| w.status.lock().clone())
     }
 
-    /// Stops recovery for `doc`; with `delete`, deletes its record folder.
+    /// Stops recovery for `doc` and waits for the writer (a write in progress
+    /// is abandoned; with `delete`, the record folder is deleted). Tests and
+    /// helpers use it; `close` stops without waiting.
     pub fn recovery_detach(&self, doc: u64, delete: bool) {
+        self.recovery.stop_impl(doc, delete, true);
+    }
+
+    /// Stops recovery for `doc` at once; the writer abandons a write in
+    /// progress and (with `delete`) deletes the folder in the background.
+    pub fn recovery_detach_nowait(&self, doc: u64, delete: bool) {
         self.recovery.stop(doc, delete);
     }
 
@@ -717,15 +1106,22 @@ impl Engine {
         self.recovery.errors.lock().get(&doc).cloned()
     }
 
-    pub(crate) fn note_file_result(&self, doc: u64, result: &Result<()>) {
+    /// `marked`: the operation made the current step the saved one.
+    pub(crate) fn note_file_result(&self, doc: u64, result: &Result<()>, marked: bool) {
         match result {
             Ok(()) => {
                 self.recovery.errors.lock().remove(&doc);
-                self.recovery.send(doc, Ctl::Wake);
+                if marked {
+                    self.recovery.saved(doc);
+                }
             }
             Err(e) => {
                 self.recovery.errors.lock().insert(doc, e.to_string());
             }
         }
+    }
+
+    pub(crate) fn recovery_join(&self) {
+        self.recovery.join_retired();
     }
 }
