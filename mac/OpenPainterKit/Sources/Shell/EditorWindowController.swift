@@ -20,6 +20,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public private(set) var brush: BrushStrokeController!
     /// Rectangle Select, the Crop tool and the marching ants (M23).
     public private(set) var selectCrop: SelectCropController!
+    /// Move Selected Pixels and Move Selection (M33).
+    public private(set) var moveTool: MoveToolController!
     private var cursor: CGPoint?
     /// The Text tool's session and input view (M46).
     public private(set) var textTool: TextToolController!
@@ -110,6 +112,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         brush = BrushStrokeController(controller: self)
         canvas.strokeSink = brush
         selectCrop = SelectCropController(controller: self)
+        moveTool = MoveToolController(controller: self)
+        canvas.onArrowKey = { [weak self] code, mods in self?.moveTool.arrow(keyCode: code, modifiers: mods) ?? false }
         canvas.onClick = { [weak self] p in
             guard let self else { return }
             self.click(p, secondary: self.canvas.pressUsesSecondary, modifiers: self.canvas.pressModifiers)
@@ -137,6 +141,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             self?.updateStatus()
             self?.textTool?.viewportChanged()
             self?.selectCrop?.viewportChanged()
+            self?.moveTool?.viewportChanged()
         }
         // scripts/launch-time.sh waits for this line (the trace replaces the hook).
         canvas.onFirstFrame = { LaunchClock.markReady() }
@@ -178,9 +183,11 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         switch key {
         case .escape:
             if canvas.cancelStroke() { return }
+            if moveTool.escape() { return }
             if selectCrop.escape() { return }
             if editor.selection != nil { editor.run("selection.deselect") }
         case .enter:
+            if moveTool.enter() { return }
             if selectCrop.enter() { return }
             editor.clearMessage()
             if editor.selection != nil, editor.isEnabled("selection.deselect") { editor.run("selection.deselect") }
@@ -196,7 +203,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         let mode: CanvasTool =
             if selectCrop?.cropActive == true { .overlay } else {
             switch t {
-            case .rectangleSelect, .ellipseSelect, .lassoSelect: .overlay
+            case .rectangleSelect, .ellipseSelect, .lassoSelect, .moveSelectedPixels, .moveSelection: .overlay
             case .pan: .pan
             case .zoom: .zoom
             case .paintbrush, .eraser, .pencil: .stroke
@@ -266,6 +273,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             editor.run("edit.undo")
             return
         }
+        // Undo during a move commits it first (one step), then undoes it.
+        moveTool?.finish()
         if canUndo { editor.run("edit.undo") }
     }
     public func redo() { if canRedo { editor.run("edit.redo") } }

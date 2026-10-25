@@ -85,6 +85,9 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var onToolKey: ((Character) -> Bool)?
     /// Escape, Enter and Delete while the canvas has focus.
     public var onKey: ((CanvasKey) -> Void)?
+    /// An arrow key (key code 123 to 126) while the canvas has focus; return
+    /// true when it was used (M33: Move tool nudges).
+    public var onArrowKey: ((UInt16, NSEvent.ModifierFlags) -> Bool)?
     /// True while the zoom is the Fit zoom: size, clear-rectangle and panel
     /// changes fit again. Any other zoom change clears it.
     public private(set) var isFitted = true
@@ -607,6 +610,10 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             if let onKey { return onKey(.enter) }
         case 51, 117:  // Delete, forward delete
             if plain, let onKey { return onKey(event.modifierFlags.contains(.shift) ? .fill : .delete) }
+        case 123...126:  // arrows
+            if let onArrowKey, onArrowKey(event.keyCode, event.modifierFlags.intersection(.deviceIndependentFlagsMask)) {
+                return
+            }
         default: break
         }
         if plain, !event.isARepeat, let onToolKey, let c = event.charactersIgnoringModifiers?.lowercased().first,

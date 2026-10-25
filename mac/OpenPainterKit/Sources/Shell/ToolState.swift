@@ -89,7 +89,7 @@ public enum PaintTool: String, CaseIterable, Sendable {
     public var isFunctional: Bool {
         switch self {
         case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket, .colorPicker, .text, .rectangleSelect,
-             .ellipseSelect, .lassoSelect: true
+             .ellipseSelect, .lassoSelect, .moveSelectedPixels, .moveSelection: true
         default: false
         }
     }
@@ -134,6 +134,10 @@ public enum PaintTool: String, CaseIterable, Sendable {
         case .paintBucket: return "Paint Bucket: click to fill with the primary color, right-click for the secondary"
         case .colorPicker: return "Color Picker: click sets the primary color, right-click the secondary; Command-click samples the image"
         case .text: return "Text: click to type; Escape, Finish, a click outside or another tool commits"
+        case .moveSelectedPixels:
+            return "Move Selected Pixels: drag to move, nubs scale, drag outside to rotate; Enter finishes, Escape cancels"
+        case .moveSelection:
+            return "Move Selection: drag to move the outline, nubs scale, drag outside to rotate; Enter finishes"
         default: return "\(label): drag to paint"
         }
     }
@@ -189,6 +193,8 @@ public struct ToolSettings: Equatable, Sendable {
     public var pickerAfterClick = PickerAfterClick.doNotSwitch
     /// Text tool options (M46).
     public var text = TextToolSettings()
+    /// Move tools resampling (M33; paint.net's default is Bicubic).
+    public var moveResampling = MoveResampling.bicubic
 
     public init() {}
 

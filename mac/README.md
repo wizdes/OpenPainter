@@ -100,6 +100,17 @@ The Mac side shapes text; the engine only composites what it is given, so the en
 - `Shell/SelectionEditActions.swift`: Erase Selection (Delete; transparent pixels, then deselect), Fill Selection (Shift-Delete; the primary color, the selection stays), Expand Selection… (a sheet; a negative number shrinks), Copy Selection (Option-Shift-Command-C; paint.net's `{"polygonList": [...]}` JSON text from the `doc.selection_polygons` query) and the Paste Selection submenu (one item per combine mode; Replace is Option-Shift-Command-V). Invert Selection (Command-I) is the engine command `selection.invert`. Each changing item is one history step, and each item is off when it would do nothing. Enter deselects, as in paint.net.
 - Every selection tool and Paste Selection combine with an empty selection when nothing is selected, and new shapes are clipped to the canvas.
 
+## Move Selected Pixels and Move Selection (M33)
+
+Rules follow paint.net's Move Tools page (https://www.getpaint.net/doc/latest/MoveTools.html), with Ctrl as Command and Alt as Option.
+
+- `Shell/MoveTool.swift`: while a Move tool is current, the canvas sends the pointer to `MoveToolController` (it is the canvas `pointerSink`; Rectangle Select gets it back on a tool change). The box is the selection bounds, or the whole layer for Move Selected Pixels with nothing selected. Move Selection with nothing selected does nothing.
+- Drag inside the box to move (whole pixels). Drag one of the 8 nubs to scale from the opposite nub; past it flips; Shift keeps the aspect ratio; Option scales about the center. Drag in the 24 pt corridor just outside the box, or with the right button anywhere, to rotate about the pivot; Shift snaps the total angle to 15 degrees and the status bar shows the angle. Drag the pivot (circle with a cross, at the box center at first) to move it. Command during a drag works on a copy, so the original pixels stay. Arrow keys nudge 1 px, Command-arrow 10 px (paint.net's Ctrl).
+- One session per tool use. The first press on the box (or the first arrow key) sends `op_move_begin`; each drag sends the whole transform (`op_move_update`, at most once per run-loop turn) and the canvas shows the engine's preview, with the ants following the box. Enter, Finish, another tool, a click outside the box and its corridor, Undo, or any engine command finishes it (`op_move_finish`, one "Move Selected Pixels" or "Move Selection" step). Escape or Cancel sends `op_move_cancel`: pixels, selection and history stay as they were.
+- The options row has Resampling (the engine's five move modes: Nearest Neighbor, Bilinear, Bicubic (default), Supersampling, Best Quality), Cancel and Finish.
+- `Shell/MoveGeometry.swift`: the hit test (nub, pivot, inside, corridor, outside) and the drag math. The session keeps the original box and one cumulative transform, so a second drag continues from the first.
+- `EngineBridge/Move.swift` wraps `op_move_begin`, `op_move_update`, `op_move_finish` and `op_move_cancel` (`engine/op-ffi/src/move_tool.rs`).
+
 ## File formats and drag and drop (M17)
 
 The engine decodes PNG itself. ImageIO decodes HEIC, HEIF, AVIF and every Camera RAW type that `CGImageSourceCopyTypeIdentifiers()` lists (30 on macOS 27). Swift hands the engine straight 8-bit RGBA and the ICC profile through `op_import_pixels`.

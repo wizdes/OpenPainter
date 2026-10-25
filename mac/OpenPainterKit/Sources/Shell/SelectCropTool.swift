@@ -178,7 +178,9 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
         let bar = controller.optionsBar
         let want: [NSView]? =
             cropActive ? cropViews : boxTool ? rectViews : tools.tool == .lassoSelect ? lassoViews : nil
-        if want.map({ $0.map(ObjectIdentifier.init) }) != bar.customOptions.map({ $0.map(ObjectIdentifier.init) }) {
+        // Leave another controller's options alone (M33: the Move tools).
+        let ours = bar.customOptions?.contains { $0 === modePopup || $0 === aspectPopup } ?? true
+        if want != nil || ours, want.map({ $0.map(ObjectIdentifier.init) }) != bar.customOptions.map({ $0.map(ObjectIdentifier.init) }) {
             bar.customOptions = want
         }
         syncOptions()
@@ -545,6 +547,7 @@ public final class SelectCropController: NSObject, CanvasPointerSink {
 
 extension EditorWindowController: ImageSizeActions {
     @objc public func showCropTool(_ sender: Any?) {
+        moveTool?.finish()  // M33: a move in progress commits first
         selectCrop.beginCrop()
     }
 

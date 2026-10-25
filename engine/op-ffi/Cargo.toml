@@ -15,6 +15,8 @@ crate-type = ["staticlib", "rlib"]
 op-engine = { path = "../op-engine", features = ["test-commands"] }
 # Live strokes (src/stroke.rs) build op-tools stroke samples.
 op-tools = { path = "../op-tools" }
+# Moves (src/move_tool.rs) name the resampling mode.
+op-ops = { path = "../op-ops" }
 serde_json = "1"
 # Canvas views (src/view.rs): op-gpu draws, op-color builds the display table.
 op-gpu = { path = "../op-gpu" }

@@ -346,6 +346,40 @@ enum OpStatus op_doc_mark_saved(struct OpEngine *p, uint64_t doc, uint64_t revis
 enum OpStatus op_doc_replace(struct OpEngine *p, uint64_t doc, uint64_t source);
 
 /**
+ * Starts a move session on the active layer. `json`: `{"kind":"pixels" |
+ * "selection", "transform", "resampling", "copy"}` (see `op_move_update`).
+ * With no selection, "pixels" moves the whole layer. Returns OP_ERR_BUSY while
+ * a stroke, a preview or another move runs, and OP_ERR_BAD_ARGUMENT for bad
+ * options or a transform that cannot be inverted.
+ */
+enum OpStatus op_move_begin(struct OpEngine *p, uint64_t doc, const uint8_t *json, uintptr_t len);
+
+/**
+ * Replaces the session's whole transform (not a delta), its resampling and
+ * its copy flag, and publishes the new preview. `json`: `{"transform":
+ * [a,b,c,d,tx,ty], "resampling", "copy"}`. Writes the preview serial to
+ * `out_serial` when it is not null. OP_ERR_BAD_ARGUMENT when no move runs or
+ * the options are bad (the preview stays as it was).
+ */
+enum OpStatus op_move_update(struct OpEngine *p,
+                             uint64_t doc,
+                             const uint8_t *json,
+                             uintptr_t len,
+                             uint64_t *out_serial);
+
+/**
+ * Commits the session as one history step. OP_ERR_BAD_ARGUMENT when no move
+ * runs; OP_ERR_BUSY (and the move is dropped) when the active layer changed.
+ */
+enum OpStatus op_move_finish(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Drops the session: pixels, selection and history stay as they were.
+ * OP_ERR_BAD_ARGUMENT when no move runs.
+ */
+enum OpStatus op_move_cancel(struct OpEngine *p, uint64_t doc);
+
+/**
  * Starts a Paintbrush, Eraser or Pencil stroke on the active layer. `json`:
  * `{"tool","width","color":"rrggbbaa","opacity":0..255,"antialias","blend",
  * "hardness":0..1,"pressure_size","pressure_opacity"}`. Returns OP_ERR_BUSY
