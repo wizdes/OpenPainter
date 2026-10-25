@@ -35,9 +35,12 @@ final class LocalHTTPServer: @unchecked Sendable {
     private var log: [String] = []
     private(set) var port: UInt16 = 0
 
-    init() throws {
+    /// `port` 0 picks a free port.
+    init(port: UInt16 = 0) throws {
         let params = NWParameters.tcp
-        params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
+        params.allowLocalEndpointReuse = true
+        params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback),
+                                                 port: port == 0 ? .any : NWEndpoint.Port(rawValue: port)!)
         listener = try NWListener(using: params)
         let ready = DispatchSemaphore(value: 0)
         listener.stateUpdateHandler = { state in
@@ -52,7 +55,7 @@ final class LocalHTTPServer: @unchecked Sendable {
             listener.cancel()
             throw NSError(domain: "LocalHTTPServer: listener did not start", code: 1)
         }
-        port = p
+        self.port = p
     }
 
     func url(_ path: String) -> URL { URL(string: "http://127.0.0.1:\(port)\(path)")! }
@@ -184,10 +187,12 @@ final class UpdateFeedTests: XCTestCase {
     /// The Debug app the test scheme builds before testing.
     static let builtApp = macDir.appendingPathComponent("build/DerivedData/Build/Products/Debug/OpenPainter.app")
 
-    /// The Sparkle keys (SU*) of the app's Info.plist, without the feed and the key.
+    /// The Sparkle keys (SU*) of the app's Info.plist, without the feed, the
+    /// key and SUEnableAutomaticChecks (throwaway hosts never check on a timer).
     static func appSparkleSettings() throws -> [String: Any] {
         let info = try XCTUnwrap(NSDictionary(contentsOf: sourceInfoPlist) as? [String: Any], sourceInfoPlist.path)
-        return info.filter { $0.key.hasPrefix("SU") && $0.key != "SUFeedURL" && $0.key != "SUPublicEDKey" }
+        let skipped: Set<String> = ["SUFeedURL", "SUPublicEDKey", "SUEnableAutomaticChecks"]
+        return info.filter { $0.key.hasPrefix("SU") && !skipped.contains($0.key) }
     }
 
     override func setUp() async throws {
@@ -311,8 +316,8 @@ final class UpdateFeedTests: XCTestCase {
     }
 
     /// The host's CFBundleVersion on disk now (it changes when Sparkle installs).
-    func hostVersion() -> String? {
-        (NSDictionary(contentsOf: hostURL.appendingPathComponent("Contents/Info.plist")) as? [String: Any])?["CFBundleVersion"] as? String
+    func hostVersion(_ key: String = "CFBundleVersion", at url: URL? = nil) -> String? {
+        (NSDictionary(contentsOf: (url ?? hostURL).appendingPathComponent("Contents/Info.plist")) as? [String: Any])?[key] as? String
     }
 
     /// Zips an update app with CFBundleVersion `version` that keeps `publicKey`
@@ -530,9 +535,14 @@ final class UpdateFeedTests: XCTestCase {
 
     // MARK: The app's own settings
 
+    /// M60: the release key's public half (the private half is
+    /// OPENPAINTER_SPARKLE_PRIVATE_KEY in ~/keys).
+    static let releasePublicKey = "Q1P9GEU6X00XfYERTrMaaVhfra04UVYC2IuWAK0TJoc="
+
     static let expectedAppSettings: [String: AnyHashable] = [
         "SUFeedURL": UpdateSettings.placeholderFeed,
-        "SUPublicEDKey": "",
+        "SUPublicEDKey": releasePublicKey,
+        "SUEnableAutomaticChecks": true,
         "SURequireSignedFeed": true,
         "SUVerifyUpdateBeforeExtraction": true,
         "SUSignedFeedFailureExpirationInterval": 0,
@@ -547,23 +557,54 @@ final class UpdateFeedTests: XCTestCase {
     }
 
     /// The Info.plist XcodeGen writes and the one inside the built app both
-    /// carry the placeholder feed, an empty key and the signed-feed rules.
-    func testAppInfoPlistHasThePlaceholderFeedAndNoKey() throws {
+    /// carry the feed, the release key, scheduled checks and the signed-feed
+    /// rules. (M58 expected an empty key here: a placeholder for M60, updated
+    /// with the user's OK.)
+    func testAppInfoPlistHasTheFeedAndTheReleaseKey() throws {
         let source = try checkAppSettings(Self.sourceInfoPlist)
-        XCTAssertFalse(UpdateSettings(info: source).isSetUp)
+        XCTAssertTrue(UpdateSettings(info: source).isSetUp)
         let built = try checkAppSettings(Self.builtApp.appendingPathComponent("Contents/Info.plist"))
         let settings = UpdateSettings(info: built)
-        XCTAssertFalse(settings.isSetUp)
+        XCTAssertTrue(settings.isSetUp)
+        XCTAssertEqual(settings.publicKey, Self.releasePublicKey)
         XCTAssertEqual(settings.feedURL?.absoluteString, UpdateSettings.placeholderFeed)
+        XCTAssertEqual(Data(base64Encoded: settings.publicKey)?.count, 32, "an ed25519 public key is 32 bytes")
     }
 
-    /// Sparkle itself refuses to start with the built app's settings (empty
-    /// key), so even a direct start cannot check an unsigned feed. The host is
-    /// a copy of the built app's Info.plist with only the bundle id changed.
-    func testSparkleRefusesToStartWithTheAppsEmptyKey() throws {
+    /// A copy of the built app's Info.plist as a throwaway host: own bundle id,
+    /// own defaults file, the feed on the local server, no timer checks.
+    func makeBuiltAppHost(_ name: String, key: String?) throws -> Bundle {
         var info = try checkAppSettings(Self.builtApp.appendingPathComponent("Contents/Info.plist"))
         info["CFBundleIdentifier"] = hostID!
         info["CFBundleExecutable"] = "OpenPainterUpdateTest"
+        info["SUDefaultsDomain"] = dir.appendingPathComponent("sparkle-defaults").path
+        info["SUEnableAutomaticChecks"] = false
+        info["SUFeedURL"] = server.url("/appcast.xml").absoluteString
+        if let key { info["SUPublicEDKey"] = key }
+        let url = dir.appendingPathComponent("\(name)/OpenPainter.app")
+        try FileManager.default.createDirectory(at: url.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
+        let plist = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+        try plist.write(to: url.appendingPathComponent("Contents/Info.plist"))
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url.appendingPathComponent("Contents/MacOS/OpenPainterUpdateTest"))
+        return try XCTUnwrap(Bundle(url: url))
+    }
+
+    /// Sparkle starts with the built app's own settings (the release key).
+    func testSparkleStartsWithTheAppsReleaseKey() throws {
+        let host = try makeBuiltAppHost("release-key", key: nil)
+        let updater = SPUUpdater(hostBundle: host, applicationBundle: host, userDriver: SilentUserDriver(), delegate: nil)
+        updaters.append(updater)
+        XCTAssertNoThrow(try updater.start())
+    }
+
+    /// The M58 guard still holds: Sparkle itself refuses to start with an
+    /// empty key, so even a direct start cannot check an unsigned feed. The
+    /// host is a copy of the built app's Info.plist with the key emptied.
+    func testSparkleRefusesToStartWithAnEmptyKey() throws {
+        var info = try checkAppSettings(Self.builtApp.appendingPathComponent("Contents/Info.plist"))
+        info["CFBundleIdentifier"] = hostID!
+        info["CFBundleExecutable"] = "OpenPainterUpdateTest"
+        info["SUPublicEDKey"] = ""
         let url = dir.appendingPathComponent("empty-key/OpenPainter.app")
         try FileManager.default.createDirectory(at: url.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
         let plist = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
@@ -605,6 +646,96 @@ final class UpdateFeedTests: XCTestCase {
         if let out = ProcessInfo.processInfo.environment["OP_M58_PNG_DIR"] {
             try renderAlert(UpdateMenuTarget.notSetUpAlert(), to: URL(fileURLWithPath: out))
         }
+    }
+
+    // MARK: A real release (M60, run by scripts/release.sh)
+
+    /// What scripts/release.sh passes (as TEST_RUNNER_OP_RELEASE_*): the
+    /// folder that holds the release DMG, the public appcast and a second copy
+    /// of the appcast whose download URL points at this test's local server.
+    /// Both feeds are signed with the real release key; this test never sees
+    /// the private key. Without these variables the release tests skip.
+    struct ReleaseInput {
+        let dir: URL
+        let version: String
+        let build: String
+        let dmgName: String
+        let publicURL: String
+
+        static func fromEnvironment() throws -> ReleaseInput {
+            let env = ProcessInfo.processInfo.environment
+            guard let dir = env["OP_RELEASE_DIR"], let version = env["OP_RELEASE_VERSION"],
+                  let build = env["OP_RELEASE_BUILD"], let publicURL = env["OP_RELEASE_DMG_URL"]
+            else { throw XCTSkip("set by scripts/release.sh only (OP_RELEASE_DIR is unset)") }
+            return ReleaseInput(dir: URL(fileURLWithPath: dir), version: version, build: build,
+                                dmgName: "OpenPainter-\(version).dmg", publicURL: publicURL)
+        }
+
+        func read(_ name: String) throws -> Data { try Data(contentsOf: dir.appendingPathComponent(name)) }
+    }
+
+    /// Serves the release files on the local server. The local appcast was
+    /// signed for a URL on a port the release script picked, so the server
+    /// must listen there: the script passes OP_RELEASE_LOCAL_PORT and the
+    /// local feed names http://127.0.0.1:<port>/<dmg>.
+    func serveRelease(_ release: ReleaseInput) throws {
+        let env = ProcessInfo.processInfo.environment
+        let port = try XCTUnwrap(env["OP_RELEASE_LOCAL_PORT"].flatMap(UInt16.init), "OP_RELEASE_LOCAL_PORT")
+        server.stop()
+        server = try LocalHTTPServer(port: port)
+        server.put("/appcast.xml", try release.read("appcast.xml"))
+        server.put("/appcast-local.xml", try release.read("check/appcast-local.xml"))
+        server.put("/\(release.dmgName)", try release.read(release.dmgName))
+    }
+
+    /// The published appcast, unchanged, with the real public key: Sparkle
+    /// accepts its signature and offers this version and build.
+    func testReleaseFeedIsAcceptedWithTheReleaseKey() throws {
+        let release = try ReleaseInput.fromEnvironment()
+        try serveRelease(release)
+        let host = try makeBuiltAppHost("release-feed", key: nil)
+        let (result, driver) = try check(host)
+
+        let item = try XCTUnwrap(result.found, "Sparkle found the release: \(String(describing: result.finishError))")
+        XCTAssertEqual(item.signingValidationStatus, .succeeded, "the feed signature was checked with the release key")
+        XCTAssertEqual(item.versionString, release.build)
+        XCTAssertEqual(item.displayVersionString, release.version)
+        XCTAssertEqual(item.fileURL?.absoluteString, release.publicURL)
+        XCTAssertEqual(item.minimumSystemVersion, "15.0.0")
+        let size = try XCTUnwrap(FileManager.default.attributesOfItem(
+            atPath: release.dir.appendingPathComponent(release.dmgName).path)[.size] as? NSNumber)
+        XCTAssertEqual(item.contentLength, size.uint64Value)
+        XCTAssertNil(result.aborted)
+        XCTAssertEqual(driver.calls, [])
+        print("M60 release feed accepted: version \(item.displayVersionString) build \(item.versionString)")
+    }
+
+    /// The local copy of the feed (same item, download from this server):
+    /// Sparkle downloads the real DMG, its installer checks the EdDSA
+    /// signature with the real key before unpacking, and installs the release
+    /// app over a throwaway "version 1" OpenPainter.app in the test folder.
+    func testReleaseDMGIsValidatedAndInstalledBySparkle() throws {
+        let release = try ReleaseInput.fromEnvironment()
+        try serveRelease(release)
+        let host = try makeBuiltAppHost("release-install", key: nil)
+        let info = host.bundleURL.appendingPathComponent("Contents/Info.plist")
+        let plist = NSMutableDictionary(contentsOf: info)!
+        plist["CFBundleVersion"] = "1"
+        plist["CFBundleShortVersionString"] = "0.0.1"
+        plist["SUFeedURL"] = server.url("/appcast-local.xml").absoluteString
+        XCTAssertTrue(plist.write(to: info, atomically: true))
+        let (_, driver) = try update(try XCTUnwrap(Bundle(url: host.bundleURL)))
+
+        XCTAssertEqual(driver.errors, [], describe(driver.errors))
+        XCTAssertTrue(driver.installed, "Sparkle reported the install: \(driver.calls)")
+        XCTAssertEqual(hostVersion(at: host.bundleURL), release.build)
+        XCTAssertEqual(hostVersion("CFBundleShortVersionString", at: host.bundleURL), release.version)
+        XCTAssertEqual(hostVersion("CFBundleIdentifier", at: host.bundleURL), "dev.yili.OpenPainter")
+        XCTAssertTrue(server.requests.contains("/\(release.dmgName)"), "\(server.requests)")
+        let verify = try run(URL(fileURLWithPath: "/usr/bin/codesign"),
+                             ["--verify", "--deep", "--strict", host.bundleURL.path])
+        XCTAssertEqual(verify.status, 0, "the installed app's signature: \(verify.out)")
+        print("M60 release DMG installed by Sparkle: build \(hostVersion(at: host.bundleURL) ?? "?")")
     }
 
     /// Writes the alert in light and dark (visual check only, outside the repo).

@@ -5,6 +5,9 @@
 #   make -C mac launch-time  scripts/launch-time.sh --first-effect on the Release app
 #   (scripts/perf-check.sh runs every speed and size gate, M58)
 #   make -C mac trace      `OpenPainter --trace` on a generated 6000x4000 PNG
+#   make -C mac release VERSION=1.0.0   ../scripts/release.sh (M60): signed,
+#                          notarized DMG and signed appcast in build/release;
+#                          RELEASE_FLAGS=--dry-run skips Apple's notary service
 # Order: engine (scripts/build-engine.sh) -> xcodegen -> xcodebuild.
 DERIVED := build/DerivedData
 APP := $(DERIVED)/Build/Products/Release/OpenPainter.app
@@ -15,7 +18,7 @@ APP := $(DERIVED)/Build/Products/Release/OpenPainter.app
 RESOLVED := OpenPainter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 XCB := xcodebuild -project OpenPainter.xcodeproj -scheme OpenPainter -derivedDataPath $(DERIVED) -onlyUsePackageVersionsFromResolvedFile
 
-.PHONY: all engine opcli project resolve app test launch-time trace clean
+.PHONY: all engine opcli project resolve app test launch-time trace release clean
 all: app
 
 engine:
@@ -47,6 +50,10 @@ launch-time: app
 trace: app
 	$(APP)/Contents/MacOS/OpenPainter --make-trace-png build/trace-6000x4000.png
 	$(APP)/Contents/MacOS/OpenPainter --trace build/trace-6000x4000.png
+
+release:
+	@test -n "$(VERSION)" || { echo 'usage: make -C mac release VERSION=x.y.z [RELEASE_FLAGS=--dry-run]' >&2; exit 2; }
+	../scripts/release.sh $(VERSION) $(RELEASE_FLAGS)
 
 clean:
 	rm -rf build OpenPainter.xcodeproj

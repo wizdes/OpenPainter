@@ -2,16 +2,17 @@
 //
 // How it works:
 // - The app's Info.plist (mac/project.yml) holds Sparkle's settings: SUFeedURL
-//   (the appcast M60 publishes), SUPublicEDKey (the EdDSA public key that
+//   (the appcast scripts/release.sh writes), SUPublicEDKey (the EdDSA public key that
 //   checks every update), SURequireSignedFeed and SUVerifyUpdateBeforeExtraction
 //   (the appcast and each archive must carry a valid EdDSA signature; see the
 //   "Signing feeds" part of Sparkle's documentation).
-// - SUPublicEDKey stays empty until M60: the release key pair is a credential
-//   and needs the user's OK. While it is empty the updater never starts, and
-//   Check for Updates says "Updates are not set up yet".
+// - M60 set SUPublicEDKey to the release key and turned on
+//   SUEnableAutomaticChecks. The empty-key guard stays: a build with an empty
+//   key never starts the updater, and Check for Updates says "Updates are not
+//   set up yet".
 // - With a key, Sparkle's standard controller starts at launch (its own
-//   scheduled checks and update windows) and the menu item calls its
-//   checkForUpdates:.
+//   scheduled checks, once a day, and update windows) and the menu item calls
+//   its checkForUpdates:.
 import AppKit
 import Sparkle
 
@@ -22,11 +23,11 @@ import Sparkle
 
 /// Sparkle's settings as the app's Info.plist gives them.
 public struct UpdateSettings: Equatable, Sendable {
-    /// The feed M60 publishes. Until then nothing is served there.
+    /// The feed scripts/release.sh writes (published at M60).
     public static let placeholderFeed = "https://yili.dev/projects/openpainter/appcast.xml"
 
     public let feedURL: URL?
-    /// Base64 EdDSA (ed25519) public key; empty until M60.
+    /// Base64 EdDSA (ed25519) public key; empty means updates are off.
     public let publicKey: String
 
     public init(feedURL: URL?, publicKey: String) {

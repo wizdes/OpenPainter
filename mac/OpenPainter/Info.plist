@@ -174,9 +174,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.graphics-design</string>
 	<key>LSMinimumSystemVersion</key>
@@ -187,10 +187,12 @@
 	<string>OpenPainter. Zoom steps from Paint.NET 3.36 (MIT).</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://yili.dev/projects/openpainter/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>Q1P9GEU6X00XfYERTrMaaVhfra04UVYC2IuWAK0TJoc=</string>
 	<key>SURequireSignedFeed</key>
 	<true/>
 	<key>SUSignedFeedFailureExpirationInterval</key>

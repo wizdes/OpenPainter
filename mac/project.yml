@@ -33,6 +33,12 @@ settings:
     ENABLE_HARDENED_RUNTIME: NO
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     DEAD_CODE_STRIPPING: YES
+    # M60: the version numbers. Local builds say 0.1.0 (1);
+    # scripts/release.sh VERSION passes MARKETING_VERSION=VERSION and
+    # CURRENT_PROJECT_VERSION=<commits on HEAD> to xcodebuild, so every
+    # release raises CFBundleVersion without editing this file.
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
   # M58: Release is built for size and launch time. Whole-module Swift
   # optimization, dead-code stripping, symbols stripped at build time (not only
   # on install), debug info kept in a separate dSYM, and no debug dylib (Xcode
@@ -101,21 +107,26 @@ targets:
       properties:
         CFBundleName: OpenPainter
         CFBundleDisplayName: OpenPainter
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "15.0"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
         LSApplicationCategoryType: public.app-category.graphics-design
         NSHumanReadableCopyright: "OpenPainter. Zoom steps from Paint.NET 3.36 (MIT)."
         # M58: Sparkle 2 updates (OpenPainterKit Shell/Updates.swift).
-        # The feed is a placeholder that M60 publishes.
+        # M60 publishes the feed here (scripts/release.sh writes it).
         SUFeedURL: https://yili.dev/projects/openpainter/appcast.xml
-        # The EdDSA public key that checks every update. Deliberately empty:
-        # the release key pair is a credential, made only at M60 with the
-        # user's OK. While it is empty the updater never starts and
-        # Help > Check for Updates says "Updates are not set up yet".
-        SUPublicEDKey: ""
+        # M60: the EdDSA public key that checks every update (not secret).
+        # Its private half is OPENPAINTER_SPARKLE_PRIVATE_KEY in ~/keys, made
+        # 2026-10-25 with the user's OK. Every update must keep this key.
+        # With an empty key the updater never starts and Help > Check for
+        # Updates says "Updates are not set up yet" (UpdateSettings.isSetUp).
+        SUPublicEDKey: "Q1P9GEU6X00XfYERTrMaaVhfra04UVYC2IuWAK0TJoc="
+        # Scheduled checks on, with no "check automatically?" question
+        # (https://sparkle-project.org/documentation/customization/,
+        # SUEnableAutomaticChecks). The default interval is one day.
+        SUEnableAutomaticChecks: true
         # The appcast and every archive must be EdDSA-signed (Sparkle docs,
         # "Signing feeds"); M60 signs both with the release key.
         SURequireSignedFeed: true
