@@ -107,8 +107,8 @@ impl GpuContext {
             self.cached_gaussian_pipeline(VERTICAL, include_str!("gaussian_vertical.wgsl"));
         let horizontal =
             self.cached_gaussian_pipeline(HORIZONTAL, include_str!("gaussian_horizontal.wgsl"));
-        let sums = intermediate(self, width, height, wgpu::TextureFormat::Rgba32Float);
-        let wc = intermediate(self, width, height, wgpu::TextureFormat::R32Float);
+        let sums = intermediate(self, width, height, wgpu::TextureFormat::Rgba32Uint);
+        let wc = intermediate(self, width, height, wgpu::TextureFormat::R32Uint);
         let output = self.texture(width, height);
         let params = self
             .device

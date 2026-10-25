@@ -1753,3 +1753,161 @@ fn m54_pencil_sketch_large_tips_match_cpu_through_the_engine() {
         }
     }
 }
+
+/// One matrix cell on the 600 × 400 input through the engine (192 px chunks):
+/// the worst CPU-GPU channel error, where it is, and the CPU reason when the
+/// engine fell back.
+fn cell_600x400(id: &str, set: &[(&str, Value)]) -> (u8, String, Option<String>) {
+    let f = multi_tile(600, 400);
+    let spec = effect::find(id).unwrap();
+    let mut params = spec.default_params();
+    for (key, value) in set {
+        params[*key] = value.clone();
+    }
+    let gpu = Engine::with_options(None, options(false, Some(192))).unwrap();
+    let g = gpu
+        .import_pixels(f.width, f.height, &f.pixels, None)
+        .unwrap();
+    let (bytes, _, fell_back) = engine_run(&gpu, g, spec.id, &params).unwrap();
+    let cpu = cpu_render(&spec, &f, &params).unwrap();
+    let (i, worst) = cpu
+        .iter()
+        .zip(&bytes)
+        .map(|(a, b)| a.abs_diff(*b))
+        .enumerate()
+        .max_by_key(|(_, d)| *d)
+        .unwrap();
+    let p = i / 4;
+    let at = format!(
+        "({},{}) channel {}: cpu {:?} gpu {:?}",
+        p % 600,
+        p / 600,
+        i % 4,
+        &cpu[p * 4..p * 4 + 4],
+        &bytes[p * 4..p * 4 + 4]
+    );
+    (worst, at, fell_back)
+}
+
+/// M54 fix regression: the six failing matrix cells. Each one must be within
+/// its kernel tolerance, whether the GPU ran it or the engine named a reason
+/// and used the CPU.
+#[test]
+fn m54fix_failing_matrix_cells_hold_their_kernel_tolerance() {
+    if !gpu_tests_enabled() {
+        return;
+    }
+    type Cell = (&'static str, Vec<(&'static str, Value)>, u8);
+    let cells: [Cell; 5] = [
+        ("effect.distort.bulge", vec![], 1),
+        ("effect.photo.glow", vec![("radius", json!(20))], 1),
+        (
+            "effect.photo.soften_portrait",
+            vec![("warmth", json!(19))],
+            1,
+        ),
+        (
+            "effect.photo.red_eye_removal",
+            vec![("saturation", json!(50))],
+            0,
+        ),
+        (
+            "effect.photo.red_eye_removal",
+            vec![("saturation", json!(100))],
+            0,
+        ),
+    ];
+    let mut failures = Vec::new();
+    for (id, set, tol) in cells {
+        let (worst, at, fell_back) = cell_600x400(id, &set);
+        if worst > tol {
+            failures.push(format!(
+                "{id} {set:?}: worst {worst} > {tol} at {at}; fell back {fell_back:?}"
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// M54 fix regression: Red Eye is exact on the GPU for every saturation step
+/// and stays on the GPU. The CPU truncates an f64 product, which sits just
+/// under a whole number for some colours (0,72,24 at saturation 100 gives 44,
+/// not 45).
+#[test]
+fn m54fix_red_eye_is_exact_on_every_colour_and_saturation() {
+    if !gpu_tests_enabled() {
+        return;
+    }
+    // Every red-heavy colour that passes the tolerance 0 test, 4096 per row.
+    let mut pixels = Vec::new();
+    for r in (0..256u32).step_by(3) {
+        for g in 0..256u32 {
+            for b in (0..256u32).step_by(5) {
+                if r > g.max(b) {
+                    pixels.extend_from_slice(&[r as u8, g as u8, b as u8, 255]);
+                }
+            }
+        }
+    }
+    let width = 4096u32;
+    pixels.resize(
+        pixels.len().div_ceil(width as usize * 4) * width as usize * 4,
+        0,
+    );
+    let height = (pixels.len() / 4) as u32 / width;
+    let f = Fixture {
+        name: "red_eye_colours".into(),
+        width,
+        height,
+        pixels,
+    };
+    let spec = effect::find("effect.photo.red_eye_removal").unwrap();
+    let gpu = Engine::with_options(None, options(false, None)).unwrap();
+    let g = gpu
+        .import_pixels(f.width, f.height, &f.pixels, None)
+        .unwrap();
+    let mut failures = Vec::new();
+    for saturation in [0, 1, 7, 25, 50, 64, 80, 99, 100] {
+        let mut params = spec.default_params();
+        params["tolerance"] = json!(0);
+        params["saturation"] = json!(saturation);
+        let (bytes, _, fell_back) = engine_run(&gpu, g, spec.id, &params).unwrap();
+        assert!(fell_back.is_none(), "Red Eye fell back: {fell_back:?}");
+        let cpu = cpu_render(&spec, &f, &params).unwrap();
+        let (worst, differ, _) = compare(&cpu, &bytes, 0);
+        if worst > 0 {
+            failures.push(format!(
+                "saturation {saturation}: worst {worst} on {differ} channels"
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// M54 fix regression: the Pencil Sketch blur now keeps 64-bit row sums, so
+/// tips above 12 stay on the GPU and give the CPU's bytes.
+#[test]
+fn m54fix_pencil_sketch_large_tips_stay_on_the_gpu() {
+    if !gpu_tests_enabled() {
+        return;
+    }
+    let f = multi_tile(280, 270);
+    let gpu = Engine::with_options(None, options(false, Some(192))).unwrap();
+    let g = gpu
+        .import_pixels(f.width, f.height, &f.pixels, None)
+        .unwrap();
+    let spec = effect::find("effect.artistic.pencil_sketch").unwrap();
+    for (tip, range) in [(13, 0), (16, -20), (20, 20)] {
+        let mut params = spec.default_params();
+        params["pencil_tip_size"] = json!(tip);
+        params["range"] = json!(range);
+        let (bytes, _, fell_back) = engine_run(&gpu, g, spec.id, &params).unwrap();
+        assert!(fell_back.is_none(), "tip {tip} fell back: {fell_back:?}");
+        let cpu = cpu_render(&spec, &f, &params).unwrap();
+        let (worst, differ, _) = compare(&cpu, &bytes, 0);
+        assert_eq!(
+            worst, 0,
+            "tip {tip} range {range}: {differ} channels differ"
+        );
+    }
+}

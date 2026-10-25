@@ -350,8 +350,8 @@ fn plan(spec: &EffectSpec, kernel: GpuKernel, p: &Value) -> std::result::Result<
             Plan::new(params([0; 3]), 8)
         }
         "effect.blur.median" => {
-            defaults_only(spec, p, &["radius", "percentile"])?;
-            Plan::new(params([0; 3]), 10)
+            let radius = int(p, "radius");
+            Plan::new(params([radius, int(p, "percentile"), 0]), radius as u32)
         }
         "effect.blur.motion" => {
             defaults_only(spec, p, &["angle", "centered", "distance"])?;
@@ -393,12 +393,8 @@ fn plan(spec: &EffectSpec, kernel: GpuKernel, p: &Value) -> std::result::Result<
             Plan::new(params([int(p, "ink_outline"), int(p, "coloring"), 0]), 6)
         }
         "effect.artistic.pencil_sketch" => {
+            // legacy_gaussian keeps 64-bit row sums, so every tip size fits.
             let radius = int(p, "pencil_tip_size");
-            // legacy_gaussian sums up to 255 * 256 * (r + 1)^4 in an i32.
-            require(
-                radius <= 12,
-                "the kernel's 32-bit blur sums overflow above tip size 12",
-            )?;
             Plan::new(params([radius, int(p, "range"), 0]), radius as u32)
         }
         "effect.distort.pixelate" => {
@@ -414,11 +410,13 @@ fn plan(spec: &EffectSpec, kernel: GpuKernel, p: &Value) -> std::result::Result<
                 p,
                 &["center_x", "center_y", "edge_behavior", "quality"],
             )?;
-            // The f32 kernel is within ±1 of the CPU at the default amount only;
-            // at -80 it is 2 away on a 520x300 image.
+            // The kernel now rounds each f32 step as the CPU does and gives the
+            // CPU's bytes at every amount (op-gpu tests/effects.rs), but
+            // tests/gpu_effects.rs still pins the CPU route away from the
+            // default amount; lifting it needs that test changed first.
             require(
                 is_default(spec, p, &["amount"]),
-                "the kernel matches the CPU only at the default amount",
+                "the engine routes Bulge to the CPU away from the default amount",
             )?;
             Plan::whole(params([int(p, "amount"), 0, 0]))
         }
