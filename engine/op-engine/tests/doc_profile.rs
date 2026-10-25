@@ -6,7 +6,11 @@ use serde_json::json;
 fn doc_profile_is_empty_for_untagged_and_the_icc_bytes_when_tagged() {
     let e = Engine::new(None).unwrap();
     let plain = e.import_pixels(1, 1, &[1, 2, 3, 255], None).unwrap();
-    assert!(e.query(plain, "doc.profile_icc", json!({})).unwrap().is_empty());
+    assert!(
+        e.query(plain, "doc.profile_icc", json!({}))
+            .unwrap()
+            .is_empty()
+    );
 
     let p3 = op_color::Profile::builtin("display-p3").unwrap().bytes();
     let tagged = e.import_pixels(1, 1, &[1, 2, 3, 255], Some(&p3)).unwrap();
@@ -23,7 +27,11 @@ fn doc_profile_is_empty_for_untagged_and_the_icc_bytes_when_tagged() {
     )
     .unwrap();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    while e.query(plain, "doc.profile_icc", json!({})).unwrap().is_empty() {
+    while e
+        .query(plain, "doc.profile_icc", json!({}))
+        .unwrap()
+        .is_empty()
+    {
         assert!(
             std::time::Instant::now() < deadline,
             "assign_profile never published"
