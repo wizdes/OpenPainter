@@ -116,14 +116,14 @@ internal static class Program
         File.WriteAllBytes(path,mask);
         Record(dir,"FloodToolBase",new{seed=new[]{x,y},tolerance_percent=percent,t,contiguous,width=surface.Width,height=surface.Height},input,path);
     }
-    private static readonly string[] EffectNames={"Ink Sketch","Oil Painting","Pencil Sketch","Edge Detect","Emboss","Outline","Relief","Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Add Noise","Frosted Glass","Clouds","Bulge","Pixelate","Polar Inversion","Tile Reflection","Twist","Reduce Noise","Glow","Red Eye Removal","Sharpen","Soften Portrait"};
+    private static readonly string[] EffectNames={"Ink Sketch","Oil Painting","Pencil Sketch","Edge Detect","Emboss","Outline","Relief","Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Add Noise","Frosted Glass","Clouds","Julia Fractal","Mandelbrot Fractal","Bulge","Pixelate","Polar Inversion","Tile Reflection","Twist","Reduce Noise","Glow","Red Eye Removal","Sharpen","Soften Portrait"};
     private static void EffectsAll()
     {
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         foreach(string old in Directory.GetFiles(dir,"*.png"))File.Delete(old);
         entries.Clear();
         string sourceDir=Path.Combine(Environment.GetEnvironmentVariable("OpenPdnSourceRoot")??Path.Combine(Root,".pdn-src"),"src/Effects");
-        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect","InkSketchEffect","OilPaintingEffect","PencilSketchEffect","EdgeDetectEffect","EmbossEffect","OutlineEffect","ReliefEffect","BulgeEffect","PixelateEffect","PolarInversionEffect","TileEffect","TwistEffect","ReduceNoiseEffect","GlowEffect","RedEyeRemoveEffect","SharpenEffect","SoftenPortraitEffect"};
+        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect","JuliaFractalEffect","MandelbrotFractalEffect","InkSketchEffect","OilPaintingEffect","PencilSketchEffect","EdgeDetectEffect","EmbossEffect","OutlineEffect","ReliefEffect","BulgeEffect","PixelateEffect","PolarInversionEffect","TileEffect","TwistEffect","ReduceNoiseEffect","GlowEffect","RedEyeRemoveEffect","SharpenEffect","SoftenPortraitEffect"};
         var abstractHelpers=new HashSet<string>(StringComparer.Ordinal){"InternalPropertyBasedEffect","PropertyBasedEffect","ConvolutionFilterEffect","LocalHistogramEffect"};
         var names=EffectNames.Concat(Directory.EnumerateFiles(sourceDir,"*Effect.cs")
             .Select(Path.GetFileNameWithoutExtension).Where(n=>n!="Effect"&&!represented.Contains(n)&&!abstractHelpers.Contains(n)))
@@ -174,6 +174,10 @@ internal static class Program
             if(name=="Zoom Blur")
                 foreach((string label,string settings) in new[]{("amount_min","{\"amount\":0}"),("amount_max","{\"amount\":100}"),("offset_mid","{\"offset_x\":0.5,\"offset_y\":-0.5}")})
                     Effects(name,settings,false,label);
+            if(name=="Julia Fractal")
+                Effects(name,"{\"factor\":10}",false,"factor_max");
+            if(name=="Mandelbrot Fractal")
+                Effects(name,"{\"invert_colors\":true}",false,"inverted");
             if(name=="Levels")
             {
                 foreach((string label,string settings) in new[]{("gamma_min","{\"gamma\":0.1}"),("gamma_max","{\"gamma\":10}"),("gamma_mid","{\"gamma\":2}")})
@@ -197,7 +201,7 @@ internal static class Program
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         string manifest=Path.Combine(dir,"manifest.json");
         if(save&&entries.Count==0&&File.Exists(manifest))entries=JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(manifest))??new();
-        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait";
+        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Julia Fractal" or "Mandelbrot Fractal" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait";
         foreach(string fixture in EffectFixtures)
         {
             string input=F(fixture);
@@ -213,7 +217,7 @@ internal static class Program
                 continue;
             }
             var src=Png.Read(input);
-            if(name is "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait")
+            if(name is "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds" or "Julia Fractal" or "Mandelbrot Fractal" or "Ink Sketch" or "Oil Painting" or "Pencil Sketch" or "Edge Detect" or "Emboss" or "Outline" or "Relief" or "Bulge" or "Pixelate" or "Polar Inversion" or "Tile Reflection" or "Twist" or "Reduce Noise" or "Glow" or "Red Eye Removal" or "Sharpen" or "Soften Portrait")
             {
                 using var sourceSurface=SurfaceOf(src);
                 using var destSurface=new Surface(src.Width,src.Height);
@@ -245,6 +249,8 @@ internal static class Program
                     "Polar Inversion"=>new PolarInversionEffect(),
                     "Tile Reflection"=>new TileEffect(),
                     "Twist"=>new TwistEffect(),
+                    "Julia Fractal"=>new JuliaFractalEffect(),
+                    "Mandelbrot Fractal"=>new MandelbrotFractalEffect(),
                     _=>new CloudsEffect()
                 };
                 var token=effect.CreateToken();
@@ -357,6 +363,21 @@ internal static class Program
                     token.GetProperty<Int32Property>(CloudsEffect.PropertyNames.Scale).Value=IntParam(doc.RootElement,"scale",250);
                     token.GetProperty<DoubleProperty>(CloudsEffect.PropertyNames.Power).Value=DoubleParam(doc.RootElement,"power",0.5);
                     token.GetProperty<Int32Property>(CloudsEffect.PropertyNames.Seed).Value=IntParam(doc.RootElement,"seed",0);
+                }
+                if(effect is JuliaFractalEffect)
+                {
+                    token.GetProperty<DoubleProperty>(JuliaFractalEffect.PropertyNames.Factor).Value=DoubleParam(doc.RootElement,"factor",4);
+                    token.GetProperty<DoubleProperty>(JuliaFractalEffect.PropertyNames.Zoom).Value=DoubleParam(doc.RootElement,"zoom",1);
+                    token.GetProperty<DoubleProperty>(JuliaFractalEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",0);
+                    token.GetProperty<Int32Property>(JuliaFractalEffect.PropertyNames.Quality).Value=IntParam(doc.RootElement,"quality",2);
+                }
+                if(effect is MandelbrotFractalEffect)
+                {
+                    token.GetProperty<Int32Property>(MandelbrotFractalEffect.PropertyNames.Factor).Value=IntParam(doc.RootElement,"factor",1);
+                    token.GetProperty<DoubleProperty>(MandelbrotFractalEffect.PropertyNames.Zoom).Value=DoubleParam(doc.RootElement,"zoom",10);
+                    token.GetProperty<DoubleProperty>(MandelbrotFractalEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",0);
+                    token.GetProperty<Int32Property>(MandelbrotFractalEffect.PropertyNames.Quality).Value=IntParam(doc.RootElement,"quality",2);
+                    token.GetProperty<BooleanProperty>(MandelbrotFractalEffect.PropertyNames.InvertColors).Value=doc.RootElement.TryGetProperty("invert_colors",out var invert)?invert.GetBoolean():false;
                 }
                 if(effect is InkSketchEffect) { token.GetProperty<Int32Property>(InkSketchEffect.PropertyNames.InkOutline).Value=IntParam(doc.RootElement,"ink_outline",50); token.GetProperty<Int32Property>(InkSketchEffect.PropertyNames.Coloring).Value=IntParam(doc.RootElement,"coloring",50); }
                 if(effect is OilPaintingEffect) { token.GetProperty<Int32Property>(OilPaintingEffect.PropertyNames.BrushSize).Value=IntParam(doc.RootElement,"brush_size",3); token.GetProperty<Int32Property>(OilPaintingEffect.PropertyNames.Coarseness).Value=IntParam(doc.RootElement,"coarseness",50); }

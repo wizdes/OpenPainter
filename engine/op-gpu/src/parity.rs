@@ -78,6 +78,8 @@ impl GpuOp for EffectOp {
                 | GpuKernel::Vignette
                 | GpuKernel::Sharpen
                 | GpuKernel::ReduceNoise
+                | GpuKernel::Turbulence
+                | GpuKernel::Clouds
         ) {
             return op_ops::effect::reference_rgba8(
                 self.effect_id,

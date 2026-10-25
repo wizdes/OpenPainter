@@ -295,7 +295,7 @@ fn m40_registry_has_seven_effects_in_menu_order() {
         })
         .collect();
     assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
-    assert_eq!(specs.len(), 40);
+    assert_eq!(specs.len(), 44);
 }
 
 #[test]

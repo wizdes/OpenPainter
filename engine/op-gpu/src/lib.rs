@@ -192,6 +192,12 @@ impl GpuContext {
                 },
             );
         }
+        if kernel == op_ops::effect::GpuKernel::Turbulence {
+            return self.effect_turbulence(width, height, bytes, 0);
+        }
+        if kernel == op_ops::effect::GpuKernel::Clouds {
+            return self.effect_clouds_seeded(width, height, bytes, 0);
+        }
         if kernel == op_ops::effect::GpuKernel::Glow {
             return self.effect_photo_glow(width, height, bytes, 6, 10, 10);
         }
@@ -229,6 +235,63 @@ impl GpuContext {
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
+    }
+
+    /// Runs the provisional integer Turbulence noise with a fixed seed.
+    pub fn effect_turbulence(
+        &mut self,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        seed: u32,
+    ) -> Result<Vec<u8>> {
+        if seed > i32::MAX as u32 {
+            return Err(GpuError::InvalidImage);
+        }
+        let packed = 4 | (128 << 4) | (50 << 14) | (1 << 21);
+        self.effect_kernel_with_params(
+            op_ops::effect::GpuKernel::Turbulence,
+            width,
+            height,
+            bytes,
+            [packed, seed as i32, 0],
+        )
+    }
+
+    /// Uses the legacy f64 noise field prepared on the CPU, then writes its
+    /// default black-to-white palette with integer RGBA8 math on the GPU.
+    pub fn effect_clouds_seeded(
+        &mut self,
+        width: u32,
+        height: u32,
+        bytes: &[u8],
+        seed: u8,
+    ) -> Result<Vec<u8>> {
+        let input = self.upload(width, height, bytes)?;
+        let output = self.texture(width, height);
+        let field = op_ops::effects::clouds::reference_rgba8(width, height, seed);
+        let values: Vec<[f32; 4]> = field
+            .chunks_exact(4)
+            .map(|pixel| [f32::from(pixel[0]), 0.0, 0.0, 0.0])
+            .collect();
+        let table = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("seeded clouds field"),
+                contents: bytemuck::cast_slice(&values),
+                usage: wgpu::BufferUsages::STORAGE,
+            });
+        let params = self.params(width, height, 0, 0, false);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("effect kernels"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+            });
+        let pipeline = self.pipeline(&module, "effect_clouds");
+        let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
+        self.dispatch(&pipeline, &bind, width, height)?;
+        self.readback(&output, width, height)
     }
 
     /// Applies OpenPDN's seeded noise offsets in an rgba8uint compute kernel.
@@ -420,6 +483,14 @@ impl GpuContext {
             op_ops::effect::GpuKernel::ReduceNoise => {
                 (0..=200).contains(&values[0]) && (0..=1000).contains(&values[1])
             }
+            op_ops::effect::GpuKernel::Turbulence => {
+                let packed = values[0] as u32;
+                (1..=10).contains(&(packed & 15))
+                    && (1..=1000).contains(&((packed >> 4) & 1023))
+                    && ((packed >> 14) & 127) <= 100
+                    && values[1] >= 0
+            }
+            op_ops::effect::GpuKernel::Clouds => false,
             _ => true,
         };
         if !valid {
@@ -518,6 +589,8 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Vignette => "effect_vignette",
             op_ops::effect::GpuKernel::Sharpen => "effect_sharpen",
             op_ops::effect::GpuKernel::ReduceNoise => "effect_reduce_noise",
+            op_ops::effect::GpuKernel::Turbulence => "effect_turbulence",
+            op_ops::effect::GpuKernel::Clouds => return Err(GpuError::InvalidImage),
             op_ops::effect::GpuKernel::AddNoise => return Err(GpuError::InvalidImage),
             op_ops::effect::GpuKernel::Glow | op_ops::effect::GpuKernel::SoftenPortrait => {
                 return Err(GpuError::InvalidImage);

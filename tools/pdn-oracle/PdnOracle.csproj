@@ -38,6 +38,7 @@
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/PosterizeAdjustment.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/GaussianBlurEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/FragmentEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/JuliaFractalEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/LocalHistogramEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/MedianEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/MotionBlurEffect.cs" />

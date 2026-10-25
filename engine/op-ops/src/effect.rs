@@ -83,7 +83,8 @@ impl ParamSchema {
                         })
                 }),
                 ParamKind::RgbBytes => v.as_array().is_some_and(|channels| {
-                    channels.len() == 3
+                    (channels.len() == 3
+                        || (matches!(field.key, "color_1" | "color_2") && channels.len() == 4))
                         && channels
                             .iter()
                             .all(|n| n.as_u64().is_some_and(|n| n <= 255))
@@ -196,6 +197,8 @@ pub enum GpuKernel {
     AddNoise,
     Glow,
     SoftenPortrait,
+    Clouds,
+    Turbulence,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -344,6 +347,10 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::sharpen::spec(),
         crate::effects::soften_portrait::spec(),
         crate::effects::vignette::spec(),
+        crate::effects::clouds::spec(),
+        crate::effects::julia_fractal::spec(),
+        crate::effects::mandelbrot_fractal::spec(),
+        crate::effects::turbulence::spec(),
         crate::effects::edge_detect::spec(),
         crate::effects::emboss::spec(),
         crate::effects::outline::spec(),
