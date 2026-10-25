@@ -47,6 +47,13 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `Shell/ColorPickerTool.swift`: the Color Picker. Click sets primary, right-click or Control-click secondary, Command-click samples the image. The engine query `doc.sample_color` averages a square window (1 to 51 px) clipped at the canvas edges, weighted by alpha.
 - Right-button (or Control) drags and Paint Bucket clicks use the secondary color.
 
+## Color Profile dialog (M27)
+
+- `Shell/ColorProfile.swift`: Image > Color Profile…, a sheet. It shows the document profile (or "None, treated as sRGB"), then Convert (`image.convert_profile` with an intent and black point compensation) or Assign (`image.assign_profile`, pixel bytes unchanged). Targets: sRGB, Display P3, Adobe RGB (1998), ProPhoto RGB, the window's display profile, or an .icc/.icm file (sent as `base64:` ICC bytes). OK runs one command, so one history step; Cancel runs nothing.
+- The engine queries `doc.profile` (embedded, description, color space, ICC size) and `doc.profile_icc` (the raw bytes, empty when there is no profile). `doc.info` also has `profile_embedded`.
+- The status bar shows the profile name (cut at 18 characters, full name in the tooltip; "sRGB (none)" with no profile).
+- The display path already follows the screen (see the canvas section); `ColorProfileTests` checks that a screen change rebuilds the table once and leaves the document alone.
+
 ## Layers and History panels (M20)
 
 - `Shell/LayersPanel.swift`: one 49 pt row per layer, top layer first: a 40 x 40 pt thumbnail, the name, a detail line (Hidden, blend mode, opacity) when it is not plain, the 24 x 24 pt eye, and the active row's 2 pt edge and diamond. The action row runs Add New, Delete, Duplicate, Merge Down, Move Up, Move Down and Properties. Dragging a row runs one `layer.move`. Clicking a row runs `layer.set_active`, which replaces the current history step's state: no new step and no change to the Edited state.
