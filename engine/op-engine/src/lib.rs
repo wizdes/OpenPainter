@@ -10,6 +10,7 @@ use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use op_ops::effect::{self, Rect};
 pub use op_ops::effect::{Param, ParamKind, ParamSchema};
 use op_tools::flood::{self, AlphaMode, FloodOptions, Sampling};
+use op_tools::gradient::GradientSession;
 use op_tools::r#move::{MoveKind, MoveOptions, MoveSession};
 use op_tools::{BrushSettings, CloneSource, RecolorOptions, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
@@ -23,6 +24,7 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 mod color_sample;
+mod gradient_commands;
 mod image_commands;
 mod shell_commands;
 pub use shell_commands::{effect_label, effects_list};
@@ -901,6 +903,7 @@ struct Actor {
     preview: Option<PreviewSession>,
     stroke: Option<ActiveStroke>,
     move_session: Option<(u64, MoveSession)>,
+    gradient_session: Option<(u64, GradientSession)>,
     published: Arc<ArcSwap<Published>>,
     read_only: Arc<AtomicBool>,
     events: Sender<Event>,
@@ -963,9 +966,16 @@ impl Actor {
         self.preview = None;
         self.stroke = None;
         self.move_session = None;
+        self.gradient_session = None;
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if id.starts_with("tool.gradient.") {
+            return self.gradient_command(id, &params);
+        }
+        if self.gradient_session.is_some() {
+            return Err(Error::Busy);
+        }
         if self.move_session.is_some() {
             self.move_finish()?;
         }
@@ -1017,7 +1027,7 @@ impl Actor {
         Ok(())
     }
     fn begin(&mut self, id: &str, params: Value, ticket: JobTicket) -> Result<u64> {
-        if self.stroke.is_some() || self.move_session.is_some() {
+        if self.stroke.is_some() || self.move_session.is_some() || self.gradient_session.is_some() {
             return Err(Error::Busy);
         }
         if self.read_only.load(Ordering::Acquire) {
@@ -1113,6 +1123,73 @@ impl Actor {
         }
         result
     }
+    fn gradient_command(&mut self, id: &str, params: &Value) -> Result<()> {
+        match id {
+            "tool.gradient.begin" => {
+                if self.read_only.load(Ordering::Acquire) {
+                    return Err(Error::ReadOnly);
+                }
+                if self.preview.is_some()
+                    || self.stroke.is_some()
+                    || self.move_session.is_some()
+                    || self.gradient_session.is_some()
+                {
+                    return Err(Error::Busy);
+                }
+                let (options, start, end) = gradient_commands::begin(params)?;
+                let session =
+                    GradientSession::new(self.history.current_state().clone(), options, start, end)
+                        .map_err(bad)?;
+                let state = session.preview().map_err(bad)?;
+                let id = self.next_session.fetch_add(1, Ordering::Relaxed);
+                self.gradient_session = Some((id, session));
+                self.publish(Some(state));
+                Ok(())
+            }
+            "tool.gradient.update" => {
+                let (handle, point) = gradient_commands::update(params)?;
+                let (_, session) = self
+                    .gradient_session
+                    .as_mut()
+                    .ok_or_else(|| bad("no gradient session"))?;
+                session.update(handle, point).map_err(bad)?;
+                let state = session.preview().map_err(bad)?;
+                self.publish(Some(state));
+                Ok(())
+            }
+            "tool.gradient.finish" => {
+                if self.read_only.load(Ordering::Acquire) {
+                    return Err(Error::ReadOnly);
+                }
+                let (_, session) = self
+                    .gradient_session
+                    .take()
+                    .ok_or_else(|| bad("no gradient session"))?;
+                if session.base_revision != self.history.current_state().revision
+                    || session.target_layer != self.active_id()
+                {
+                    self.publish(None);
+                    return Err(Error::Busy);
+                }
+                let state = session.finish().map_err(bad)?;
+                self.history
+                    .commit("Gradient", "tool.gradient.finish", state);
+                self.revision += 1;
+                self.publish(None);
+                self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+                self.event(EventKind::HistoryChanged, 0, json!({}));
+                Ok(())
+            }
+            "tool.gradient.cancel" => {
+                if self.gradient_session.take().is_none() {
+                    return Err(bad("no gradient session"));
+                }
+                self.publish(None);
+                Ok(())
+            }
+            _ => Err(bad("unknown gradient command")),
+        }
+    }
     fn stroke_begin(&mut self, settings: BrushSettings, seed: u64) -> Result<u64> {
         self.check_stroke_begin()?;
         let session = StrokeSession::new(
@@ -1198,7 +1275,11 @@ impl Actor {
         if self.read_only.load(Ordering::Acquire) {
             return Err(Error::ReadOnly);
         }
-        if self.preview.is_some() || self.stroke.is_some() || self.move_session.is_some() {
+        if self.preview.is_some()
+            || self.stroke.is_some()
+            || self.move_session.is_some()
+            || self.gradient_session.is_some()
+        {
             return Err(Error::Busy);
         }
         Ok(())
@@ -1216,7 +1297,11 @@ impl Actor {
         if self.read_only.load(Ordering::Acquire) {
             return Err(Error::ReadOnly);
         }
-        if self.preview.is_some() || self.stroke.is_some() || self.move_session.is_some() {
+        if self.preview.is_some()
+            || self.stroke.is_some()
+            || self.move_session.is_some()
+            || self.gradient_session.is_some()
+        {
             return Err(Error::Busy);
         }
         let session =
@@ -1375,6 +1460,7 @@ impl Actor {
                 Message::Stop(reply) => {
                     self.preview = None;
                     self.stroke = None;
+                    self.gradient_session = None;
                     self.publish(None);
                     stopping = Some(reply);
                 }
@@ -1664,6 +1750,7 @@ impl Engine {
             preview: None,
             stroke: None,
             move_session: None,
+            gradient_session: None,
             published: published.clone(),
             read_only: read_only.clone(),
             events: self.events_tx.clone(),
@@ -1750,6 +1837,9 @@ impl Engine {
     fn precheck(&self, op: &Op) -> Result<()> {
         match op {
             Op::Command(id, p) => {
+                if id.starts_with("tool.gradient.") {
+                    return Ok(());
+                }
                 spec(id)?.params.validate(p.clone()).map_err(bad)?;
             }
             Op::PreviewBegin(id, p) => {
