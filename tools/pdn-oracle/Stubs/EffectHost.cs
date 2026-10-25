@@ -20,12 +20,12 @@ namespace PaintDotNet.IndirectUI {
     }
 }
 namespace PaintDotNet.PropertySystem {
-    public abstract class Property { public object Name { get; } protected Property(object name) { Name=name; } }
-    public sealed class Int32Property : Property { public int Value { get; set; } public Int32Property(object name,int value,int min,int max):base(name){Value=value;} }
-    public sealed class DoubleProperty : Property { public double Value {get;set;} public DoubleProperty(object name,double value,double min,double max):base(name){Value=value;} }
-    public sealed class StaticListChoiceProperty : Property { public object Value {get;set;} public StaticListChoiceProperty(object name,Type[] values,int index,bool allowCustom):base(name){Value=values[index];} public StaticListChoiceProperty(object name,object[] values,int index):base(name){Value=values[index];} }
-    public sealed class BooleanProperty : Property { public bool Value { get; set; } public BooleanProperty(object name,bool value):base(name){Value=value;} }
-    public sealed class DoubleVectorProperty : Property { public double ValueX {get;set;} public double ValueY {get;set;} public PaintDotNet.Pair<double,double> Value {get=>PaintDotNet.Pair.Create(ValueX,ValueY);set{ValueX=value.First;ValueY=value.Second;}} public DoubleVectorProperty(object name,PaintDotNet.Pair<double,double> value,PaintDotNet.Pair<double,double> min,PaintDotNet.Pair<double,double> max):base(name){Value=value;} }
+    public abstract class Property { public object Name { get; } protected Property(object name) { Name=name; } public object Value { get=>GetType().GetProperty("Value",System.Reflection.BindingFlags.DeclaredOnly|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Instance)!.GetValue(this); set=>GetType().GetProperty("Value",System.Reflection.BindingFlags.DeclaredOnly|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Instance)!.SetValue(this,value); } }
+    public sealed class Int32Property : Property { public new int Value { get; set; } public Int32Property(object name,int value,int min,int max):base(name){Value=value;} }
+    public sealed class DoubleProperty : Property { public new double Value {get;set;} public DoubleProperty(object name,double value,double min,double max):base(name){Value=value;} }
+    public sealed class StaticListChoiceProperty : Property { public new object Value {get;set;} public StaticListChoiceProperty(object name,Type[] values,int index,bool allowCustom):base(name){Value=values[index];} public StaticListChoiceProperty(object name,object[] values,int index):base(name){Value=values[index];} }
+    public sealed class BooleanProperty : Property { public new bool Value { get; set; } public BooleanProperty(object name,bool value):base(name){Value=value;} }
+    public sealed class DoubleVectorProperty : Property { public double ValueX {get;set;} public double ValueY {get;set;} public new PaintDotNet.Pair<double,double> Value {get=>PaintDotNet.Pair.Create(ValueX,ValueY);set{ValueX=value.First;ValueY=value.Second;}} public DoubleVectorProperty(object name,PaintDotNet.Pair<double,double> value,PaintDotNet.Pair<double,double> min,PaintDotNet.Pair<double,double> max):base(name){Value=value;} }
     public abstract class PropertyCollectionRule { }
     public sealed class SoftMutuallyBoundMinMaxRule<TValue,TProperty> : PropertyCollectionRule { public SoftMutuallyBoundMinMaxRule(object min,object max) { } }
     public sealed class LinkValuesBasedOnBooleanRule<TValue,TProperty> : PropertyCollectionRule {
@@ -41,6 +41,8 @@ namespace PaintDotNet.PropertySystem {
             Int32Property i=>new Int32Property(i.Name,i.Value,int.MinValue,int.MaxValue),
             DoubleProperty d=>new DoubleProperty(d.Name,d.Value,double.MinValue,double.MaxValue),
             BooleanProperty b=>new BooleanProperty(b.Name,b.Value),
+            StaticListChoiceProperty c=>new StaticListChoiceProperty(c.Name,new[]{c.Value},0),
+            DoubleVectorProperty v=>new DoubleVectorProperty(v.Name,v.Value,v.Value,v.Value),
             _=>throw new NotSupportedException($"Cannot clone {p.GetType().Name}")
         })));
     }
@@ -67,7 +69,7 @@ namespace PaintDotNet.Effects {
         private readonly PropertyCollection properties;
         public PropertyBasedEffectConfigToken(PropertyCollection properties){this.properties=properties;}
         public T GetProperty<T>(object name) where T:Property=>(T)properties.Values[name];
-        public void SetPropertyValue(object name,object value) { switch(properties.Values[name]) { case Int32Property i: i.Value=Convert.ToInt32(value); break; case DoubleProperty d: d.Value=Convert.ToDouble(value); break; default: throw new NotSupportedException(); } }
+        public void SetPropertyValue(object name,object value) { switch(properties.Values[name]) { case Int32Property i: i.Value=Convert.ToInt32(value); break; case DoubleProperty d: d.Value=Convert.ToDouble(value); break; case Property p: p.Value=value; break; } }
     }
     public abstract class PropertyBasedEffect {
         public static ControlInfo CreateDefaultConfigUI(PropertyCollection properties)=>new();

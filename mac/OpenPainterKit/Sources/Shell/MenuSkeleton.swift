@@ -85,12 +85,12 @@ public enum MenuSkeleton {
     /// paint.net Effects submenus and their items.
     static let paintNetEffects: [(String, [String])] = [
         ("Artistic", ["Ink Sketch", "Oil Painting", "Pencil Sketch"]),
-        ("Blurs", ["Bokeh Blur", "Fragment Blur", "Gaussian Blur", "Median Blur", "Motion Blur", "Radial Blur",
+        ("Blurs", ["Bokeh Blur", "Fragment Blur", "Gaussian Blur", "Motion Blur", "Radial Blur",
                    "Sketch Blur", "Square Blur", "Surface Blur", "Unfocus", "Zoom Blur"]),
         ("Color", ["Quantize"]),
         ("Distort", ["Bulge", "Crystalize", "Dents", "Frosted Glass", "Morphology", "Pixelate", "Polar Inversion",
                      "Tile Reflection", "Twist"]),
-        ("Noise", ["Add Noise", "Reduce Noise"]),
+        ("Noise", ["Add Noise", "Median", "Reduce Noise"]),
         ("Object", ["Drop Shadow"]),
         ("Photo", ["Glow", "Red Eye Removal", "Sharpen", "Soften Portrait", "Straighten", "Vignette"]),
         ("Render", ["Clouds", "Julia Fractal", "Mandelbrot Fractal", "Turbulence"]),

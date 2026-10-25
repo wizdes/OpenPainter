@@ -61,6 +61,10 @@
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/TwistEffect.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/WarpEffectBase.cs" />
     <Compile Include="$(OpenPdnSourceRoot)/src/Effects/WarpEdgeBehavior.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/ReduceNoiseEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/RedEyeRemoveEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/SharpenEffect.cs" />
+    <Compile Include="$(OpenPdnSourceRoot)/src/Effects/SoftenPortraitEffect.cs" />
   </ItemGroup>
   <Target Name="ExtractLegacyFlood" BeforeTargets="CoreCompile">
     <Exec Command="python3 &quot;$(MSBuildProjectDirectory)/extract-flood.py&quot;" />

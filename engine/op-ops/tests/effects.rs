@@ -128,7 +128,6 @@ fn registry_follows_paint_net_menu_order() {
             ("Artistic", "effect.artistic.pencil_sketch"),
             ("Blurs", "effect.blur.fragment"),
             ("Blurs", "effect.blur.gaussian"),
-            ("Blurs", "effect.blur.median"),
             ("Blurs", "effect.blur.motion"),
             ("Blurs", "effect.blur.radial"),
             ("Blurs", "effect.blur.zoom"),
@@ -138,6 +137,14 @@ fn registry_follows_paint_net_menu_order() {
             ("Distort", "effect.distort.polar_inversion"),
             ("Distort", "effect.distort.tile_reflection"),
             ("Distort", "effect.distort.twist"),
+            ("Noise", "effect.noise.add"),
+            ("Noise", "effect.blur.median"),
+            ("Noise", "effect.noise.reduce"),
+            ("Photo", "effect.photo.glow"),
+            ("Photo", "effect.photo.red_eye_removal"),
+            ("Photo", "effect.photo.sharpen"),
+            ("Photo", "effect.photo.soften_portrait"),
+            ("Photo", "effect.photo.vignette"),
             ("Stylize", "effect.stylize.edge_detect"),
             ("Stylize", "effect.stylize.emboss"),
             ("Stylize", "effect.stylize.outline"),
@@ -145,6 +152,280 @@ fn registry_follows_paint_net_menu_order() {
             ("Edit", "effect.fill.content_aware"),
         ]
     );
+}
+
+#[test]
+fn m41_red_eye_uses_source_intensity_and_preserves_alpha() {
+    let spec = effect::find("effect.photo.red_eye_removal").expect("red eye effect");
+    let params = spec.default_params();
+    let red = (spec.render_cpu)(
+        &|_, _| [240, 30, 10, 117],
+        0,
+        0,
+        &Default::default(),
+        &params,
+    );
+    assert_eq!(red, [81, 30, 10, 117]);
+    let neutral = (spec.render_cpu)(&|_, _| [80, 60, 55, 0], 0, 0, &Default::default(), &params);
+    assert_eq!(neutral, [80, 60, 55, 0]);
+}
+
+#[test]
+fn m41_vignette_zero_strength_is_identity_even_under_alpha_zero() {
+    let spec = effect::find("effect.photo.vignette").expect("vignette effect");
+    let params = spec
+        .schema
+        .validate(serde_json::json!({"strength": 0}))
+        .unwrap();
+    let pixel = (spec.render_cpu)(
+        &|_, _| [123, 44, 90, 0],
+        0,
+        0,
+        &op_ops::effect::Prepared {
+            width: 5,
+            height: 5,
+            ..Default::default()
+        },
+        &params,
+    );
+    assert_eq!(pixel, [123, 44, 90, 0]);
+}
+
+#[test]
+fn m41_vignette_provisional_elliptical_golden() {
+    let spec = effect::find("effect.photo.vignette").unwrap();
+    let params = spec
+        .schema
+        .validate(serde_json::json!({"radius":0,"strength":100}))
+        .unwrap();
+    let prep = op_ops::effect::Prepared {
+        width: 3,
+        height: 3,
+        ..Default::default()
+    };
+    let expected = [[1u8, 26, 1], [26, 100, 26], [1, 26, 1]];
+    for y in 0..3 {
+        for x in 0..3 {
+            let pixel = (spec.render_cpu)(&|_, _| [100, 100, 100, 0], x, y, &prep, &params);
+            let value = expected[y as usize][x as usize];
+            assert_eq!(pixel, [value, value, value, 0]);
+        }
+    }
+}
+
+#[test]
+fn m41_case_catalog_covers_parameters_pixels_selections_and_tiles() {
+    const SHARED: &[&str] = &[
+        "image_edges",
+        "partial_alpha",
+        "hidden_color",
+        "geometry_selection",
+        "soft_mask_selection",
+        "tile_seams",
+        "reordered_tiles",
+        "parallel_tiles",
+    ];
+    const CATALOG: &[(&str, &[&str])] = &[
+        (
+            "effect.noise.add",
+            &["intensity", "saturation", "coverage", "seed"],
+        ),
+        ("effect.blur.median", &["radius", "percentile"]),
+        ("effect.noise.reduce", &["radius", "strength"]),
+        ("effect.photo.glow", &["radius", "brightness", "contrast"]),
+        ("effect.photo.red_eye_removal", &["tolerance", "saturation"]),
+        ("effect.photo.sharpen", &["amount"]),
+        (
+            "effect.photo.soften_portrait",
+            &["softness", "lighting", "warmth"],
+        ),
+        (
+            "effect.photo.vignette",
+            &["center_x", "center_y", "radius", "strength"],
+        ),
+    ];
+    const EFFECTS: &[&str] = &[
+        "effect.noise.add",
+        "effect.blur.median",
+        "effect.noise.reduce",
+        "effect.photo.glow",
+        "effect.photo.red_eye_removal",
+        "effect.photo.sharpen",
+        "effect.photo.soften_portrait",
+        "effect.photo.vignette",
+    ];
+    assert_eq!(CATALOG.len(), EFFECTS.len());
+    let small = document(3, 3);
+    let wide = document(257, 3);
+    let rect = Rect::new(0, 0, 257, 3);
+    let mut coverage = vec![0u8; 257 * 3];
+    coverage[255] = 128;
+    coverage[256] = 255;
+    let soft = wide.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+        MaskGrid {
+            width: 257,
+            height: 3,
+            bytes: Arc::from(coverage),
+        },
+    ))));
+    let geometry = wide.set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+        PolygonSet(vec![vec![
+            (255.5, 0.0),
+            (257.0, 0.0),
+            (257.0, 3.0),
+            (255.5, 3.0),
+        ]]),
+    ))));
+    for id in EFFECTS {
+        let (_, names) = CATALOG
+            .iter()
+            .find(|(key, _)| key == id)
+            .expect("catalog entry");
+        let spec = effect::find(id).unwrap();
+        assert_eq!(
+            names.len(),
+            spec.schema.fields.len(),
+            "{id} parameter count"
+        );
+        for field in &spec.schema.fields {
+            assert!(
+                names.contains(&field.key),
+                "{id} missing parameter {}",
+                field.key
+            );
+            let default = spec.default_params();
+            for case in ["min", "default", "max"] {
+                let mut params = default.clone();
+                if case != "default" {
+                    let value = if case == "min" {
+                        field.min.unwrap()
+                    } else {
+                        field.max.unwrap()
+                    };
+                    params[field.key] = match field.kind {
+                        op_ops::effect::ParamKind::Int => serde_json::json!(value as i64),
+                        _ => serde_json::json!(value),
+                    };
+                }
+                effect::render(&small, &spec, Rect::new(0, 0, 3, 3), Some(params)).unwrap();
+            }
+            if field.min.unwrap() <= 0.0 && field.max.unwrap() >= 0.0 {
+                let mut params = default.clone();
+                params[field.key] = match field.kind {
+                    op_ops::effect::ParamKind::Int => serde_json::json!(0),
+                    _ => serde_json::json!(0.0),
+                };
+                effect::render(&small, &spec, Rect::new(0, 0, 3, 3), Some(params)).unwrap();
+            }
+        }
+        assert_eq!(SHARED.len(), 8, "{id} shared cases");
+        let full = effect::render(&wide, &spec, rect, None).unwrap();
+        let masked = effect::render(&soft, &spec, rect, None).unwrap();
+        let selected = effect::render(&geometry, &spec, rect, None).unwrap();
+        let original = wide.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        let full_left = full.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        let mask_left = masked.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+        assert_eq!(&mask_left[..4], &original[..4], "{id} outside mask");
+        assert_eq!(
+            &selected.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap()[..4],
+            &original[..4],
+            "{id} outside geometry"
+        );
+        for channel in 0..4 {
+            let i = 255 * 4 + channel;
+            assert_eq!(
+                mask_left[i],
+                effect::coverage_lerp(original[i], full_left[i], 128),
+                "{id} soft mask"
+            );
+        }
+        assert_eq!(
+            &masked.read_tile(0, TileCoord { x: 1, y: 0 }).unwrap()[..4],
+            &full.read_tile(0, TileCoord { x: 1, y: 0 }).unwrap()[..4],
+            "{id} seam"
+        );
+        let mut coords = effect::tile_coords(rect);
+        coords.reverse();
+        for parallel in [false, true] {
+            let reordered =
+                effect::render_tiles(&wide, &spec, rect, &coords, parallel, None).unwrap();
+            for coord in &coords {
+                assert_eq!(
+                    reordered.read_tile(0, *coord).unwrap(),
+                    full.read_tile(0, *coord).unwrap(),
+                    "{id} tile order"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn m41_add_noise_seed_matches_oracle_mean_and_variance() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let input = op_formats::png::decode_png(
+        &std::fs::read(root.join("tests/fixtures/partial_alpha_64.png")).unwrap(),
+    )
+    .unwrap();
+    let expected = op_formats::png::decode_png(
+        &std::fs::read(
+            root.join("tests/oracle/legacy336/effects/Add_Noise_default_partial_alpha_64.png"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let mut bytes = vec![0; TILE_BYTES];
+    for y in 0..64usize {
+        let src = y * 64 * 4;
+        let dst = y * TILE_SIZE * 4;
+        bytes[dst..dst + 64 * 4].copy_from_slice(&input.pixels[src..src + 64 * 4]);
+    }
+    let doc = DocState::new(store(), 64, 64, 96.0)
+        .unwrap()
+        .write_tile(
+            0,
+            TileCoord { x: 0, y: 0 },
+            TileData::try_from(bytes).unwrap(),
+        )
+        .unwrap();
+    let output = effect::render(
+        &doc,
+        &effect::find("effect.noise.add").unwrap(),
+        Rect::new(0, 0, 64, 64),
+        None,
+    )
+    .unwrap();
+    let tile = output.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
+    let mut oracle_sum = [0.0; 3];
+    let mut actual_sum = [0.0; 3];
+    let mut oracle_squared = [0.0; 3];
+    let mut actual_squared = [0.0; 3];
+    for y in 0..64usize {
+        for x in 0..64usize {
+            for channel in 0..3 {
+                let src = (y * 64 + x) * 4 + channel;
+                let dst = (y * TILE_SIZE + x) * 4 + channel;
+                let oracle_delta = f64::from(expected.pixels[src]) - f64::from(input.pixels[src]);
+                let actual_delta = f64::from(tile[dst]) - f64::from(input.pixels[src]);
+                oracle_sum[channel] += oracle_delta;
+                actual_sum[channel] += actual_delta;
+                oracle_squared[channel] += oracle_delta * oracle_delta;
+                actual_squared[channel] += actual_delta * actual_delta;
+            }
+        }
+    }
+    for channel in 0..3 {
+        let oracle_mean = oracle_sum[channel] / 4096.0;
+        let actual_mean = actual_sum[channel] / 4096.0;
+        let oracle_variance = oracle_squared[channel] / 4096.0 - oracle_mean * oracle_mean;
+        let actual_variance = actual_squared[channel] / 4096.0 - actual_mean * actual_mean;
+        assert_eq!(actual_mean, oracle_mean, "channel {channel} mean");
+        assert_eq!(
+            actual_variance, oracle_variance,
+            "channel {channel} variance"
+        );
+        assert!(actual_variance > 0.0, "channel {channel} needs noise");
+    }
 }
 
 #[test]
@@ -1020,6 +1301,12 @@ fn blur_effects_match_legacy_oracles() {
     )
     .unwrap();
     for (name, id) in [
+        ("Add Noise", "effect.noise.add"),
+        ("Reduce Noise", "effect.noise.reduce"),
+        ("Glow", "effect.photo.glow"),
+        ("Red Eye Removal", "effect.photo.red_eye_removal"),
+        ("Sharpen", "effect.photo.sharpen"),
+        ("Soften Portrait", "effect.photo.soften_portrait"),
         ("Fragment Blur", "effect.blur.fragment"),
         ("Gaussian Blur", "effect.blur.gaussian"),
         ("Median Blur", "effect.blur.median"),
@@ -1081,7 +1368,14 @@ fn blur_effects_match_legacy_oracles() {
                     let i = ((y % TILE_SIZE) * TILE_SIZE + x % TILE_SIZE) * 4;
                     let j = (y * input.width as usize + x) * 4;
                     for channel in 0..4 {
-                        let tolerance = if name == "Motion Blur" { 1 } else { 0 };
+                        let tolerance = if matches!(
+                            name,
+                            "Motion Blur" | "Reduce Noise" | "Glow" | "Soften Portrait"
+                        ) {
+                            1
+                        } else {
+                            0
+                        };
                         assert!(
                             tile[i + channel].abs_diff(expected.pixels[j + channel]) <= tolerance,
                             "{name} {} {x},{y} channel {channel}: {} vs {}",

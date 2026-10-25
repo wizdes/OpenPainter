@@ -189,6 +189,13 @@ pub enum GpuKernel {
     Pixelate,
     Bulge,
     Twist,
+    RedEyeRemoval,
+    Vignette,
+    Sharpen,
+    ReduceNoise,
+    AddNoise,
+    Glow,
+    SoftenPortrait,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -208,6 +215,7 @@ pub struct Prepared {
     pub height: i32,
     pub halo: i32,
     pub gaussian: Option<std::sync::Arc<Vec<crate::effects::gaussian_blur::GaussianColumn>>>,
+    pub noise: Option<std::sync::Arc<Vec<[i32; 3]>>>,
 }
 pub type PixelReader<'a> = dyn Fn(i32, i32) -> [u8; 4] + 'a;
 pub struct TileInputs<'a> {
@@ -319,7 +327,6 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::pencil_sketch::spec(),
         crate::effects::fragment::spec(),
         crate::effects::gaussian_blur::spec(),
-        crate::effects::median_blur::spec(),
         crate::effects::motion_blur::spec(),
         crate::effects::radial_blur::spec(),
         crate::effects::zoom_blur::spec(),
@@ -329,6 +336,14 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::polar_inversion::spec(),
         crate::effects::tile_reflection::spec(),
         crate::effects::twist::spec(),
+        crate::effects::add_noise::spec(),
+        crate::effects::median_blur::spec(),
+        crate::effects::reduce_noise::spec(),
+        crate::effects::glow::spec(),
+        crate::effects::red_eye_removal::spec(),
+        crate::effects::sharpen::spec(),
+        crate::effects::soften_portrait::spec(),
+        crate::effects::vignette::spec(),
         crate::effects::edge_detect::spec(),
         crate::effects::emboss::spec(),
         crate::effects::outline::spec(),

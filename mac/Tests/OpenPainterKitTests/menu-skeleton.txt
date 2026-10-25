@@ -123,7 +123,6 @@ Effects > Artistic > Pencil Sketch
 Effects > Blurs
 Effects > Blurs > Fragment Blur
 Effects > Blurs > Gaussian Blur
-Effects > Blurs > Median Blur
 Effects > Blurs > Motion Blur
 Effects > Blurs > Radial Blur
 Effects > Blurs > Zoom Blur
@@ -147,17 +146,19 @@ Effects > Distort > Crystalize (off)
 Effects > Distort > Dents (off)
 Effects > Distort > Morphology (off)
 Effects > Noise
-Effects > Noise > Add Noise (off)
-Effects > Noise > Reduce Noise (off)
+Effects > Noise > Add Noise
+Effects > Noise > Median
+Effects > Noise > Reduce Noise
 Effects > Object
 Effects > Object > Drop Shadow (off)
 Effects > Photo
-Effects > Photo > Glow (off)
-Effects > Photo > Red Eye Removal (off)
-Effects > Photo > Sharpen (off)
-Effects > Photo > Soften Portrait (off)
+Effects > Photo > Glow
+Effects > Photo > Red Eye Removal
+Effects > Photo > Sharpen
+Effects > Photo > Soften Portrait
+Effects > Photo > Vignette
+Effects > Photo > ---
 Effects > Photo > Straighten (off)
-Effects > Photo > Vignette (off)
 Effects > Render
 Effects > Render > Clouds (off)
 Effects > Render > Julia Fractal (off)
