@@ -290,13 +290,19 @@ fn main() -> ExitCode {
         for scenario in scenarios {
             let name = format!("opcli scenario {}", scenario.display());
             let argument = scenario.to_string_lossy();
+            let out = std::env::temp_dir().join(format!(
+                "op-scenario-{}-{}",
+                std::process::id(),
+                scenario.file_stem().unwrap_or_default().to_string_lossy()
+            ));
+            let out = out.to_string_lossy();
             run(
                 &mut steps,
                 &name,
                 &engine,
                 "cargo",
                 &[
-                    "run", "--quiet", "-p", "op-cli", "--", "scenario", &argument,
+                    "run", "--quiet", "-p", "op-cli", "--", "scenario", &argument, "-o", &out,
                 ],
             );
         }

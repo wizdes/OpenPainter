@@ -14,7 +14,7 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-files="$(git ls-files -co --exclude-standard -- engine scripts tests tools | while read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done)"
+files="$(git ls-files -co --exclude-standard -- engine scripts tests tools docs/reports | while read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done)"
 mac_hash="$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)"
 
 dest=/tmp/op-linux-src

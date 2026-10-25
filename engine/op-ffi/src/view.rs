@@ -19,6 +19,9 @@
 //! - `op_view_detach`, `op_doc_close` (for the document's views) and
 //!   `op_engine_free` return only after the view's in-flight frame has finished
 //!   and its layer has been released (ARCHITECTURE section 6).
+// The view host draws only on macOS (CAMetalLayer); on other systems the
+// host and its render loop are compiled but never called.
+#![cfg_attr(not(target_os = "macos"), allow(dead_code, clippy::drop_non_drop))]
 use crate::{OpEngine, OpStatus, engine, guard};
 use std::collections::{HashMap, VecDeque};
 use std::ffi::c_void;
