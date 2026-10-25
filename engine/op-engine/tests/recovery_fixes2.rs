@@ -265,3 +265,35 @@ fn item5_lock_retries_stop_within_their_time_limit() {
     churn.join().unwrap();
     assert!(took < Duration::from_secs(4), "discard took {took:?}");
 }
+
+/// Round 3, item 1: the status never reports a revision whose record is
+/// already gone. The writer is paused right after it deleted the record.
+#[test]
+fn round3_the_acknowledged_revision_is_cleared_before_the_record_goes() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("clear");
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 6), None).unwrap();
+    let gate = Gate::default();
+    let options = RecoveryOptions {
+        hooks: RecordHooks {
+            on_stage: Some(gate.hook(RecordStage::RecordDeleted)),
+            ..RecordHooks::default()
+        },
+        ..manual()
+    };
+    e.recovery_attach(doc, &dir, None, options).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    assert!(e.recovery_flush(doc).unwrap().is_some());
+    gate.arm();
+    e.save_document(doc, root.path().join("s.opaint"), SaveFormat::Opaint, true)
+        .unwrap();
+    wait(|| gate.reached().then_some(()));
+    assert!(!dir.join(recovery::MANIFEST).exists());
+    let status = e.recovery_status(doc).unwrap();
+    gate.open();
+    assert_eq!(
+        status.acknowledged, None,
+        "the status named a revision whose record was gone"
+    );
+}

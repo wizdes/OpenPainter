@@ -56,6 +56,8 @@ pub enum RecordStage {
     ManifestTemp,
     /// The new manifest is renamed and the folder synced; not acknowledged yet.
     Committed,
+    /// A clean-up (after a save, or a clean document) deleted the record.
+    RecordDeleted,
 }
 
 /// Test hooks for a record write: a pause or a callback at each stage, and an
@@ -528,8 +530,14 @@ impl FolderLock {
                 if !create {
                     return Ok(None);
                 }
-                fs::create_dir_all(dir).map_err(|e| io_text("cannot make", dir, e))?;
-                sync_dir(parent_of(dir)).map_err(|e| io_text("cannot sync", parent_of(dir), e))?;
+                // A new folder is made under a hidden name with its lock
+                // already held, then renamed into place: a scan never sees it
+                // empty and unlocked (it would delete it as a crash leftover).
+                if let Some(lock) = Self::create_locked(dir)? {
+                    return Ok(Some(lock));
+                }
+                // Someone else made the folder meanwhile: lock theirs.
+                continue;
             }
             let file = match OpenOptions::new()
                 .create(true)
@@ -564,6 +572,54 @@ impl FolderLock {
                 return Ok(Some(lock));
             }
         }
+    }
+
+    /// Makes `dir` with its lock held (see `take`). None: `dir` appeared
+    /// meanwhile.
+    fn create_locked(dir: &Path) -> std::result::Result<Option<Self>, String> {
+        let parent = parent_of(dir);
+        fs::create_dir_all(parent).map_err(|e| io_text("cannot make", parent, e))?;
+        let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let name = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let fresh = parent.join(format!(".{name}.new-{}-{n}", std::process::id()));
+        fs::create_dir(&fresh).map_err(|e| io_text("cannot make", &fresh, e))?;
+        let made = (|| {
+            let path = fresh.join(LOCK);
+            let file = OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .write(true)
+                .open(&path)
+                .map_err(|e| io_text("cannot open", &path, e))?;
+            file.try_lock()
+                .map_err(|e| io_text("cannot lock", &path, format!("{e:?}")))?;
+            Ok::<File, String>(file)
+        })();
+        let file = match made {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = fs::remove_dir_all(&fresh);
+                return Err(e);
+            }
+        };
+        // rename(2) of a folder onto an existing non-empty folder fails, so
+        // a folder someone else made in between is never replaced.
+        if dir.exists() || fs::rename(&fresh, dir).is_err() {
+            drop(file);
+            let _ = fs::remove_dir_all(&fresh);
+            if dir.is_dir() {
+                return Ok(None);
+            }
+            return Err(format!("cannot make {}", dir.display()));
+        }
+        sync_dir(parent).map_err(|e| io_text("cannot sync", parent, e))?;
+        Ok(Some(Self {
+            file,
+            dir: dir.to_path_buf(),
+        }))
     }
 
     /// The lock file at the folder's path is still the one we hold.
@@ -663,14 +719,35 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
             }
             continue;
         }
-        let (manifest, problem) = match read_record(&dir) {
+        // The lock is held only for the check above: reading the record
+        // (the snapshot's checksum can take long) happens without it, so an
+        // attach to this folder never waits behind a scan's reads.
+        drop(lock);
+        let read = match read_record(&dir) {
+            Ok(m) => Ok(m),
+            // It changed meanwhile: a live owner took it (skip it), or read
+            // it again under the lock.
+            Err(_) => match FolderLock::take(&dir, false, Duration::ZERO) {
+                Ok(Some(lock)) => {
+                    let again = read_record(&dir);
+                    drop(lock);
+                    again
+                }
+                _ => continue,
+            },
+        };
+        // A live owner may have taken the folder while it was read: skip it.
+        match FolderLock::take(&dir, false, Duration::ZERO) {
+            Ok(Some(lock)) => drop(lock),
+            _ => continue,
+        }
+        let (manifest, problem) = match read {
             Ok(m) => {
                 let stale = older_than_file(&m);
                 (Some(m), stale)
             }
             Err(p) => (None, Some(p)),
         };
-        drop(lock);
         let stale = manifest.is_some() && problem.is_some();
         out.push(RecordInfo {
             uuid,
@@ -825,10 +902,18 @@ impl WriterState {
         if self.retry_clear_at.is_some_and(|t| Instant::now() < t) {
             return Err("waiting to retry the clean-up".into());
         }
+        // The status changes first, so it never names a revision whose
+        // record is already gone; it is put back if the delete fails.
+        let acknowledged = self.status.lock().acknowledged.take();
         let deleted = {
             let mut shared = self.shared.lock();
             delete_record(&self.dir, &mut shared)
         };
+        if deleted.is_ok() {
+            self.stage(RecordStage::RecordDeleted);
+        } else {
+            self.status.lock().acknowledged = acknowledged;
+        }
         match deleted {
             Ok(_) => {
                 self.retry_clear_at = None;
@@ -851,18 +936,32 @@ impl WriterState {
         event_to(&self.events, self.doc, json);
     }
 
+    fn stage(&self, s: RecordStage) {
+        if let Some(f) = &self.options.hooks.on_stage {
+            f(s)
+        }
+    }
+
     /// A clean save happened (on the writer thread, so the save itself never
     /// waits for a record write): the file's stamp is taken again and the
     /// record deleted, manifest first.
     fn saved(&mut self) {
-        let deleted = {
-            let mut shared = self.shared.lock();
-            shared.base = stamp_of(shared.original.as_deref());
-            if !shared.on_disk {
-                return;
-            }
-            delete_record(&self.dir, &mut shared)
-        };
+        let mut shared = self.shared.lock();
+        shared.base = stamp_of(shared.original.as_deref());
+        if !shared.on_disk {
+            return;
+        }
+        // The status changes first, so it never names a revision whose
+        // record is already gone; it is put back if the delete fails.
+        let acknowledged = self.status.lock().acknowledged.take();
+        let deleted = delete_record(&self.dir, &mut shared);
+        drop(shared);
+        if deleted.is_err() {
+            self.status.lock().acknowledged = acknowledged;
+        }
+        if deleted.is_ok() {
+            self.stage(RecordStage::RecordDeleted);
+        }
         match deleted {
             Ok(_) => {
                 self.written = None;
@@ -1253,11 +1352,16 @@ mod tests {
 
     /// Makes every lock look lost (taken over by another holder).
     pub(super) static FORCE_LOST: AtomicBool = AtomicBool::new(false);
+    /// FORCE_LOST is process-wide: the lock tests run one at a time.
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn taking_a_lock_that_keeps_being_lost_gives_up_within_its_time_limit() {
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let root = std::env::temp_dir().join(format!("op-lock-limit-{}", std::process::id()));
         let dir = root.join("x");
+        // An existing folder: taking it checks that the lock is still held.
+        fs::create_dir_all(&dir).unwrap();
         FORCE_LOST.store(true, Ordering::SeqCst);
         let (tx, rx) = std::sync::mpsc::channel();
         let d = dir.clone();
@@ -1272,5 +1376,46 @@ mod tests {
         let (result, took) = got.expect("take() kept retrying past its time limit");
         assert!(result.is_err(), "{result:?}");
         assert!(took < Duration::from_secs(5), "{took:?}");
+    }
+
+    #[test]
+    fn a_new_folder_is_never_visible_without_its_lock_held() {
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = std::env::temp_dir().join(format!("op-lock-new-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stolen = Arc::new(AtomicU64::new(0));
+        let watcher = {
+            let (stop, stolen, root) = (stop.clone(), stolen.clone(), root.clone());
+            std::thread::spawn(move || {
+                while !stop.load(Ordering::SeqCst) {
+                    for i in 0..4 {
+                        let dir = root.join(format!("d{i}"));
+                        // What a scan does: lock a folder that has no record.
+                        if let Ok(Some(lock)) = FolderLock::take(&dir, false, Duration::ZERO) {
+                            stolen.fetch_add(1, Ordering::SeqCst);
+                            drop(lock);
+                        }
+                    }
+                }
+            })
+        };
+        for n in 0..2000 {
+            let dir = root.join(format!("d{}", n % 4));
+            let lock = FolderLock::take(&dir, true, Duration::from_secs(2))
+                .unwrap()
+                .unwrap();
+            // Released by deleting the folder, as a close does.
+            lock.delete_folder().unwrap();
+        }
+        stop.store(true, Ordering::SeqCst);
+        watcher.join().unwrap();
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(
+            stolen.load(Ordering::SeqCst),
+            0,
+            "a scan locked a folder an attach had just made"
+        );
     }
 }
