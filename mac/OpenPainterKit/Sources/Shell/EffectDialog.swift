@@ -647,9 +647,12 @@ extension EditorWindowController: EffectMenuActions {
     func validateRepeat(_ item: NSMenuItem, busy: Bool) -> Bool {
         guard let last = EffectDialogController.lastEffect else {
             item.title = "Repeat Effect"
+            item.image = MenuIcons.image(for: "Effects > Repeat Effect")
             return false
         }
         item.title = "Repeat \(last.label)"
+        // paint.net shows the last effect's icon on Repeat (M55).
+        item.image = MenuIcons.effectImage(last.id) ?? MenuIcons.image(for: "Effects > Repeat Effect")
         return !busy && editor.isEnabled(last.id)
     }
 }

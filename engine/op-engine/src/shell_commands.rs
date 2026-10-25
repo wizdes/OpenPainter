@@ -363,7 +363,7 @@ pub fn effect_label(e: &effect::EffectSpec) -> String {
         "effect.blur.square" => "Square Blur",
         "effect.blur.surface" => "Surface Blur",
         "effect.blur.gaussian" => "Gaussian Blur",
-        "effect.blur.median" => "Median",
+        "effect.blur.median" => "Median Blur",
         "effect.noise.add" => "Add Noise",
         "effect.noise.reduce" => "Reduce Noise",
         "effect.blur.motion" => "Motion Blur",

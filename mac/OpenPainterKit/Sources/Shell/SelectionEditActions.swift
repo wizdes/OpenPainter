@@ -35,7 +35,8 @@ public enum SelectionClipboard {
     public static var pasteboard = NSPasteboard.general
 
     /// paint.net's Paste Selection submenu titles, in combine-mode order.
-    public nonisolated static let pasteTitles = ["Replace", "Add (Union)", "Subtract", "Intersect", "Invert (\"xor\")"]
+    /// paint.net 5.1's titles (EditMenu.html screenshot), in mode order (M55).
+    public nonisolated static let pasteTitles = ["Replace", "Add (union)", "Exclude", "Intersect", "Invert (\"xor\")"]
 
     /// The clipboard text when it is selection text with at least one polygon.
     public static func selectionText() -> String? {
