@@ -1,5 +1,5 @@
 // The canvas overlay (M23): marching ants for the engine's selection outline
-// and for a rectangle being dragged, the Rectangle Select handles, and the Crop
+// and for a rectangle, ellipse or lasso (M29) being dragged, the Rectangle Select handles, and the Crop
 // tool's frame (dimmed outside, thirds lines, handles). Paths are kept in
 // document pixels and moved into view points when the viewport changes, so
 // the outline is right at every zoom. The ants move by animating the dash
@@ -28,6 +28,11 @@ public final class SelectionOverlayView: NSView {
     public private(set) var selectionPath: CGPath?
     /// A rectangle being dragged (document pixels).
     public var pending: CGRect? { didSet { if pending != oldValue { redraw() } } }
+    /// True: `pending` is drawn as the ellipse inside it (Ellipse Select, M29).
+    public var pendingEllipse = false { didSet { if pendingEllipse != oldValue { redraw() } } }
+    /// A lasso being dragged (document pixels), drawn closed back to its
+    /// first point (Lasso Select, M29).
+    public var pendingLasso: [CGPoint]? { didSet { if pendingLasso != oldValue { redraw() } } }
     /// The rectangle whose handles show (document pixels).
     public var handleRect: CGRect? { didSet { if handleRect != oldValue { redraw() } } }
     /// The crop frame's corners on the original image (document pixels), and
@@ -116,7 +121,14 @@ public final class SelectionOverlayView: NSView {
         antsUnder.path = selectionPath?.copy(using: &t)
         antsOver.path = antsUnder.path
         if let r = pending, r.width > 0 || r.height > 0 {
-            let p = CGPath(rect: r.applying(t), transform: nil)
+            let p = pendingEllipse ? CGPath(ellipseIn: r.applying(t), transform: nil)
+                : CGPath(rect: r.applying(t), transform: nil)
+            pendingUnder.path = p
+            pendingOver.path = p
+        } else if let pts = pendingLasso, pts.count >= 2 {
+            let p = CGMutablePath()
+            p.addLines(between: pts.map { $0.applying(t) })
+            p.closeSubpath()
             pendingUnder.path = p
             pendingOver.path = p
         } else {

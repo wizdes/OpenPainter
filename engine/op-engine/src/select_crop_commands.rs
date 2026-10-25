@@ -89,17 +89,18 @@ pub(super) fn history_label(id: &str) -> Option<&'static str> {
     }
 }
 
-/// For an amend of the current Rectangle Select step: the state to combine
-/// against (the current state with the selection from before that step). When
-/// the current step is not a Rectangle Select step, `amend` becomes false and
-/// the command adds a new step.
+/// For an amend of the current Rectangle Select (or, M29, Ellipse Select)
+/// step: the state to combine against (the current state with the selection
+/// from before that step). When the current step is not a step of the same
+/// command, `amend` becomes false and the command adds a new step.
 pub(super) fn amend_base(id: &str, mut params: Value, h: &History) -> (Option<DocState>, Value) {
-    if id != "selection.rectangle" || params["amend"].as_bool() != Some(true) {
+    let amendable = id == "selection.rectangle" || id == "selection.ellipse";
+    if !amendable || params["amend"].as_bool() != Some(true) {
         return (None, params);
     }
     let i = h.current_index();
     if i > 0
-        && h.command_id(i) == Some("selection.rectangle")
+        && h.command_id(i) == Some(id)
         && let Some(before) = h.state(i - 1)
     {
         return (
@@ -111,7 +112,7 @@ pub(super) fn amend_base(id: &str, mut params: Value, h: &History) -> (Option<Do
     (None, params)
 }
 
-fn combine_mode(name: &str) -> CombineMode {
+pub(super) fn combine_mode(name: &str) -> CombineMode {
     match name {
         "add" => CombineMode::Add,
         "subtract" => CombineMode::Subtract,

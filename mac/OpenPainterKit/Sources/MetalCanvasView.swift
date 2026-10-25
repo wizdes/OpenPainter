@@ -30,6 +30,8 @@ public protocol CanvasPointerSink: AnyObject {
 /// Keys the canvas hands to its window's editor (focus rules, mac/README.md).
 public enum CanvasKey: Sendable {
     case escape, enter, delete
+    /// Shift-Delete: Fill Selection (M29).
+    case fill
 }
 
 @MainActor
@@ -564,7 +566,7 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         case 36, 76:  // Return, keypad Enter
             if let onKey { return onKey(.enter) }
         case 51, 117:  // Delete, forward delete
-            if plain, let onKey { return onKey(.delete) }
+            if plain, let onKey { return onKey(event.modifierFlags.contains(.shift) ? .fill : .delete) }
         default: break
         }
         if plain, !event.isARepeat, let onToolKey, let c = event.charactersIgnoringModifiers?.lowercased().first,

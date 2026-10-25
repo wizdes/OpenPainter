@@ -37,6 +37,7 @@ mod line_commands;
 pub mod live_stroke;
 mod profile_query;
 mod select_crop_commands;
+mod selection_commands;
 mod shape_commands;
 mod shell_commands;
 mod text_commands;
@@ -772,6 +773,7 @@ fn specs() -> Vec<CommandSpec> {
     entries.extend(layer_commands::specs());
     entries.extend(layer_menu_commands::specs());
     entries.extend(select_crop_commands::specs());
+    entries.extend(selection_commands::specs());
     for (index, effect) in effect::registered().into_iter().enumerate() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
@@ -1188,6 +1190,7 @@ impl Actor {
                         .or_else(|| layer_commands::history_label(id, &params))
                         .or_else(|| layer_menu_commands::history_label(id).map(str::to_owned))
                         .or_else(|| select_crop_commands::history_label(id).map(str::to_owned))
+                        .or_else(|| selection_commands::history_label(id, &params))
                         .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);
@@ -2550,6 +2553,10 @@ impl Engine {
                 .rasterize_selection(op_core::selection::RasterMode::Pixelated)
                 .bytes
                 .to_vec()),
+            "doc.selection_polygons" => {
+                serde_json::to_vec(&selection_commands::selection_polygons(&s.state))
+                    .map_err(internal)
+            }
             "doc.resolution" => {
                 serde_json::to_vec(&select_crop_commands::resolution(&s.state)).map_err(internal)
             }

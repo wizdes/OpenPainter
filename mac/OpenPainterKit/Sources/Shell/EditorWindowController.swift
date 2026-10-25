@@ -162,14 +162,15 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// While text is open, Escape and Enter go to the Text tool. Otherwise Escape
-    /// cancels a drag, else deselects, and Enter has nothing to finish yet.
-    /// Delete is Erase Selection, which comes in a later version.
+    /// cancels a drag, else deselects; Enter finishes the Crop tool, else
+    /// deselects (paint.net's Enter). Delete is Erase Selection and
+    /// Shift-Delete is Fill Selection (M29, SelectionEditActions.swift).
     public func canvasKey(_ key: CanvasKey) {
         if textTool?.isEditing == true {
             switch key {
             case .escape: return textTool.escape()
             case .enter: return textTool.enter()
-            case .delete: return textTool.apply { $0.deleteForward() }
+            case .delete, .fill: return textTool.apply { $0.deleteForward() }
             }
         }
         switch key {
@@ -180,8 +181,11 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         case .enter:
             if selectCrop.enter() { return }
             editor.clearMessage()
+            if editor.selection != nil, editor.isEnabled("selection.deselect") { editor.run("selection.deselect") }
         case .delete:
-            editor.report("Erase Selection comes in a later version.")
+            eraseSelection()
+        case .fill:
+            fillSelection()
         }
     }
 
@@ -190,7 +194,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         let mode: CanvasTool =
             if selectCrop?.cropActive == true { .overlay } else {
             switch t {
-            case .rectangleSelect: .overlay
+            case .rectangleSelect, .ellipseSelect, .lassoSelect: .overlay
             case .pan: .pan
             case .zoom: .zoom
             case .paintbrush, .eraser, .pencil: .stroke
@@ -328,6 +332,9 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             let count = editor.info.layers.count, active = editor.info.activeLayer
             return !busy && [active != count - 1, active < count - 1, active > 0, active != 0][min(max(item.tag, 0), 3)]
         case #selector(zoomToSelection(_:)): return editor.selection != nil
+        case #selector(eraseSelection(_:)), #selector(fillSelection(_:)), #selector(copySelection(_:)),
+             #selector(pasteSelection(_:)), #selector(showExpandSelection(_:)):
+            return validateSelectionEdit(item)
         case #selector(ImageSizeActions.showCropTool(_:)): return !busy && !selectCrop.cropActive
         case #selector(ImageSizeActions.showResizeImage(_:)), #selector(ImageSizeActions.showCanvasSize(_:)):
             return !busy

@@ -15,6 +15,8 @@
 //   Exit                  Alt+F4        -> OpenPainter > Quit (Cmd+Q)
 //   Erase Selection       Delete        -> Delete (backspace key)
 //   Fill Selection        Backspace     -> Shift+Delete
+//   Copy Selection        Ctrl+Alt+Shift+C -> Option+Shift+Cmd+C (M29)
+//   Paste Selection > Replace  Ctrl+Alt+Shift+V -> Option+Shift+Cmd+V (M29)
 //   Tools/History/Layers/Colors  F5-F8 -> F5-F8, and Option+Cmd+1 to 4
 import AppKit
 
@@ -65,6 +67,7 @@ public enum MenuSkeleton {
     static let shiftCmd: NSEvent.ModifierFlags = [.command, .shift]
     static let optCmd: NSEvent.ModifierFlags = [.command, .option]
     static let opt: NSEvent.ModifierFlags = [.option]
+    static let optShiftCmd: NSEvent.ModifierFlags = [.command, .option, .shift]
 
     static func key(_ scalar: Int) -> String { String(UnicodeScalar(UInt16(scalar)).map(Character.init) ?? " ") }
     static let deleteKey = String(Character(UnicodeScalar(8)))
@@ -188,12 +191,17 @@ public enum MenuSkeleton {
                 i("Paste into New Layer", "v", shiftCmd),
                 i("Paste into New Image", "v", optCmd),
                 .separator,
-                i("Copy Selection"),
-                i("Paste Selection"),
+                // M29: SelectionEditActions.swift.
+                .item("Copy Selection", "c", optShiftCmd, .selector(#selector(SelectionEditActions.copySelection(_:)))),
+                .submenu("Paste Selection", SelectionClipboard.pasteTitles.enumerated().map { n, title in
+                    .item(title, n == 0 ? "v" : "", n == 0 ? optShiftCmd : [],
+                          .selector(#selector(SelectionEditActions.pasteSelection(_:))))
+                }),
                 .separator,
-                i("Erase Selection", deleteKey, []),
-                i("Fill Selection", deleteKey, [.shift]),
-                i("Invert Selection", "i"),
+                .item("Erase Selection", deleteKey, [], .selector(#selector(SelectionEditActions.eraseSelection(_:)))),
+                .item("Fill Selection", deleteKey, [.shift], .selector(#selector(SelectionEditActions.fillSelection(_:)))),
+                .item("Invert Selection", "i", cmd, .command("selection.invert")),
+                .item("Expand Selection…", "", [], .selector(#selector(SelectionEditActions.showExpandSelection(_:)))),
                 .item("Select All", "a", cmd, .selector(#selector(NSResponder.selectAll(_:)))),
                 .item("Deselect", "d", cmd, .command("selection.deselect")),
             ] + (editEffects.isEmpty ? [] : [.separator] + editEffects)),
@@ -312,6 +320,8 @@ public enum MenuSkeleton {
                 case let .selector(s):
                     item.action = s
                     if let tag = goToTitles.firstIndex(of: title) { item.tag = tag }
+                    if s == #selector(SelectionEditActions.pasteSelection(_:)),
+                       let tag = SelectionClipboard.pasteTitles.firstIndex(of: title) { item.tag = tag }
                 case let .command(id):
                     item.action = #selector(EditorMenuActions.runCommand(_:))
                     item.representedObject = id
