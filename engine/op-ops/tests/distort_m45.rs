@@ -50,12 +50,14 @@ impl op_core::tiles::SpillIo for MemorySpill {
         Ok(())
     }
 }
-fn image() -> DocState {
-    let store = Arc::new(TileStore::with_io(
+fn store() -> Arc<TileStore> {
+    Arc::new(TileStore::with_io(
         16 * TILE_BYTES,
         Box::new(MemorySpill(Mutex::new(Vec::new()))),
-    ));
-    let mut doc = DocState::new(store, 258, 2, 96.0).unwrap();
+    ))
+}
+fn image() -> DocState {
+    let mut doc = DocState::new(store(), 258, 2, 96.0).unwrap();
     for tile_x in 0..2 {
         let mut bytes = vec![0; TILE_BYTES];
         for y in 0..2 {
@@ -96,6 +98,71 @@ fn tiles(doc: &DocState) -> Vec<Vec<u8>> {
     (0..2)
         .map(|x| doc.read_tile(0, TileCoord { x, y: 0 }).unwrap())
         .collect()
+}
+
+#[test]
+fn m54_every_registered_effect_has_a_target_and_deterministic_tiles() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let targets = std::fs::read_to_string(root.join("tests/oracle/targets.toml")).unwrap();
+    let doc = image();
+    let mut count = 0;
+    for spec in effect::registered() {
+        assert!(
+            targets.contains(&format!("id = \"{}\"", spec.id)),
+            "{} lacks an oracle target row",
+            spec.id
+        );
+        let selected;
+        let content_doc;
+        let input = if spec.id == "effect.fill.content_aware" {
+            let mut built = DocState::new(store(), 258, 64, 96.0).unwrap();
+            for x in 0..2 {
+                let mut bytes = vec![0; TILE_BYTES];
+                for pixel in bytes.chunks_exact_mut(4) {
+                    pixel.copy_from_slice(&[80, 120, 160, 255]);
+                }
+                built = built
+                    .write_tile(0, TileCoord { x, y: 0 }, TileData::try_from(bytes).unwrap())
+                    .unwrap();
+            }
+            content_doc = built;
+            selected = content_doc.clone().set_selection(SelectionState::Active(
+                SelectionSource::Coverage(Arc::new(MaskGrid {
+                    width: 258,
+                    height: 64,
+                    bytes: Arc::from(
+                        (0..258 * 64)
+                            .map(|i| u8::from(i == 32 * 258 + 128) * 255)
+                            .collect::<Vec<_>>(),
+                    ),
+                })),
+            ));
+            &selected
+        } else {
+            &doc
+        };
+        let effect_rect = Rect::new(0, 0, 258, input.height);
+        let effect_coords = effect::tile_coords(effect_rect);
+        let whole = effect::render(input, &spec, effect_rect, None).unwrap();
+        let mut reverse = effect_coords.clone();
+        reverse.reverse();
+        let reversed = effect::render_tiles_checked(
+            input,
+            &spec,
+            effect_rect,
+            &reverse,
+            None,
+            || Ok(()),
+            |_, _| {},
+        )
+        .unwrap();
+        let parallel =
+            effect::render_tiles(input, &spec, effect_rect, &effect_coords, true, None).unwrap();
+        assert_eq!(tiles(&whole), tiles(&reversed), "{} reversed", spec.id);
+        assert_eq!(tiles(&whole), tiles(&parallel), "{} parallel", spec.id);
+        count += 1;
+    }
+    assert_eq!(count, 55, "registry size changed; review matrix coverage");
 }
 
 #[test]

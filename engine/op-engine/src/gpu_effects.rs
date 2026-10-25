@@ -394,6 +394,11 @@ fn plan(spec: &EffectSpec, kernel: GpuKernel, p: &Value) -> std::result::Result<
         }
         "effect.artistic.pencil_sketch" => {
             let radius = int(p, "pencil_tip_size");
+            // legacy_gaussian sums up to 255 * 256 * (r + 1)^4 in an i32.
+            require(
+                radius <= 12,
+                "the kernel's 32-bit blur sums overflow above tip size 12",
+            )?;
             Plan::new(params([radius, int(p, "range"), 0]), radius as u32)
         }
         "effect.distort.pixelate" => {

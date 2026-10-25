@@ -1085,3 +1085,47 @@ fn pixelate_cell_size_endpoints_match_cpu_on_metal() {
         assert_eq!(actual, expected, "cell size {size}");
     }
 }
+
+/// M54 regression: pixels exactly on the Bulge radius are outside the bulge,
+/// so they keep their bytes, including color under zero alpha. The GPU's
+/// approximate `sqrt(d²) / radius` used to put them inside, which resampled a
+/// clear pixel to all zero (CPU [4,127,4,0], GPU [0,0,0,0] at (5,135)).
+#[test]
+fn m54_bulge_radius_edge_pixels_keep_hidden_color() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    for (width, height) in [(280u32, 270u32), (300, 270), (600, 400)] {
+        // Opaque gradient with a fully clear column pair at each radius edge.
+        let radius = width.min(height) / 2;
+        let (cx, cy) = (width / 2, height / 2);
+        let mut bytes = Vec::with_capacity((width * height * 4) as usize);
+        for y in 0..height {
+            for x in 0..width {
+                let on_edge = y.abs_diff(cy) <= 1
+                    && (x.abs_diff(cx) == radius || x.abs_diff(cx) == radius - 1)
+                    || x.abs_diff(cx) <= 1 && y.abs_diff(cy) == radius;
+                let alpha = if on_edge { 0 } else { 255 };
+                bytes.extend_from_slice(&[(x % 251) as u8, (y % 241) as u8, 77, alpha]);
+            }
+        }
+        let expected =
+            effect::reference_rgba8("effect.distort.bulge", width, height, &bytes).unwrap();
+        let actual = gpu
+            .effect_kernel(GpuKernel::Bulge, width, height, &bytes)
+            .unwrap();
+        let worst = expected
+            .iter()
+            .zip(&actual)
+            .enumerate()
+            .max_by_key(|(_, (a, b))| a.abs_diff(**b))
+            .unwrap();
+        let p = worst.0 / 4;
+        assert!(
+            worst.1.0.abs_diff(*worst.1.1) <= 1,
+            "{width}x{height} at ({},{}): cpu {:?} gpu {:?}",
+            p as u32 % width,
+            p as u32 / width,
+            &expected[p * 4..p * 4 + 4],
+            &actual[p * 4..p * 4 + 4]
+        );
+    }
+}

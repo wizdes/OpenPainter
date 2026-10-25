@@ -1113,8 +1113,11 @@ fn effect_bulge(@builtin(global_invocation_id) id: vec3<u32>) {
   if radius <= 0.0 { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
   let u = f32(id.x) - cx;
   let v = f32(id.y) - cy;
-  let t = 1.0 - sqrt(u * u + v * v) / radius;
-  if t <= 0.0 { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
+  // Compare squares: they are exact here, while Metal's sqrt and divide are
+  // not, and the CPU's t <= 0 is exact on the radius.
+  let d2 = u * u + v * v;
+  if d2 >= radius * radius { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
+  let t = max(0.0, 1.0 - sqrt(d2) / radius);
   let scale = 1.0 - (f32(bitcast<i32>(p.mode)) / 100.0) * t * t;
   textureStore(output_tex, vec2<i32>(id.xy), bilinear_clamp(u * scale + cx, v * scale + cy));
 }
