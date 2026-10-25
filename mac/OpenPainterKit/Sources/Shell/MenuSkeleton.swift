@@ -112,7 +112,9 @@ public enum MenuSkeleton {
     }
 
     static func effectsMenu(_ effects: [Engine.EffectInfo]) -> [Entry] {
-        var out: [Entry] = [i("Repeat Effect", "f"), .separator]
+        var out: [Entry] = [
+            .item("Repeat Effect", "f", cmd, .selector(#selector(EffectMenuActions.repeatEffect(_:)))), .separator,
+        ]
         // Every category other than Adjustments and Edit names an Effects submenu
         // ("Blurs"); an "Effects/<Submenu>" form is accepted too.
         func submenu(_ e: Engine.EffectInfo) -> String {
@@ -313,6 +315,8 @@ public enum MenuSkeleton {
                 case let .effect(id):
                     item.action = #selector(EditorMenuActions.runEffect(_:))
                     item.representedObject = id
+                    // The menu opens the effect's dialog (M24, EffectDialog.swift).
+                    item.target = EffectMenuTarget.shared
                 case let .panel(kind):
                     item.action = #selector(PanelMenuTarget.togglePanel(_:))
                     item.target = panelTarget

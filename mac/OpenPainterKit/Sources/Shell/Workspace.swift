@@ -60,6 +60,7 @@ public final class Workspace {
                 switch event.kind {
                 case .docChanged, .historyChanged, .layersChanged:
                     self.editors.first { $0.document.id == event.doc }?.scheduleRefresh()
+                case .progress: EffectDialogController.progressEvent(event)
                 default: break
                 }
             }

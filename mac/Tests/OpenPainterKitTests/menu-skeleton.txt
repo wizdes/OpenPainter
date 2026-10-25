@@ -114,7 +114,7 @@ Adjustments > Posterize [⇧⌘P]
 Adjustments > Sepia [⇧⌘E]
 Adjustments > Temperature and Tint
 Effects
-Effects > Repeat Effect [⌘F] (off)
+Effects > Repeat Effect [⌘F]
 Effects > ---
 Effects > Artistic
 Effects > Artistic > Ink Sketch
