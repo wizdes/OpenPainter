@@ -104,6 +104,19 @@ The engine decodes PNG itself. ImageIO decodes HEIC, HEIF, AVIF and every Camera
 - `Shell/FileDrop.swift`: files dropped on the canvas area or the image strip open one at a time, in drop order. A 2 pt accent outline shows while files are over the target. Files that cannot open are named in one status-bar message, and nothing opens for them. Import as Layer comes later.
 - Camera RAW tests use three CC0 samples from https://raw.pixls.us. `tools/fetch-raw-samples.sh` puts them in `~/Library/Caches/OpenPainter/raw-samples`, and `tools/raw-samples.txt` lists each URL, license and SHA-256. Without them, the RAW test skips and prints why.
 
+## Document lifecycle (M19)
+
+File > New, Open, Save, Save As, Save a Copy and Revert to Saved, following paint.net's File menu (https://www.getpaint.net/doc/latest/FileMenu.html).
+
+- `PlatformServices/ImageDocument.swift`: the NSDocument for every image. The app's `PainterDocument` is a subclass with no code of its own, so the XCTests drive the real class. `ImageDocumentController` (the app's document controller) shows the New Image dialog and reviews unsaved images on Quit.
+- New (`Shell/NewImageDialog.swift`): paint.net's 800 × 600 at 96 pixels/inch, the print size, and the background (White, Secondary color or Transparent). The engine makes one "Background" layer (`op_doc_new`). A new image is untitled, not modified, and saves as `.opaint`.
+- Open: `.opaint` and PNG through the engine (`op_doc_open_opaint`, `op_doc_open_png`); JPEG, BMP, GIF, TIFF, WebP, HEIC, HEIF, AVIF and Camera RAW through ImageIO (M17's path). The route reads the file's first bytes.
+- Save writes: `.opaint` (all layers, names, opacity, blend modes, visibility, resolution and profile) and flattened PNG through the engine (`op_doc_save`), then JPEG (quality 0.9 until M50), BMP, TIFF, GIF, HEIC, and WebP and AVIF where `CGImageDestinationCopyTypeIdentifiers()` lists them, through ImageIO with the kept metadata. JPEG puts transparent pixels on white.
+- Flatten prompt: a layered image going to any format but `.opaint` asks Flatten or Cancel. The file is flattened; the open image keeps its layers.
+- Unsaved mark: the engine's saved step (`op_core::history::History`). `doc.info`'s `dirty` is true when the current history step is not the saved one, so undo back to the saved step clears the window's edited dot and the strip's `*`, and redo sets them again. Save and Save As mark the step (`op_doc_save`, or `op_doc_mark_saved` after an ImageIO write, which checks the revision the pixels were read at). Save a Copy does not mark it, and the document keeps its file and name.
+- Revert to Saved reads the file again and gives the open engine document its content (`op_doc_replace`): one history step, not modified, same window.
+- Close and Quit with unsaved work ask Save, Don't Save or Cancel for each image, one at a time. Cancel keeps that window and the app open. Tests answer the prompts through `ImageDocument.unsavedPrompt` and `ImageDocument.flattenPrompt`.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.

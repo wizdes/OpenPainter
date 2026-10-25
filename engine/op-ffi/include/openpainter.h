@@ -295,6 +295,50 @@ enum OpStatus op_pointer(struct OpEngine *_p,
                          uintptr_t _len);
 
 /**
+ * File > New: a one-layer image named "Background" filled with
+ * `background_rgba` (0xRRGGBBAA, straight alpha; 0 is Transparent) at `dpi`
+ * pixels per inch. The new image is not modified.
+ */
+enum OpStatus op_doc_new(struct OpEngine *p,
+                         uint32_t width,
+                         uint32_t height,
+                         double dpi,
+                         uint32_t background_rgba,
+                         uint64_t *out_doc);
+
+/**
+ * Opens a `.opaint` file (UTF-8 path). A damaged file returns
+ * OP_ERR_BAD_ARGUMENT; a file that cannot be read returns OP_ERR_INTERNAL.
+ */
+enum OpStatus op_doc_open_opaint(struct OpEngine *p,
+                                 const uint8_t *path,
+                                 uintptr_t len,
+                                 uint64_t *out_doc);
+
+/**
+ * Saves the document's current history step. `json`:
+ * `{"path":"/x.opaint","format":"opaint"|"png","mark_saved":true}`.
+ * `mark_saved` (default true) makes that step the saved one, so `doc.info`
+ * reports `dirty: false` until the history moves off it; Save a Copy passes
+ * false. The file is replaced only after it is fully written.
+ */
+enum OpStatus op_doc_save(struct OpEngine *p, uint64_t doc, const uint8_t *json, uintptr_t len);
+
+/**
+ * Marks the current step saved after the app wrote the file itself.
+ * `revision` is the `doc.info` revision the pixels were read at; when the
+ * document changed since, this returns OP_ERR_BUSY and the mark stays.
+ */
+enum OpStatus op_doc_mark_saved(struct OpEngine *p, uint64_t doc, uint64_t revision);
+
+/**
+ * Revert: `doc` takes `source`'s content as a fresh, saved, one-step
+ * history. The document id, its views and its window stay; `source` stays
+ * open for the caller to close.
+ */
+enum OpStatus op_doc_replace(struct OpEngine *p, uint64_t doc, uint64_t source);
+
+/**
  * Starts a Paintbrush, Eraser or Pencil stroke on the active layer. `json`:
  * `{"tool","width","color":"rrggbbaa","opacity":0..255,"antialias","blend",
  * "hardness":0..1,"pressure_size","pressure_opacity"}`. Returns OP_ERR_BUSY

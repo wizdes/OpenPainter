@@ -141,7 +141,7 @@ final class FileDropTests: XCTestCase {
         XCTAssertTrue(opened.isEmpty, "the opener was never called")
         let message = try XCTUnwrap(wc.editor.message)
         XCTAssertEqual(message, "Cannot open these 2 files: notes.txt and broken.heic. "
-            + "OpenPainter opens PNG, HEIC, HEIF, AVIF and Camera RAW.")
+            + "OpenPainter opens OpenPainter (.opaint), PNG, JPEG, BMP, GIF, TIFF, WebP, HEIC, HEIF, AVIF and Camera RAW.")
         XCTAssertEqual(wc.statusBar.hint.stringValue, message, "the status bar shows it")
     }
 
@@ -154,7 +154,7 @@ final class FileDropTests: XCTestCase {
         XCTAssertTrue(waitUntil { self.fx.workspace.editors.count == 2 })
         XCTAssertEqual(opened, ["first.heic"])
         XCTAssertEqual(wc.editor.message,
-                       "Cannot open this file: readme.md. OpenPainter opens PNG, HEIC, HEIF, AVIF and Camera RAW.")
+                       "Cannot open this file: readme.md. OpenPainter opens OpenPainter (.opaint), PNG, JPEG, BMP, GIF, TIFF, WebP, HEIC, HEIF, AVIF and Camera RAW.")
     }
 
     func testDragWithoutFilesIsRefused() throws {

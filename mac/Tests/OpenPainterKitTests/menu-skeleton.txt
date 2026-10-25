@@ -12,16 +12,18 @@ OpenPainter > Show All
 OpenPainter > ---
 OpenPainter > Quit OpenPainter [⌘Q]
 File
-File > New… [⌘N] (off)
+File > New… [⌘N]
 File > Open… [⌘O]
 File > Open Recent
 File > Open Recent > Clear Menu
 File > Acquire
 File > Acquire > From Scanner or Camera… (off)
 File > ---
-File > Save [⌘S] (off)
+File > Save [⌘S]
 File > Save As… [⇧⌘S]
+File > Save a Copy…
 File > Save All [⌥⌘S] (off)
+File > Revert to Saved
 File > ---
 File > Print… [⌘P] (off)
 File > ---

@@ -31,8 +31,9 @@ public enum DocumentLoaderError: Error, LocalizedError, Equatable {
 }
 
 public enum DocumentLoader {
-    /// Opens `url`: PNG through the engine, HEIC, HEIF, AVIF and Camera RAW
-    /// through ImageIO and `op_import_pixels`.
+    /// Opens `url`: PNG and .opaint through the engine; HEIC, HEIF, AVIF,
+    /// Camera RAW, JPEG, BMP, GIF, TIFF and WebP through ImageIO and
+    /// `op_import_pixels`.
     public static func open(_ url: URL, engine: Engine) throws -> LoadedImage {
         let name = url.lastPathComponent
         let doc: Document
@@ -44,6 +45,9 @@ public enum DocumentLoader {
             throw DocumentLoaderError.unsupported(name)
         case .engine:
             do { doc = try engine.openPNG(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
+        case .native:
+            do { doc = try engine.openOpaint(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
+            type = ImageFormats.opaintIdentifier
         case .imageIO:
             let image = try ImageIOImporter.decode(url: url)
             do {

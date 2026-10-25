@@ -10,9 +10,23 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
+			<string>OpenPainter image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>dev.yili.openpainter.opaint</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
 			<string>PNG image</string>
 			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
+			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
 			<key>LSItemContentTypes</key>
@@ -24,7 +38,77 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>HEIF image</string>
+			<string>JPEG image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.jpeg</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>BMP image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.microsoft.bmp</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>TIFF image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.tiff</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>GIF image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.compuserve.gif</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>WebP image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>org.webmproject.webp</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>HEIC image</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
@@ -32,6 +116,19 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.heic</string>
+			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).PainterDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>HEIF image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
 				<string>public.heif</string>
 			</array>
 			<key>NSDocumentClass</key>
@@ -90,5 +187,31 @@
 	<string>OpenPainter. Zoom steps from Paint.NET 3.36 (MIT).</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.composite-content</string>
+				<string>public.image</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>OpenPainter image</string>
+			<key>UTTypeIdentifier</key>
+			<string>dev.yili.openpainter.opaint</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>opaint</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>image/openraster</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

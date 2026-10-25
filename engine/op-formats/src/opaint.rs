@@ -289,6 +289,20 @@ pub struct LoadedOpaint {
 /// Load a native file, returning a notice when its minor version is newer.
 pub fn load_opaint_with_notice(path: impl AsRef<Path>) -> Result<LoadedOpaint> {
     let path = path.as_ref();
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let store = Arc::new(TileStore::with_default_budget(parent).map_err(other)?);
+    load_opaint_with_store(path, store)
+}
+/// Load a native file into `store` (M19: the engine passes a store in the
+/// temp folder, so nothing is written next to the file).
+pub fn load_opaint_with_store(
+    path: impl AsRef<Path>,
+    store: Arc<TileStore>,
+) -> Result<LoadedOpaint> {
+    let path = path.as_ref();
     let mut zip = ZipArchive::new(File::open(path)?).map_err(other)?;
     if zip.is_empty() {
         return Err(invalid("missing mimetype"));
@@ -344,11 +358,6 @@ pub fn load_opaint_with_notice(path: impl AsRef<Path>) -> Result<LoadedOpaint> {
         return Err(invalid("empty layer stack"));
     }
     let dpi: f64 = parse_required(&root, "op:dpi")?;
-    let parent = path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    let store = Arc::new(TileStore::with_default_budget(parent).map_err(other)?);
     let mut doc = DocState::new(store, width, height, dpi).map_err(other)?;
     for i in 1..layers.len() {
         doc = doc.add_layer(i, "").map_err(other)?;
