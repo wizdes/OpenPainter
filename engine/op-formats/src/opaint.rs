@@ -141,6 +141,10 @@ fn save_impl(
             Err(e) => return Err(e.into()),
         }
     };
+    // M57 review: a stop request is also checked while layers are built and
+    // between encodes, not only when bytes are written.
+    let cancel = hooks.cancel;
+    let stop = || cancelled(cancel);
     let result = (|| {
         let mut zip = ZipWriter::new(HookedFile {
             file,
@@ -157,11 +161,11 @@ fn save_impl(
         zip.write_all(xml.as_bytes())?;
         checkpoint(2)?;
         for (index, _) in doc.layers.iter().enumerate() {
-            let image = layer_image(doc, index)?;
-            let png = encode_png(&image).map_err(other)?;
+            stop()?;
+            let image = layer_image(doc, index, cancel)?;
             zip.start_file(format!("data/layer{index}.png"), deflated)
                 .map_err(zip_err)?;
-            zip.write_all(&png)?;
+            write_png(&mut zip, &image, cancel)?;
             checkpoint(3 + index)?;
         }
         if let Some(profile) = &doc.profile {
@@ -188,10 +192,12 @@ fn save_impl(
                 .map_err(zip_err)?;
             zip.write_all(&png)?;
         }
-        let merged = composite(doc)?;
+        stop()?;
+        let merged = composite(doc, cancel)?;
+        stop()?;
         zip.start_file("mergedimage.png", deflated)
             .map_err(zip_err)?;
-        zip.write_all(&encode_png(&merged).map_err(other)?)?;
+        write_png(&mut zip, &merged, cancel)?;
         let thumb = thumbnail(&merged);
         zip.start_file("Thumbnails/thumbnail.png", deflated)
             .map_err(zip_err)?;
@@ -211,10 +217,40 @@ fn save_impl(
     result
 }
 
-fn layer_image(doc: &DocState, index: usize) -> Result<DecodedImage> {
+/// Encodes `image` as PNG straight into the open ZIP entry, stopping between
+/// row bands once `cancel` is set.
+fn write_png<W: Write>(
+    out: W,
+    image: &DecodedImage,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<()> {
+    crate::png::encode_png_to(out, image, || cancelled(cancel).is_err()).map_err(|e| {
+        if cancelled(cancel).is_err() {
+            Error::Io(std::io::Error::other("save cancelled"))
+        } else {
+            other(e)
+        }
+    })
+}
+
+/// Err("save cancelled") once `cancel` is set.
+fn cancelled(cancel: Option<&std::sync::atomic::AtomicBool>) -> Result<()> {
+    if cancel.is_some_and(|c| c.load(std::sync::atomic::Ordering::SeqCst)) {
+        Err(Error::Io(std::io::Error::other("save cancelled")))
+    } else {
+        Ok(())
+    }
+}
+
+fn layer_image(
+    doc: &DocState,
+    index: usize,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<DecodedImage> {
     let len = image_len(doc.width, doc.height)?;
     let mut pixels = vec![0; len];
     for ty in 0..doc.height.div_ceil(TILE_SIZE as u32) {
+        cancelled(cancel)?;
         for tx in 0..doc.width.div_ceil(TILE_SIZE as u32) {
             let tile = doc
                 .read_tile(
@@ -707,9 +743,13 @@ fn parse_paths(value: &Value) -> Result<Vec<Vec<(f64, f64)>>> {
     Ok(result)
 }
 
-fn composite(doc: &DocState) -> Result<DecodedImage> {
+fn composite(
+    doc: &DocState,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<DecodedImage> {
     let mut output = vec![0; image_len(doc.width, doc.height)?];
     for ty in 0..doc.height.div_ceil(TILE_SIZE as u32) {
+        cancelled(cancel)?;
         for tx in 0..doc.width.div_ceil(TILE_SIZE as u32) {
             let mut acc = vec![[0.0_f32; 4]; TILE_SIZE * TILE_SIZE];
             for (i, layer) in doc.layers.iter().enumerate().rev() {
@@ -954,5 +994,60 @@ mod tests {
         .unwrap_err();
         assert!(error.to_string().contains("save cancelled"), "{error}");
         assert_eq!(fs::read(&path).unwrap(), old);
+    }
+
+    #[test]
+    fn a_cancel_during_layer_building_stops_the_save_without_waiting_for_the_encode() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::new(dir.path(), 1 << 30).unwrap());
+        let mut doc = DocState::new(store, 4096, 4096, 72.0).unwrap();
+        let mut x = 7_u32;
+        for ty in 0..16 {
+            for tx in 0..16 {
+                let tile: Vec<u8> = (0..crate::opaint::TILE_SIZE * crate::opaint::TILE_SIZE * 4)
+                    .map(|_| {
+                        x ^= x << 13;
+                        x ^= x >> 17;
+                        x ^= x << 5;
+                        x as u8
+                    })
+                    .collect();
+                doc = doc
+                    .write_tile(
+                        0,
+                        TileCoord { x: tx, y: ty },
+                        TileData::try_from(tile).unwrap(),
+                    )
+                    .unwrap();
+            }
+        }
+        let path = dir.path().join("big.opaint");
+        // What the first write waits for: building and encoding layer 0.
+        let start = std::time::Instant::now();
+        let _png = encode_png(&layer_image(&doc, 0, None).unwrap()).unwrap();
+        let layer = start.elapsed();
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let c2 = cancel.clone();
+        let setter = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            c2.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        let start = std::time::Instant::now();
+        let error = save_opaint_with_hooks(
+            &doc,
+            &path,
+            SaveHooks {
+                cancel: Some(&cancel),
+                ..SaveHooks::default()
+            },
+        )
+        .unwrap_err();
+        let took = start.elapsed();
+        setter.join().unwrap();
+        assert!(error.to_string().contains("save cancelled"), "{error}");
+        assert!(
+            took < layer / 2,
+            "cancel took {took:?}; building and encoding a layer takes {layer:?}"
+        );
     }
 }

@@ -96,6 +96,26 @@ pub extern "C" fn op_recovery_detach(p: *mut OpEngine, doc: u64, delete_record: 
     })
 }
 
+/// Waits up to `timeout_ms` for recovery writers that were told to stop
+/// (closed documents) to finish. The app calls it on Quit. OP_OK when all
+/// finished, OP_ERR_BUSY when some were still running at the limit.
+#[unsafe(no_mangle)]
+pub extern "C" fn op_recovery_wait_stopped(p: *mut OpEngine, timeout_ms: u64) -> OpStatus {
+    guard(|| {
+        let e = match engine(p) {
+            Ok(e) => e,
+            Err(s) => return s,
+        };
+        if e.core()
+            .recovery_wait_stopped(std::time::Duration::from_millis(timeout_ms))
+        {
+            OpStatus::OP_OK
+        } else {
+            OpStatus::OP_ERR_BUSY
+        }
+    })
+}
+
 /// Lists the records under the UTF-8 folder `root` that no live process
 /// owns, as a JSON array (needs no engine). Each entry: `uuid`, `dir`,
 /// `valid`, `problem`, `revision`, `original_url`, `time_unix`, `width`,
@@ -122,7 +142,8 @@ pub extern "C" fn op_recovery_scan(root: *const u8, len: usize, out: *mut OpBuff
 
 /// Opens the record in `{"dir":...}` as a new document marked unsaved, and
 /// keeps recording it into the same folder (same JSON options as attach).
-/// OP_ERR_BAD_ARGUMENT when the record is damaged.
+/// OP_ERR_BAD_ARGUMENT when the record is damaged, or older than its file
+/// unless `"untitled": true` (Recover as Untitled: the document names no file).
 #[unsafe(no_mangle)]
 pub extern "C" fn op_recovery_open(
     p: *mut OpEngine,
@@ -146,7 +167,16 @@ pub extern "C" fn op_recovery_open(
             Ok(d) => d,
             Err(s) => return s,
         };
-        match e.core().recovery_open(dir, options(&params)) {
+        let untitled = params
+            .get("untitled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let opened = if untitled {
+            e.core().recovery_open_untitled(dir, options(&params))
+        } else {
+            e.core().recovery_open(dir, options(&params))
+        };
+        match opened {
             Ok((id, _)) => {
                 unsafe { *out_doc = id };
                 OpStatus::OP_OK

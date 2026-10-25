@@ -129,3 +129,51 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 }
+
+/// `opcli recovery-quit <root>`: the M57 review's Quit sequence. Writes a
+/// record, edits, starts a second write that is slow before its first byte
+/// (as a large layer's encode is), closes the image (Don't Save) while that
+/// write is in flight, waits for stopping writers as the app's Quit does
+/// (here at most 200 ms), and exits 100 ms later without any other cleanup.
+pub fn quit(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    let [root] = args else {
+        return Err("usage: opcli recovery-quit <root>".into());
+    };
+    let armed = Arc::new(AtomicBool::new(false));
+    let slow = armed.clone();
+    let options = RecoveryOptions {
+        settle: Duration::from_secs(3600),
+        max_interval: Duration::from_secs(3600),
+        hooks: RecordHooks {
+            on_stage: Some(Arc::new(move |s| {
+                if slow.load(Ordering::SeqCst) && s == RecordStage::Begin {
+                    std::thread::sleep(Duration::from_millis(1500));
+                }
+            })),
+            ..RecordHooks::default()
+        },
+    };
+    let engine = Arc::new(Engine::with_options(
+        None,
+        EngineOptions {
+            force_cpu: true,
+            ..Default::default()
+        },
+    )?);
+    let pixels: Vec<u8> = (0..512 * 512 * 4).map(|i| (i * 7 % 251) as u8).collect();
+    let doc = engine.import_pixels(512, 512, &pixels, None)?;
+    engine.recovery_attach(doc, std::path::Path::new(root).join("doc"), None, options)?;
+    engine.dispatch(doc, "image.invert_colors", json!({}))?;
+    engine.recovery_flush(doc)?;
+    engine.dispatch(doc, "image.invert_colors", json!({}))?;
+    armed.store(true, Ordering::SeqCst);
+    let e2 = engine.clone();
+    std::thread::spawn(move || {
+        let _ = e2.recovery_flush(doc);
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    engine.close(doc)?;
+    engine.recovery_wait_stopped(Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(100));
+    std::process::exit(0);
+}

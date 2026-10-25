@@ -456,6 +456,13 @@ enum OpStatus op_recovery_flush(struct OpEngine *p, uint64_t doc);
 enum OpStatus op_recovery_detach(struct OpEngine *p, uint64_t doc, bool delete_record);
 
 /**
+ * Waits up to `timeout_ms` for recovery writers that were told to stop
+ * (closed documents) to finish. The app calls it on Quit. OP_OK when all
+ * finished, OP_ERR_BUSY when some were still running at the limit.
+ */
+enum OpStatus op_recovery_wait_stopped(struct OpEngine *p, uint64_t timeout_ms);
+
+/**
  * Lists the records under the UTF-8 folder `root` that no live process
  * owns, as a JSON array (needs no engine). Each entry: `uuid`, `dir`,
  * `valid`, `problem`, `revision`, `original_url`, `time_unix`, `width`,
@@ -466,7 +473,8 @@ enum OpStatus op_recovery_scan(const uint8_t *root, uintptr_t len, struct OpBuff
 /**
  * Opens the record in `{"dir":...}` as a new document marked unsaved, and
  * keeps recording it into the same folder (same JSON options as attach).
- * OP_ERR_BAD_ARGUMENT when the record is damaged.
+ * OP_ERR_BAD_ARGUMENT when the record is damaged, or older than its file
+ * unless `"untitled": true` (Recover as Untitled: the document names no file).
  */
 enum OpStatus op_recovery_open(struct OpEngine *p,
                                const uint8_t *json,

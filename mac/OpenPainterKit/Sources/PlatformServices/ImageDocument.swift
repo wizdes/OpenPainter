@@ -62,6 +62,15 @@ open class ImageDocument: NSDocument, EditorHost {
     nonisolated(unsafe) private var pendingSaveOptions: SaveOptions?
     /// True between a menu or save-panel save and its save(to:) call.
     nonisolated(unsafe) private var saveFromUI = false
+    /// Reads the revision a save writes (`doc.info`'s `revision`). Tests replace it.
+    nonisolated(unsafe) public static var revisionReader: (Document) throws -> UInt64 = defaultRevisionReader
+    public static func defaultRevisionReader(_ doc: Document) throws -> UInt64 {
+        guard let r = (try doc.info()["revision"] as? NSNumber)?.uint64Value else {
+            throw EngineError.internal
+        }
+        return r
+    }
+
     /// The revision the last write(to:) wrote; marked saved when the save completes.
     nonisolated(unsafe) private var pendingSavedRevision: UInt64?
     /// M57: why recovery could not start (shown in the status bar; retried).
@@ -314,7 +323,17 @@ open class ImageDocument: NSDocument, EditorHost {
             ? typeName : (ImageFormats.saveType(forExtension: url.pathExtension) ?? typeName)
         // The revision being written; the save's completion marks it saved
         // (M57 review item 4: not here, where the file is only a temporary copy).
-        let revision = ((try? doc.info())?["revision"] as? NSNumber)?.uint64Value
+        // If it cannot be read the save fails and says why (review round 2).
+        let revision: UInt64
+        do {
+            revision = try Self.revisionReader(doc)
+        } catch {
+            throw NSError(domain: "OpenPainter", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” could not be saved.",
+                NSLocalizedFailureReasonErrorKey: "The image's state could not be read (\(error)).",
+                NSLocalizedRecoverySuggestionErrorKey: "Your changes are still open. The last saved file was not changed.",
+            ])
+        }
         do {
             try DocumentSaver.write(doc, to: url, type: type, metadata: metadata.isEmpty ? nil : metadata,
                                     options: pendingSaveOptions ?? saveOptions(for: type), markSaved: false)
@@ -435,12 +454,15 @@ open class ImageDocument: NSDocument, EditorHost {
         let cls = (controller.documentClass(forType: ImageFormats.opaintIdentifier) as? ImageDocument.Type)
             ?? ImageDocument.self
         let timing = RecoveryCenter.timing
+        // A record older than its file (saved since, here or by another app)
+        // opens as a new untitled image, so it can never replace the newer file.
+        let untitled = record.stale
         let opened = try await Task.detached {
-            try engine.openRecovery(dir: record.dir, timing: timing)
+            try engine.openRecovery(dir: record.dir, timing: timing, untitled: untitled)
         }.value
         recoveryOpenedHook?()
         let doc = cls.init()
-        doc.adoptRecovered(opened, record: record)
+        doc.adoptRecovered(opened, record: record, untitled: untitled)
         controller.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
@@ -449,13 +471,13 @@ open class ImageDocument: NSDocument, EditorHost {
         return doc
     }
 
-    private func adoptRecovered(_ opened: Document, record: RecoveryRecord) {
+    private func adoptRecovered(_ opened: Document, record: RecoveryRecord, untitled: Bool) {
         engineDocument = opened
         recoveryDir = record.dir
         let info = (try? opened.info()) ?? [:]
         pixelSize = CGSize(width: (info["width"] as? NSNumber)?.doubleValue ?? Double(record.width ?? 0),
                            height: (info["height"] as? NSNumber)?.doubleValue ?? Double(record.height ?? 0))
-        if let url = record.originalURL, url.isFileURL {
+        if !untitled, let url = record.originalURL, url.isFileURL {
             fileURL = url
             fileType = ImageFormats.saveType(forExtension: url.pathExtension) ?? ImageFormats.opaintIdentifier
         } else {

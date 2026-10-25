@@ -228,10 +228,13 @@ final class RecoveryTests: XCTestCase {
         XCTAssertTrue(damaged.detailLabel.stringValue.contains("damaged"))
         XCTAssertTrue(damaged.discardButton.isEnabled)
         damaged.discardButton.performClick(nil)
-        XCTAssertEqual(sheet.rows.count, 1)
+        // Discard runs off the main thread (review round 2, item 4).
+        let first = await eventually { sheet.rows.count == 1 }
+        XCTAssertTrue(first)
         XCTAssertFalse(FileManager.default.fileExists(atPath: bad.path))
         sheet.rows[0].discardButton.performClick(nil)
-        XCTAssertNil(RecoveryCenter.sheet)
+        let closed = await eventually { RecoveryCenter.sheet == nil }
+        XCTAssertTrue(closed)
         XCTAssertTrue(RecoveryCenter.pendingRecords().isEmpty)
     }
 
@@ -437,6 +440,89 @@ final class RecoveryTests: XCTestCase {
         XCTAssertLessThan(longest, .milliseconds(250), "the main thread was blocked")
     }
 
+
+    // MARK: Review round 2 (items 2, 4, 5)
+
+    /// Item 2: a record older than its changed file (another app, a sync
+    /// service) recovers as a new untitled image, never over the file.
+    func testARecordOlderThanItsFileRecoversAsUntitled() async throws {
+        let url = try pngCopy()
+        let expected = try await crash(try open(url))
+        try await Task.sleep(for: .milliseconds(20))
+        try Data("changed by another app".utf8).write(to: url)
+        let pending = RecoveryCenter.pendingRecords()
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertTrue(pending[0].stale)
+        XCTAssertFalse(pending[0].valid)
+        var recovered: [ImageDocument] = []
+        let offered = await RecoveryCenter.offerAtLaunch(controller: NSDocumentController.shared,
+                                                         onRecovered: { recovered.append($0) })
+        let sheet = try XCTUnwrap(offered)
+        let row = sheet.rows[0]
+        XCTAssertEqual(row.recoverButton.title, "Recover as Untitled")
+        XCTAssertTrue(row.recoverButton.isEnabled)
+        XCTAssertTrue(row.detailLabel.stringValue.contains("changed since this copy"), row.detailLabel.stringValue)
+        row.recoverButton.performClick(nil)
+        let done = await eventually { !recovered.isEmpty }
+        XCTAssertTrue(done)
+        let doc = try XCTUnwrap(recovered.first)
+        docs.append(doc)
+        XCTAssertNil(doc.fileURL, "an untitled image names no file")
+        XCTAssertTrue(doc.isDocumentEdited)
+        XCTAssertEqual(try XCTUnwrap(doc.engineDocument).pixels(), expected)
+        XCTAssertEqual(try Data(contentsOf: url), Data("changed by another app".utf8))
+    }
+
+    /// Item 4: Discard runs off the main thread, even when the folder's lock
+    /// is held and the delete has to wait and fail.
+    func testDiscardDoesNotBlockTheMainThread() async throws {
+        _ = try await crash(try open(try pngCopy()))
+        let offered = await RecoveryCenter.offerAtLaunch(controller: NSDocumentController.shared)
+        let sheet = try XCTUnwrap(offered)
+        let row = sheet.rows[0]
+        // Another document holds the folder now, so the delete waits and fails.
+        let holder = try fx.engine.importPixels(width: 8, height: 8, rgba: [UInt8](repeating: 9, count: 256))
+        try holder.attachRecovery(dir: row.record.dir, originalURL: nil)
+        // The action itself (performClick adds the button's highlight time).
+        let start = ContinuousClock.now
+        sheet.discard(row.discardButton)
+        let took = ContinuousClock.now - start
+        XCTAssertLessThan(took, .milliseconds(20), "Discard blocked the main thread for \(took)")
+        XCTAssertTrue(row.busy)
+        let failed = await eventually { row.detailLabel.stringValue.contains("could not be deleted") }
+        XCTAssertTrue(failed, row.detailLabel.stringValue)
+        XCTAssertFalse(row.busy)
+        try holder.detachRecovery(deleteRecord: true)
+        try holder.close()
+    }
+
+    /// Item 5: when the revision being saved cannot be read, the save fails
+    /// and says so instead of leaving the image silently unsaved.
+    func testASaveWhoseRevisionCannotBeReadFailsVisibly() async throws {
+        let doc = try open(try pngCopy())
+        try await run(doc, "image.invert_colors")
+        ImageDocument.revisionReader = { _ in throw EngineError.internal }
+        defer { ImageDocument.revisionReader = ImageDocument.defaultRevisionReader }
+        let error = saveAndWait(doc, to: dir.appendingPathComponent("r.opaint"),
+                                type: ImageFormats.opaintIdentifier, .saveAsOperation)
+        XCTAssertNotNil(error)
+        XCTAssertTrue(doc.isDocumentEdited)
+        XCTAssertTrue(try XCTUnwrap(doc.editor?.message).contains("could not be saved"))
+    }
+
+    /// Item 1: Quit waits (with a limit) for writers of closed images.
+    func testQuitWaitsForStoppedRecoveryWriters() async throws {
+        let doc = try open(try pngCopy())
+        try await run(doc, "image.invert_colors")
+        let recordDir = try XCTUnwrap(doc.recoveryDir)
+        for wc in doc.windowControllers { wc.window?.orderOut(nil) }
+        doc.close()
+        docs.removeAll()
+        // Close already moved the folder away; Quit's wait finishes the rest.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: recordDir.path))
+        XCTAssertTrue(fx.engine.waitForRecoveryWriters(timeout: .seconds(2)))
+    }
+
     // MARK: Look
 
     /// Sizes from the SPEC (24 pt targets, 12 pt rows text, 11 pt secondary);
@@ -450,10 +536,20 @@ final class RecoveryTests: XCTestCase {
                 "time_unix": 1_761_400_000.0, "width": 1200, "height": 760, "layers": 3, "snapshot_bytes": 1000,
             ])
         }
+        var stale = record("Poster.opaint", valid: false)
+        stale = RecoveryRecord(json: [
+            "uuid": stale.uuid, "dir": stale.dir.path, "valid": false, "stale": true,
+            "problem": "The file was saved after this copy was made.", "revision": 4,
+            "original_url": "file:///Users/me/Pictures/Poster.opaint", "time_unix": 1_761_400_000.0,
+            "width": 800, "height": 600, "layers": 2, "snapshot_bytes": 1000,
+        ])
         let sheet = RecoverySheetController(records: [
             record("Harbor at dusk.opaint", valid: true), record(nil, valid: true), record("Logo.png", valid: false),
+            stale,
         ])
-        XCTAssertEqual(sheet.rows.map(\.nameLabel.stringValue), ["Harbor at dusk.opaint", "Untitled", "Logo.png"])
+        XCTAssertEqual(sheet.rows.map(\.nameLabel.stringValue),
+                       ["Harbor at dusk.opaint", "Untitled", "Logo.png", "Poster.opaint"])
+        XCTAssertEqual(sheet.rows[3].recoverButton.title, "Recover as Untitled")
         for row in sheet.rows {
             XCTAssertEqual(row.frame.height, RecoverySheetController.rowHeight)
             XCTAssertGreaterThanOrEqual(row.recoverButton.frame.height, Theme.target)

@@ -81,7 +81,8 @@ final class ImageIOFuzzTests: XCTestCase {
         var rng = Rng(s: 0x57_1A6E_10 ^ UInt64(name.utf8.count))
         var cases = 0, opened = 0, slowest = 0.0, overOneSecond = 0
         let deadline = Date().addingTimeInterval(seconds)
-        let baseline = FuzzLimits.footprint()
+        let watch = try FuzzLimits.MemoryWatch()
+        defer { watch.stop() }
         var stalls = 0
         while Date() < deadline {
             var data = Array(seeds[rng.below(seeds.count)])
@@ -108,8 +109,8 @@ final class ImageIOFuzzTests: XCTestCase {
                 stalls += 1
                 print("IMAGEIO_FUZZ \(name) stall \(Int(took * 1000)) ms: \(FuzzLimits.save(Data(data), name + "-stall"))")
             }
-            let grown = FuzzLimits.footprint() &- baseline
-            guard FuzzLimits.footprint() < baseline || grown < FuzzLimits.memoryCap else {
+            let grown = try watch.grown()
+            guard grown < FuzzLimits.memoryCap else {
                 XCTFail("\(name) case \(cases) grew memory by \(grown >> 20) MiB")
                 return
             }

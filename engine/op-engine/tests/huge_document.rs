@@ -134,6 +134,25 @@ fn a_200_megapixel_document_paints_blurs_undoes_and_saves_under_the_memory_cap()
     );
     drop(blurred);
 
+    // M57 review round 2: a recovery record write of the blurred document
+    // overlapping a Save of the same document.
+    let engine = std::sync::Arc::new(engine);
+    let e2 = engine.clone();
+    let t = Instant::now();
+    let flusher = std::thread::spawn(move || e2.recovery_flush(doc));
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    engine
+        .save_document(
+            doc,
+            dir.path().join("overlap.opaint"),
+            SaveFormat::Opaint,
+            false,
+        )
+        .unwrap();
+    let flushed = flusher.join().unwrap();
+    lap("Record write overlapping a Save", t);
+    assert!(flushed.is_ok(), "{flushed:?}");
+
     let t = Instant::now();
     engine.dispatch(doc, "edit.undo", json!({})).unwrap();
     lap("Undo", t);

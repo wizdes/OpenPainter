@@ -56,7 +56,8 @@ final class TabletLogFuzzTests: XCTestCase {
         var corpus = [Array(seed)]
         var cases = 0, ok = 0, slowest = 0.0
         let deadline = Date().addingTimeInterval(seconds)
-        let baseline = FuzzLimits.footprint()
+        let watch = try FuzzLimits.MemoryWatch()
+        defer { watch.stop() }
         while Date() < deadline {
             var data = corpus[rng.below(corpus.count)]
             Self.mutate(&data, &rng)
@@ -75,8 +76,8 @@ final class TabletLogFuzzTests: XCTestCase {
                 if corpus.count < 64 { corpus.append(data) }
             }
             slowest = max(slowest, Date().timeIntervalSince(start))
-            let grown = FuzzLimits.footprint() &- baseline
-            guard FuzzLimits.footprint() < baseline || grown < FuzzLimits.memoryCap else {
+            let grown = try watch.grown()
+            guard grown < FuzzLimits.memoryCap else {
                 XCTFail("case \(cases) grew memory by \(grown >> 20) MiB")
                 return
             }
@@ -84,5 +85,19 @@ final class TabletLogFuzzTests: XCTestCase {
         }
         print("TABLETLOG_FUZZ cases \(cases) ok \(ok) crashes 0 slowest \(Int(slowest * 1000)) ms in \(Int(seconds)) s")
         XCTAssertGreaterThan(cases, 100)
+    }
+
+    /// The watchdog sees memory that is used and given back inside one input.
+    func testTheMemoryWatchSeesGrowthThatComesAndGoes() throws {
+        let watch = try FuzzLimits.MemoryWatch()
+        defer { watch.stop() }
+        do {
+            var block = [UInt8](repeating: 0, count: 96 << 20)
+            for i in stride(from: 0, to: block.count, by: 4096) { block[i] = UInt8(truncatingIfNeeded: i >> 12) }
+            Thread.sleep(forTimeInterval: 0.1)
+            XCTAssertGreaterThan(block[4096], 0)
+        }
+        Thread.sleep(forTimeInterval: 0.05)
+        XCTAssertGreaterThan(try watch.grown(), 64 << 20)
     }
 }

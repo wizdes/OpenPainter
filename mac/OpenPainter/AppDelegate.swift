@@ -54,6 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
 
+    /// M57: closed images' recovery writers finish deleting their copies
+    /// (each close already moved its folder out of the way); wait at most 2 s.
+    func applicationWillTerminate(_ notification: Notification) {
+        AppEngine.shared.waitForRecoveryWriters(timeout: .seconds(2))
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         var args = Array(CommandLine.arguments.dropFirst())
         var files: [String] = []

@@ -26,7 +26,8 @@ public final class RecoverySheetController: NSWindowController {
     /// Opens the record's image off the main thread; throws when it cannot
     /// (the row shows why). The row shows a spinner meanwhile.
     public var onRecover: (@MainActor (RecoveryRecord) async throws -> Void)?
-    public var onDiscard: (@MainActor (RecoveryRecord) throws -> Void)?
+    /// Deletes the record; runs off the main thread.
+    public var onDiscard: (@Sendable (RecoveryRecord) throws -> Void)?
     public var onClose: (@MainActor () -> Void)?
 
     public init(records: [RecoveryRecord]) {
@@ -52,6 +53,10 @@ public final class RecoverySheetController: NSWindowController {
     /// "Oct 25, 2:02 PM · 1200 × 760 px · 3 layers" (when it was recorded),
     /// or why it cannot be opened (the full problem is the tooltip).
     public static func detail(_ r: RecoveryRecord) -> String {
+        if r.stale {
+            // The full reason is the tooltip; the button says what Recover does.
+            return "The file changed since this copy."
+        }
         guard r.valid else { return "This copy is damaged and cannot be opened." }
         var parts: [String] = []
         if let t = r.time {
@@ -136,13 +141,23 @@ public final class RecoverySheetController: NSWindowController {
         }
     }
 
+    /// Deletes the copy off the main thread (the folder's lock may make it
+    /// wait); the row shows a spinner meanwhile (M57 review round 2).
     @objc public func discard(_ sender: Any?) {
-        guard let row = row(of: sender) else { return }
-        do {
-            try onDiscard?(row.record)
-            remove(row.record)
-        } catch {
-            row.show(problem: "The recovery copy could not be deleted: \(error.localizedDescription)")
+        guard let row = row(of: sender), !row.busy else { return }
+        row.setBusy(true)
+        let action = onDiscard
+        let record = row.record
+        Task { @MainActor [weak self, weak row] in
+            let result: Result<Void, any Error> = await Task.detached {
+                Result { try action?(record) }
+            }.value
+            row?.setBusy(false)
+            switch result {
+            case .success: self?.remove(record)
+            case .failure(let error):
+                row?.show(problem: "The recovery copy could not be deleted: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -200,18 +215,24 @@ public final class RecoveryRow: FilledView {
             b.font = Theme.font(12)
             b.bezelStyle = .rounded
         }
-        recoverButton.isEnabled = record.valid
+        if record.stale { recoverButton.title = "Recover as Untitled" }
+        recoverButton.isEnabled = record.valid || record.stale
         recoverButton.setAccessibilityLabel("Recover \(nameLabel.stringValue)")
         discardButton.setAccessibilityLabel("Discard the recovery copy of \(nameLabel.stringValue)")
         add(nameLabel, 16, 10, w - 16 - 200 - 8, 16)
         add(detailLabel, 16, 30, w - 16 - 200 - 8, 16)
-        add(recoverButton, w - 16 - 88 - 8 - 88, 16, 88, 24)
+        if record.stale {
+            nameLabel.frame.size.width = w - 16 - 260 - 8
+            detailLabel.frame.size.width = w - 16 - 260 - 8
+        }
+        let recoverWidth: CGFloat = record.stale ? 140 : 88
+        add(recoverButton, w - 16 - 88 - 8 - recoverWidth, 16, recoverWidth, 24)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.isHidden = true
         spinner.setAccessibilityLabel("Recovering \(nameLabel.stringValue)")
-        add(spinner, w - 16 - 88 - 8 - 88 - 8 - 16, 20, 16, 16)
+        add(spinner, w - 16 - 88 - 8 - recoverWidth - 8 - 16, 20, 16, 16)
         add(discardButton, w - 16 - 88, 16, 88, 24)
     }
 
@@ -228,7 +249,7 @@ public final class RecoveryRow: FilledView {
         busy = on
         spinner.isHidden = !on
         if on { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
-        recoverButton.isEnabled = !on && record.valid
+        recoverButton.isEnabled = !on && (record.valid || record.stale)
         discardButton.isEnabled = !on
     }
 

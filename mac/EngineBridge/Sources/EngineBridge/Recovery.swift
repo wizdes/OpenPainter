@@ -11,6 +11,9 @@ public struct RecoveryRecord: Sendable, Equatable {
     public let dir: URL
     /// False when the record cannot be opened; `problem` says why.
     public let valid: Bool
+    /// The record reads, but its file was saved after it: it can only be
+    /// recovered as a new untitled image ("Recover as Untitled").
+    public let stale: Bool
     public let problem: String?
     public let revision: UInt64?
     /// The file the document came from or was last saved to (nil: untitled).
@@ -25,6 +28,7 @@ public struct RecoveryRecord: Sendable, Equatable {
         uuid = j["uuid"] as? String ?? ""
         dir = URL(fileURLWithPath: j["dir"] as? String ?? "")
         valid = j["valid"] as? Bool ?? false
+        stale = j["stale"] as? Bool ?? false
         problem = j["problem"] as? String
         revision = (j["revision"] as? NSNumber)?.uint64Value
         originalURL = (j["original_url"] as? String).flatMap { URL(string: $0) }
@@ -81,9 +85,10 @@ extension Engine {
 
     /// Recover: opens the record in `dir` as a new document marked unsaved and
     /// keeps recording it into the same folder.
-    public func openRecovery(dir: URL, timing: RecoveryTiming = RecoveryTiming()) throws -> Document {
+    public func openRecovery(dir: URL, timing: RecoveryTiming = RecoveryTiming(), untitled: Bool = false) throws -> Document {
         var params = timing.json
         params["dir"] = dir.path
+        params["untitled"] = untitled
         let json = try jsonData(params)
         var id: UInt64 = 0
         try withHandle { h in
@@ -93,6 +98,16 @@ extension Engine {
             }
         }
         return Document(engine: self, id: id)
+    }
+}
+
+extension Engine {
+    /// Quit: waits up to `timeout` for recovery writers of closed images to
+    /// finish. False when some were still running at the limit.
+    @discardableResult
+    public func waitForRecoveryWriters(timeout: Duration) -> Bool {
+        let ms = UInt64(max(0, RecoveryTiming.ms(timeout)))
+        return (try? withHandle { h in try checkStatus(op_recovery_wait_stopped(h, ms)) }) != nil
     }
 }
 

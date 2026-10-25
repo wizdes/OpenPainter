@@ -143,3 +143,17 @@ fn the_latest_acknowledged_revision_recovers_whenever_the_process_is_killed() {
         }
     }
 }
+
+/// M57 review round 2, item 1: Don't Save while a slow record write is in
+/// flight, then Quit at once. The next launch must not offer the record.
+#[test]
+fn dont_save_then_a_fast_quit_leaves_nothing_to_recover() {
+    let root = tempfile::tempdir().unwrap();
+    let status = Command::new(env!("CARGO_BIN_EXE_opcli"))
+        .args(["recovery-quit", root.path().to_str().unwrap()])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let found = recovery::scan(root.path());
+    assert!(found.is_empty(), "the next launch offers {found:?}");
+}

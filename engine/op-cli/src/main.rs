@@ -13,6 +13,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!("opcli {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
+    if args[0] == "recovery-quit" {
+        return recovery_helper::quit(&args[1..]);
+    }
     if args[0] == "recovery-helper" {
         return recovery_helper::run(&args[1..]);
     }
