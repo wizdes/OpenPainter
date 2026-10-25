@@ -25,11 +25,13 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 mod color_sample;
+mod gpu_effects;
 mod gradient_commands;
 mod image_commands;
 mod layer_commands;
 mod line_commands;
 mod shell_commands;
+pub use gpu_effects::EngineOptions;
 pub use layer_commands::{BLEND_MODES, blend_name, content_key};
 pub use shell_commands::{effect_label, effects_list};
 
@@ -112,6 +114,7 @@ pub struct RunCtx {
     ticket: JobTicket,
     doc: u64,
     events: Sender<Event>,
+    gpu: Arc<gpu_effects::GpuShared>,
 }
 impl RunCtx {
     /// Returns `Err(Cancelled)` once the ticket is cancelled.
@@ -209,6 +212,10 @@ fn invert_tiles(ctx: &RunCtx, s: &DocState, delay_ms: u64) -> Result<Outcome> {
 }
 fn run_effect(ctx: &RunCtx, s: &DocState, id: &str, params: &Value) -> Result<Outcome> {
     let effect = effect::find(id).ok_or_else(|| bad(format!("unknown effect {id}")))?;
+    if let Some(next) = gpu_effects::try_render(ctx, s, &effect, params)? {
+        ctx.check()?;
+        return Ok(Outcome::State(next));
+    }
     let rect = Rect::new(0, 0, s.width, s.height);
     let coords = effect::tile_coords(rect);
     let next = effect::render_tiles_checked(
@@ -408,6 +415,42 @@ fn toggle_selection(_: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
         SelectionState::Active(_) => SelectionState::None,
     };
     Ok(Outcome::State(s.set_selection(next)))
+}
+/// Test-only: an antialiased ellipse (geometry) or a soft gradient mask
+/// (coverage) that leaves the left and bottom edges unselected.
+fn set_selection_shape(_: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
+    let (w, h) = (f64::from(s.width), f64::from(s.height));
+    let source = match p["shape"].as_str().unwrap() {
+        "ellipse" => {
+            let (cx, cy, rx, ry) = (w * 0.47 + 0.3, h * 0.52 + 0.2, w * 0.33, h * 0.36);
+            let points = (0..96)
+                .map(|i| {
+                    let t = f64::from(i) * std::f64::consts::TAU / 96.0;
+                    (cx + rx * t.cos(), cy + ry * t.sin())
+                })
+                .collect();
+            SelectionSource::Geometry(Arc::new(PolygonSet(vec![points])))
+        }
+        _ => {
+            let mut bytes = Vec::with_capacity(s.width as usize * s.height as usize);
+            for y in 0..s.height {
+                for x in 0..s.width {
+                    let off = x < s.width / 6 || y > s.height * 5 / 6;
+                    bytes.push(if off {
+                        0
+                    } else {
+                        ((x * 7 + y * 3) % 300).min(255) as u8
+                    });
+                }
+            }
+            let grid = op_core::doc::MaskGrid::new(s.width, s.height, bytes)
+                .ok_or_else(|| internal("mask size"))?;
+            SelectionSource::Coverage(Arc::new(grid))
+        }
+    };
+    Ok(Outcome::State(
+        s.set_selection(SelectionState::Active(source)),
+    ))
 }
 fn panic_preview(_: &RunCtx, _: &DocState, _: &Value) -> Result<Outcome> {
     panic!("test worker panic")
@@ -698,6 +741,21 @@ fn specs() -> Vec<CommandSpec> {
             run: toggle_selection,
             previewable: false,
         },
+        CommandSpec {
+            id: "test.set_selection_shape",
+            params: ParamSchema {
+                fields: vec![Param {
+                    key: "shape",
+                    kind: ParamKind::Choice(&["ellipse", "soft"]),
+                    min: None,
+                    max: None,
+                    default: None,
+                }],
+            },
+            enabled: always,
+            run: set_selection_shape,
+            previewable: false,
+        },
     ];
     entries.extend(image_commands::specs());
     entries.extend(shell_commands::specs());
@@ -930,6 +988,7 @@ struct Actor {
     pending_jobs: usize,
     /// The last `Published::preview_serial` handed out.
     preview_serial: AtomicU64,
+    gpu: Arc<gpu_effects::GpuShared>,
 }
 impl Actor {
     fn view(&self, preview: Option<DocState>) -> Published {
@@ -971,6 +1030,7 @@ impl Actor {
             ticket: ticket.clone(),
             doc: self.id,
             events: self.events.clone(),
+            gpu: self.gpu.clone(),
         }
     }
     fn active_id(&self) -> LayerId {
@@ -1801,9 +1861,18 @@ pub struct Engine {
     pool: Arc<ThreadPool>,
     events_tx: Sender<Event>,
     event_join: Mutex<Option<JoinHandle<()>>>,
+    gpu: Arc<gpu_effects::GpuShared>,
 }
 impl Engine {
+    /// An engine with options from the environment (`OP_FORCE_CPU=1` turns the GPU off).
     pub fn new(callback: Option<Arc<dyn Fn(Event) + Send + Sync>>) -> Result<Self> {
+        Self::with_options(callback, EngineOptions::from_env())
+    }
+    /// The GPU is not created here; it starts on the first effect, on a worker.
+    pub fn with_options(
+        callback: Option<Arc<dyn Fn(Event) + Send + Sync>>,
+        options: EngineOptions,
+    ) -> Result<Self> {
         let pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .num_threads(2)
@@ -1825,6 +1894,7 @@ impl Engine {
             pool,
             events_tx: tx,
             event_join: Mutex::new(Some(join)),
+            gpu: gpu_effects::GpuShared::new(options),
         })
     }
     pub fn import_pixels(
@@ -1910,6 +1980,7 @@ impl Engine {
             next_session: self.next_session.clone(),
             pending_jobs: 0,
             preview_serial: AtomicU64::new(0),
+            gpu: self.gpu.clone(),
         };
         let join = std::thread::spawn(move || actor.run(rx));
         self.docs.lock().insert(
@@ -2142,6 +2213,9 @@ impl Engine {
             "doc.info" => {
                 let mut info = s.info();
                 info["read_only"] = json!(d.read_only.load(Ordering::Acquire));
+                if let (Some(info), Value::Object(gpu)) = (info.as_object_mut(), self.gpu.info()) {
+                    info.extend(gpu);
+                }
                 serde_json::to_vec(&info).map_err(internal)
             }
             "doc.pixels" => s.pixels(

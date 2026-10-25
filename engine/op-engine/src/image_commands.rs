@@ -553,6 +553,10 @@ mod tests {
             ticket: JobTicket::new(0),
             doc: 1,
             events,
+            gpu: crate::gpu_effects::GpuShared::new(crate::EngineOptions {
+                force_cpu: true,
+                ..Default::default()
+            }),
         };
         let Outcome::State(flat) = flatten(&ctx, &state, &json!({})).unwrap() else {
             panic!("flatten returned no state")

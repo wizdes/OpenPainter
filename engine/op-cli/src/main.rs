@@ -25,7 +25,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         json!({})
     };
     let input = decode_png(&std::fs::read(&args[1])?)?;
-    let engine = Engine::new(None)?;
+    // The CLI renders with the CPU reference by default (ARCHITECTURE.md);
+    // OP_CLI_GPU=1 opts in to the GPU path.
+    let engine = Engine::with_options(
+        None,
+        op_engine::EngineOptions {
+            force_cpu: std::env::var("OP_CLI_GPU").as_deref() != Ok("1"),
+            ..Default::default()
+        },
+    )?;
     let doc = engine.import_pixels(
         input.width,
         input.height,
