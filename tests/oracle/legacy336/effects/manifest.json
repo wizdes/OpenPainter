@@ -1892,62 +1892,272 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "FragmentEffect",
+    "op": "Fragment Blur",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_default_impulse_64.png",
+    "output_sha256": "d87d8af995bdffb3a15a61748b660b4328d5444919ea43fd2af514eacf5df208",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "FragmentEffect",
+    "op": "Fragment Blur",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_default_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "FragmentEffect",
+    "op": "Fragment Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_default_plasma_512x384.png",
+    "output_sha256": "ed54de6c76252d5fc299daf08cc87a5f186503154469059e18d61c3975cb1a9a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "FragmentEffect",
+    "op": "Fragment Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_default_plasma_alpha_512x384.png",
+    "output_sha256": "12ebe7177f4320051c94288e3948dcd28086b84b5002f916bc6429c3c42445dd",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "FragmentEffect",
+    "op": "Fragment Blur",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_default_alpha_edge_64.png",
+    "output_sha256": "d89b1c4de96bb926797e122fb2eeb840ab4ec1e9e02985983b0e184e6ff07488",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "distance": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_distance_min_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "distance": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_distance_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "distance": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_distance_min_plasma_512x384.png",
+    "output_sha256": "39087efc86c49b03a1dd5a3f9e4dfc9298bdee8b5b5189ec12d5c6711bcf5744",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "distance": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_distance_min_plasma_alpha_512x384.png",
+    "output_sha256": "a4c696b4467585e790257e4fa97bbae6a22b4e0ae498384c68d685a3ee49e2b8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "distance": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_distance_min_alpha_edge_64.png",
+    "output_sha256": "7ec909223a5d49b3727f67ef43f77877511612c6185227140d0890a3340bc364",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "fragments": 50
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_fragments_max_impulse_64.png",
+    "output_sha256": "fe16b6bc8d5e33c4c51ce5abc9a2ebe3cdbbb4e096abb4e70b5f83c3d21ff8ad",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "fragments": 50
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_fragments_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "fragments": 50
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_fragments_max_plasma_512x384.png",
+    "output_sha256": "8ba615f7ea0930d89853d3447697ace030a721e8b1de971a23837f0bf13b279f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "fragments": 50
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_fragments_max_plasma_alpha_512x384.png",
+    "output_sha256": "24190ce880f5809acde7fef0e882118e6695fdaf42430d34899eeedaf123ce4e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "fragments": 50
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_fragments_max_alpha_edge_64.png",
+    "output_sha256": "a177b11a6680dc3fe793a31b8767b7bd09813354b1c7e2f76c73bd6842e15219",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "rotation": 360
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_rotation_max_impulse_64.png",
+    "output_sha256": "d87d8af995bdffb3a15a61748b660b4328d5444919ea43fd2af514eacf5df208",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "rotation": 360
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_rotation_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "rotation": 360
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_rotation_max_plasma_512x384.png",
+    "output_sha256": "ed54de6c76252d5fc299daf08cc87a5f186503154469059e18d61c3975cb1a9a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "rotation": 360
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_rotation_max_plasma_alpha_512x384.png",
+    "output_sha256": "12ebe7177f4320051c94288e3948dcd28086b84b5002f916bc6429c3c42445dd",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Fragment Blur",
+    "parameters": {
+      "rotation": 360
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Fragment_Blur_rotation_max_alpha_edge_64.png",
+    "output_sha256": "d89b1c4de96bb926797e122fb2eeb840ab4ec1e9e02985983b0e184e6ff07488",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
@@ -3542,122 +3752,612 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MedianEffect",
+    "op": "Median Blur",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Median_Blur_default_impulse_64.png",
+    "output_sha256": "550739e71890b5452f68e696418360f4a010fd2da29cd4ec5eedb3ec1e3a4c85",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MedianEffect",
+    "op": "Median Blur",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Median_Blur_default_partial_alpha_64.png",
+    "output_sha256": "ff6595fec061213d82c9ce57b37b2b1d1563ad3f77d1bbd6250ff693c257ce54",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MedianEffect",
+    "op": "Median Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Median_Blur_default_plasma_512x384.png",
+    "output_sha256": "b41ab5e31c0d7dcf2c23693409440bf3595265d2f513af0a68ca173d17002d4e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MedianEffect",
+    "op": "Median Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Median_Blur_default_plasma_alpha_512x384.png",
+    "output_sha256": "4d15a1942baad1afc2ff4f52cfd93a606e2f376678f2db43102fcbc791be80c3",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MedianEffect",
+    "op": "Median Blur",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Median_Blur_default_alpha_edge_64.png",
+    "output_sha256": "9a6ae106d15ebd3f570010b6f5756acf58a8822f499278a395e4c6399a589dbd",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MotionBlurEffect",
+    "op": "Median Blur",
+    "parameters": {
+      "radius": 1
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_radius_min_impulse_64.png",
+    "output_sha256": "550739e71890b5452f68e696418360f4a010fd2da29cd4ec5eedb3ec1e3a4c85",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "radius": 1
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_radius_min_partial_alpha_64.png",
+    "output_sha256": "ff6595fec061213d82c9ce57b37b2b1d1563ad3f77d1bbd6250ff693c257ce54",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "radius": 1
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_radius_min_plasma_512x384.png",
+    "output_sha256": "2074a9525aa00b6c660e26bf98b7400b9edf23d1e7509954dbd2d3c02e4eebd1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "radius": 1
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_radius_min_plasma_alpha_512x384.png",
+    "output_sha256": "4b071091c9ace8e881091b1e9c1798d5e56cc0bece16271495d92a22a1dbf47e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "radius": 1
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_radius_min_alpha_edge_64.png",
+    "output_sha256": "424d9eba4c285343916ed296ff4b763d02401cdac94cc5070cc4b8de68f414d0",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_min_impulse_64.png",
+    "output_sha256": "811f480e8788defd212b3ae2251e3ed0577b3d90610c04f901bcd8985f31ec06",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_min_plasma_512x384.png",
+    "output_sha256": "e204a73dfbda33c70f843e149b0d82b1108fc9b44c7ab4452074e3b154ad7839",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_min_plasma_alpha_512x384.png",
+    "output_sha256": "d790ef4a54e3224b8b9fa68a06caec4b2ba5a3d8ffff80c205ea31de76888b05",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_min_alpha_edge_64.png",
+    "output_sha256": "dd9226a9434c94a9d6bafb8faad0f88211333d80c9f1cccbf2a0afe0948fb71e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_max_impulse_64.png",
+    "output_sha256": "ad5394f2834be8879d3b2ad80ddcb52ce5440e5faf830f01cb2c1bb33f58261f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_max_partial_alpha_64.png",
+    "output_sha256": "ff6595fec061213d82c9ce57b37b2b1d1563ad3f77d1bbd6250ff693c257ce54",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_max_plasma_512x384.png",
+    "output_sha256": "6943d0b01cf403205ad6f18bfcc800119acbaaeaa7d27ed8449aee8fdf79c2dc",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_max_plasma_alpha_512x384.png",
+    "output_sha256": "2ed3444b1f79bb4620ecacfa9be007d124579a4124e6f5d9748866b735c45d71",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Median Blur",
+    "parameters": {
+      "percentile": 100
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Median_Blur_percentile_max_alpha_edge_64.png",
+    "output_sha256": "75ce0568350653ecd189b58fcb45d8b15715cd8fb027377eff63fd7cecf93589",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_default_impulse_64.png",
+    "output_sha256": "2ca8b1de56b61fe353e7254c4d15ed317d7c25e99d2505523426238db3b11727",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MotionBlurEffect",
+    "op": "Motion Blur",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_default_partial_alpha_64.png",
+    "output_sha256": "a75d42026316404b5bca718a7a1262fdcac02cf77a72277e31750afdd6540448",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MotionBlurEffect",
+    "op": "Motion Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_default_plasma_512x384.png",
+    "output_sha256": "75fb29d6e7c52e4a7c6f3fc20c6fe6cc7e519473a553c740e27c15a3b2ae3f0a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MotionBlurEffect",
+    "op": "Motion Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_default_plasma_alpha_512x384.png",
+    "output_sha256": "af43f308afb5326f559e8ec031fb48aacf466f54b23dcc403aa2b388cbbfb5a2",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "MotionBlurEffect",
+    "op": "Motion Blur",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_default_alpha_edge_64.png",
+    "output_sha256": "3fa12e394e611c103cf7ec05cc4b68d06550128047b1fb42835d68a124217764",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "distance": 1
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_distance_min_impulse_64.png",
+    "output_sha256": "473560cd806d29a032f57d98c795a9a3725089762363a216fa4dff137713a7ff",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "distance": 1
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_distance_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "distance": 1
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_distance_min_plasma_512x384.png",
+    "output_sha256": "ae88e06926e85483b32f677f1df8cae8c5792706405f12c406d3e18c34c74f4a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "distance": 1
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_distance_min_plasma_alpha_512x384.png",
+    "output_sha256": "9a62a83bfff4a2dfbecdcb87976a4130bead8489686e944f745254ea9204411b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "distance": 1
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_distance_min_alpha_edge_64.png",
+    "output_sha256": "72070cf9a809e37fb7c396cbdd306938140c66cf6a9b9b6d3ada765186e5662e",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": -180
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_min_impulse_64.png",
+    "output_sha256": "03330a8608e94851f063dc0943f935722e97b7c8bd306d36ad6b42024f071d66",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": -180
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": -180
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_min_plasma_512x384.png",
+    "output_sha256": "f33fd2c5bfc0db6248815cbc05f75e149f6d4cd63c4ec42fa77de48b0c8f5c5a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": -180
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_min_plasma_alpha_512x384.png",
+    "output_sha256": "6e554280cdbfc3b41b6850ff6dddec99d7c4a728a707458b31b066b4ae0e4f6b",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": -180
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_min_alpha_edge_64.png",
+    "output_sha256": "3e1ff15904fec1d4512cf73d35154ecda5c60e4a2d0207b239534693abc966ee",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": 180
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_max_impulse_64.png",
+    "output_sha256": "9a3ad59a210c3dc119cdb252fbeda6d841fb78c8e9a3742130c71034bdad2197",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": 180
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_max_partial_alpha_64.png",
+    "output_sha256": "7119a8c12d3ace11efe9b19b90904e1ac967b62e1c75bd40b0b79d0bbd8bfec4",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": 180
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_max_plasma_512x384.png",
+    "output_sha256": "8dbef030d865ab765619706f3244c8b0cdf5846a3e28ce9fa81698633587866a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": 180
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_max_plasma_alpha_512x384.png",
+    "output_sha256": "18489718b9703255903985e4b1ba9a5f331bbee8c536735b0db054c019ba09df",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "angle": 180
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_angle_max_alpha_edge_64.png",
+    "output_sha256": "2816dccb85a2b389e74bd74ed1fe1811765f821a7dc9164b6259c5782d9ba4d8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "centered": false
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_uncentered_impulse_64.png",
+    "output_sha256": "59d69a73cad5ac21a7cae0b35600517c20caa2ec5c501009adb22a4517e4c1df",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "centered": false
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_uncentered_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "centered": false
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_uncentered_plasma_512x384.png",
+    "output_sha256": "01b1b5c6efc5ca02ef74af4855997ada1aaf1861f793bd7ebda1aef71acf9282",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "centered": false
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_uncentered_plasma_alpha_512x384.png",
+    "output_sha256": "148d39a63920785a0e40f4918ea4a1bc86f1cd0f37c3e6697e541b849ae01b9c",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Motion Blur",
+    "parameters": {
+      "centered": false
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Motion_Blur_uncentered_alpha_edge_64.png",
+    "output_sha256": "275023f657e9dc6ce59419baefc00a9dc92b72542711f7c4b7b4287b999ae79f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
@@ -4652,62 +5352,277 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "RadialBlurEffect",
+    "op": "Radial Blur",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_default_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "RadialBlurEffect",
+    "op": "Radial Blur",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_default_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "RadialBlurEffect",
+    "op": "Radial Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_default_plasma_512x384.png",
+    "output_sha256": "850318fa077165dfb5525f21e1d03cbfb042502474f65c6bb25fd8403f89062f",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "RadialBlurEffect",
+    "op": "Radial Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_default_plasma_alpha_512x384.png",
+    "output_sha256": "90dd1f42176ad1ee0b5ea0c79bbe05f97227469fccd73921b891f83e4f641ca1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "RadialBlurEffect",
+    "op": "Radial Blur",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_default_alpha_edge_64.png",
+    "output_sha256": "96719fc5ec4fa567913180a1a60a93033d0f891693afac477909543585a8c293",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "angle": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_angle_min_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "angle": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_angle_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "angle": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_angle_min_plasma_512x384.png",
+    "output_sha256": "39087efc86c49b03a1dd5a3f9e4dfc9298bdee8b5b5189ec12d5c6711bcf5744",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "angle": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_angle_min_plasma_alpha_512x384.png",
+    "output_sha256": "a4c696b4467585e790257e4fa97bbae6a22b4e0ae498384c68d685a3ee49e2b8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "angle": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_angle_min_alpha_edge_64.png",
+    "output_sha256": "7ec909223a5d49b3727f67ef43f77877511612c6185227140d0890a3340bc364",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_quality_min_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_quality_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_quality_min_plasma_512x384.png",
+    "output_sha256": "a57d87317264c8345ea2bb82213e2008899b667439d90e1895c97f92c575c326",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_quality_min_plasma_alpha_512x384.png",
+    "output_sha256": "ed6feed648603c9f7d017648e1177890cfe66aaa3ebd5e4390b83296b273727a",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "quality": 1
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_quality_min_alpha_edge_64.png",
+    "output_sha256": "5c77ec13f7245da29c6f3526fe28905093484f26627ee4e1eb8a45c411be7cf2",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_offset_mid_impulse_64.png",
+    "output_sha256": "6a44c51e1d1d5ec147a473204faaf21318c8c43df7990220416fa46076b5ce37",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_offset_mid_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_offset_mid_plasma_512x384.png",
+    "output_sha256": "da1ed893544e25afbe1038015d75b247298faf17d69d541e806f7db706b24c54",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_offset_mid_plasma_alpha_512x384.png",
+    "output_sha256": "20acf0b8eeefa3142a4395a35873bb886379bc084b8c9b6c2af19d9ee729b005",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Radial Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Radial_Blur_offset_mid_alpha_edge_64.png",
+    "output_sha256": "36c1569e7dcfd8bbed1263ffb62ccf596bb84b28fe7e16bf9c6f480122084180",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
@@ -5432,61 +6347,276 @@
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "ZoomBlurEffect",
+    "op": "Zoom Blur",
     "parameters": {},
     "input": "tests/fixtures/impulse_64.png",
     "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_default_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "ZoomBlurEffect",
+    "op": "Zoom Blur",
     "parameters": {},
     "input": "tests/fixtures/partial_alpha_64.png",
     "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_default_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "ZoomBlurEffect",
+    "op": "Zoom Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_512x384.png",
     "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_default_plasma_512x384.png",
+    "output_sha256": "368719a23921aef0c0075c1a4096379745c6335337b87a4f08aa1fd280bfc879",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "ZoomBlurEffect",
+    "op": "Zoom Blur",
     "parameters": {},
     "input": "tests/fixtures/plasma_alpha_512x384.png",
     "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_default_plasma_alpha_512x384.png",
+    "output_sha256": "252f3ec73cefbc1b147ee2b070bdbae5ce9c5e671058177261f67079d4950701",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   },
   {
     "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
     "dotnet": "8.0.32",
-    "op": "ZoomBlurEffect",
+    "op": "Zoom Blur",
     "parameters": {},
     "input": "tests/fixtures/alpha_edge_64.png",
     "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
-    "output": "",
-    "output_sha256": "",
-    "status": "not-run",
-    "notes": "No compile entry or CLI dispatcher exists for this effect class."
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_default_alpha_edge_64.png",
+    "output_sha256": "2a5ca1e50f024be24e5fc1ae47359d59f24823454c6080e13aeeb66a5d32d465",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 0
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_min_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 0
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_min_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 0
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_min_plasma_512x384.png",
+    "output_sha256": "39087efc86c49b03a1dd5a3f9e4dfc9298bdee8b5b5189ec12d5c6711bcf5744",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 0
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_min_plasma_alpha_512x384.png",
+    "output_sha256": "a4c696b4467585e790257e4fa97bbae6a22b4e0ae498384c68d685a3ee49e2b8",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 0
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_min_alpha_edge_64.png",
+    "output_sha256": "7ec909223a5d49b3727f67ef43f77877511612c6185227140d0890a3340bc364",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 100
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_max_impulse_64.png",
+    "output_sha256": "795513779de7a68912e27ff2f99b14455999cddebbb89ff57711338d203c3675",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 100
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_max_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 100
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_max_plasma_512x384.png",
+    "output_sha256": "a2ea4b2adb8714f88b6f137b153f80489d2888d151872d43e2c4a28c175020bf",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 100
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_max_plasma_alpha_512x384.png",
+    "output_sha256": "344a3e568ab09c3e720a89e65aac4abf89e9f9e7f2f726b6a10d5125b4b2885c",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "amount": 100
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_amount_max_alpha_edge_64.png",
+    "output_sha256": "a5f4f9d4812da60a4a56d22a4976409bba19271c1fc307130320aee39614dac1",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/impulse_64.png",
+    "input_sha256": "ecc21efd4083219e77a274e68f6904bc9d88c618504877f15765e5e64f1243d1",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_offset_mid_impulse_64.png",
+    "output_sha256": "11397ded8d2b8e1cb05cf42ec4234d8998d2dc2745b384931532791919bc0b6d",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/partial_alpha_64.png",
+    "input_sha256": "18657fb4ec9d86201e84647ccb8ca06df9a9631262e6f4dab1a027556c3bbed3",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_offset_mid_partial_alpha_64.png",
+    "output_sha256": "38d30578f829b36c31a0776a3bd3a3be401b684981bf78faa8171f5acecce6bb",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/plasma_512x384.png",
+    "input_sha256": "aac46bc01ba9e982a6df58c2fba79288172b6fa2dc9ab98f1c224647d1a06f9b",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_offset_mid_plasma_512x384.png",
+    "output_sha256": "db28aedd5f883e60d5f2eab17ca2607acaff963321d8ba27ba9cb02d4940fdfe",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/plasma_alpha_512x384.png",
+    "input_sha256": "3a8bd2382d5b7e4807c7971244a69a0584c910e8b87af24d9a9e713407cb23c9",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_offset_mid_plasma_alpha_512x384.png",
+    "output_sha256": "713ea50bcc02d0e68c542f155693ea814754b3a9e9820e2990395b824299c7e5",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
+  },
+  {
+    "commit": "cca476b0df2a2f70996e6b9486ec45327631568c",
+    "dotnet": "8.0.32",
+    "op": "Zoom Blur",
+    "parameters": {
+      "offset_x": 0.5,
+      "offset_y": -0.5
+    },
+    "input": "tests/fixtures/alpha_edge_64.png",
+    "input_sha256": "2022fc55bbf037848c2f2f5e4e37c8efae851739c3dd83eebc31e10345de3bc6",
+    "output": "tests/oracle/legacy336/effects/Zoom_Blur_offset_mid_alpha_edge_64.png",
+    "output_sha256": "dcd3dfc2a839ecd5c44c84382ffa101b67c3c245d7b149a5a53f283252386efe",
+    "status": "ok",
+    "notes": "Direct OpenPDN effect class with UI and property stubs."
   }
 ]

@@ -1,4 +1,5 @@
 //! Integer-addressed GPU image operations. RGBA8 stays encoded and straight in storage.
+pub mod gaussian;
 #[cfg(target_os = "macos")]
 pub mod layer;
 pub mod presenter;
@@ -162,7 +163,7 @@ impl GpuContext {
         self.dispatch(&pipeline, &bind, dw, dh)?;
         self.readback(&output, dw, dh)
     }
-    /// Runs a registered pointwise effect on straight RGBA8 bytes.
+    /// Runs a registered effect with its legacy default parameters on straight RGBA8 bytes.
     pub fn effect_kernel(
         &mut self,
         kernel: op_ops::effect::GpuKernel,
@@ -170,6 +171,11 @@ impl GpuContext {
         height: u32,
         bytes: &[u8],
     ) -> Result<Vec<u8>> {
+        if kernel == op_ops::effect::GpuKernel::Gaussian {
+            return self
+                .gaussian_timed(width, height, bytes, 2)
+                .map(|(pixels, _)| pixels);
+        }
         if matches!(
             kernel,
             op_ops::effect::GpuKernel::Curves
@@ -246,6 +252,12 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Curves
             | op_ops::effect::GpuKernel::Levels
             | op_ops::effect::GpuKernel::Exposure => return Err(GpuError::InvalidImage),
+            op_ops::effect::GpuKernel::Gaussian => "effect_gaussian",
+            op_ops::effect::GpuKernel::Fragment => "effect_fragment",
+            op_ops::effect::GpuKernel::Median => "effect_median",
+            op_ops::effect::GpuKernel::Motion => "effect_motion",
+            op_ops::effect::GpuKernel::Radial => "effect_radial",
+            op_ops::effect::GpuKernel::Zoom => "effect_zoom",
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

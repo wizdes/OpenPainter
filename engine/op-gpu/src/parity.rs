@@ -28,6 +28,25 @@ impl GpuOp for EffectOp {
         self.effect_id.into()
     }
     fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
+        if self.kernel == GpuKernel::Gaussian {
+            return gaussian_reference(inputs.width, inputs.height, &inputs.bottom);
+        }
+        if matches!(
+            self.kernel,
+            GpuKernel::Fragment
+                | GpuKernel::Median
+                | GpuKernel::Motion
+                | GpuKernel::Radial
+                | GpuKernel::Zoom
+        ) {
+            return op_ops::effect::reference_rgba8(
+                self.effect_id,
+                inputs.width,
+                inputs.height,
+                &inputs.bottom,
+            )
+            .unwrap();
+        }
         let spec = find_effect(self.effect_id).expect("registered effect");
         let params = spec.default_params();
         let mut out = inputs.bottom.clone();
@@ -49,6 +68,9 @@ impl GpuOp for EffectOp {
     fn compare_hidden_color(&self) -> bool {
         true
     }
+}
+pub fn gaussian_reference(width: u32, height: u32, bytes: &[u8]) -> Vec<u8> {
+    op_ops::effects::gaussian_blur::reference_rgba8(width, height, bytes)
 }
 pub struct CompositeOp {
     pub mode: LayerBlendMode,

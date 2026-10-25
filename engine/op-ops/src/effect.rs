@@ -173,6 +173,12 @@ pub enum GpuKernel {
     Levels,
     Exposure,
     HighlightsShadows,
+    Gaussian,
+    Fragment,
+    Median,
+    Motion,
+    Radial,
+    Zoom,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -185,7 +191,13 @@ pub struct ArithmeticContract {
 }
 #[derive(Clone, Debug, Default)]
 pub struct Prepared {
+    /// Per-channel lookup tables (Auto-Level, Levels, Curves, Exposure).
     pub channel_lut: Option<Box<[[u8; 256]; 3]>>,
+    /// Document size; zero means "unbounded", so every tile pixel renders.
+    pub width: i32,
+    pub height: i32,
+    pub halo: i32,
+    pub gaussian: Option<std::sync::Arc<Vec<crate::effects::gaussian_blur::GaussianColumn>>>,
 }
 pub type PixelReader<'a> = dyn Fn(i32, i32) -> [u8; 4] + 'a;
 pub struct TileInputs<'a> {
@@ -223,6 +235,11 @@ impl EffectSpec {
             for px in 0..TILE_SIZE {
                 let x = input.output_rect.x + px as i32;
                 let y = input.output_rect.y + py as i32;
+                if prepared.width > 0
+                    && (x < 0 || x >= prepared.width || y < 0 || y >= prepared.height)
+                {
+                    continue;
+                }
                 let pixel = (self.render_cpu)(input.sample, x, y, prepared, params);
                 let index = (py * TILE_SIZE + px) * 4;
                 output[index..index + 4].copy_from_slice(&pixel);
@@ -231,11 +248,46 @@ impl EffectSpec {
         output
     }
 }
-pub fn prepare_noop(_: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
-    Ok(Prepared::default())
+pub fn prepare_noop(doc: &DocState, _: &SelectionState, _: &Value) -> Result<Prepared> {
+    Ok(Prepared {
+        width: doc.width as i32,
+        height: doc.height as i32,
+        ..Prepared::default()
+    })
 }
 pub fn pointwise_input(rect: Rect, _: &Prepared) -> Rect {
     rect
+}
+pub fn neighborhood_input(rect: Rect, prepared: &Prepared) -> Rect {
+    let halo = prepared.halo.max(0);
+    Rect::new(
+        rect.x.saturating_sub(halo),
+        rect.y.saturating_sub(halo),
+        rect.width.saturating_add((halo as u32).saturating_mul(2)),
+        rect.height.saturating_add((halo as u32).saturating_mul(2)),
+    )
+}
+pub fn whole_image_input(_: Rect, prepared: &Prepared) -> Rect {
+    Rect::new(0, 0, prepared.width as u32, prepared.height as u32)
+}
+pub fn blend_samples(samples: &[[u8; 4]]) -> [u8; 4] {
+    if samples.is_empty() {
+        return [255, 255, 255, 0];
+    }
+    let alpha: u64 = samples.iter().map(|s| u64::from(s[3])).sum();
+    if alpha == 0 {
+        return [0; 4];
+    }
+    let mut out = [0; 4];
+    for channel in 0..3 {
+        let sum: u64 = samples
+            .iter()
+            .map(|s| u64::from(s[channel]) * u64::from(s[3]))
+            .sum();
+        out[channel] = (sum / alpha) as u8;
+    }
+    out[3] = (alpha / samples.len() as u64) as u8;
+    out
 }
 pub fn registered() -> Vec<EffectSpec> {
     vec![
@@ -245,7 +297,6 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::curves::spec(),
         crate::effects::exposure::spec(),
         crate::effects::highlights_shadows::spec(),
-        crate::effects::content_aware::spec(),
         crate::effects::hue_saturation::spec(),
         crate::effects::invert_alpha::spec(),
         crate::effects::invert_colors::spec(),
@@ -253,10 +304,45 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::posterize::spec(),
         crate::effects::sepia::spec(),
         crate::effects::temperature_tint::spec(),
+        crate::effects::fragment::spec(),
+        crate::effects::gaussian_blur::spec(),
+        crate::effects::median_blur::spec(),
+        crate::effects::motion_blur::spec(),
+        crate::effects::radial_blur::spec(),
+        crate::effects::zoom_blur::spec(),
+        crate::effects::content_aware::spec(),
     ]
 }
 pub fn find(id: &str) -> Option<EffectSpec> {
     registered().into_iter().find(|spec| spec.id == id)
+}
+/// Whole-image CPU reference for default GPU effect parameters.
+pub fn reference_rgba8(id: &str, width: u32, height: u32, bytes: &[u8]) -> Result<Vec<u8>> {
+    let spec = find(id).ok_or_else(|| EffectError::Parameters(format!("unknown effect {id}")))?;
+    if bytes.len() != width as usize * height as usize * 4 {
+        return Err(EffectError::Parameters("image byte count".into()));
+    }
+    let params = spec.schema.validate(serde_json::json!({}))?;
+    let prepared = Prepared {
+        width: width as i32,
+        height: height as i32,
+        ..Prepared::default()
+    };
+    let sample = |x: i32, y: i32| {
+        if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+            return [0; 4];
+        }
+        let i = (y as usize * width as usize + x as usize) * 4;
+        bytes[i..i + 4].try_into().unwrap()
+    };
+    let mut output = vec![0; bytes.len()];
+    for y in 0..height as i32 {
+        for x in 0..width as i32 {
+            let i = (y as usize * width as usize + x as usize) * 4;
+            output[i..i + 4].copy_from_slice(&(spec.render_cpu)(&sample, x, y, &prepared, &params));
+        }
+    }
+    Ok(output)
 }
 pub fn tile_coords(rect: Rect) -> Vec<TileCoord> {
     if rect.width == 0 || rect.height == 0 {

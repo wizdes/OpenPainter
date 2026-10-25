@@ -207,6 +207,41 @@ fn effect_highlights_shadows(@builtin(global_invocation_id) id: vec3<u32>) {
   let rgb = vec3<u32>(clamp(vec3<i32>(src.rgb) + vec3<i32>(shift), vec3<i32>(0i), vec3<i32>(255i)));
   textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(rgb, src.a));
 }
+@compute @workgroup_size(16, 16)
+fn effect_gaussian(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let radius = i32(p.mode);
+  var wa_sum = 0u;
+  var wc_sum = 0u;
+  var sums = vec4<u32>(0u);
+  for (var dx = -radius; dx <= radius; dx++) {
+    let xx = i32(id.x) + dx;
+    if xx < 0 || xx >= i32(p.width) { continue; }
+    let wx = 16u * u32(radius + 1 - abs(dx));
+    var wa_col = 0u;
+    var wc_col = 0u;
+    var col = vec4<u32>(0u);
+    for (var dy = -radius; dy <= radius; dy++) {
+      let yy = i32(id.y) + dy;
+      if yy < 0 || yy >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, vec2<i32>(xx, yy), 0);
+      let wy = 16u * u32(radius + 1 - abs(dy));
+      wa_col += wy;
+      let alpha_weight = wy * (c.a + (c.a >> 7u));
+      wc_col += alpha_weight;
+      col += (alpha_weight >> 8u) * c;
+    }
+    wa_sum += wx * wa_col;
+    wc_sum += wx * wc_col;
+    sums += wx * col;
+  }
+  wc_sum = wc_sum >> 8u;
+  var result = vec4<u32>(0u);
+  if wa_sum > 0u && wc_sum > 0u {
+    result = vec4<u32>(sums.r / wc_sum, sums.g / wc_sum, sums.b / wc_sum, sums.a / wa_sum);
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), result);
+}
 fn unit(x: u32) -> f32 { return f32(x) / 255.0; }
 fn byte(x: f32) -> u32 { return u32(floor(clamp(x, 0.0, 1.0) * 255.0 + 0.5)); }
 fn blend(mode: u32, b: f32, s: f32) -> f32 {
@@ -286,4 +321,161 @@ fn box_blur(@builtin(global_invocation_id) id: vec3<u32>) {
     }
   }
   textureStore(output_tex, vec2<i32>(id.xy), (sum + vec4<u32>(4u)) / vec4<u32>(9u));
+}
+
+@compute @workgroup_size(16, 16)
+fn effect_fragment(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let offsets = array<vec2<i32>, 4>(vec2<i32>(8,0), vec2<i32>(0,-8), vec2<i32>(-8,0), vec2<i32>(0,8));
+  var count = 0u;
+  var alpha = 0u;
+  var rgb = vec3<u32>(0u);
+  for (var j = 0u; j < 4u; j++) {
+    let uv = vec2<i32>(id.xy) - offsets[j];
+    if uv.x < 0 || uv.y < 0 || uv.x >= i32(p.width) || uv.y >= i32(p.height) { continue; }
+    let c = textureLoad(input_tex, uv, 0);
+    count += 1u;
+    alpha += c.a;
+    rgb += c.rgb * c.a;
+  }
+  var result = vec4<u32>(0u);
+  if count == 0u { result = vec4<u32>(255u,255u,255u,0u); }
+  else if alpha > 0u { result = vec4<u32>(rgb / alpha, alpha / count); }
+  textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+
+@compute @workgroup_size(16, 16)
+fn effect_zoom(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let cx = i32(p.width) << 15;
+  let cy = i32(p.height) << 15;
+  var fx = (i32(id.x) << 16) - cx;
+  var fy = (i32(id.y) << 16) - cy;
+  var count = 1u;
+  let origin = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  var alpha = origin.a;
+  var rgb = origin.rgb * origin.a;
+  for (var j = 0; j < 64; j++) {
+    fx -= ((fx >> 4) * 10) >> 10;
+    fy -= ((fy >> 4) * 10) >> 10;
+    let u = (fx + cx + 32768) >> 16;
+    let v = (fy + cy + 32768) >> 16;
+    if u < 0 || v < 0 || u >= i32(p.width) || v >= i32(p.height) { continue; }
+    let c = textureLoad(input_tex, vec2<i32>(u,v), 0);
+    count += 1u;
+    alpha += c.a;
+    rgb += c.rgb * c.a;
+  }
+  var result = vec4<u32>(0u);
+  if alpha > 0u { result = vec4<u32>(rgb / alpha, alpha / count); }
+  textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+
+fn radial_rotate(point: vec2<i32>, fr: i32) -> vec2<i32> {
+  let quadratic = (fr * fr) >> 11;
+  let nx = point.x - (((point.y >> 8) * fr) >> 8) - (((point.x >> 14) * quadratic) >> 8);
+  let ny = point.y + (((point.x >> 8) * fr) >> 8) - (((point.y >> 14) * quadratic) >> 8);
+  return vec2<i32>(nx, ny);
+}
+@compute @workgroup_size(16, 16)
+fn effect_radial(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let cx = i32(p.width) << 15;
+  let cy = i32(p.height) << 15;
+  let initial = vec2<i32>((i32(id.x) << 16) - cx, (i32(id.y) << 16) - cy);
+  var plus = initial;
+  var minus = initial;
+  let origin = textureLoad(input_tex, vec2<i32>(id.xy), 0);
+  var alpha = origin.a;
+  var rgb = origin.rgb * origin.a;
+  var count = 1u;
+  for (var j = 0; j < 136; j++) {
+    plus = radial_rotate(plus, 16);
+    minus = radial_rotate(minus, -16);
+    for (var side = 0; side < 2; side++) {
+      let point = select(minus, plus, side == 0);
+      let u = (point.x + cx + 32768) >> 16;
+      let v = (point.y + cy + 32768) >> 16;
+      if u <= 0 || v <= 0 || u >= i32(p.width) || v >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, vec2<i32>(u,v), 0);
+      count += 1u;
+      alpha += c.a;
+      rgb += c.rgb * c.a;
+    }
+  }
+  var result = vec4<u32>(0u);
+  if alpha > 0u { result = vec4<u32>(rgb / alpha, alpha / count); }
+  textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+
+@compute @workgroup_size(16, 16)
+fn effect_median(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  var hist: array<vec4<u32>, 256>;
+  var area = 0u;
+  for (var dy = -10; dy <= 10; dy++) {
+    for (var dx = -10; dx <= 10; dx++) {
+      let uv = vec2<i32>(id.xy) + vec2<i32>(dx,dy);
+      if uv.x < 0 || uv.y < 0 || uv.x >= i32(p.width) || uv.y >= i32(p.height) || dx*dx+dy*dy > 110 { continue; }
+      let c = textureLoad(input_tex, uv, 0);
+      hist[c.r].r += 1u;
+      hist[c.g].g += 1u;
+      hist[c.b].b += 1u;
+      hist[c.a].a += 1u;
+      area += 1u;
+    }
+  }
+  let rank = area / 2u;
+  var result = vec4<u32>(0u);
+  for (var channel = 0u; channel < 4u; channel++) {
+    var value = 0u;
+    while value < 255u && hist[value][channel] == 0u { value += 1u; }
+    var count = 0u;
+    while value < 255u && count < rank { count += hist[value][channel]; value += 1u; }
+    result[channel] = value;
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), result);
+}
+
+fn motion_bilinear(pt: vec2<f32>) -> vec4<u32> {
+  let ix = i32(floor(pt.x));
+  let iy = i32(floor(pt.y));
+  let fx = u32(256.0 * (pt.x - f32(ix)));
+  let fy = u32(256.0 * (pt.y - f32(iy)));
+  let xx = min(ix + 1, i32(p.width) - 1);
+  let yy = min(iy + 1, i32(p.height) - 1);
+  let c1 = textureLoad(input_tex, vec2<i32>(ix,iy), 0);
+  let c2 = textureLoad(input_tex, vec2<i32>(xx,iy), 0);
+  let c3 = textureLoad(input_tex, vec2<i32>(ix,yy), 0);
+  let c4 = textureLoad(input_tex, vec2<i32>(xx,yy), 0);
+  let w1 = (256u-fx)*(256u-fy);
+  let w2 = fx*(256u-fy);
+  let w3 = (256u-fx)*fy;
+  let w4 = fx*fy;
+  let af = c1.a*w1 + c2.a*w2 + c3.a*w3 + c4.a*w4;
+  if af == 0u { return vec4<u32>(0u); }
+  let rgb = (c1.rgb*c1.a*w1 + c2.rgb*c2.a*w2 + c3.rgb*c3.a*w3 + c4.rgb*c4.a*w4) / af;
+  return vec4<u32>(rgb, (af+32768u)>>16u);
+}
+@compute @workgroup_size(16, 16)
+fn effect_motion(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let start = vec2<f32>(4.531538963317871, -2.113091230392456);
+  let end = -start;
+  var count = 0u;
+  var alpha = 0u;
+  var rgb = vec3<u32>(0u);
+  for (var j = 0; j < 16; j++) {
+    let fraction = f32(j) / 15.0;
+    let pt = vec2<f32>(id.xy) + start + fraction * (end - start);
+    if pt.x < 0.0 || pt.y < 0.0 || pt.x > f32(p.width - 1u) || pt.y > f32(p.height - 1u) { continue; }
+    let c = motion_bilinear(pt);
+    count += 1u;
+    alpha += c.a;
+    rgb += c.rgb*c.a;
+  }
+  var result = vec4<u32>(0u);
+  if count == 0u { result = vec4<u32>(255u,255u,255u,0u); }
+  else if alpha > 0u { result = vec4<u32>(rgb/alpha,alpha/count); }
+  textureStore(output_tex, vec2<i32>(id.xy), result);
 }

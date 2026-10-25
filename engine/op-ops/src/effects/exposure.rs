@@ -46,6 +46,7 @@ fn prepare(
     }
     Ok(Prepared {
         channel_lut: Some(table),
+        ..Prepared::default()
     })
 }
 fn render_cpu(sample: &PixelReader<'_>, x: i32, y: i32, prepared: &Prepared, _: &Value) -> [u8; 4] {

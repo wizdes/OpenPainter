@@ -116,14 +116,14 @@ internal static class Program
         File.WriteAllBytes(path,mask);
         Record(dir,"FloodToolBase",new{seed=new[]{x,y},tolerance_percent=percent,t,contiguous,width=surface.Width,height=surface.Height},input,path);
     }
-    private static readonly string[] EffectNames={"Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Gaussian Blur","Add Noise","Frosted Glass","Clouds"};
+    private static readonly string[] EffectNames={"Invert Colors","Desaturate","Sepia","Brightness and Contrast","Hue and Saturation","Posterize","Auto-Level","Levels","Curves","Fragment Blur","Gaussian Blur","Median Blur","Motion Blur","Radial Blur","Zoom Blur","Add Noise","Frosted Glass","Clouds"};
     private static void EffectsAll()
     {
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         foreach(string old in Directory.GetFiles(dir,"*.png"))File.Delete(old);
         entries.Clear();
         string sourceDir=Path.Combine(Root,".pdn-src/src/Effects");
-        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","GaussianBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect"};
+        var represented=new HashSet<string>(StringComparer.Ordinal){"InvertColorsEffect","DesaturateEffect","SepiaEffect","BrightnessAndContrastAdjustment","HueAndSaturationAdjustment","PosterizeAdjustment","AutoLevelEffect","LevelsEffect","CurvesEffect","FragmentEffect","GaussianBlurEffect","MedianEffect","MotionBlurEffect","RadialBlurEffect","ZoomBlurEffect","AddNoiseEffect","FrostedGlassEffect","CloudsEffect"};
         var abstractHelpers=new HashSet<string>(StringComparer.Ordinal){"InternalPropertyBasedEffect","PropertyBasedEffect","ConvolutionFilterEffect","LocalHistogramEffect"};
         var names=EffectNames.Concat(Directory.EnumerateFiles(sourceDir,"*Effect.cs")
             .Select(Path.GetFileNameWithoutExtension).Where(n=>n!="Effect"&&!represented.Contains(n)&&!abstractHelpers.Contains(n)))
@@ -159,6 +159,21 @@ internal static class Program
                 foreach((string label,string settings) in new[]{("radius_min","{\"radius\":0}"),("radius_max","{\"radius\":200}"),("radius_mid","{\"radius\":100}")})
                     Effects(name,settings,false,label);
             }
+            if(name=="Fragment Blur")
+                foreach((string label,string settings) in new[]{("distance_min","{\"distance\":0}"),("fragments_max","{\"fragments\":50}"),("rotation_max","{\"rotation\":360}")})
+                    Effects(name,settings,false,label);
+            if(name=="Median Blur")
+                foreach((string label,string settings) in new[]{("radius_min","{\"radius\":1}"),("percentile_min","{\"percentile\":0}"),("percentile_max","{\"percentile\":100}")})
+                    Effects(name,settings,false,label);
+            if(name=="Motion Blur")
+                foreach((string label,string settings) in new[]{("distance_min","{\"distance\":1}"),("angle_min","{\"angle\":-180}"),("angle_max","{\"angle\":180}"),("uncentered","{\"centered\":false}")})
+                    Effects(name,settings,false,label);
+            if(name=="Radial Blur")
+                foreach((string label,string settings) in new[]{("angle_min","{\"angle\":0}"),("quality_min","{\"quality\":1}"),("offset_mid","{\"offset_x\":0.5,\"offset_y\":-0.5}")})
+                    Effects(name,settings,false,label);
+            if(name=="Zoom Blur")
+                foreach((string label,string settings) in new[]{("amount_min","{\"amount\":0}"),("amount_max","{\"amount\":100}"),("offset_mid","{\"offset_x\":0.5,\"offset_y\":-0.5}")})
+                    Effects(name,settings,false,label);
             if(name=="Levels")
             {
                 foreach((string label,string settings) in new[]{("gamma_min","{\"gamma\":0.1}"),("gamma_max","{\"gamma\":10}"),("gamma_mid","{\"gamma\":2}")})
@@ -182,7 +197,7 @@ internal static class Program
         string dir=Path.Combine(Oracle,"effects");Directory.CreateDirectory(dir);
         string manifest=Path.Combine(dir,"manifest.json");
         if(save&&entries.Count==0&&File.Exists(manifest))entries=JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(manifest))??new();
-        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Gaussian Blur" or "Add Noise" or "Frosted Glass" or "Clouds";
+        bool supported=name is "Invert Colors" or "Desaturate" or "Sepia" or "Hue and Saturation" or "Auto-Level" or "Levels" or "Curves" or "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds";
         foreach(string fixture in EffectFixtures)
         {
             string input=F(fixture);
@@ -198,7 +213,7 @@ internal static class Program
                 continue;
             }
             var src=Png.Read(input);
-            if(name is "Brightness and Contrast" or "Posterize" or "Gaussian Blur" or "Add Noise" or "Frosted Glass" or "Clouds")
+            if(name is "Brightness and Contrast" or "Posterize" or "Fragment Blur" or "Gaussian Blur" or "Median Blur" or "Motion Blur" or "Radial Blur" or "Zoom Blur" or "Add Noise" or "Frosted Glass" or "Clouds")
             {
                 using var sourceSurface=SurfaceOf(src);
                 using var destSurface=new Surface(src.Width,src.Height);
@@ -206,6 +221,11 @@ internal static class Program
                     "Brightness and Contrast"=>new BrightnessAndContrastAdjustment(),
                     "Posterize"=>new PosterizeAdjustment(),
                     "Gaussian Blur"=>new GaussianBlurEffect(),
+                    "Fragment Blur"=>new FragmentEffect(),
+                    "Median Blur"=>new MedianEffect(),
+                    "Motion Blur"=>new MotionBlurEffect(),
+                    "Radial Blur"=>new RadialBlurEffect(),
+                    "Zoom Blur"=>new ZoomBlurEffect(),
                     "Add Noise"=>new AddNoiseEffect(),
                     "Frosted Glass"=>new FrostedGlassEffect(),
                     _=>new CloudsEffect()
@@ -224,6 +244,34 @@ internal static class Program
                 }
                 if(effect is GaussianBlurEffect)
                     token.GetProperty<Int32Property>(GaussianBlurEffect.PropertyNames.Radius).Value=IntParam(doc.RootElement,"radius",2);
+                if(effect is FragmentEffect)
+                {
+                    token.GetProperty<Int32Property>(FragmentEffect.PropertyNames.Fragments).Value=IntParam(doc.RootElement,"fragments",4);
+                    token.GetProperty<Int32Property>(FragmentEffect.PropertyNames.Distance).Value=IntParam(doc.RootElement,"distance",8);
+                    token.GetProperty<DoubleProperty>(FragmentEffect.PropertyNames.Rotation).Value=DoubleParam(doc.RootElement,"rotation",0);
+                }
+                if(effect is MedianEffect)
+                {
+                    token.GetProperty<Int32Property>(MedianEffect.PropertyNames.Radius).Value=IntParam(doc.RootElement,"radius",10);
+                    token.GetProperty<Int32Property>(MedianEffect.PropertyNames.Percentile).Value=IntParam(doc.RootElement,"percentile",50);
+                }
+                if(effect is MotionBlurEffect)
+                {
+                    token.GetProperty<DoubleProperty>(MotionBlurEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",25);
+                    token.GetProperty<Int32Property>(MotionBlurEffect.PropertyNames.Distance).Value=IntParam(doc.RootElement,"distance",10);
+                    token.GetProperty<BooleanProperty>(MotionBlurEffect.PropertyNames.Centered).Value=doc.RootElement.TryGetProperty("centered",out var centered)?centered.GetBoolean():true;
+                }
+                if(effect is RadialBlurEffect)
+                {
+                    token.GetProperty<DoubleProperty>(RadialBlurEffect.PropertyNames.Angle).Value=DoubleParam(doc.RootElement,"angle",2);
+                    token.GetProperty<Int32Property>(RadialBlurEffect.PropertyNames.Quality).Value=IntParam(doc.RootElement,"quality",2);
+                    token.GetProperty<DoubleVectorProperty>(RadialBlurEffect.PropertyNames.Offset).Value=Pair.Create(DoubleParam(doc.RootElement,"offset_x",0),DoubleParam(doc.RootElement,"offset_y",0));
+                }
+                if(effect is ZoomBlurEffect)
+                {
+                    token.GetProperty<Int32Property>(ZoomBlurEffect.PropertyNames.Amount).Value=IntParam(doc.RootElement,"amount",10);
+                    token.GetProperty<DoubleVectorProperty>(ZoomBlurEffect.PropertyNames.Offset).Value=Pair.Create(DoubleParam(doc.RootElement,"offset_x",0),DoubleParam(doc.RootElement,"offset_y",0));
+                }
                 if(effect is AddNoiseEffect)
                 {
                     token.GetProperty<Int32Property>(AddNoiseEffect.PropertyNames.Intensity).Value=IntParam(doc.RootElement,"intensity",64);
