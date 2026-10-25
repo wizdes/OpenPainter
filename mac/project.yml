@@ -75,6 +75,24 @@ targets:
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.png]
             NSDocumentClass: $(PRODUCT_MODULE_NAME).PainterDocument
+          # M17: ImageIO import. HEIC and AVIF are Editor types because Save As
+          # writes them (AVIF only where CGImageDestinationCopyTypeIdentifiers
+          # lists it; PainterDocument.writableTypes decides at run time).
+          - CFBundleTypeName: HEIF image
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.heic, public.heif]
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).PainterDocument
+          - CFBundleTypeName: AVIF image
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.avif]
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).PainterDocument
+          - CFBundleTypeName: Camera RAW image
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.camera-raw-image]
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).PainterDocument
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.yili.OpenPainter

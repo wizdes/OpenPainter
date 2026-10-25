@@ -166,7 +166,7 @@ public enum MenuSkeleton {
                 .submenu("Acquire", [i("From Scanner or Camera…")]),
                 .separator,
                 i("Save", "s"),
-                i("Save As…", "s", shiftCmd),
+                .item("Save As…", "s", shiftCmd, .selector(#selector(NSDocument.saveAs(_:)))),  // M17: HEIC, AVIF
                 i("Save All", "s", optCmd),
                 .separator,
                 i("Print…", "p"),

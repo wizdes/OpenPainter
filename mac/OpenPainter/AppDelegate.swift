@@ -31,6 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PainterDocument.prepareEngine()
         let workspace = Workspace(engine: AppEngine.shared, tools: ToolState.shared)
         Workspace.shared = workspace
+        // M17: files dropped on a canvas or the image strip open one at a time, in order.
+        workspace.fileOpener = { url, done in
+            NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, error in
+                MainActor.assumeIsolated { done(error) }
+            }
+        }
         workspace.startEvents()
         NSApp.mainMenu = MainMenu.build(workspace)
         NotificationCenter.default.addObserver(
@@ -101,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.title = "OpenPainter"
         w.isRestorable = false
         w.isReleasedWhenClosed = false
-        let label = NSTextField(labelWithString: "Open an image with File > Open (⌘O),\nor drop a PNG on the Dock icon.")
+        let label = NSTextField(labelWithString: "Open an image with File > Open (⌘O),\nor drop an image on the Dock icon.")
         label.alignment = .center
         label.textColor = .secondaryLabelColor
         label.frame = NSRect(x: 20, y: 90, width: 380, height: 60)

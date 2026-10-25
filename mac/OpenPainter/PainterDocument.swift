@@ -1,4 +1,6 @@
-// One open image. The engine reads and decodes the PNG itself (op_doc_open_png).
+// One open image. The engine reads and decodes PNG itself (op_doc_open_png);
+// HEIC, HEIF, AVIF and Camera RAW come through ImageIO (M17, DocumentLoader).
+// Save As writes HEIC, and AVIF where this macOS can encode it.
 import AppKit
 import OpenPainterKit
 
@@ -25,29 +27,39 @@ final class PainterDocument: NSDocument, EditorHost {
     override class var autosavesInPlace: Bool { false }
     override class func canConcurrentlyReadDocuments(ofType typeName: String) -> Bool { true }
 
+    /// EXIF, XMP and GPS from an ImageIO import, kept for M50's save options
+    /// (the engine has no metadata slot).
+    private(set) var metadata = ImageMetadata()
+    /// Status-bar notes from the import, such as a 16-bit to 8-bit conversion.
+    private var importNotes: [String] = []
+
     override func read(from url: URL, ofType typeName: String) throws {
         guard let engine = Self.engine else { throw NSError(domain: "OpenPainter", code: 1) }
-        let doc: Document
+        let loaded: LoadedImage
         do {
-            doc = try engine.openPNG(path: url.path)
+            loaded = try DocumentLoader.open(url, engine: engine)
         } catch {
-            throw NSError(
-                domain: "OpenPainter", code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "The engine could not open “\(url.lastPathComponent)” (\(error))."])
+            throw NSError(domain: "OpenPainter", code: 2, userInfo: [NSLocalizedDescriptionKey: error.localizedDescription])
         }
-        let info = try doc.info()
-        let w = (info["width"] as? NSNumber)?.doubleValue ?? 0
-        let h = (info["height"] as? NSNumber)?.doubleValue ?? 0
-        guard w > 0, h > 0 else {
-            try? doc.close()
-            throw NSError(domain: "OpenPainter", code: 3, userInfo: [NSLocalizedDescriptionKey: "The image has no pixels."])
-        }
-        engineDocument = doc
-        pixelSize = CGSize(width: w, height: h)
+        engineDocument = loaded.document
+        pixelSize = loaded.pixelSize
+        metadata = loaded.metadata
+        importNotes = loaded.notes
+    }
+
+    /// Save As offers HEIC, and AVIF only where ImageIO can encode it. Other
+    /// formats come with M19 and M50.
+    override func writableTypes(for saveOperation: NSDocument.SaveOperationType) -> [String] {
+        ImageFormats.exportTypes().map(\.identifier)
     }
 
     override func data(ofType typeName: String) throws -> Data {
-        throw NSError(domain: "OpenPainter", code: 4, userInfo: [NSLocalizedDescriptionKey: "Saving comes in a later version."])
+        guard let doc = engineDocument,
+              ImageFormats.exportTypes().contains(where: { $0.identifier == typeName })
+        else {
+            throw NSError(domain: "OpenPainter", code: 4, userInfo: [NSLocalizedDescriptionKey: "Saving this format comes in a later version."])
+        }
+        return try DocumentLoader.export(doc, type: typeName, metadata: metadata)
     }
 
     override func makeWindowControllers() {
@@ -57,6 +69,7 @@ final class PainterDocument: NSDocument, EditorHost {
         workspace.add(editor)
         let wc = EditorWindowController(editor: editor, workspace: workspace)
         addWindowController(wc)
+        if !importNotes.isEmpty { editor.report(importNotes.joined(separator: " ")) }
     }
 
     override func showWindows() {

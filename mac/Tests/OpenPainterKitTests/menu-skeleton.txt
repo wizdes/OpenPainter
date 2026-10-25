@@ -20,7 +20,7 @@ File > Acquire
 File > Acquire > From Scanner or Camera… (off)
 File > ---
 File > Save [⌘S] (off)
-File > Save As… [⇧⌘S] (off)
+File > Save As… [⇧⌘S]
 File > Save All [⌥⌘S] (off)
 File > ---
 File > Print… [⌘P] (off)
