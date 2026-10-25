@@ -196,7 +196,7 @@ final class ImageIOImportTests: XCTestCase {
         XCTAssertEqual(image.colorSpaceName, CGColorSpace.displayP3 as String)
         let loaded = try open(url)
         XCTAssertEqual(try profileDescription(loaded.document), "Display P3")
-        let icc = try loaded.document.queryData("doc.profile")
+        let icc = try loaded.document.queryData("doc.profile_icc")
         XCTAssertEqual(icc, image.icc, "the engine holds the ICC bytes ImageIO reported")
         XCTAssertEqual(CGColorSpace(iccData: icc as CFData)?.name, CGColorSpace.displayP3)
     }

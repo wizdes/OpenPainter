@@ -68,13 +68,13 @@ public enum DocumentLoader {
     }
 
     /// Encodes the flattened image as HEIC or AVIF with the document profile
-    /// (`doc.profile`) and the kept metadata.
+    /// (`doc.profile_icc`) and the kept metadata.
     public static func export(_ doc: Document, type: String, metadata: ImageMetadata? = nil,
                               quality: Double = ImageIOExporter.defaultQuality) throws -> Data {
         let info = try doc.info()
         let w = (info["width"] as? NSNumber)?.intValue ?? 0
         let h = (info["height"] as? NSNumber)?.intValue ?? 0
-        let icc = try doc.queryData("doc.profile")
+        let icc = try doc.queryData("doc.profile_icc")
         return try ImageIOExporter.encode(
             rgba: try doc.pixels(), width: w, height: h, icc: icc.isEmpty ? nil : icc, type: type,
             quality: quality, metadata: metadata)

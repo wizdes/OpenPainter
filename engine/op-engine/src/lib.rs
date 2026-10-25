@@ -2505,14 +2505,6 @@ impl Engine {
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
             ),
-            // M17: the document's ICC bytes (empty for an untagged, sRGB document),
-            // for Mac export through ImageIO.
-            "doc.profile" => Ok(s
-                .state
-                .profile
-                .as_deref()
-                .map(<[u8]>::to_vec)
-                .unwrap_or_default()),
             "doc.selection" => {
                 serde_json::to_vec(&shell_commands::selection_info(&s.state)).map_err(internal)
             }
