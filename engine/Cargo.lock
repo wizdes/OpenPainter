@@ -1129,6 +1129,7 @@ dependencies = [
  "op-color",
  "op-core",
  "op-formats",
+ "op-gpu",
  "op-ops",
  "op-tools",
  "parking_lot",

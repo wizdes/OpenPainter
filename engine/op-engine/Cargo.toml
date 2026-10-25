@@ -16,6 +16,7 @@ op-ops = { path = "../op-ops" }
 op-tools = { path = "../op-tools" }
 op-formats = { path = "../op-formats" }
 op-color = { path = "../op-color" }
+op-gpu = { path = "../op-gpu" }
 lcms2 = { version = "6.2.0", features = ["static"] }
 arc-swap = "1"
 parking_lot = "0.12"

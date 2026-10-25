@@ -1388,4 +1388,5 @@ impl GpuTileCache {
         Ok(&self.tiles.get(&key).unwrap().0)
     }
 }
+pub mod gaussian_cached;
 pub mod parity;
