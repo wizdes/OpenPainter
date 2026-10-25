@@ -43,6 +43,8 @@ pub(crate) enum FileOp {
     },
     MarkSaved(u64),
     Replace(DocState),
+    /// M57: no step is saved (a document recovered after a crash).
+    MarkUnsaved,
 }
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -153,7 +155,7 @@ impl Engine {
         mark_saved: bool,
     ) -> Result<()> {
         let path = path.as_ref().to_path_buf();
-        self.call(id, |r| {
+        let result = self.call(id, |r| {
             Message::File(
                 FileOp::Save {
                     path,
@@ -162,7 +164,16 @@ impl Engine {
                 },
                 r,
             )
-        })?
+        })?;
+        // M57: the error text for the app (`doc.last_file_error`), and a clean
+        // save lets the recovery writer delete its record at once.
+        self.note_file_result(id, &result);
+        result
+    }
+
+    /// M57: marks the document unsaved (no step is the saved one).
+    pub fn mark_unsaved(&self, id: u64) -> Result<()> {
+        self.call(id, |r| Message::File(FileOp::MarkUnsaved, r))?
     }
 
     /// Marks the current step saved after the app wrote the file itself
@@ -170,7 +181,9 @@ impl Engine {
     /// the pixels at; if the document changed since, this returns Busy and the
     /// mark stays.
     pub fn mark_saved(&self, id: u64, revision: u64) -> Result<()> {
-        self.call(id, |r| Message::File(FileOp::MarkSaved(revision), r))?
+        let result = self.call(id, |r| Message::File(FileOp::MarkSaved(revision), r))?;
+        self.note_file_result(id, &result);
+        result
     }
 
     /// Revert: `id` takes `source`'s current content as a fresh history (one
@@ -214,6 +227,12 @@ impl Actor {
                     return Err(Error::Busy);
                 }
                 self.mark_current_saved();
+                Ok(())
+            }
+            FileOp::MarkUnsaved => {
+                self.history.mark_unsaved();
+                self.publish(None);
+                self.event(EventKind::HistoryChanged, 0, json!({"saved":false}));
                 Ok(())
             }
             FileOp::Replace(state) => {

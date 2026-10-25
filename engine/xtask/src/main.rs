@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant};
 
+mod fuzz;
+
 #[derive(Clone, Copy)]
 enum Status {
     Pass,
@@ -147,6 +149,13 @@ fn run_step(steps: &mut Vec<Step>, step: &CommandStep, engine: &Path, repo: &Pat
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("fuzz") {
+        let engine = engine_dir(
+            std::env::var_os("CARGO_MANIFEST_DIR"),
+            env!("CARGO_MANIFEST_DIR"),
+        );
+        return fuzz::main(&engine, &args[1..]);
+    }
     if args.len() != 3 || args[0] != "check" || args[1] != "--tier" {
         eprintln!("Usage: cargo xtask check --tier fast|milestone|checkpoint");
         return ExitCode::from(2);

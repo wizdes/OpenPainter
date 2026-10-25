@@ -106,6 +106,16 @@ tools/codegen/          Catalog to Swift generator
 - A new action after undo drops the redo branch.
 - A failed operation leaves the current state and the history index unchanged.
 
+### Recovery records (M57)
+Autosave keeps a crash copy of every open document; it never replaces the user's own file.
+- **Where:** `~/Library/Application Support/OpenPainter/Recovery/<doc-uuid>/`, one folder per open document. The app picks the UUID when the document opens. Tests pass their own root.
+- **Files:** `owner.lock` (held with `flock` while a live process owns the folder; the kernel lets go when the process dies, even on SIGKILL), `manifest.json`, and one `snapshot-<rev>-<pid>-<n>.opaint`.
+- **Manifest:** `format` (1), `revision`, `original_url` (or null), `time_unix`, `snapshot` (the file name), `snapshot_bytes`, `snapshot_crc32`, `width`, `height`, `layers`, `pid`.
+- **Write order:** (1) the snapshot goes to a temp file, is synced, renamed into place, and the folder is synced; (2) the manifest goes the same way (temp, fsync, rename, fsync the folder); (3) only then is the old snapshot deleted and the revision acknowledged (a `Recovery` event and `doc.recovery`). Until step 2's rename, the old manifest still names the old, complete snapshot, so a torn write never wins. A reader accepts a record only when the snapshot's size and CRC-32 match the manifest.
+- **When:** one writer thread per document reads the published snapshot (an `arc-swap` load), so it never waits for the actor or the UI. It writes 30 s after the last change, or at the latest 2 minutes after the first change that has no record, while edits go on. A clean document (saved, or undone back to the saved step) has no record: the writer deletes it. Close deletes the whole folder. A failed write (disk full, any I/O error) keeps the previous record, reports the error, and tries again after the next settle period.
+- **Launch:** the app lists the folders whose lock it can take (`op_recovery_scan`); a folder with a manifest is a document that did not close cleanly. One sheet lists them with Recover and Discard. Recover opens the snapshot as a new document marked unsaved, with the original file as its file, and keeps writing into the same folder, so the old record stays until a newer one replaces it. Discard deletes the folder. A folder with no manifest (a crash before the first record) is deleted by the scan.
+- **Proof:** `op-cli/tests/recovery_kill.rs` kills a helper process with SIGKILL before, during and after a record write; `op-engine/tests/recovery.rs` covers timing, save, close, recover and an injected disk-full write; `op-engine/tests/low_disk.rs` fills a real 20 MB disk image.
+
 ### Commands
 - `CommandSpec { id: "image.flip_horizontal", label_key, params: ParamSchema, enabled(&DocState) -> bool, run(ctx, params) -> Result<Outcome> }`.
 - Ids are stable strings: `layer.add`, `edit.undo`, `effect.blur.gaussian`, `tool.select`, `history.jump`. Params are JSON validated against the schema.

@@ -13,6 +13,7 @@ use std::thread::JoinHandle;
 mod document;
 mod export;
 mod move_tool;
+mod recovery;
 mod stroke;
 mod view;
 pub use document::*;
@@ -49,6 +50,10 @@ pub enum OpEventKind {
     /// OP_ERR_CANCELLED) or an error name such as "read_only" or "panic".
     OP_EVENT_JOB_FINISHED = 4,
     OP_EVENT_PROGRESS = 5,
+    /// M57: a recovery record was written, failed or was cleared. Payload:
+    /// `{"ok":true,"revision":n}`, `{"ok":false,"error":"..."}` or
+    /// `{"ok":true,"revision":null,"cleared":true}`.
+    OP_EVENT_RECOVERY = 6,
 }
 #[repr(C)]
 pub struct OpConfig {
@@ -170,6 +175,7 @@ fn make_event(e: Event) -> OpEvent {
         EventKind::LayersChanged => OpEventKind::OP_EVENT_LAYERS_CHANGED,
         EventKind::JobFinished => OpEventKind::OP_EVENT_JOB_FINISHED,
         EventKind::Progress => OpEventKind::OP_EVENT_PROGRESS,
+        EventKind::Recovery => OpEventKind::OP_EVENT_RECOVERY,
     } as u32;
     OpEvent {
         kind,

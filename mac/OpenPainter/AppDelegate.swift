@@ -34,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.startWindow = nil
         }
         PainterDocument.prepareEngine()
+        // M57: crash recovery records in ~/Library/Application Support/OpenPainter/Recovery.
+        RecoveryCenter.root = RecoveryCenter.defaultRoot
         let workspace = Workspace(engine: AppEngine.shared, tools: ToolState.shared)
         Workspace.shared = workspace
         // M17: files dropped on a canvas or the image strip open one at a time, in order.
@@ -81,7 +83,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         for f in files { open(URL(fileURLWithPath: f)) }
-        DispatchQueue.main.async { self.showStartWindowIfIdle() }
+        DispatchQueue.main.async {
+            self.showStartWindowIfIdle()
+            // M57: images a crash left unsaved: one sheet with Recover and Discard.
+            RecoveryCenter.offerAtLaunch(controller: NSDocumentController.shared, on: self.startWindow,
+                                         onFinished: { [weak self] in
+                // The start window goes once a recovered image is open.
+                guard !NSDocumentController.shared.documents.isEmpty else { return }
+                self?.startWindow?.close()
+                self?.startWindow = nil
+            })
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

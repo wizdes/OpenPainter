@@ -154,6 +154,12 @@ paint.net's Save Configuration dialog (https://www.getpaint.net/doc/latest/FileM
 - Metadata (`PlatformServices/MetadataFilter.swift`): Keep all, Remove location (GPS) or Remove all (EXIF, XMP, GPS, IPTC). Remove location drops the `{GPS}` dictionary and every XMP `GPS*` tag. No save writes an embedded thumbnail. PNG keeps EXIF (`eXIf`, a raw block ImageIO builds from the kept dictionaries) and XMP (`iTXt`) through the engine's PNG writer, so the pixels stay exact. Opening a PNG reads its EXIF and XMP with ImageIO.
 - Resolution: every save writes the document's pixels per inch (PNG `pHYs`, JPEG JFIF density, TIFF, HEIC and AVIF DPI through ImageIO). Opening reads it back: the engine reads `pHYs`, and ImageIO files open at their `DPIWidth` through `op_import_pixels_at` (96 when the file states none).
 
+## Crash recovery and low disk (M57)
+
+- Every open image has a recovery folder `~/Library/Application Support/OpenPainter/Recovery/<uuid>/` (`PlatformServices/RecoveryCenter.swift`; the app sets `RecoveryCenter.root` at launch, tests set their own and it is off by default). The engine writes a record on its own thread 30 s after the last change, or at the latest 2 minutes after the first unrecorded change (format and write order: docs/ARCHITECTURE.md, "Recovery records"). A clean save, an undo back to the saved step and a close delete it.
+- At launch, `RecoveryCenter.offerAtLaunch` lists the records no running app owns in one sheet (`Shell/RecoverySheet.swift`): the original file name, when it was recorded, the size and layer count, with Recover and Discard per image and Decide Later. Recover opens the image marked unsaved with its original file as its file; a damaged record shows why and can only be discarded.
+- A failed save (disk full, no permission) shows the reason in plain words in NSDocument's error sheet and in the status bar; the open image, its history and the last saved file stay as they were. A failed recovery write shows in the status bar each time and in one sheet (`ImageDocument.recoveryErrorPrompt`) until a write works again.
+
 ## View menu, Settings and appearance (M56)
 
 - View menu (paint.net 5.1 order, https://www.getpaint.net/doc/latest/ViewMenu.html): Zoom In, Zoom Out, Zoom to Window, Zoom to Selection, Actual Size, Zoom Presets (paint.net's 25 preset zooms, 3200% to 1%, the current one checked), Pixel Grid, Rulers (Option-Command-R, paint.net Ctrl+Alt+R), and Pixels, Inches, Centimeters. The zoom commands reuse `ZoomPresets` and `Viewport` (M09).

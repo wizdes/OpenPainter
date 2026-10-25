@@ -35,13 +35,72 @@ pub type Result<T> = std::result::Result<T, Error>;
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
+/// Keeps a ZIP writer's I/O error (such as a full disk) as I/O, with its text.
+fn zip_err(error: zip::result::ZipError) -> Error {
+    match error {
+        zip::result::ZipError::Io(e) => Error::Io(e),
+        other => Error::Invalid(other.to_string()),
+    }
+}
 fn other(error: impl std::fmt::Display) -> Error {
     invalid(error.to_string())
 }
 
 /// Save one document by replacing the target only after the complete ZIP is synced.
 pub fn save_opaint(doc: &DocState, path: impl AsRef<Path>) -> Result<()> {
-    save_impl(doc, path.as_ref(), |_| Ok(()), false)
+    save_impl(doc, path.as_ref(), |_| Ok(()), false, SaveHooks::default())
+}
+
+/// Robustness hooks for one save (M57): an injected disk-full failure and a
+/// callback after every write, so tests can fail or pause a save part way.
+#[derive(Default)]
+pub struct SaveHooks<'a> {
+    /// The write that would pass this many bytes fails with ENOSPC ("No space
+    /// left on device"), as a full disk would.
+    pub fail_after_bytes: Option<u64>,
+    /// Called after each write with the bytes written so far.
+    pub on_write: Option<&'a mut dyn FnMut(u64)>,
+}
+
+/// `save_opaint` with `hooks`. The target is still replaced only after the
+/// complete ZIP is synced, so a failed or killed save leaves the old file.
+pub fn save_opaint_with_hooks(
+    doc: &DocState,
+    path: impl AsRef<Path>,
+    hooks: SaveHooks<'_>,
+) -> Result<()> {
+    save_impl(doc, path.as_ref(), |_| Ok(()), false, hooks)
+}
+
+/// The temp file a save writes, with the hooks applied to every write.
+struct HookedFile<'a> {
+    file: File,
+    written: u64,
+    hooks: SaveHooks<'a>,
+}
+impl Write for HookedFile<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if let Some(limit) = self.hooks.fail_after_bytes
+            && self.written + buf.len() as u64 > limit
+        {
+            // ENOSPC is 28 on macOS and Linux.
+            return Err(std::io::Error::from_raw_os_error(28));
+        }
+        let n = self.file.write(buf)?;
+        self.written += n as u64;
+        if let Some(callback) = self.hooks.on_write.as_mut() {
+            callback(self.written);
+        }
+        Ok(n)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file.flush()
+    }
+}
+impl std::io::Seek for HookedFile<'_> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.file.seek(pos)
+    }
 }
 
 fn save_impl(
@@ -49,6 +108,7 @@ fn save_impl(
     path: &Path,
     mut checkpoint: impl FnMut(usize) -> Result<()>,
     keep_temp: bool,
+    hooks: SaveHooks<'_>,
 ) -> Result<()> {
     let parent = path
         .parent()
@@ -71,27 +131,31 @@ fn save_impl(
         }
     };
     let result = (|| {
-        let mut zip = ZipWriter::new(file);
+        let mut zip = ZipWriter::new(HookedFile {
+            file,
+            written: 0,
+            hooks,
+        });
         let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
         let deflated = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-        zip.start_file("mimetype", stored).map_err(other)?;
+        zip.start_file("mimetype", stored).map_err(zip_err)?;
         zip.write_all(MIME)?;
         checkpoint(1)?;
         let xml = make_xml(doc)?;
-        zip.start_file("stack.xml", deflated).map_err(other)?;
+        zip.start_file("stack.xml", deflated).map_err(zip_err)?;
         zip.write_all(xml.as_bytes())?;
         checkpoint(2)?;
         for (index, _) in doc.layers.iter().enumerate() {
             let image = layer_image(doc, index)?;
             let png = encode_png(&image).map_err(other)?;
             zip.start_file(format!("data/layer{index}.png"), deflated)
-                .map_err(other)?;
+                .map_err(zip_err)?;
             zip.write_all(&png)?;
             checkpoint(3 + index)?;
         }
         if let Some(profile) = &doc.profile {
             zip.start_file("data/profile.icc", deflated)
-                .map_err(other)?;
+                .map_err(zip_err)?;
             zip.write_all(profile)?;
         }
         if let SelectionState::Active(SelectionSource::Coverage(mask)) = &doc.selection {
@@ -110,18 +174,19 @@ fn save_impl(
             })
             .map_err(other)?;
             zip.start_file("data/selection.png", deflated)
-                .map_err(other)?;
+                .map_err(zip_err)?;
             zip.write_all(&png)?;
         }
         let merged = composite(doc)?;
-        zip.start_file("mergedimage.png", deflated).map_err(other)?;
+        zip.start_file("mergedimage.png", deflated)
+            .map_err(zip_err)?;
         zip.write_all(&encode_png(&merged).map_err(other)?)?;
         let thumb = thumbnail(&merged);
         zip.start_file("Thumbnails/thumbnail.png", deflated)
-            .map_err(other)?;
+            .map_err(zip_err)?;
         zip.write_all(&encode_png(&thumb).map_err(other)?)?;
-        let file = zip.finish().map_err(other)?;
-        file.sync_all()?;
+        let file = zip.finish().map_err(zip_err)?;
+        file.file.sync_all()?;
         checkpoint(usize::MAX)?;
         if !keep_temp {
             fs::rename(&temp, path)?;
@@ -302,8 +367,17 @@ pub fn load_opaint_with_store(
     path: impl AsRef<Path>,
     store: Arc<TileStore>,
 ) -> Result<LoadedOpaint> {
-    let path = path.as_ref();
-    let mut zip = ZipArchive::new(File::open(path)?).map_err(other)?;
+    load_opaint_from_reader(File::open(path.as_ref())?, store)
+}
+/// Load a native file held in memory (the M57 fuzz target reads this way).
+pub fn load_opaint_from_bytes(bytes: &[u8], store: Arc<TileStore>) -> Result<LoadedOpaint> {
+    load_opaint_from_reader(std::io::Cursor::new(bytes), store)
+}
+fn load_opaint_from_reader<R: Read + std::io::Seek>(
+    reader: R,
+    store: Arc<TileStore>,
+) -> Result<LoadedOpaint> {
+    let mut zip = ZipArchive::new(reader).map_err(other)?;
     if zip.is_empty() {
         return Err(invalid("missing mimetype"));
     }
@@ -506,7 +580,11 @@ fn check_path(path: &str) -> Result<()> {
     }
     Ok(())
 }
-fn read_entry(zip: &mut ZipArchive<File>, name: &str, limit: u64) -> Result<Vec<u8>> {
+fn read_entry<R: Read + std::io::Seek>(
+    zip: &mut ZipArchive<R>,
+    name: &str,
+    limit: u64,
+) -> Result<Vec<u8>> {
     let entry = zip.by_name(name).map_err(other)?;
     if entry.size() > limit {
         return Err(invalid(format!("{name} exceeds size limit")));
@@ -776,10 +854,11 @@ mod tests {
                 }
             },
             false,
+            SaveHooks::default(),
         );
         assert!(error.is_err());
         assert_eq!(fs::read(&path).unwrap(), old);
-        save_impl(&doc, &path, |_| Ok(()), true).unwrap();
+        save_impl(&doc, &path, |_| Ok(()), true, SaveHooks::default()).unwrap();
         assert_eq!(fs::read(&path).unwrap(), old);
         assert!(
             fs::read_dir(dir.path()).unwrap().any(|e| e
@@ -789,5 +868,57 @@ mod tests {
                 .ends_with(".tmp"))
         );
         assert!(load_opaint(&path).is_ok());
+    }
+
+    #[test]
+    fn a_disk_full_save_keeps_the_old_file_and_reports_enospc() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store, 300, 300, 72.0).unwrap();
+        let path = dir.path().join("full.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let old = fs::read(&path).unwrap();
+        let mut writes = 0;
+        let mut count = |_bytes: u64| writes += 1;
+        let error = save_opaint_with_hooks(
+            &doc.add_layer(1, "two").unwrap(),
+            &path,
+            SaveHooks {
+                fail_after_bytes: Some(200),
+                on_write: Some(&mut count),
+            },
+        )
+        .unwrap_err();
+        match &error {
+            Error::Io(e) => assert_eq!(e.raw_os_error(), Some(28)),
+            other => panic!("expected an I/O error, got {other}"),
+        }
+        assert!(error.to_string().contains("No space left on device"));
+        assert!(writes > 0);
+        assert_eq!(fs::read(&path).unwrap(), old);
+        let names: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".tmp"))
+            .collect();
+        assert!(names.is_empty(), "{names:?}");
+        assert_eq!(load_opaint(&path).unwrap().layers.len(), 1);
+    }
+
+    #[test]
+    fn a_file_in_memory_loads_like_the_same_file_on_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store.clone(), 5, 3, 72.0)
+            .unwrap()
+            .add_layer(1, "b")
+            .unwrap();
+        let path = dir.path().join("m.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let loaded = load_opaint_from_bytes(&fs::read(&path).unwrap(), store).unwrap();
+        assert_eq!(loaded.doc.layers.len(), 2);
+        assert_eq!(loaded.doc.layers[1].name, "b");
+        let empty = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        assert!(load_opaint_from_bytes(b"PK\x03\x04 nonsense", empty).is_err());
     }
 }

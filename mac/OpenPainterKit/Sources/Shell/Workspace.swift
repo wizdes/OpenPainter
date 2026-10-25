@@ -68,6 +68,10 @@ public final class Workspace {
                 case .docChanged, .historyChanged, .layersChanged:
                     self.editors.first { $0.document.id == event.doc }?.scheduleRefresh()
                 case .progress: EffectDialogController.progressEvent(event)
+                case .recovery:
+                    // M57: a failed recovery write shows in the status bar and a sheet.
+                    let host = self.editors.first { $0.document.id == event.doc }?.host as? ImageDocument
+                    host?.recoveryEvent(event.json)
                 default: break
                 }
             }

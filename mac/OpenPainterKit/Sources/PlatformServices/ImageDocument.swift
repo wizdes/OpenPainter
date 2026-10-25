@@ -62,6 +62,16 @@ open class ImageDocument: NSDocument, EditorHost {
     nonisolated(unsafe) private var pendingSaveOptions: SaveOptions?
     /// True between a menu or save-panel save and its save(to:) call.
     nonisolated(unsafe) private var saveFromUI = false
+    /// M57: this image's recovery record folder (nil: recovery is off).
+    nonisolated(unsafe) public private(set) var recoveryDir: URL?
+    /// M57: true after a recovery write failed, until one works again.
+    nonisolated(unsafe) public private(set) var recoveryFailing = false
+    public typealias RecoveryErrorPrompt = @MainActor (ImageDocument, String) -> Void
+    /// M57: shown once when recovery copies start failing (disk full). Tests
+    /// replace it; the default is a sheet over the image's window.
+    nonisolated(unsafe) public static var recoveryErrorPrompt: RecoveryErrorPrompt = { doc, text in
+        ImageDocument.showRecoveryAlert(doc, text)
+    }
 
     public required override init() {
         super.init()
@@ -87,6 +97,7 @@ open class ImageDocument: NSDocument, EditorHost {
         engineDocument = doc
         pixelSize = CGSize(width: settings.width, height: settings.height)
         fileType = ImageFormats.opaintIdentifier
+        startRecovery(originalURL: nil)
     }
 
     /// Open, and Revert (a second read): Revert gives the open engine document
@@ -108,6 +119,7 @@ open class ImageDocument: NSDocument, EditorHost {
             }
         } else {
             engineDocument = loaded.document
+            startRecovery(originalURL: url)
         }
         pixelSize = loaded.pixelSize
         metadata = loaded.metadata
@@ -204,7 +216,22 @@ open class ImageDocument: NSDocument, EditorHost {
                             completionHandler: @escaping ((any Error)?) -> Void) {
         let finish: ((any Error)?) -> Void = { [weak self] error in
             self?.pendingSaveOptions = nil
-            MainActor.assumeIsolated { self?.afterSave() }
+            MainActor.assumeIsolated {
+                self?.afterSave()
+                // M57: a failed save says why in the status bar too; the
+                // image and its history stay as they were.
+                if let error, !Self.isUserCancelled(error) {
+                    // NSDocument writes to a temporary copy first; when moving it
+                    // into place fails, the engine has already marked the step
+                    // saved. The real file was not changed, so the image is unsaved.
+                    if saveOperation == .saveOperation || saveOperation == .saveAsOperation,
+                       let self, !self.isDocumentEdited {
+                        try? self.engineDocument?.markUnsaved()
+                        self.syncEditedState()
+                    }
+                    self?.reportSaveFailure(error)
+                }
+            }
             completionHandler(error)
         }
         let type = ImageFormats.saveTypes().contains(typeName)
@@ -264,6 +291,10 @@ open class ImageDocument: NSDocument, EditorHost {
         editor?.name = displayName
         for wc in windowControllers { wc.window?.title = displayName }
         syncEditedState()
+        // M57: the next recovery record names the file the image now has.
+        if let dir = recoveryDir, let doc = engineDocument {
+            try? doc.attachRecovery(dir: dir, originalURL: fileURL, timing: RecoveryCenter.timing)
+        }
     }
 
     override open func write(to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType,
@@ -276,10 +307,113 @@ open class ImageDocument: NSDocument, EditorHost {
             try DocumentSaver.write(doc, to: url, type: type, metadata: metadata.isEmpty ? nil : metadata,
                                     options: pendingSaveOptions ?? saveOptions(for: type), markSaved: mark)
         } catch {
+            // M57: the engine's own text (such as "No space left on device"), in plain words.
+            let engineText = error is EngineError ? doc.lastFileError() : nil
+            let reason = RecoveryCenter.plainReason(engineText ?? Self.describe(error))
             throw NSError(domain: "OpenPainter", code: 4, userInfo: [
                 NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” could not be saved.",
-                NSLocalizedFailureReasonErrorKey: error.localizedDescription,
+                NSLocalizedFailureReasonErrorKey: reason,
+                NSLocalizedRecoverySuggestionErrorKey: "Your changes are still open. The last saved file was not changed.",
+                NSUnderlyingErrorKey: error,
             ])
+        }
+    }
+
+    /// An error's text with its underlying POSIX error, if any.
+    static func describe(_ error: any Error) -> String {
+        let e = error as NSError
+        if let under = e.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return "\(e.localizedDescription) \(under.localizedDescription) (os error \(under.code))"
+        }
+        return e.localizedDescription
+    }
+
+    // MARK: Recovery (M57)
+
+    /// Turns on recovery records for this image when the app has a recovery folder.
+    private func startRecovery(originalURL: URL?) {
+        guard let root = RecoveryCenter.root, let doc = engineDocument, recoveryDir == nil else { return }
+        let dir = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            try doc.attachRecovery(dir: dir, originalURL: originalURL, timing: RecoveryCenter.timing,
+                                   testFailAfterBytes: RecoveryCenter.testFailAfterBytes)
+            recoveryDir = dir
+        } catch {
+            FileHandle.standardError.write(Data("OpenPainter: recovery is off for this image: \(error)\n".utf8))
+        }
+    }
+
+    /// The status-bar text for a failed save.
+    @MainActor
+    func reportSaveFailure(_ error: any Error) {
+        let e = error as NSError
+        var text = e.localizedDescription
+        if let reason = e.localizedFailureReason, !text.contains(reason) { text += " " + reason }
+        editor?.report("\(text) Your changes are still open.")
+    }
+
+    /// A recovery event from the engine (Workspace forwards it).
+    @MainActor
+    public func recoveryEvent(_ json: [String: Any]) {
+        if json["ok"] as? Bool == false {
+            let reason = RecoveryCenter.plainReason(json["error"] as? String ?? "")
+            let text = "A recovery copy of “\(displayName ?? "Untitled")” could not be saved. \(reason) "
+                + "Your changes are still open."
+            editor?.report(text)
+            if !recoveryFailing {
+                recoveryFailing = true
+                Self.recoveryErrorPrompt(self, text)
+            }
+        } else if recoveryFailing {
+            recoveryFailing = false
+            editor?.report("Recovery copies are being saved again.")
+        }
+    }
+
+    /// Recover: opens a crash's record as an unsaved image with the original
+    /// file as its file (untitled when it had none), and shows its window.
+    @MainActor @discardableResult
+    public static func recover(_ record: RecoveryRecord, controller: NSDocumentController) throws -> ImageDocument {
+        guard let engine = Self.engine else { throw NSError(domain: "OpenPainter", code: 1) }
+        let cls = (controller.documentClass(forType: ImageFormats.opaintIdentifier) as? ImageDocument.Type)
+            ?? ImageDocument.self
+        let opened = try engine.openRecovery(dir: record.dir, timing: RecoveryCenter.timing)
+        let doc = cls.init()
+        doc.adoptRecovered(opened, record: record)
+        controller.addDocument(doc)
+        doc.makeWindowControllers()
+        doc.showWindows()
+        doc.syncEditedState()
+        doc.editor?.report("Recovered with the changes that were not saved.")
+        return doc
+    }
+
+    private func adoptRecovered(_ opened: Document, record: RecoveryRecord) {
+        engineDocument = opened
+        recoveryDir = record.dir
+        let info = (try? opened.info()) ?? [:]
+        pixelSize = CGSize(width: (info["width"] as? NSNumber)?.doubleValue ?? Double(record.width ?? 0),
+                           height: (info["height"] as? NSNumber)?.doubleValue ?? Double(record.height ?? 0))
+        if let url = record.originalURL, url.isFileURL {
+            fileURL = url
+            fileType = ImageFormats.saveType(forExtension: url.pathExtension) ?? ImageFormats.opaintIdentifier
+        } else {
+            fileType = ImageFormats.opaintIdentifier
+        }
+    }
+
+    /// "OpenPainter could not save a recovery copy" over the image's window.
+    @MainActor
+    static func showRecoveryAlert(_ doc: ImageDocument, _ text: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Recovery copies cannot be saved"
+        alert.informativeText = text + " Save the image to keep your work."
+        alert.addButton(withTitle: "OK")
+        if let w = doc.windowControllers.first?.window {
+            alert.beginSheetModal(for: w) { _ in }
+        } else {
+            alert.runModal()
         }
     }
 

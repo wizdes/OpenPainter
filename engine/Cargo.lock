@@ -1094,6 +1094,7 @@ dependencies = [
  "op-engine",
  "op-formats",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1124,6 +1125,7 @@ name = "op-engine"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "crc32fast",
  "crossbeam-channel",
  "lcms2",
  "op-color",

@@ -2,6 +2,7 @@
 use op_engine::Engine;
 use op_formats::png::{DecodedImage, decode_png, encode_png};
 use serde_json::{Value, json};
+mod recovery_helper;
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -11,6 +12,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if args[0] == "--version" || args[0] == "-V" {
         println!("opcli {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
+    }
+    if args[0] == "recovery-helper" {
+        return recovery_helper::run(&args[1..]);
     }
     if args[0] != "run" || args.len() < 5 {
         return Err("usage: opcli run <png> <command-id> [json] -o <out.png>".into());

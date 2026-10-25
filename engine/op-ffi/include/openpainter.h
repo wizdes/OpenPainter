@@ -50,6 +50,12 @@ typedef enum OpEventKind {
    */
   OP_EVENT_JOB_FINISHED = 4,
   OP_EVENT_PROGRESS = 5,
+  /**
+   * M57: a recovery record was written, failed or was cleared. Payload:
+   * `{"ok":true,"revision":n}`, `{"ok":false,"error":"..."}` or
+   * `{"ok":true,"revision":null,"cleared":true}`.
+   */
+  OP_EVENT_RECOVERY = 6,
 } OpEventKind;
 
 typedef struct OpEngine OpEngine;
@@ -352,6 +358,13 @@ enum OpStatus op_doc_mark_saved(struct OpEngine *p, uint64_t doc, uint64_t revis
 enum OpStatus op_doc_replace(struct OpEngine *p, uint64_t doc, uint64_t source);
 
 /**
+ * M57: no history step is the saved one, so `doc.info` reports `dirty`
+ * until the next save. The app calls it when NSDocument's save failed after
+ * the engine had already written (and marked) its temporary copy.
+ */
+enum OpStatus op_doc_mark_unsaved(struct OpEngine *p, uint64_t doc);
+
+/**
  * Encodes `rgba` (`width` × `height` straight RGBA8, top row first) into
  * `out` (free with op_buffer_free). `json` holds the options, such as
  * `{"format":"jpeg","jpeg_quality":95,"jpeg_subsampling":"422","dpi":300}`;
@@ -418,6 +431,53 @@ enum OpStatus op_move_finish(struct OpEngine *p, uint64_t doc);
  * OP_ERR_BAD_ARGUMENT when no move runs.
  */
 enum OpStatus op_move_cancel(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Turns on recovery records for `doc`. `json`: `{"dir":"<root>/<doc-uuid>",
+ * "original_url":"file:///x.opaint"|null, "settle_ms":30000,
+ * "max_interval_ms":120000}`. Calling it again only updates `original_url`.
+ */
+enum OpStatus op_recovery_attach(struct OpEngine *p,
+                                 uint64_t doc,
+                                 const uint8_t *json,
+                                 uintptr_t len);
+
+/**
+ * Writes a record now if the document changed since the last one, and
+ * waits for it. Mostly for tests; the writer writes by itself.
+ */
+enum OpStatus op_recovery_flush(struct OpEngine *p, uint64_t doc);
+
+/**
+ * Stops recovery for `doc`. With `delete_record` false the record stays on
+ * disk and its folder is let go, as after a crash (tests use this); with
+ * true the folder is deleted, as on a clean close.
+ */
+enum OpStatus op_recovery_detach(struct OpEngine *p, uint64_t doc, bool delete_record);
+
+/**
+ * Lists the records under the UTF-8 folder `root` that no live process
+ * owns, as a JSON array (needs no engine). Each entry: `uuid`, `dir`,
+ * `valid`, `problem`, `revision`, `original_url`, `time_unix`, `width`,
+ * `height`, `layers`, `snapshot_bytes`.
+ */
+enum OpStatus op_recovery_scan(const uint8_t *root, uintptr_t len, struct OpBuffer *out);
+
+/**
+ * Opens the record in `{"dir":...}` as a new document marked unsaved, and
+ * keeps recording it into the same folder (same JSON options as attach).
+ * OP_ERR_BAD_ARGUMENT when the record is damaged.
+ */
+enum OpStatus op_recovery_open(struct OpEngine *p,
+                               const uint8_t *json,
+                               uintptr_t len,
+                               uint64_t *out_doc);
+
+/**
+ * Deletes the record folder in `{"dir":...}` (Discard). OP_ERR_BUSY when a
+ * live process owns it.
+ */
+enum OpStatus op_recovery_discard(const uint8_t *json, uintptr_t len);
 
 /**
  * Starts a Paintbrush, Eraser or Pencil stroke on the active layer. `json`:
