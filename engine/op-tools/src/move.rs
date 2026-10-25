@@ -89,8 +89,26 @@ impl From<DocError> for MoveError {
     }
 }
 
+/// Pasted pixels floating over the active layer (M34 Paste): straight RGBA8,
+/// `width` x `height`, with the top-left corner at (`x`, `y`) in document
+/// pixels. It may reach past the canvas; the part outside shows once the move
+/// brings it in.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FloatImage {
+    pub x: i64,
+    pub y: i64,
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+
 pub struct MoveSession {
     base: DocState,
+    /// Paste: the floating pixels. The layer keeps its own pixels (nothing is
+    /// cut) and the pasted pixels go over them.
+    float: Option<FloatImage>,
+    /// The history label `finish` should use instead of the kind's (paste).
+    label: Option<String>,
     pub base_revision: u64,
     pub target_layer: LayerId,
     pub kind: MoveKind,
@@ -118,12 +136,59 @@ impl MoveSession {
             base_revision: base.revision,
             target_layer: base.layers[layer].id,
             base,
+            float: None,
+            label: None,
             kind,
             options,
             original,
             coverage,
             generation: 0,
         })
+    }
+    /// A paste session (M34): `float` floats over the active layer of `base`
+    /// and moves like selected pixels. `base` should select the pasted bounds.
+    pub fn paste(
+        base: DocState,
+        float: FloatImage,
+        options: MoveOptions,
+    ) -> Result<Self, MoveError> {
+        options
+            .transform
+            .inverse()
+            .ok_or(MoveError::SingularTransform)?;
+        if float.width == 0
+            || float.height == 0
+            || float.rgba.len() != float.width as usize * float.height as usize * 4
+        {
+            return Err(MoveError::Document(DocError::Dimensions));
+        }
+        let layer = base.active_layer;
+        let original = read_layer(&base, layer)?;
+        Ok(Self {
+            base_revision: base.revision,
+            target_layer: base.layers[layer].id,
+            base,
+            float: Some(float),
+            label: None,
+            kind: MoveKind::Pixels,
+            options,
+            original,
+            coverage: Vec::new(),
+            generation: 0,
+        })
+    }
+    /// Sets the history label for `finish` (such as "Paste").
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+    /// The label set with `with_label`.
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+    /// True for a paste session.
+    pub fn is_paste(&self) -> bool {
+        self.float.is_some()
     }
     pub fn update(&mut self, options: MoveOptions) -> Result<(), MoveError> {
         options
@@ -145,7 +210,10 @@ impl MoveSession {
         if self.kind == MoveKind::Selection {
             return Ok(next.set_selection(selection));
         }
-        if self.options.transform == Affine::identity() && !self.options.copy {
+        if self.float.is_none()
+            && self.options.transform == Affine::identity()
+            && !self.options.copy
+        {
             return Ok(next.set_selection(selection));
         }
         let inverse = self
@@ -154,7 +222,7 @@ impl MoveSession {
             .inverse()
             .ok_or(MoveError::SingularTransform)?;
         let mut out = self.original.clone();
-        if !self.options.copy {
+        if self.float.is_none() && !self.options.copy {
             // For coverage c and source alpha a, the cut keeps a(1-c) and the
             // floating part gets ac. Source-over of those parts at identity
             // gives a(1-c)+ac(1-a(1-c)), which is less than a. The identity
@@ -256,13 +324,34 @@ impl MoveSession {
         }
     }
     fn exact_sample(&self, sx: f64, sy: f64) -> [u8; 4] {
-        let x = (sx - 0.5).round() as isize;
-        let y = (sy - 0.5).round() as isize;
+        self.source((sx - 0.5).round() as isize, (sy - 0.5).round() as isize)
+    }
+    /// The floating pixel at (x, y) before the transform; clear outside it.
+    fn source(&self, x: isize, y: isize) -> [u8; 4] {
+        if let Some(f) = &self.float {
+            let (fx, fy) = (x as i64 - f.x, y as i64 - f.y);
+            if fx < 0 || fy < 0 || fx >= f.width as i64 || fy >= f.height as i64 {
+                return [0; 4];
+            }
+            let j = (fy as usize * f.width as usize + fx as usize) * 4;
+            return [f.rgba[j], f.rgba[j + 1], f.rgba[j + 2], f.rgba[j + 3]];
+        }
         if x < 0 || y < 0 || x >= self.base.width as isize || y >= self.base.height as isize {
             return [0; 4];
         }
-        let p = y as usize * self.base.width as usize + x as usize;
-        self.floating(p)
+        self.floating(y as usize * self.base.width as usize + x as usize)
+    }
+    /// The floating pixels' bounds before the transform: (x0, y0, x1, y1).
+    fn source_bounds(&self) -> (f64, f64, f64, f64) {
+        match &self.float {
+            Some(f) => (
+                f.x as f64,
+                f.y as f64,
+                f.x as f64 + f.width as f64,
+                f.y as f64 + f.height as f64,
+            ),
+            None => (0.0, 0.0, self.base.width as f64, self.base.height as f64),
+        }
     }
     fn floating(&self, p: usize) -> [u8; 4] {
         let j = p * 4;
@@ -314,11 +403,8 @@ impl MoveSession {
                 };
             }
         }
-        if sx < -3.0
-            || sy < -3.0
-            || sx > self.base.width as f64 + 3.0
-            || sy > self.base.height as f64 + 3.0
-        {
+        let (x0, y0, x1, y1) = self.source_bounds();
+        if sx < x0 - 3.0 || sy < y0 - 3.0 || sx > x1 + 3.0 || sy > y1 + 3.0 {
             return [0; 4];
         }
         let mode = effective_mode(self.options.resampling, self.options.transform);
@@ -337,14 +423,10 @@ impl MoveSession {
                     continue;
                 }
                 weights += weight;
-                if ix < 0
-                    || iy < 0
-                    || ix >= self.base.width as isize
-                    || iy >= self.base.height as isize
-                {
+                let p = self.source(ix, iy);
+                if p[3] == 0 {
                     continue;
                 }
-                let p = self.floating(iy as usize * self.base.width as usize + ix as usize);
                 let a = p[3] as f64 / 255.0;
                 sum[3] += weight * a;
                 for c in 0..3 {

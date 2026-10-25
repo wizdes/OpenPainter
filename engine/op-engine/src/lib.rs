@@ -26,6 +26,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
+mod clipboard_commands;
 mod color_sample;
 mod document_file;
 mod flood_commands;
@@ -43,6 +44,7 @@ mod selection_commands;
 mod shape_commands;
 mod shell_commands;
 mod text_commands;
+pub use clipboard_commands::{PasteRequest, PasteStarted, decode_png};
 pub use document_file::SaveFormat;
 pub use gpu_effects::EngineOptions;
 pub use layer_commands::{BLEND_MODES, blend_name, content_key};
@@ -981,6 +983,8 @@ enum Message {
     MoveUpdate(MoveOptions, Sender<Result<()>>),
     MoveFinish(Sender<Result<()>>),
     MoveCancel(Sender<Result<()>>),
+    /// M34: a paste opens a move session with floating pixels (clipboard_commands.rs).
+    PasteBegin(Box<PasteRequest>, Sender<Result<PasteStarted>>),
     /// M19: save, mark saved, replace content (document_file.rs).
     File(document_file::FileOp, Sender<Result<()>>),
     Stop(Sender<()>),
@@ -1809,17 +1813,25 @@ impl Actor {
             .move_session
             .take()
             .ok_or_else(|| bad("no move session"))?;
-        if session.target_layer != self.active_id() {
+        // A paste session's layer may be the new layer it adds (M34).
+        if !session.is_paste() && session.target_layer != self.active_id() {
             self.publish(None);
             return Err(Error::Busy);
         }
         let kind = session.kind;
+        let paste = session.label().map(str::to_owned);
         let state = session.finish().map_err(bad)?;
         let label = match kind {
             MoveKind::Pixels => "Move Selected Pixels",
             MoveKind::Selection => "Move Selection",
         };
-        self.history.commit(label, label, state);
+        match &paste {
+            Some(l) => {
+                self.history
+                    .commit(l.as_str(), clipboard_commands::paste_command_id(l), state)
+            }
+            None => self.history.commit(label, label, state),
+        }
         if kind == MoveKind::Selection
             || self.history.current_state().selection
                 != self
@@ -1834,6 +1846,9 @@ impl Actor {
         self.publish(None);
         self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
         self.event(EventKind::HistoryChanged, 0, json!({}));
+        if paste.is_some() {
+            self.paste_finished();
+        }
         Ok(())
     }
     fn stroke_append(&mut self, samples: &[StrokeSample]) -> Result<()> {
@@ -1971,6 +1986,9 @@ impl Actor {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
                 Message::MoveBegin(_, _, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
+                Message::PasteBegin(_, r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
                 Message::File(_, r) if stopping.is_some() => {
@@ -2111,6 +2129,11 @@ impl Actor {
                 }
                 Message::MoveBegin(kind, options, r) => {
                     let _ = r.send(self.move_begin(kind, options));
+                }
+                Message::PasteBegin(req, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| self.paste_begin(*req)))
+                        .unwrap_or(Err(Error::Panic));
+                    let _ = r.send(result);
                 }
                 Message::MoveUpdate(options, r) => {
                     let _ = r.send(self.move_update(options));
@@ -2538,6 +2561,13 @@ impl Engine {
     pub fn move_cancel(&self, id: u64) -> Result<()> {
         self.call(id, Message::MoveCancel)?
     }
+    /// Paste and Paste into New Layer (M34): converts the pixels to the
+    /// document's profile and starts a move session with them floating. Then
+    /// `move_update`, `move_finish` (one history step) and `move_cancel` work
+    /// as for any move.
+    pub fn paste_begin(&self, id: u64, request: PasteRequest) -> Result<PasteStarted> {
+        self.call(id, |r| Message::PasteBegin(Box::new(request), r))?
+    }
     pub fn query(&self, id: u64, query: &str, params: Value) -> Result<Vec<u8>> {
         // Catalog queries need no document (id 0 is fine).
         if query == "tool.shape.catalog" {
@@ -2578,6 +2608,11 @@ impl Engine {
                 serde_json::to_vec(&profile_query::profile_info(&s.state)).map_err(internal)
             }
             "doc.profile_icc" => Ok(profile_query::profile_icc(&s.state)),
+            "clipboard.copy" => clipboard_commands::copy_pixels(
+                &s.state,
+                params.get("merged").and_then(Value::as_bool) == Some(true),
+            ),
+            "clipboard.profile_icc" => clipboard_commands::profile_icc(&s.state),
             "doc.selection" => {
                 serde_json::to_vec(&shell_commands::selection_info(shown)).map_err(internal)
             }

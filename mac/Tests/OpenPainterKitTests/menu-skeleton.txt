@@ -30,12 +30,12 @@ Edit
 Edit > Undo [⌘Z]
 Edit > Redo [⇧⌘Z]
 Edit > ---
-Edit > Cut [⌘X] (off)
-Edit > Copy [⌘C] (off)
-Edit > Copy Merged [⇧⌘C] (off)
-Edit > Paste [⌘V] (off)
-Edit > Paste into New Layer [⇧⌘V] (off)
-Edit > Paste into New Image [⌥⌘V] (off)
+Edit > Cut [⌘X]
+Edit > Copy [⌘C]
+Edit > Copy Merged [⇧⌘C]
+Edit > Paste [⌘V]
+Edit > Paste into New Layer [⇧⌘V]
+Edit > Paste into New Image [⌥⌘V]
 Edit > ---
 Edit > Copy Selection [⌥⇧⌘C]
 Edit > Paste Selection

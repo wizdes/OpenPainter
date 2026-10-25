@@ -308,6 +308,38 @@ enum OpStatus op_pointer(struct OpEngine *_p,
                          uintptr_t _len);
 
 /**
+ * Starts a paste on `doc`. `json`: `{"width", "height", "x", "y",
+ * "new_layer", "transform", "resampling"}`: the size of `rgba` (straight
+ * RGBA8), the top-left corner in document pixels (it may lie off the canvas),
+ * whether to add a layer above the active one first, and the move options
+ * (see `op_move_update`). `icc` is the image's profile (empty: sRGB); pixels
+ * in another profile are converted to the document's. Writes
+ * `{"session", "converted_from"}` to `out` (free with op_buffer_free);
+ * `converted_from` is the pasted profile's description, or null when no
+ * conversion was needed. OP_ERR_BUSY while a stroke, preview, move or tool
+ * session runs.
+ */
+enum OpStatus op_paste_begin(struct OpEngine *p,
+                             uint64_t doc,
+                             const uint8_t *json,
+                             uintptr_t len,
+                             const uint8_t *rgba,
+                             uintptr_t rgba_len,
+                             const uint8_t *icc,
+                             uintptr_t icc_len,
+                             struct OpBuffer *out);
+
+/**
+ * Decodes a PNG exactly (straight RGBA8, colors under zero alpha kept) into
+ * `out_pixels` (free with op_pixels_free) and its ICC profile into `out_icc`
+ * (empty when the PNG has none; free with op_buffer_free). Needs no engine.
+ */
+enum OpStatus op_png_decode(const uint8_t *png,
+                            uintptr_t len,
+                            struct OpPixelBuffer *out_pixels,
+                            struct OpBuffer *out_icc);
+
+/**
  * File > New: a one-layer image named "Background" filled with
  * `background_rgba` (0xRRGGBBAA, straight alpha; 0 is Transparent) at `dpi`
  * pixels per inch. The new image is not modified.

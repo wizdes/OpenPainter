@@ -297,10 +297,9 @@ pdn = "Edit > Cut"
 win = "Ctrl+X"
 mac = "Edit > Cut"
 key = "⌘X"
-command = ""
+command = "cut:"
 icon = true
-status = "pending"
-reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+status = "v1"
 source = "https://www.getpaint.net/doc/latest/EditMenu.html"
 
 [[item]]
@@ -308,10 +307,9 @@ pdn = "Edit > Copy"
 win = "Ctrl+C"
 mac = "Edit > Copy"
 key = "⌘C"
-command = ""
+command = "copy:"
 icon = true
-status = "pending"
-reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+status = "v1"
 source = "https://www.getpaint.net/doc/latest/EditMenu.html"
 
 [[item]]
@@ -319,10 +317,9 @@ pdn = "Edit > Copy Merged"
 win = "Ctrl+Shift+C"
 mac = "Edit > Copy Merged"
 key = "⇧⌘C"
-command = ""
+command = "copyMerged:"
 icon = true
-status = "pending"
-reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+status = "v1"
 source = "https://www.getpaint.net/doc/latest/EditMenu.html"
 
 [[item]]
@@ -330,10 +327,9 @@ pdn = "Edit > Paste"
 win = "Ctrl+V"
 mac = "Edit > Paste"
 key = "⌘V"
-command = ""
+command = "paste:"
 icon = true
-status = "pending"
-reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+status = "v1"
 source = "https://www.getpaint.net/doc/latest/EditMenu.html"
 
 [[item]]
@@ -341,10 +337,9 @@ pdn = "Edit > Paste into New Layer"
 win = "Ctrl+Shift+V"
 mac = "Edit > Paste into New Layer"
 key = "⇧⌘V"
-command = ""
+command = "pasteIntoNewLayer:"
 icon = true
-status = "pending"
-reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+status = "v1"
 source = "https://www.getpaint.net/doc/latest/EditMenu.html"
 
 [[item]]
@@ -352,10 +347,9 @@ pdn = "Edit > Paste into New Image"
 win = "Ctrl+Alt+V"
 mac = "Edit > Paste into New Image"
 key = "⌥⌘V"
-command = ""
+command = "pasteIntoNewImage:"
 icon = true
-status = "pending"
-reason = "M34 (Clipboard) builds it; not merged when M55 ran"
+status = "v1"
 source = "https://www.getpaint.net/doc/latest/EditMenu.html"
 
 [[item]]

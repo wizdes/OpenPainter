@@ -331,6 +331,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let busy = FocusRouter.target(in: window) == .dialog
         if let on = validateViewItem(item) { return on }
+        if let on = validateClipboardItem(item) { return on }  // M34
         if let on = menuState(item, busy: busy) { return on }  // M55, MenuStates.swift
         switch item.action {
         case #selector(runCommand(_:)):
