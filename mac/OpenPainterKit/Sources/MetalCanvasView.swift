@@ -79,6 +79,15 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     public var recorder: TabletLogRecorder?
     /// A click with the `.click` tool, in document pixels.
     public var onClick: ((CGPoint) -> Void)?
+    /// `.click` tools (M31): a press at a view point this returns true for
+    /// grabs an on-canvas handle (the Magic Wand and Paint Bucket click point).
+    /// Its drags go to `onHandleDrag` and its release to `onHandleRelease`, in
+    /// document pixels, and no click is sent.
+    public var onClickPress: ((CGPoint) -> Bool)?
+    public var onHandleDrag: ((CGPoint) -> Void)?
+    public var onHandleRelease: ((CGPoint) -> Void)?
+    /// True while a press from `onClickPress` drags a handle.
+    public private(set) var handleDragging = false
     /// The pointer position in document pixels, nil when it leaves the canvas.
     public var onCursor: ((CGPoint?) -> Void)?
     /// A plain letter key; return true when it picked a tool.
@@ -438,6 +447,7 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
         lastDrag = p
         if effectiveTool == .pan { NSCursor.closedHand.set() }
         if effectiveTool == .stroke { beginPen(event, secondary: pressUsesSecondary) }
+        handleDragging = effectiveTool == .click && onClickPress?(p) == true
         if effectiveTool == .overlay {
             pointerSink?.pointerDown(
                 document: viewport.documentPoint(atView: p), view: p, modifiers: pressModifiers,
@@ -532,7 +542,9 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             pointerSink?.pointerDragged(
                 document: viewport.documentPoint(atView: p), view: p,
                 modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask))
-        case .click, .inactive:
+        case .click:
+            if handleDragging { onHandleDrag?(viewport.documentPoint(atView: p)) }
+        case .inactive:
             break
         }
     }
@@ -555,6 +567,11 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
             pointerSink?.pointerUp(
                 document: viewport.documentPoint(atView: p), view: p,
                 modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask))
+            return
+        }
+        if handleDragging {
+            handleDragging = false
+            onHandleRelease?(viewport.documentPoint(atView: p))
             return
         }
         if effectiveTool == .click, let start = dragStart, hypot(p.x - start.x, p.y - start.y) < 4 {

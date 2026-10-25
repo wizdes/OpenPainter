@@ -21,6 +21,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     /// Rectangle Select, the Crop tool and the marching ants (M23).
     public private(set) var selectCrop: SelectCropController!
     private var cursor: CGPoint?
+    /// The live Magic Wand and Paint Bucket (M31, FloodTool.swift).
+    public private(set) var flood: FloodToolController!
     /// The Text tool's session and input view (M46).
     public private(set) var textTool: TextToolController!
     static let minimumSize = NSSize(width: 1100, height: 792)
@@ -110,6 +112,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         brush = BrushStrokeController(controller: self)
         canvas.strokeSink = brush
         selectCrop = SelectCropController(controller: self)
+        flood = FloodToolController(controller: self)
         canvas.onClick = { [weak self] p in
             guard let self else { return }
             self.click(p, secondary: self.canvas.pressUsesSecondary, modifiers: self.canvas.pressModifiers)
@@ -137,6 +140,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             self?.updateStatus()
             self?.textTool?.viewportChanged()
             self?.selectCrop?.viewportChanged()
+            self?.flood?.viewportChanged()
         }
         // scripts/launch-time.sh waits for this line (the trace replaces the hook).
         canvas.onFirstFrame = { LaunchClock.markReady() }
@@ -156,11 +160,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         let tool = workspace.tools.tool
         if tool == .colorPicker { return pickColor(at: point, secondary: secondary, modifiers: modifiers) }
         if tool == .text { return textTool.click(at: point) }
-        guard tool == .magicWand || tool == .paintBucket else { return }
-        let x = Int(point.x.rounded(.down)), y = Int(point.y.rounded(.down))
-        guard x >= 0, y >= 0, x < editor.info.width, y < editor.info.height else { return }
-        editor.run(tool == .magicWand ? "tool.magic_wand" : "tool.paint_bucket",
-                   workspace.tools.floodParams(tool: tool, x: x, y: y, secondary: secondary))
+        // Magic Wand and Paint Bucket: the result stays live until Finish (M31).
+        flood.click(at: point, secondary: secondary)
     }
 
     /// While text is open, Escape and Enter go to the Text tool. Otherwise Escape
@@ -178,9 +179,11 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         switch key {
         case .escape:
             if canvas.cancelStroke() { return }
+            if flood.cancel() { return }
             if selectCrop.escape() { return }
             if editor.selection != nil { editor.run("selection.deselect") }
         case .enter:
+            if flood.finish() { return }
             if selectCrop.enter() { return }
             editor.clearMessage()
             if editor.selection != nil, editor.isEnabled("selection.deselect") { editor.run("selection.deselect") }
@@ -266,6 +269,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             editor.run("edit.undo")
             return
         }
+        // Undo while a fill or wand selection is live drops it (M31).
+        if flood?.cancel() == true { return }
         if canUndo { editor.run("edit.undo") }
     }
     public func redo() { if canRedo { editor.run("edit.redo") } }

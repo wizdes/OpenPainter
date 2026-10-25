@@ -12,6 +12,9 @@ A thin Swift wrapper over the OpenPainter engine's C interface
   `CAMetalLayer` on its render thread. `set` sends the view state and the display ICC,
   `info` reads it back, `detach` waits for the in-flight frame and releases the layer.
   `Engine.viewCounters()` returns the live view, layer, surface and wgpu counters.
+- `FloodPreview.swift` (M31): `floodBegin`, `floodUpdate`, `floodFinish` and `floodCancel` run a live Magic Wand or
+  Paint Bucket session on the engine's preview stack; `selectionPath(preview:)` and `selectionMask(preview:)` read its
+  live selection.
 - `Engine.close()` frees the engine. Queued work and running jobs finish first.
   No event arrives after it returns.
 
@@ -47,3 +50,5 @@ Rebuild step 1 after any Rust change. SwiftPM does not know that the library dep
 - Preview cancel and ticket cancel leave the document unchanged.
 - A panic command makes the document read-only.
 - Freeing the engine with pending jobs returns, and no callback runs after it.
+- A live Magic Wand session: two tolerance updates show in the live mask, Finish gives one "Magic Wand" step,
+  and Cancel keeps the document (`FloodPreviewTests`).

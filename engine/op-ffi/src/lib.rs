@@ -398,6 +398,10 @@ pub extern "C" fn op_dispatch(
         }
     })
 }
+/// Answers a query (JSON). The selection queries `doc.selection`,
+/// `doc.selection_path` and `doc.selection_mask` take `{"preview":true}` to read
+/// the open preview's selection (the live Magic Wand session, M31); without it,
+/// or with no preview, they read the document.
 #[unsafe(no_mangle)]
 pub extern "C" fn op_query(
     p: *mut OpEngine,
