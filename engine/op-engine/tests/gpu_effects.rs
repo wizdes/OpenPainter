@@ -574,6 +574,62 @@ fn effect_preview_and_commit_use_the_gpu_and_match_cpu() {
 }
 
 #[test]
+fn m54_ten_effect_chain_stays_within_two_channels() {
+    if !gpu_tests_enabled() {
+        return;
+    }
+    let source = image(64, 64);
+    let gpu = Engine::with_options(None, options(false)).unwrap();
+    let cpu = Engine::with_options(None, options(true)).unwrap();
+    let g = gpu.import_pixels(64, 64, &source, None).unwrap();
+    let c = cpu.import_pixels(64, 64, &source, None).unwrap();
+    let chain = [
+        "effect.adjust.invert_colors",
+        "effect.adjust.brightness_contrast",
+        "effect.adjust.sepia",
+        "effect.adjust.temperature_tint",
+        "effect.adjust.posterize",
+        "effect.adjust.invert_alpha",
+        "effect.adjust.black_and_white",
+        "effect.adjust.exposure",
+        "effect.adjust.highlights_shadows",
+        "effect.photo.red_eye_removal",
+    ];
+    for effect_id in chain {
+        let before = gpu_runs(&gpu, g);
+        gpu.dispatch(g, effect_id, json!({})).unwrap();
+        cpu.dispatch(c, effect_id, json!({})).unwrap();
+        assert_eq!(gpu_runs(&gpu, g), before + 1, "{effect_id} fell back");
+    }
+    let max_error = pixels(&gpu, g)
+        .iter()
+        .zip(pixels(&cpu, c))
+        .map(|(a, b)| a.abs_diff(b))
+        .max()
+        .unwrap();
+    println!("M54 10-effect engine chain: max channel error {max_error}/255");
+    assert!(max_error <= 2, "10-effect chain error {max_error}/255");
+}
+
+/// The matrix is written by tests/m54_parity.rs (`m54_write_parity_matrix`).
+#[test]
+fn m54_matrix_lists_every_registered_effect() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/reports/parity-matrix.md");
+    let matrix = std::fs::read_to_string(path).expect("run the ignored M54 report test first");
+    let mut checked = 0;
+    for spec in effect::registered() {
+        assert!(
+            matrix.contains(&format!("| {} |", spec.id)),
+            "{} missing from matrix",
+            spec.id
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 55);
+}
+
+#[test]
 fn doc_info_reports_gpu_limits_and_chunk_size() {
     if !gpu_tests_enabled() {
         return;
