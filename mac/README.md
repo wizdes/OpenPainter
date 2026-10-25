@@ -111,6 +111,14 @@ Rules follow paint.net's Move Tools page (https://www.getpaint.net/doc/latest/Mo
 - `Shell/MoveGeometry.swift`: the hit test (nub, pivot, inside, corridor, outside) and the drag math. The session keeps the original box and one cumulative transform, so a second drag continues from the first.
 - `EngineBridge/Move.swift` wraps `op_move_begin`, `op_move_update`, `op_move_finish` and `op_move_cancel` (`engine/op-ffi/src/move_tool.rs`).
 
+## Magic Wand and Paint Bucket (M31)
+
+- `Shell/FloodTool.swift`: as in paint.net 5, a click with the Magic Wand or the Paint Bucket stays live. The window's `click` starts an engine preview session (`Document.floodBegin`, `EngineBridge/FloodPreview.swift`) at the clicked pixel; nothing enters History yet.
+- While it is open, any change to the tolerance (slider or field), Tolerance alpha (Premultiplied or Straight; paint.net's default is Premultiplied), selection or blend mode, sampling, flood mode, antialiasing or the fill color sends the full parameters again (`floodUpdate`). The engine re-runs the flood on the unchanged document, so the result equals one plain `tool.magic_wand` or `tool.paint_bucket` command with the last parameters.
+- The click point shows as a handle (a white square with four arrows). Dragging it moves the click point (`MetalCanvasView.onClickPress`, `onHandleDrag`, `onHandleRelease` in the `.click` mode).
+- Finish (Enter, the Finish button at the end of the options row, another tool, or a click elsewhere, which then starts a new one) commits one step named "Magic Wand" or "Paint Bucket". Escape and Undo drop it and leave the image as it was. A command from elsewhere (a menu, a panel) commits it in the engine first, and the session ends here too.
+- The live wand selection shows its marching ants: `doc.selection_path` with `{"preview": true}`.
+
 ## File formats and drag and drop (M17)
 
 The engine decodes PNG itself. ImageIO decodes HEIC, HEIF, AVIF and every Camera RAW type that `CGImageSourceCopyTypeIdentifiers()` lists (30 on macOS 27). Swift hands the engine straight 8-bit RGBA and the ICC profile through `op_import_pixels`.

@@ -274,6 +274,12 @@ enum OpStatus op_dispatch(struct OpEngine *p,
                           uintptr_t len,
                           uint64_t *out_ticket);
 
+/**
+ * Answers a query (JSON). The selection queries `doc.selection`,
+ * `doc.selection_path` and `doc.selection_mask` take `{"preview":true}` to read
+ * the open preview's selection (the live Magic Wand session, M31); without it,
+ * or with no preview, they read the document.
+ */
 enum OpStatus op_query(struct OpEngine *p,
                        uint64_t doc,
                        const char *query_id,

@@ -3,7 +3,9 @@
 // pen pressure for size and for opacity. Eraser: the same without blend mode.
 // Pencil (always 1 px, hard, aliased in paint.net): blend mode, opacity, pen
 // pressure for opacity. Magic
-// Wand and Paint Bucket: tolerance, mode, sampling, flood mode. Zoom and Pan:
+// Wand and Paint Bucket: tolerance (slider and field), tolerance alpha,
+// selection or blend mode, sampling, flood mode, antialiasing and Finish
+// (M31: the click stays live until Finish). Zoom and Pan:
 // none. Color Picker: sample size, layer or image, after click. At narrow sizes the row scrolls sideways instead of wrapping.
 import AppKit
 
@@ -26,6 +28,14 @@ public final class OptionsBarView: FilledView {
     public let pressureOpacity = NSButton(checkboxWithTitle: "Opacity", target: nil, action: nil)
     // Flood controls.
     public let toleranceField = Labels.field("50", width: 52, height: 28)
+    /// Live tolerance (M31): dragging it re-makes the open fill or selection.
+    public let toleranceSlider = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)
+    public let toleranceAlpha = Labels.popup(ToolSettings.ToleranceAlpha.allCases.map(\.label))
+    /// Commits the open Magic Wand or Paint Bucket session (Enter does the same).
+    public let floodFinish = NSButton(title: "Finish", target: nil, action: nil)
+    public var onFloodFinish: (() -> Void)?
+    /// True while a Magic Wand or Paint Bucket session is open: Finish is on.
+    public var floodSessionOpen = false { didSet { floodFinish.isEnabled = floodSessionOpen } }
     public let selectionMode = Labels.popup(ToolSettings.SelectionMode.allCases.map(\.label))
     public let sampling = Labels.popup(ToolSettings.Sampling.allCases.map(\.label))
     public let floodMode = Labels.popup(ToolSettings.FloodMode.allCases.map(\.label))
@@ -90,7 +100,25 @@ public final class OptionsBarView: FilledView {
         antialias.target = self
         antialias.action = #selector(controlChanged(_:))
         antialias.setAccessibilityLabel("Antialiasing")
-        for p in [blend, selectionMode, sampling, floodMode, pickerSize, pickerSampling, pickerAfterClick] {
+        toleranceSlider.isContinuous = true
+        toleranceSlider.target = self
+        toleranceSlider.action = #selector(toleranceSlid(_:))
+        toleranceSlider.translatesAutoresizingMaskIntoConstraints = false
+        // The status bar's zoom slider size (docs/design/SPEC.md): 96 pt wide, 28 pt to hit.
+        toleranceSlider.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        toleranceSlider.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        toleranceSlider.setAccessibilityLabel("Tolerance")
+        toleranceAlpha.setAccessibilityLabel("Tolerance alpha")
+        toleranceAlpha.toolTip = "Premultiplied: transparent pixels match. Straight: they match only when their colors match."
+        floodFinish.bezelStyle = .rounded
+        floodFinish.font = Theme.font(12)
+        floodFinish.target = self
+        floodFinish.action = #selector(floodFinishClicked(_:))
+        floodFinish.isEnabled = false
+        floodFinish.setAccessibilityLabel("Finish fill or selection")
+        floodFinish.toolTip = "Finish (Enter): keep the result; Escape undoes the click"
+        for p in [blend, selectionMode, sampling, floodMode, toleranceAlpha, pickerSize, pickerSampling,
+                  pickerAfterClick] {
             p.target = self
             p.action = #selector(controlChanged(_:))
         }
@@ -148,6 +176,8 @@ public final class OptionsBarView: FilledView {
         pressureSize.state = s.pressureSize ? .on : .off
         pressureOpacity.state = s.pressureOpacity ? .on : .off
         if toleranceField.currentEditor() == nil { toleranceField.stringValue = Self.number(s.tolerance) }
+        toleranceSlider.doubleValue = s.tolerance
+        toleranceAlpha.selectItem(at: ToolSettings.ToleranceAlpha.allCases.firstIndex(of: s.toleranceAlpha) ?? 0)
         antialias.state = s.antialias ? .on : .off
         blend.selectItem(at: ToolSettings.Blend.allCases.firstIndex(of: s.blend) ?? 0)
         selectionMode.selectItem(at: ToolSettings.SelectionMode.allCases.firstIndex(of: s.selectionMode) ?? 0)
@@ -208,7 +238,9 @@ public final class OptionsBarView: FilledView {
             group()
             add(Labels.label("Pen pressure"), pressureOpacity)
         case .flood:
-            add(Labels.label("Tolerance"), toleranceField, Labels.label("%"))
+            add(Labels.label("Tolerance"), toleranceSlider, toleranceField, Labels.label("%"))
+            group()
+            add(Labels.label("Tolerance alpha"), toleranceAlpha)
             group()
             let label = Labels.label("Selection mode")
             modeLabel = label
@@ -220,6 +252,8 @@ public final class OptionsBarView: FilledView {
             add(Labels.label("Flood mode"), floodMode)
             group()
             add(Labels.label("Antialiasing"), antialias)
+            group()
+            add(floodFinish)
         case .picker:
             add(Labels.label("Sampling"), pickerSize)
             group()
@@ -266,6 +300,13 @@ public final class OptionsBarView: FilledView {
         sync()  // shows the clamped value, or the old one after bad input
     }
 
+    /// Whole percents, as paint.net's tolerance slider shows them.
+    @objc private func toleranceSlid(_ sender: NSSlider) {
+        tools.settings.tolerance = min(max(sender.doubleValue.rounded(), 0), 100)
+    }
+
+    @objc private func floodFinishClicked(_ sender: Any?) { onFloodFinish?() }
+
     @objc private func controlChanged(_ sender: Any?) {
         var s = tools.settings
         s.antialias = antialias.state == .on
@@ -275,6 +316,7 @@ public final class OptionsBarView: FilledView {
         s.selectionMode = ToolSettings.SelectionMode.allCases[max(selectionMode.indexOfSelectedItem, 0)]
         s.sampling = ToolSettings.Sampling.allCases[max(sampling.indexOfSelectedItem, 0)]
         s.floodMode = ToolSettings.FloodMode.allCases[max(floodMode.indexOfSelectedItem, 0)]
+        s.toleranceAlpha = ToolSettings.ToleranceAlpha.allCases[max(toleranceAlpha.indexOfSelectedItem, 0)]
         s.pickerSize = PickerSampleSize.allCases[max(pickerSize.indexOfSelectedItem, 0)]
         s.pickerSampling = ToolSettings.Sampling.allCases[max(pickerSampling.indexOfSelectedItem, 0)]
         s.pickerAfterClick = PickerAfterClick.allCases[max(pickerAfterClick.indexOfSelectedItem, 0)]

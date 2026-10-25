@@ -165,6 +165,13 @@ public struct ToolSettings: Equatable, Sendable {
         case layer, image
         public var label: String { self == .layer ? "Layer" : "Image" }
     }
+    /// How alpha counts in the tolerance test (M31). paint.net's default is
+    /// Premultiplied: transparent pixels match whatever their color bytes
+    /// (https://www.getpaint.net/doc/latest/MagicWand.html).
+    public enum ToleranceAlpha: String, CaseIterable, Sendable {
+        case premultiplied, straight
+        public var label: String { rawValue.capitalized }
+    }
     public enum SelectionMode: String, CaseIterable, Sendable {
         case replace, add, subtract, intersect, invert
         public var label: String { rawValue.capitalized }
@@ -186,6 +193,7 @@ public struct ToolSettings: Equatable, Sendable {
     public var tolerance: Double = 50
     public var floodMode = FloodMode.contiguous
     public var sampling = Sampling.layer
+    public var toleranceAlpha = ToleranceAlpha.premultiplied
     public var selectionMode = SelectionMode.replace
     /// Color Picker options (M36).
     public var pickerSize = PickerSampleSize.one
@@ -351,6 +359,7 @@ public final class ToolState {
             "tolerance": settings.tolerance / 100,
             "contiguous": settings.floodMode == .contiguous,
             "sampling": settings.sampling.rawValue,
+            "alpha": settings.toleranceAlpha.rawValue,
             "antialias": settings.antialias,
         ]
         if tool == .paintBucket {

@@ -289,6 +289,7 @@ final class SelectCropTests: XCTestCase {
         fx.workspace.tools.tool = .magicWand
         fx.workspace.tools.settings.tolerance = 0
         wc.click(CGPoint(x: 10, y: 10))
+        wc.flood.finish()  // M31: the click stays live until Finish
         XCTAssertTrue(waitUntil { wc.editor.info.historyLabels.count == 3 })
         XCTAssertTrue(waitUntil { s.overlay.selectionPath.map { !$0.isEmpty } ?? false })
         wc.canvasKey(.escape)

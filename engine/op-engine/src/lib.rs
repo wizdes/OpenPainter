@@ -28,6 +28,7 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 mod color_sample;
 mod document_file;
+mod flood_commands;
 mod gpu_effects;
 mod gradient_commands;
 mod image_commands;
@@ -1082,6 +1083,19 @@ impl Actor {
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        // M31: an open Magic Wand or Paint Bucket session (flood_commands.rs).
+        if self
+            .preview
+            .as_ref()
+            .is_some_and(|p| flood_commands::is_flood(p.command))
+        {
+            if id == "edit.undo" {
+                self.preview = None;
+                self.publish(None);
+                return Ok(());
+            }
+            self.commit(ticket)?;
+        }
         if id.starts_with("tool.text.") {
             if self.line_session.is_some() {
                 self.line_finish()?;
@@ -1192,6 +1206,7 @@ impl Actor {
                         .or_else(|| select_crop_commands::history_label(id).map(str::to_owned))
                         .or_else(|| selection_commands::history_label(id, &params))
                         .or_else(|| image_commands::history_label(id).map(str::to_owned))
+                        .or_else(|| flood_commands::history_label(id).map(str::to_owned))
                         .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);
@@ -2518,6 +2533,13 @@ impl Engine {
         }
         let d = self.doc(id)?;
         let s = d.published.load_full();
+        // `{"preview": true}`: the selection queries read the open preview's
+        // state (the live Magic Wand selection, M31), else the document's.
+        let shown = if params.get("preview").and_then(Value::as_bool) == Some(true) {
+            s.preview.as_ref().unwrap_or(&s.state)
+        } else {
+            &s.state
+        };
         match query {
             "doc.info" => {
                 let mut info = s.info();
@@ -2538,7 +2560,7 @@ impl Engine {
             }
             "doc.profile_icc" => Ok(profile_query::profile_icc(&s.state)),
             "doc.selection" => {
-                serde_json::to_vec(&shell_commands::selection_info(&s.state)).map_err(internal)
+                serde_json::to_vec(&shell_commands::selection_info(shown)).map_err(internal)
             }
             "doc.sample_color" => {
                 serde_json::to_vec(&color_sample::sample_color(&s.state, &params)?)
@@ -2546,11 +2568,9 @@ impl Engine {
             }
             "layer.thumbnail" => layer_commands::thumbnail(&s.state, &params),
             "doc.selection_path" => {
-                serde_json::to_vec(&select_crop_commands::selection_path(&s.state))
-                    .map_err(internal)
+                serde_json::to_vec(&select_crop_commands::selection_path(shown)).map_err(internal)
             }
-            "doc.selection_mask" => Ok(s
-                .state
+            "doc.selection_mask" => Ok(shown
                 .rasterize_selection(op_core::selection::RasterMode::Pixelated)
                 .bytes
                 .to_vec()),

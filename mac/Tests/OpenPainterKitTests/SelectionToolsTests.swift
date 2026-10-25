@@ -298,6 +298,7 @@ final class SelectionToolsTests: XCTestCase {
             fx.workspace.tools.settings.selectionMode = mode
             let n = wc.editor.info.historyLabels.count
             wc.click(CGPoint(x: 200, y: 150))
+            wc.flood.finish()  // M31: the click stays live until Finish
             XCTAssertTrue(waitUntil { wc.editor.info.historyLabels.count == n + 1 })
             let got = try XCTUnwrap(try mask(wc.editor), "\(mode): the selection is active")
             XCTAssertTrue(got == (selects ? region : [UInt8](repeating: 0, count: W * H)), "\(mode)")
@@ -509,6 +510,7 @@ final class SelectionToolsTests: XCTestCase {
         fx.workspace.tools.settings.selectionMode = .replace
         fx.workspace.tools.settings.tolerance = 30
         src.click(CGPoint(x: 200, y: 150))
+        src.flood.finish()  // M31: the click stays live until Finish
         steps(src, 3)
         let wand = try XCTUnwrap(try mask(src.editor))
         XCTAssertTrue(src.copySelectionOutline())

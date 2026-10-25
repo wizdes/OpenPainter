@@ -558,6 +558,7 @@ final class ColorsPanelTests: XCTestCase {
         tools.settings.tolerance = 100
         let n = ed.info.historyLabels.count
         wc.click(CGPoint(x: 300, y: 300), secondary: true)
+        wc.flood.finish()  // M31: the click stays live until Finish
         XCTAssertTrue(waitUntil { ed.info.historyLabels.count == n + 1 }, ed.message ?? "")
         px = try ed.document.pixels()
         XCTAssertEqual(Array(px[(300 * 512 + 300) * 4..<(300 * 512 + 300) * 4 + 3]), [0, 0, 255])

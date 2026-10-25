@@ -120,6 +120,7 @@ final class StripAndToolTests: XCTestCase {
         XCTAssertFalse(wc.optionsBar.toleranceField.superview == nil, "flood options shown")
         tools.settings.tolerance = 0
         wc.click(CGPoint(x: 300, y: 300))
+        wc.flood.finish()  // M31: the click stays live until Finish
         XCTAssertTrue(waitUntil { wc.editor.selection != nil })
         XCTAssertEqual(tools.floodParams(tool: .magicWand, x: 1, y: 2)["combine"] as? String, "replace")
         XCTAssertEqual(tools.floodParams(tool: .magicWand, x: 1, y: 2)["tolerance"] as? Double, 0)
@@ -131,6 +132,7 @@ final class StripAndToolTests: XCTestCase {
         XCTAssertEqual(tools.floodParams(tool: .paintBucket, x: 0, y: 0)["contiguous"] as? Bool, false)
         let before = wc.editor.info.historyLabels.count
         wc.click(CGPoint(x: 300, y: 300))
+        wc.flood.finish()  // M31: the click stays live until Finish
         XCTAssertTrue(waitUntil { wc.editor.info.historyLabels.count == before + 1 })
         // Zoom and Pan have no options; tools not built yet are selectable and say so.
         tools.tool = .zoom
