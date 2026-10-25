@@ -160,16 +160,18 @@ public enum MenuSkeleton {
                 .item("Quit OpenPainter", "q", cmd, .selector(#selector(NSApplication.terminate(_:)))),
             ]),
             .submenu("File", [
-                i("New…", "n"),
+                .item("New…", "n", cmd, .selector(#selector(NSDocumentController.newDocument(_:)))),  // M19
                 .item("Open…", "o", cmd, .selector(#selector(NSDocumentController.openDocument(_:)))),
                 .submenu("Open Recent", [
                     .item("Clear Menu", "", [], .selector(#selector(NSDocumentController.clearRecentDocuments(_:)))),
                 ]),
                 .submenu("Acquire", [i("From Scanner or Camera…")]),
                 .separator,
-                i("Save", "s"),
-                .item("Save As…", "s", shiftCmd, .selector(#selector(NSDocument.saveAs(_:)))),  // M17: HEIC, AVIF
+                .item("Save", "s", cmd, .selector(#selector(NSDocument.save(_:)))),  // M19
+                .item("Save As…", "s", shiftCmd, .selector(#selector(NSDocument.saveAs(_:)))),
+                .item("Save a Copy…", "", [], .selector(#selector(NSDocument.saveTo(_:)))),  // M19
                 i("Save All", "s", optCmd),
+                .item("Revert to Saved", "", [], .selector(#selector(NSDocument.revertToSaved(_:)))),  // M19
                 .separator,
                 i("Print…", "p"),
                 .separator,

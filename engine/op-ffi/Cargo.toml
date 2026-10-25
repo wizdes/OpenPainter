@@ -23,6 +23,10 @@ wgpu = { version = "27", features = ["counters"] }
 pollster = "0.4"
 parking_lot = "0.12"
 
+[dev-dependencies]
+# M19 document tests write files.
+tempfile = "3"
+
 [build-dependencies]
 cbindgen = "0.29"
 

@@ -27,6 +27,7 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 mod color_sample;
+mod document_file;
 mod gpu_effects;
 mod gradient_commands;
 mod image_commands;
@@ -39,6 +40,7 @@ mod select_crop_commands;
 mod shape_commands;
 mod shell_commands;
 mod text_commands;
+pub use document_file::SaveFormat;
 pub use gpu_effects::EngineOptions;
 pub use layer_commands::{BLEND_MODES, blend_name, content_key};
 pub use shell_commands::{effect_label, effects_list};
@@ -832,38 +834,40 @@ impl Published {
         } else {
             &self.state
         };
-        let len = (state.width as usize)
-            .checked_mul(state.height as usize)
-            .and_then(|n| n.checked_mul(4))
-            .ok_or_else(|| bad("image too large"))?;
-        if len > 1024 * 1024 * 1024 {
-            return Err(bad("image too large"));
-        }
-        let mut out = vec![0; len];
-        for ty in 0..state.height.div_ceil(TILE_SIZE as u32) {
-            for tx in 0..state.width.div_ceil(TILE_SIZE as u32) {
-                let tile = op_ops::composite::composite_tile(
-                    state,
-                    TileCoord {
-                        x: tx as i32,
-                        y: ty as i32,
-                    },
-                )
-                .map_err(internal)?;
-                for y in 0..(state.height - ty * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize {
-                    let n =
-                        (state.width - tx * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize * 4;
-                    let dst = ((ty as usize * TILE_SIZE + y) * state.width as usize
-                        + tx as usize * TILE_SIZE)
-                        * 4;
-                    out[dst..dst + n].copy_from_slice(
-                        &tile.as_bytes()[y * TILE_SIZE * 4..y * TILE_SIZE * 4 + n],
-                    );
-                }
+        flatten(state)
+    }
+}
+/// The flattened composite of `state` as straight RGBA8, row by row.
+pub(crate) fn flatten(state: &DocState) -> Result<Vec<u8>> {
+    let len = (state.width as usize)
+        .checked_mul(state.height as usize)
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| bad("image too large"))?;
+    if len > 1024 * 1024 * 1024 {
+        return Err(bad("image too large"));
+    }
+    let mut out = vec![0; len];
+    for ty in 0..state.height.div_ceil(TILE_SIZE as u32) {
+        for tx in 0..state.width.div_ceil(TILE_SIZE as u32) {
+            let tile = op_ops::composite::composite_tile(
+                state,
+                TileCoord {
+                    x: tx as i32,
+                    y: ty as i32,
+                },
+            )
+            .map_err(internal)?;
+            for y in 0..(state.height - ty * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize {
+                let n = (state.width - tx * TILE_SIZE as u32).min(TILE_SIZE as u32) as usize * 4;
+                let dst = ((ty as usize * TILE_SIZE + y) * state.width as usize
+                    + tx as usize * TILE_SIZE)
+                    * 4;
+                out[dst..dst + n]
+                    .copy_from_slice(&tile.as_bytes()[y * TILE_SIZE * 4..y * TILE_SIZE * 4 + n]);
             }
         }
-        Ok(out)
     }
+    Ok(out)
 }
 #[derive(Clone, Debug)]
 pub enum EventKind {
@@ -973,6 +977,8 @@ enum Message {
     MoveUpdate(MoveOptions, Sender<Result<()>>),
     MoveFinish(Sender<Result<()>>),
     MoveCancel(Sender<Result<()>>),
+    /// M19: save, mark saved, replace content (document_file.rs).
+    File(document_file::FileOp, Sender<Result<()>>),
     Stop(Sender<()>),
 }
 struct ActiveStroke {
@@ -1947,6 +1953,14 @@ impl Actor {
                 Message::MoveBegin(_, _, r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
+                Message::File(_, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
+                Message::File(op, r) => {
+                    let result = catch_unwind(AssertUnwindSafe(|| self.file_op(op)))
+                        .unwrap_or(Err(Error::Panic));
+                    let _ = r.send(result);
+                }
                 Message::MoveUpdate(_, r) | Message::MoveFinish(r) | Message::MoveCancel(r)
                     if stopping.is_some() =>
                 {
@@ -2210,6 +2224,10 @@ impl Engine {
         if let Some(icc) = icc {
             state = state.set_profile(Some(Arc::from(icc)));
         }
+        self.spawn_document(state, store)
+    }
+    /// Starts the actor for a new document whose step 0 is `state`.
+    fn spawn_document(&self, state: DocState, store: Arc<TileStore>) -> Result<u64> {
         let history = History::new(state.clone());
         let id = self.next_doc.fetch_add(1, Ordering::Relaxed);
         let published = Arc::new(ArcSwap::from_pointee(Published {

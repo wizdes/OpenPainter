@@ -1,4 +1,5 @@
-// ImageIO export for HEIC and, where macOS can encode it, AVIF (M17).
+// ImageIO export for HEIC and, where macOS can encode it, AVIF (M17); M19 adds
+// JPEG, BMP, TIFF, GIF and WebP (where macOS can encode it).
 //
 // The engine's straight RGBA8 pixels become a CGImage tagged with the document
 // profile, and CGImageDestination writes it
@@ -28,13 +29,14 @@ public enum ImageIOExportError: Error, LocalizedError, Equatable {
 public enum ImageIOExporter {
     public static let defaultQuality = 0.9
 
-    /// Encodes straight RGBA8 pixels as `type` ("public.heic" or "public.avif").
+    /// Encodes straight RGBA8 pixels as `type`: HEIC or AVIF (M17), or since
+    /// M19 any of `ImageFormats.imageIOSaveTypes()` (JPEG, BMP, TIFF, GIF, WebP).
     public static func encode(
         rgba: [UInt8], width: Int, height: Int, icc: Data?, type: String,
         quality: Double = defaultQuality, metadata: ImageMetadata? = nil,
         destinationTypes: [String] = ImageFormats.systemDestinationTypes
     ) throws -> Data {
-        guard ImageFormats.exportTypes(destinationTypes: destinationTypes).contains(where: { $0.identifier == type })
+        guard ImageFormats.imageIOSaveTypes(destinationTypes: destinationTypes).contains(type)
         else { throw ImageIOExportError.unsupportedType(UTType(type)?.preferredFilenameExtension?.uppercased() ?? type) }
         guard width > 0, height > 0, rgba.count == width * height * 4 else { throw ImageIOExportError.badPixels }
         let image = try cgImage(rgba: rgba, width: width, height: height, icc: icc)

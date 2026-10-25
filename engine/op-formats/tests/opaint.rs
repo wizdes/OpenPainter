@@ -470,3 +470,25 @@ fn loaded_sparse_layer_ids_are_never_reused() {
         );
     }
 }
+
+/// M19: the app loads into a store in the temp folder, so opening a file
+/// never writes a tile spill file next to the user's image.
+#[test]
+fn load_with_store_writes_nothing_next_to_the_file() {
+    let files = tempfile::tempdir().unwrap();
+    let spill = tempfile::tempdir().unwrap();
+    let store = Arc::new(TileStore::with_default_budget(spill.path()).unwrap());
+    let mut doc = DocState::new(store.clone(), 3, 2, 150.0).unwrap();
+    doc = doc.add_layer(1, "Top").unwrap();
+    let path = files.path().join("picture.opaint");
+    save_opaint(&doc, &path).unwrap();
+    let loaded = op_formats::opaint::load_opaint_with_store(&path, store).unwrap();
+    assert_eq!(loaded.doc.layers.len(), 2);
+    assert_eq!(loaded.doc.layers[1].name, "Top");
+    assert_eq!(loaded.doc.dpi, 150.0);
+    let names: Vec<_> = std::fs::read_dir(files.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, vec!["picture.opaint".to_string()]);
+}

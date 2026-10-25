@@ -5,7 +5,7 @@ import OpenPainterKit
 
 /// Counts documents that are still being read, so the start window is not shown
 /// while a file from Finder, the Dock or the command line is opening.
-final class PainterDocumentController: NSDocumentController {
+final class PainterDocumentController: ImageDocumentController {
     private(set) var opening = 0
 
     override func openDocument(
@@ -28,6 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         _ = PainterDocumentController()  // becomes NSDocumentController.shared
+        // M19: File > New closes the empty start window once the image shows.
+        ImageDocumentController.onNewImage = { [weak self] _ in
+            self?.startWindow?.close()
+            self?.startWindow = nil
+        }
         PainterDocument.prepareEngine()
         let workspace = Workspace(engine: AppEngine.shared, tools: ToolState.shared)
         Workspace.shared = workspace
@@ -107,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.title = "OpenPainter"
         w.isRestorable = false
         w.isReleasedWhenClosed = false
-        let label = NSTextField(labelWithString: "Open an image with File > Open (⌘O),\nor drop an image on the Dock icon.")
+        let label = NSTextField(labelWithString: "Make an image with File > New (⌘N), open one with\nFile > Open (⌘O), or drop an image on the Dock icon.")
         label.alignment = .center
         label.textColor = .secondaryLabelColor
         label.frame = NSRect(x: 20, y: 90, width: 380, height: 60)

@@ -25,7 +25,7 @@ public enum ImageFormats {
     }
 
     /// Every type a file may have to open in OpenPainter.
-    public static func openTypes() -> [UTType] { engineTypes + imageIOImportTypes() }
+    public static func openTypes() -> [UTType] { [opaintType] + engineTypes + imageIOImportTypes() + flatImportTypes() }
 
     /// The types Save As offers: HEIC always (when ImageIO can write it), AVIF
     /// only when this macOS can encode it.
@@ -49,6 +49,8 @@ public enum ImageFormats {
     /// wrong extension still opens the right way.
     public enum Route: Equatable, Sendable {
         case engine
+        /// A native `.opaint` file (M19), opened by the engine with all layers.
+        case native
         case imageIO(String)
         case unsupported
     }
@@ -56,19 +58,21 @@ public enum ImageFormats {
     public static func route(for url: URL) -> Route {
         if let h = try? FileHandle(forReadingFrom: url) {
             defer { try? h.close() }
-            if let head = try? h.read(upToCount: 8), head == Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+            let head = (try? h.read(upToCount: 128)) ?? Data()
+            if head.prefix(8) == Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
                 return .engine
             }
+            if isOpaint(head) { return .native }
         } else {
             return .unsupported
         }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let type = CGImageSourceGetType(source) as String?
         else { return .unsupported }
-        let ids = Set(imageIOImportTypes().map(\.identifier))
+        let ids = Set(imageIOImportTypes().map(\.identifier) + flatImportTypes().map(\.identifier))
         return ids.contains(type) ? .imageIO(type) : .unsupported
     }
 
     /// A short list of what opens, for messages.
-    public static let openSummary = "PNG, HEIC, HEIF, AVIF and Camera RAW"
+    public static let openSummary = "OpenPainter (.opaint), PNG, JPEG, BMP, GIF, TIFF, WebP, HEIC, HEIF, AVIF and Camera RAW"
 }
