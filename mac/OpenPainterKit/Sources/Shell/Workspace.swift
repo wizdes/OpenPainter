@@ -47,6 +47,7 @@ public final class Workspace {
         for p in panels.panels.values { p.router = { [weak self] in self?.active?.windowController?.window } }
         panels.stage = { [weak self] in self?.active?.windowController?.stageInScreen }
         panels.onChange = { [weak self] in self?.notify() }
+        wireColors()
     }
 
     /// Reads engine events and refreshes the editor they name. Call once.
@@ -123,5 +124,23 @@ public final class Workspace {
         editors.remove(at: from)
         editors.insert(editor, at: min(max(index, 0), editors.count))
         notify()
+    }
+}
+
+extension Workspace {
+    /// Colors panel hooks (M36): More and Less resize the panel; palette
+    /// reports go to the active image's status bar.
+    fileprivate func wireColors() {
+        var toolsBeforeExpand: CGRect?
+        colorsView.onExpandedChange = { [weak self] on in
+            guard let self else { return }
+            if on {
+                toolsBeforeExpand = self.panels.setColorsExpanded(true)
+            } else {
+                self.panels.setColorsExpanded(false, restoreTools: toolsBeforeExpand)
+                toolsBeforeExpand = nil
+            }
+        }
+        colorsView.onReport = { [weak self] text in self?.active?.report(text) }
     }
 }

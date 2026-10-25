@@ -1,7 +1,7 @@
 // The 36 pt tool-options row: the tool picker, then the current tool's options.
 // Brush tools: width with - and +, antialiasing, blend mode, opacity. Magic
 // Wand and Paint Bucket: tolerance, mode, sampling, flood mode. Zoom and Pan:
-// none. At narrow sizes the row scrolls sideways instead of wrapping.
+// none. Color Picker: sample size, layer or image, after click. At narrow sizes the row scrolls sideways instead of wrapping.
 import AppKit
 
 @MainActor
@@ -22,6 +22,10 @@ public final class OptionsBarView: FilledView {
     public let selectionMode = Labels.popup(ToolSettings.SelectionMode.allCases.map(\.label))
     public let sampling = Labels.popup(ToolSettings.Sampling.allCases.map(\.label))
     public let floodMode = Labels.popup(ToolSettings.FloodMode.allCases.map(\.label))
+    // Color Picker controls (M36).
+    public let pickerSize = Labels.popup(PickerSampleSize.allCases.map(\.label))
+    public let pickerSampling = Labels.popup(ToolSettings.Sampling.allCases.map(\.label))
+    public let pickerAfterClick = Labels.popup(PickerAfterClick.allCases.map(\.label))
     private var shownSet: PaintTool.OptionSet?
     private var shownTool: PaintTool?
 
@@ -60,7 +64,7 @@ public final class OptionsBarView: FilledView {
         antialias.target = self
         antialias.action = #selector(controlChanged(_:))
         antialias.setAccessibilityLabel("Antialiasing")
-        for p in [blend, selectionMode, sampling, floodMode] {
+        for p in [blend, selectionMode, sampling, floodMode, pickerSize, pickerSampling, pickerAfterClick] {
             p.target = self
             p.action = #selector(controlChanged(_:))
         }
@@ -68,6 +72,9 @@ public final class OptionsBarView: FilledView {
         selectionMode.setAccessibilityLabel("Selection mode")
         sampling.setAccessibilityLabel("Sampling")
         floodMode.setAccessibilityLabel("Flood mode")
+        pickerSize.setAccessibilityLabel("Sample size")
+        pickerSampling.setAccessibilityLabel("Sampling")
+        pickerAfterClick.setAccessibilityLabel("After click")
         tools.observe(self) { [weak self] in self?.sync() }
         sync()
     }
@@ -117,6 +124,9 @@ public final class OptionsBarView: FilledView {
         selectionMode.selectItem(at: ToolSettings.SelectionMode.allCases.firstIndex(of: s.selectionMode) ?? 0)
         sampling.selectItem(at: ToolSettings.Sampling.allCases.firstIndex(of: s.sampling) ?? 0)
         floodMode.selectItem(at: ToolSettings.FloodMode.allCases.firstIndex(of: s.floodMode) ?? 0)
+        pickerSize.selectItem(at: PickerSampleSize.allCases.firstIndex(of: s.pickerSize) ?? 0)
+        pickerSampling.selectItem(at: ToolSettings.Sampling.allCases.firstIndex(of: s.pickerSampling) ?? 0)
+        pickerAfterClick.selectItem(at: PickerAfterClick.allCases.firstIndex(of: s.pickerAfterClick) ?? 0)
         minus.isEnabled = s.brushWidth > ToolSettings.widthRange.lowerBound
         plus.isEnabled = s.brushWidth < ToolSettings.widthRange.upperBound
         // Paint Bucket uses blend mode; Magic Wand uses selection mode.
@@ -165,6 +175,12 @@ public final class OptionsBarView: FilledView {
             add(Labels.label("Flood mode"), floodMode)
             group()
             add(Labels.label("Antialiasing"), antialias)
+        case .picker:
+            add(Labels.label("Sampling"), pickerSize)
+            group()
+            add(Labels.label("Layer or image"), pickerSampling)
+            group()
+            add(Labels.label("After click"), pickerAfterClick)
         }
         for v in stack.arrangedSubviews where v is NSPopUpButton || v is NSButton {
             let has = v.constraints.contains { $0.firstAttribute == .height && $0.firstItem === v }
@@ -206,6 +222,9 @@ public final class OptionsBarView: FilledView {
         s.selectionMode = ToolSettings.SelectionMode.allCases[max(selectionMode.indexOfSelectedItem, 0)]
         s.sampling = ToolSettings.Sampling.allCases[max(sampling.indexOfSelectedItem, 0)]
         s.floodMode = ToolSettings.FloodMode.allCases[max(floodMode.indexOfSelectedItem, 0)]
+        s.pickerSize = PickerSampleSize.allCases[max(pickerSize.indexOfSelectedItem, 0)]
+        s.pickerSampling = ToolSettings.Sampling.allCases[max(pickerSampling.indexOfSelectedItem, 0)]
+        s.pickerAfterClick = PickerAfterClick.allCases[max(pickerAfterClick.indexOfSelectedItem, 0)]
         tools.settings = s
     }
 }

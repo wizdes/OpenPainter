@@ -97,14 +97,22 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     // MARK: Canvas
 
     private func wireCanvas() {
-        canvas.onStroke = { [weak self] points in self?.stroke(points) }
-        canvas.onClick = { [weak self] p in self?.click(p) }
+        canvas.onStroke = { [weak self] points in
+            guard let self else { return }
+            self.stroke(points, secondary: self.canvas.pressUsesSecondary)
+        }
+        canvas.onClick = { [weak self] p in
+            guard let self else { return }
+            self.click(p, secondary: self.canvas.pressUsesSecondary, modifiers: self.canvas.pressModifiers)
+        }
         canvas.onCursor = { [weak self] p in
             self?.cursor = p
             self?.updateStatus()
         }
         canvas.onToolKey = { [weak self] c in
-            guard let self, let t = PaintTool.tool(forKey: c, current: self.workspace.tools.tool) else { return false }
+            guard let self else { return false }
+            if self.colorKey(c) { return true }
+            guard let t = PaintTool.tool(forKey: c, current: self.workspace.tools.tool) else { return false }
             self.workspace.tools.tool = t
             return true
         }
@@ -120,21 +128,22 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         canvas.onFirstFrame = { LaunchClock.markReady() }
     }
 
-    func stroke(_ points: [CGPoint]) {
+    func stroke(_ points: [CGPoint], secondary: Bool = false) {
         let tool = workspace.tools.tool
         guard tool.strokeName != nil, !points.isEmpty else { return }
-        var p = workspace.tools.strokeParams(tool: tool)
+        var p = workspace.tools.strokeParams(tool: tool, secondary: secondary)
         p["points"] = points.map { String(format: "%.2f %.2f 1", $0.x, $0.y) }.joined(separator: " ")
         editor.run("tool.stroke", p)
     }
 
-    func click(_ point: CGPoint) {
+    func click(_ point: CGPoint, secondary: Bool = false, modifiers: NSEvent.ModifierFlags = []) {
         let tool = workspace.tools.tool
+        if tool == .colorPicker { return pickColor(at: point, secondary: secondary, modifiers: modifiers) }
         guard tool == .magicWand || tool == .paintBucket else { return }
         let x = Int(point.x.rounded(.down)), y = Int(point.y.rounded(.down))
         guard x >= 0, y >= 0, x < editor.info.width, y < editor.info.height else { return }
         editor.run(tool == .magicWand ? "tool.magic_wand" : "tool.paint_bucket",
-                   workspace.tools.floodParams(tool: tool, x: x, y: y))
+                   workspace.tools.floodParams(tool: tool, x: x, y: y, secondary: secondary))
     }
 
     /// Escape cancels a drag, else deselects. Enter has nothing to finish yet.
@@ -158,7 +167,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             case .pan: .pan
             case .zoom: .zoom
             case .paintbrush, .eraser, .pencil: .stroke
-            case .magicWand, .paintBucket: .click
+            case .magicWand, .paintBucket, .colorPicker: .click
             default: .inactive
             }
         if canvas.tool != mode { canvas.tool = mode }

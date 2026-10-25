@@ -74,6 +74,10 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     private var suspended = false
     private var spaceHeld = false
     private var dragStart: CGPoint?
+    /// The button and keys of the current or last press. A right-button press,
+    /// or a Control-click (the Mac right-click), uses the secondary color.
+    public private(set) var pressUsesSecondary = false
+    public private(set) var pressModifiers: NSEvent.ModifierFlags = []
     private var lastDrag: CGPoint?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private var waitingForFirstFrame = false
@@ -347,7 +351,13 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     }
 
     public override func mouseDown(with event: NSEvent) {
+        press(event, right: false)
+    }
+
+    private func press(_ event: NSEvent, right: Bool) {
         window?.makeFirstResponder(self)
+        pressModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        pressUsesSecondary = right || pressModifiers.contains(.control)
         let p = point(event)
         dragStart = p
         lastDrag = p
@@ -442,9 +452,21 @@ public final class MetalCanvasView: NSView, NSMenuItemValidation {
     }
 
     public override func rightMouseDown(with event: NSEvent) {
+        // Brush and click tools use the right button for the secondary color.
+        if effectiveTool == .stroke || effectiveTool == .click { return press(event, right: true) }
         guard effectiveTool == .zoom else { return super.rightMouseDown(with: event) }
         let p = point(event)
         change { $0.zoomOut(at: p) }
+    }
+
+    public override func rightMouseDragged(with event: NSEvent) {
+        guard pressUsesSecondary, dragStart != nil else { return super.rightMouseDragged(with: event) }
+        mouseDragged(with: event)
+    }
+
+    public override func rightMouseUp(with event: NSEvent) {
+        guard pressUsesSecondary, dragStart != nil else { return super.rightMouseUp(with: event) }
+        mouseUp(with: event)
     }
 
     public override func keyDown(with event: NSEvent) {

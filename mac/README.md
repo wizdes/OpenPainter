@@ -38,6 +38,15 @@ Bundle id `dev.yili.OpenPainter`, macOS 15, arm64, ad-hoc signed.
 - `MenuSkeleton`: the menu bar in paint.net 5.1 order. Its header lists where Mac keys replace paint.net keys. `Tests/OpenPainterKitTests/menu-skeleton.txt` is the checked-in item list; change it together with the menu.
 - The fit rectangle is the stage less the shown panels (left and right reserves) less 16 pt. Fit recomputes when the window resizes or a panel moves, shows or hides. A zoom the user chose stays.
 
+## Colors panel and Color Picker (M36)
+
+- `Shell/ColorsPanel.swift`: the Colors panel. Primary and secondary swatches (the notch marks the active slot; click the other swatch to move it, C on the canvas does the same), swap (X), black and white reset, the hex field, the HSV wheel, More » / « Less (RGB, HSV and alpha sliders with fields), and the palette (32 swatches compact, 96 expanded). More grows the panel up to 470 pt and shortens Tools to keep a 12 pt gap (`PanelLayout.colorsFrames`).
+- Wheel keys (paint.net Ctrl, Alt, Shift): Command keeps the saturation, Option keeps the hue, Shift snaps the hue to 15 degree spokes, Command-Shift does both. Control-click is the Mac right-click, so it sets the other slot.
+- Palette files are paint.net's: one `aarrggbb` per line, `;` comments, at most 96 colors, missing slots white. Malformed lines are skipped and named in the status bar.
+- `Shell/ColorModel.swift`: HSV math, the wheel rules, palette parsing and the default palette.
+- `Shell/ColorPickerTool.swift`: the Color Picker. Click sets primary, right-click or Control-click secondary, Command-click samples the image. The engine query `doc.sample_color` averages a square window (1 to 51 px) clipped at the canvas edges, weighted by alpha.
+- Right-button (or Control) drags and Paint Bucket clicks use the secondary color.
+
 ## Focus rules
 
 Cmd+A, Delete, Escape, Enter, Undo (Cmd+Z) and Redo (Shift+Cmd+Z) go to the active document unless a text field or a dialog has focus. `FocusRouter.target(in:)` decides; `EditorWindow` and `ShellPanel` apply it.
