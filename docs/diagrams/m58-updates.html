@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signed update checks</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 16px;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 0.5rem;
+    }
+    .lede { color: var(--color-muted); font-size: 0.92rem; line-height: 1.5; max-width: 62ch; margin-bottom: 1.5rem; }
+    .scroll { overflow-x: auto; }
+    svg { width: 100%; min-width: 880px; display: block; }
+    .cards { display: grid; grid-template-columns: 1.1fr 1fr 0.9fr; gap: 12px; margin-top: 1.5rem; }
+    .card { background: #fff; border: 1px solid rgba(45,49,66,0.14); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+    .card h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 6px; }
+    .card p { font-size: 0.86rem; line-height: 1.5; }
+    @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">OpenPainter · M58 · updates and release build</p>
+    <h1>How a signed update reaches the app</h1>
+    <p class="lede">M58 adds Sparkle 2 for Check for Updates. The feed and every update must carry an EdDSA signature that matches the key built into the app. No real key exists yet; until M60 adds one, the menu item only says updates are not set up.</p>
+    <div class="scroll"><svg viewBox="0 56 880 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="m58-title m58-desc">
+<title id="m58-title">Signed update checks sequence</title>
+<desc id="m58-desc">Check for Updates goes to Updates.swift. If the app's public key is empty it answers that updates are not set up yet. Otherwise Sparkle fetches the signed feed, verifies it, fetches the update, verifies its EdDSA signature before unpacking, then installs and relaunches.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker><marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker><marker id="arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#4f5d75" stroke-width="1.2"/></marker></defs>
+<g stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"><line x1="120" y1="124" x2="120" y2="640"/><line x1="340" y1="124" x2="340" y2="640"/><line x1="560" y1="124" x2="560" y2="640"/><line x1="780" y1="124" x2="780" y2="640"/></g><g font-family="'Geist', sans-serif"><rect x="40" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/><rect x="40" y="80" width="160" height="44" rx="6" fill="#fff" stroke="#2d3142" stroke-width="1.2"/>
+<text x="120" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Help menu</text><text x="120" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">AppKit</text><rect x="260" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/><rect x="260" y="80" width="160" height="44" rx="6" fill="#fff" stroke="#2d3142" stroke-width="1.2"/>
+<text x="340" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Updates.swift</text><text x="340" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">new in M58</text><rect x="480" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/><rect x="480" y="80" width="160" height="44" rx="6" fill="rgba(191,69,32,0.06)" stroke="#bf4520" stroke-width="1.2"/>
+<text x="560" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Sparkle 2.10</text><text x="560" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">SPUUpdater</text><rect x="700" y="80" width="160" height="44" rx="6" fill="#f5f5f5"/><rect x="700" y="80" width="160" height="44" rx="6" fill="#fff" stroke="#2d3142" stroke-width="1.2"/>
+<text x="780" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">Feed server</text><text x="780" y="115" text-anchor="middle" font-size="9" font-family="'Geist Mono', monospace" fill="#4f5d75">yili.dev (M60)</text></g><g font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.06em" fill="#4f5d75"><line x1="124" y1="160" x2="336" y2="160" stroke="#4f5d75" stroke-width="1.3" marker-end="url(#arrow)"/><rect x="173.0" y="142" width="114" height="12" fill="#f5f5f5"/><text x="230.0" y="151" text-anchor="middle" fill="#4f5d75">CHECK FOR UPDATES</text><rect x="100" y="180" width="260" height="72" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+<rect x="100" y="180" width="40" height="16" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+<text x="120" y="192" text-anchor="middle" letter-spacing="0.12em">OPT</text><text x="150" y="192">[public key empty]</text><line x1="336" y1="236" x2="124" y2="236" stroke="#4f5d75" stroke-width="1.3" stroke-dasharray="5,4" marker-end="url(#arrow)"/><rect x="182.0" y="218" width="96" height="12" fill="#f5f5f5"/><text x="230.0" y="227" text-anchor="middle" fill="#4f5d75">NOT SET UP YET</text><line x1="344" y1="284" x2="556" y2="284" stroke="#4f5d75" stroke-width="1.3" marker-end="url(#arrow)"/><rect x="411.0" y="266" width="78" height="12" fill="#f5f5f5"/><text x="450.0" y="275" text-anchor="middle" fill="#4f5d75">START CHECK</text><line x1="564" y1="320" x2="776" y2="320" stroke="#4f5d75" stroke-width="1.3" marker-end="url(#arrow)"/><rect x="631.0" y="302" width="78" height="12" fill="#f5f5f5"/><text x="670.0" y="311" text-anchor="middle" fill="#4f5d75">GET APPCAST</text><line x1="776" y1="356" x2="564" y2="356" stroke="#4f5d75" stroke-width="1.3" stroke-dasharray="5,4" marker-end="url(#arrow)"/><rect x="631.0" y="338" width="78" height="12" fill="#f5f5f5"/><text x="670.0" y="347" text-anchor="middle" fill="#4f5d75">SIGNED FEED</text><path d="M564,372 H604 V396 H568" fill="none" stroke="#4f5d75" stroke-width="1.3" marker-end="url(#arrow)"/><rect x="610" y="378" width="74" height="12" fill="#f5f5f5"/><text x="612" y="387" fill="#4f5d75">VERIFY FEED</text><line x1="564" y1="428" x2="776" y2="428" stroke="#4f5d75" stroke-width="1.3" marker-end="url(#arrow)"/><rect x="634.0" y="410" width="72" height="12" fill="#f5f5f5"/><text x="670.0" y="419" text-anchor="middle" fill="#4f5d75">GET UPDATE</text><line x1="776" y1="464" x2="564" y2="464" stroke="#4f5d75" stroke-width="1.3" stroke-dasharray="5,4" marker-end="url(#arrow)"/><rect x="622.0" y="446" width="96" height="12" fill="#f5f5f5"/><text x="670.0" y="455" text-anchor="middle" fill="#4f5d75">UPDATE ARCHIVE</text><path d="M564,480 H604 V504 H568" fill="none" stroke="#bf4520" stroke-width="1.3" marker-end="url(#arrow-accent)"/><rect x="610" y="486" width="128" height="12" fill="#f5f5f5"/><text x="612" y="495" fill="#bf4520">VERIFY BEFORE UNPACK</text><line x1="556" y1="548" x2="124" y2="548" stroke="#4f5d75" stroke-width="1.3" stroke-dasharray="5,4" marker-end="url(#arrow-open)"/><rect x="283.0" y="530" width="114" height="12" fill="#f5f5f5"/><text x="340.0" y="539" text-anchor="middle" fill="#4f5d75">INSTALL, RELAUNCH</text><text x="560" y="590" text-anchor="middle" font-family="'Instrument Serif', serif" font-style="italic" font-size="12" letter-spacing="0" fill="#4f5d75">A wrong key or a changed feed stops here; nothing installs.</text></g></svg></div>
+    <div class="cards">
+      <div class="card"><h2>Release build</h2><p>The engine is now built as a static library with full link-time optimization (it never actually ran before). Swift uses whole-module optimization and dead-code stripping. The app went from 14.6 MB to 10.75 MB, including Sparkle.</p></div>
+      <div class="card"><h2>Launch</h2><p>GPU effect pipelines compile on first use; launch builds only the canvas pipeline. Median launch to a usable canvas: 0.75 s on a quiet Mac, 1.2 s under heavy load (budget 3 s).</p></div>
+      <div class="card"><h2>Checked by script</h2><p><code>scripts/perf-check.sh</code> fails on app size over 75 MB, launch over 3 s, any early effect pipeline, or a 10% regression from the recorded baseline.</p></div>
+    </div>
+  </div>
+</body>
+</html>
