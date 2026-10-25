@@ -141,6 +141,8 @@ struct Render {
     target: op_gpu::layer::MetalLayerTarget,
     renderer: op_gpu::presenter::ViewRenderer,
     doc_revision: Option<u64>,
+    /// `Published::preview_serial` of the uploaded pixels (0: no preview).
+    doc_preview: u64,
     doc_profile: Option<Arc<[u8]>>,
     display_gen: u64,
     has_table: bool,
@@ -376,8 +378,12 @@ fn doc_changed(host: &Host, v: &View) -> bool {
     let Ok(snap) = host.engine().core().snapshot(v.doc) else {
         return false;
     };
-    let seen = v.render.lock().as_ref().and_then(|r| r.doc_revision);
-    seen.is_some_and(|rev| rev != snap.revision)
+    let seen = v
+        .render
+        .lock()
+        .as_ref()
+        .and_then(|r| r.doc_revision.map(|rev| (rev, r.doc_preview)));
+    seen.is_some_and(|key| key != (snap.revision, snap.preview_serial))
 }
 #[cfg(not(target_os = "macos"))]
 fn doc_changed(_host: &Host, _v: &View) -> bool {
@@ -412,8 +418,9 @@ fn render_one(host: &Host, v: &View) {
         Ok(s) => s,
         Err(_) => return fail(r, OpStatus::OP_ERR_NO_SUCH_DOC, "document closed".into()),
     };
-    if r.doc_revision != Some(snap.revision) {
-        let pixels = match snap.pixels(false) {
+    // A preview session (such as Layer Properties) shows its preview pixels.
+    if r.doc_revision != Some(snap.revision) || r.doc_preview != snap.preview_serial {
+        let pixels = match snap.pixels(true) {
             Ok(p) => p,
             Err(e) => return fail(r, OpStatus::OP_ERR_INTERNAL, format!("pixels: {e}")),
         };
@@ -426,6 +433,7 @@ fn render_one(host: &Host, v: &View) {
         }
         r.doc_uploads += 1;
         r.doc_revision = Some(snap.revision);
+        r.doc_preview = snap.preview_serial;
         if r.doc_profile != snap.state.profile {
             r.doc_profile = snap.state.profile.clone();
             need_table = true;
@@ -614,6 +622,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             target,
             renderer,
             doc_revision: None,
+            doc_preview: 0,
             doc_profile: None,
             display_gen: 0,
             has_table: false,

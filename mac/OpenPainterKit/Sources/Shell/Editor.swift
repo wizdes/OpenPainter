@@ -16,12 +16,21 @@ public struct DocInfo: Equatable, Sendable {
     public struct Layer: Equatable, Sendable {
         public var name: String
         public var visible: Bool
+        public var id = 0
+        /// 0 to 255.
+        public var opacity = 255
+        /// The engine's blend mode name, such as "normal" or "color_burn".
+        public var blend = "normal"
+        /// Changes when the layer's pixels change (thumbnail cache key).
+        public var revision = 0
     }
     public var width = 0
     public var height = 0
     public var layers: [Layer] = []
     public var activeLayer = 0
     public var historyLabels: [String] = []
+    /// The command id of each history step (the History panel's icons).
+    public var historyCommands: [String] = []
     public var historyIndex = 0
     public var dirty = false
     public var revision: Int = 0
@@ -32,10 +41,13 @@ public struct DocInfo: Equatable, Sendable {
         width = (json["width"] as? NSNumber)?.intValue ?? 0
         height = (json["height"] as? NSNumber)?.intValue ?? 0
         layers = (json["layers"] as? [[String: Any]] ?? []).map {
-            Layer(name: $0["name"] as? String ?? "", visible: $0["visible"] as? Bool ?? true)
+            Layer(name: $0["name"] as? String ?? "", visible: $0["visible"] as? Bool ?? true,
+                  id: ($0["id"] as? NSNumber)?.intValue ?? 0, opacity: ($0["opacity"] as? NSNumber)?.intValue ?? 255,
+                  blend: $0["blend"] as? String ?? "normal", revision: ($0["revision"] as? NSNumber)?.intValue ?? 0)
         }
         activeLayer = (json["active_layer"] as? NSNumber)?.intValue ?? 0
         historyLabels = json["history_labels"] as? [String] ?? []
+        historyCommands = json["history_commands"] as? [String] ?? []
         historyIndex = (json["history_index"] as? NSNumber)?.intValue ?? 0
         dirty = json["dirty"] as? Bool ?? false
         revision = (json["revision"] as? NSNumber)?.intValue ?? 0

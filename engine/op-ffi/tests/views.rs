@@ -380,6 +380,48 @@ fn state_round_trip_frames_color_tag_mips_and_grid() {
     op_engine_free(e);
 }
 
+/// M20: a preview session (Layer Properties) shows on the canvas, and Cancel
+/// shows the document again, with no op_view_set in between.
+#[test]
+fn preview_pixels_show_and_cancel_restores() {
+    if !gpu_tests() {
+        return;
+    }
+    let e = engine();
+    let d = doc(e, 64, 48);
+    let layer = Layer::metal();
+    let v = attach(e, d, &layer);
+    let srgb = srgb_icc();
+    assert_eq!(op_view_set(e, v, &state(1.0, &srgb)), OpStatus::OP_OK);
+    wait(e, v, 1);
+    assert_eq!(info(e, v).doc_uploads, 1);
+    let send = |cmd: &str, json: &str| {
+        let c = std::ffi::CString::new(cmd).unwrap();
+        let mut ticket = 0;
+        assert_eq!(
+            op_dispatch(e, d, c.as_ptr(), json.as_ptr(), json.len(), &mut ticket),
+            OpStatus::OP_OK
+        );
+    };
+    let uploads = |n: u64| {
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while info(e, v).doc_uploads < n && std::time::Instant::now() < end {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        info(e, v).doc_uploads
+    };
+    send(
+        "preview.begin",
+        r#"{"command":"layer.properties","params":{"index":0,"name":"B","visible":true,"blend":"normal","opacity":10}}"#,
+    );
+    assert_eq!(uploads(2), 2, "the preview was uploaded");
+    send("preview.cancel", "{}");
+    assert_eq!(uploads(3), 3, "the plain document came back");
+    assert_eq!(info(e, v).frame_errors, 0);
+    assert_eq!(op_view_detach(e, v), OpStatus::OP_OK);
+    op_engine_free(e);
+}
+
 #[test]
 fn stale_ids_and_document_close() {
     if !gpu_tests() {

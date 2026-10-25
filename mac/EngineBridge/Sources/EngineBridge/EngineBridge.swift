@@ -305,6 +305,13 @@ public final class Document: Sendable {
         return try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
     }
 
+    /// Any `op_query` on this document, as raw bytes (binary answers such as
+    /// `layer.thumbnail`).
+    public func queryData(_ queryID: String, _ params: [String: any Sendable] = [:]) throws -> Data {
+        let json = try JSONSerialization.data(withJSONObject: params)
+        return try engine.query(doc: id, id: queryID, json: json)
+    }
+
     /// `commands.list`: every command id and whether it is enabled now.
     public func enabledCommands() throws -> [String: Bool] {
         let list = try query("commands.list") as? [[String: Any]] ?? []

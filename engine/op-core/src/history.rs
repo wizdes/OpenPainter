@@ -78,6 +78,12 @@ impl History {
         });
         self.current = self.steps.len() - 1;
     }
+    /// Replaces the current step's state in place: no new step, and the step
+    /// keeps its label, command id and saved identity, so the dirty flag does not
+    /// change. For changes that are not edits, such as choosing the active layer.
+    pub fn replace_current(&mut self, state: DocState) {
+        self.steps[self.current].state = state;
+    }
     pub fn undo(&mut self) -> bool {
         if self.current == 0 {
             false
