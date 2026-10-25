@@ -37,6 +37,7 @@ mod layer_commands;
 mod layer_menu_commands;
 mod line_commands;
 pub mod live_stroke;
+mod mask_commands;
 mod profile_query;
 pub mod save_export;
 mod select_crop_commands;
@@ -778,6 +779,7 @@ fn specs() -> Vec<CommandSpec> {
     entries.extend(layer_menu_commands::specs());
     entries.extend(select_crop_commands::specs());
     entries.extend(selection_commands::specs());
+    entries.extend(mask_commands::specs());
     for (index, effect) in effect::registered().into_iter().enumerate() {
         let run = match effect.id {
             "effect.adjust.invert_colors" => run_invert_colors,
@@ -1212,6 +1214,7 @@ impl Actor {
                         .or_else(|| selection_commands::history_label(id, &params))
                         .or_else(|| image_commands::history_label(id).map(str::to_owned))
                         .or_else(|| flood_commands::history_label(id).map(str::to_owned))
+                        .or_else(|| mask_commands::history_label(id).map(str::to_owned))
                         .unwrap_or_else(|| id.into()),
                 };
                 self.history.commit(label, id, state);
@@ -2621,6 +2624,7 @@ impl Engine {
                     .map_err(internal)
             }
             "layer.thumbnail" => layer_commands::thumbnail(&s.state, &params),
+            "layer.pixels" => mask_commands::layer_pixels(&s.state, &params),
             "doc.selection_path" => {
                 serde_json::to_vec(&select_crop_commands::selection_path(shown)).map_err(internal)
             }

@@ -304,6 +304,11 @@ public enum MenuSkeleton {
                 .item("Flip Vertical", "", [], .command("layer.flip_vertical")),
                 .item("Rotate 180°", "", [], .command("layer.rotate_180")),
                 layerItem("Rotate / Zoom…"),
+                // M53: RemoveBackground.swift (paint.net 5.1 has no such item).
+                .submenu("Remove Background", [
+                    .item("Select Foreground", "", [], .selector(#selector(RemoveBackgroundActions.selectForeground(_:)))),
+                    .item("Remove Background", "", [], .selector(#selector(RemoveBackgroundActions.removeBackground(_:)))),
+                ]),
                 .separator,
                 // paint.net: Ctrl+Alt+PgUp, Alt+PgUp, Alt+PgDn, Ctrl+Alt+PgDn.
                 .item("Go to Top Layer", key(NSPageUpFunctionKey), optCmd, .selector(#selector(EditorMenuActions.goToLayer(_:)))),
