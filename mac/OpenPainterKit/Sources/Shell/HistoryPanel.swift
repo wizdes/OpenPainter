@@ -23,6 +23,7 @@ public enum HistoryStep {
         case "tool.stroke": return "paintbrush.pointed"
         case "tool.magic_wand": return "wand.and.stars"
         case "tool.paint_bucket": return "drop"
+        case "tool.text.finish": return "textformat"
         case "image.crop_to_selection", "image.auto_crop": return "crop"
         case "image.flip_horizontal": return "arrow.left.and.right"
         case "image.flip_vertical": return "arrow.up.and.down"

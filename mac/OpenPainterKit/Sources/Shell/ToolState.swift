@@ -88,7 +88,7 @@ public enum PaintTool: String, CaseIterable, Sendable {
     /// Tools that work in this version. The rest are selectable and say "coming soon".
     public var isFunctional: Bool {
         switch self {
-        case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket, .colorPicker: true
+        case .zoom, .pan, .paintbrush, .eraser, .pencil, .magicWand, .paintBucket, .colorPicker, .text: true
         default: false
         }
     }
@@ -103,13 +103,14 @@ public enum PaintTool: String, CaseIterable, Sendable {
         }
     }
 
-    public enum OptionSet: Sendable { case none, brush, flood, picker }
+    public enum OptionSet: Sendable { case none, brush, flood, picker, text }
 
     public var options: OptionSet {
         switch self {
         case .paintbrush, .eraser, .pencil: .brush
         case .magicWand, .paintBucket: .flood
         case .colorPicker: .picker
+        case .text: .text
         default: .none
         }
     }
@@ -123,6 +124,7 @@ public enum PaintTool: String, CaseIterable, Sendable {
         case .magicWand: return "Magic Wand: click to select a region of similar color"
         case .paintBucket: return "Paint Bucket: click to fill with the primary color, right-click for the secondary"
         case .colorPicker: return "Color Picker: click sets the primary color, right-click the secondary; Command-click samples the image"
+        case .text: return "Text: click to type; Escape, Finish, a click outside or another tool commits"
         default: return "\(label): drag to paint"
         }
     }
@@ -170,6 +172,8 @@ public struct ToolSettings: Equatable, Sendable {
     public var pickerSize = PickerSampleSize.one
     public var pickerSampling = Sampling.layer
     public var pickerAfterClick = PickerAfterClick.doNotSwitch
+    /// Text tool options (M46).
+    public var text = TextToolSettings()
 
     public init() {}
 

@@ -17,6 +17,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public private(set) var commandButtons: [String: ShellButton] = [:]
     public private(set) var panelToggles: [PanelKind: ToggleButton] = [:]
     private var cursor: CGPoint?
+    /// The Text tool's session and input view (M46).
+    public private(set) var textTool: TextToolController!
     static let minimumSize = NSSize(width: 1100, height: 792)
 
     public var canvas: MetalCanvasView { container.canvas }
@@ -52,6 +54,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         window.toolbar = toolbar
         editor.windowController = self
         wireCanvas()
+        textTool = TextToolController(window: self)
+        optionsBar.textControls.onFinish = { [weak self] in self?.textTool.finish() }
         workspace.tools.observe(self) { [weak self] in self?.toolChanged() }
         workspace.observe(self) { [weak self] in self?.workspaceChanged() }
         editor.observe(self) { [weak self] in self?.editorChanged() }
@@ -123,7 +127,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             if t == .zoom, self.workspace.tools.tool != .zoom { self.workspace.tools.tool = .zoom }
             if t == .pan, self.workspace.tools.tool != .pan { self.workspace.tools.tool = .pan }
         }
-        container.onViewportChange = { [weak self] _ in self?.updateStatus() }
+        container.onViewportChange = { [weak self] _ in
+            self?.updateStatus()
+            self?.textTool?.viewportChanged()
+        }
         // scripts/launch-time.sh waits for this line (the trace replaces the hook).
         canvas.onFirstFrame = { LaunchClock.markReady() }
     }
@@ -139,6 +146,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     func click(_ point: CGPoint, secondary: Bool = false, modifiers: NSEvent.ModifierFlags = []) {
         let tool = workspace.tools.tool
         if tool == .colorPicker { return pickColor(at: point, secondary: secondary, modifiers: modifiers) }
+        if tool == .text { return textTool.click(at: point) }
         guard tool == .magicWand || tool == .paintBucket else { return }
         let x = Int(point.x.rounded(.down)), y = Int(point.y.rounded(.down))
         guard x >= 0, y >= 0, x < editor.info.width, y < editor.info.height else { return }
@@ -146,9 +154,17 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
                    workspace.tools.floodParams(tool: tool, x: x, y: y, secondary: secondary))
     }
 
-    /// Escape cancels a drag, else deselects. Enter has nothing to finish yet.
+    /// While text is open, Escape and Enter go to the Text tool. Otherwise Escape
+    /// cancels a drag, else deselects, and Enter has nothing to finish yet.
     /// Delete is Erase Selection, which comes in a later version.
     public func canvasKey(_ key: CanvasKey) {
+        if textTool?.isEditing == true {
+            switch key {
+            case .escape: return textTool.escape()
+            case .enter: return textTool.enter()
+            case .delete: return textTool.apply { $0.deleteForward() }
+            }
+        }
         switch key {
         case .escape:
             if canvas.cancelStroke() { return }
@@ -167,7 +183,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
             case .pan: .pan
             case .zoom: .zoom
             case .paintbrush, .eraser, .pencil: .stroke
-            case .magicWand, .paintBucket, .colorPicker: .click
+            case .magicWand, .paintBucket, .colorPicker, .text: .click
             default: .inactive
             }
         if canvas.tool != mode { canvas.tool = mode }
@@ -197,7 +213,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         let size = CGSize(width: editor.info.width, height: editor.info.height)
         statusBar.update(
             selection: editor.selection, cursor: cursor, imageSize: size, zoom: canvas.viewport.zoom,
-            hint: editor.message ?? workspace.tools.tool.hint)
+            hint: editor.message ?? textTool?.notice ?? workspace.tools.tool.hint)
     }
 
     private func updateCommandStates() {
@@ -225,7 +241,15 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public var canUndo: Bool { editor.info.historyIndex > 0 }
     public var canRedo: Bool { editor.info.historyIndex + 1 < editor.info.historyLabels.count }
 
-    public func undo() { if canUndo { editor.run("edit.undo") } }
+    public func undo() {
+        // Undo while typing commits the text first, so Redo can bring it back.
+        if textTool?.isEditing == true {
+            textTool.finish()
+            editor.run("edit.undo")
+            return
+        }
+        if canUndo { editor.run("edit.undo") }
+    }
     public func redo() { if canRedo { editor.run("edit.redo") } }
     public func selectAllPixels() { editor.run("selection.select_all") }
 

@@ -137,9 +137,9 @@ final class StripAndToolTests: XCTestCase {
         XCTAssertEqual(wc.canvas.tool, .zoom)
         XCTAssertNil(wc.optionsBar.toleranceField.superview)
         XCTAssertNil(wc.optionsBar.widthField.superview)
-        tools.tool = .text
+        tools.tool = .shapes
         XCTAssertEqual(wc.canvas.tool, .inactive)
-        XCTAssertEqual(wc.statusBar.hint.stringValue, "Text is coming soon")
+        XCTAssertEqual(wc.statusBar.hint.stringValue, "Shapes is coming soon")
         // Letter keys on the canvas pick tools; S cycles the selection tools.
         wc.window?.makeFirstResponder(wc.canvas)
         wc.canvas.keyDown(with: keyEvent("b", keyCode: 11))

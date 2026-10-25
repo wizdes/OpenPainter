@@ -26,6 +26,8 @@ public final class OptionsBarView: FilledView {
     public let pickerSize = Labels.popup(PickerSampleSize.allCases.map(\.label))
     public let pickerSampling = Labels.popup(ToolSettings.Sampling.allCases.map(\.label))
     public let pickerAfterClick = Labels.popup(PickerAfterClick.allCases.map(\.label))
+    /// Text tool controls (M46).
+    public private(set) lazy var textControls = TextOptionsControls(tools: tools)
     private var shownSet: PaintTool.OptionSet?
     private var shownTool: PaintTool?
 
@@ -129,6 +131,7 @@ public final class OptionsBarView: FilledView {
         pickerAfterClick.selectItem(at: PickerAfterClick.allCases.firstIndex(of: s.pickerAfterClick) ?? 0)
         minus.isEnabled = s.brushWidth > ToolSettings.widthRange.lowerBound
         plus.isEnabled = s.brushWidth < ToolSettings.widthRange.upperBound
+        if tool.options == .text { textControls.sync() }
         // Paint Bucket uses blend mode; Magic Wand uses selection mode.
         if tool.options == .flood {
             selectionMode.isHidden = tool != .magicWand
@@ -181,6 +184,9 @@ public final class OptionsBarView: FilledView {
             add(Labels.label("Layer or image"), pickerSampling)
             group()
             add(Labels.label("After click"), pickerAfterClick)
+        case .text:
+            textControls.add({ for v in $0 { stack.addArrangedSubview(v) } }, group: group, antialias: antialias,
+                             blend: blend)
         }
         for v in stack.arrangedSubviews where v is NSPopUpButton || v is NSButton {
             let has = v.constraints.contains { $0.firstAttribute == .height && $0.firstItem === v }
