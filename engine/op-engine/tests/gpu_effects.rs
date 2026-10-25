@@ -478,6 +478,10 @@ fn cancel_during_gpu_effect_leaves_document_unchanged() {
     }
     let (e, rx) = engine_with_events(EngineOptions {
         max_gpu_chunk: Some(64),
+        // The job waits after its first progress report until the cancel below
+        // lands. Without it the Linux VM finished the last tiles first and the
+        // job reported "ok" (checkpoint run, 2026-10-25).
+        hold_gpu_job_for_cancel: true,
         ..EngineOptions::default()
     });
     let (w, h) = (1024, 768);

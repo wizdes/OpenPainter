@@ -40,6 +40,11 @@ pub struct EngineOptions {
     /// Test hook: GPU creation fails with this message.
     #[doc(hidden)]
     pub simulate_gpu_failure: Option<String>,
+    /// Test hook: after a GPU effect's first progress report, wait up to 30 s
+    /// for the job to be cancelled before going on. A test can then cancel a
+    /// running GPU job without racing the last tiles on a fast or busy machine.
+    #[doc(hidden)]
+    pub hold_gpu_job_for_cancel: bool,
 }
 impl EngineOptions {
     /// Options from the environment: `OP_FORCE_CPU=1` turns the GPU off.
@@ -879,6 +884,10 @@ fn compose(
             )
             .map_err(bad)?;
         ctx.progress(done + 1, coords.len());
+        // Only jobs with a caller ticket report progress, so only they wait.
+        if done == 0 && ctx.ticket.id != 0 && ctx.gpu.options.hold_gpu_job_for_cancel {
+            ctx.sleep(30_000)?;
+        }
     }
     ctx.check()?;
     Ok(next)

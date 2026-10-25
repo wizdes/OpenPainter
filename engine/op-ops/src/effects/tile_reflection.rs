@@ -18,8 +18,8 @@ fn render(s: &PixelReader<'_>, x: i32, y: i32, p: &Prepared, v: &Value) -> [u8; 
         let w = y as f32 - p.height as f32 * 0.5 - oy;
         let a = cos * u + sin * w;
         let b = -sin * u + cos * w;
-        let a2 = a + intensity * (a * scale).tan();
-        let b2 = b + intensity * (b * scale).tan();
+        let a2 = a + intensity * tan(a * scale);
+        let b2 = b + intensity * tan(b * scale);
         samples.push(d::bilinear(
             s,
             p.width as f32 * 0.5 + cos * a2 - sin * b2,
@@ -29,6 +29,13 @@ fn render(s: &PixelReader<'_>, x: i32, y: i32, p: &Prepared, v: &Value) -> [u8; 
         ));
     }
     d::blend(&samples)
+}
+/// The tangent the way the C# original computes it: `(float)Math.Tan(x)`, in
+/// f64. `f32::tan` calls the system's `tanf`, and macOS and glibc round it
+/// differently near the poles, where the warp magnifies one ulp into a whole
+/// pixel, so Linux missed the legacy oracle by up to 11 channels.
+fn tan(x: f32) -> f32 {
+    f64::from(x).tan() as f32
 }
 pub fn spec() -> EffectSpec {
     EffectSpec {

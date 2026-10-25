@@ -61,6 +61,19 @@ impl Profile {
             {
                 return Err(Error::InvalidProfile("ICC tag points outside data".into()));
             }
+            // lcms2 allocates and zeroes 12 bytes per claimed mluc record before
+            // it reads any, so a tiny tag can claim gigabytes of records.
+            let data = &bytes[offset..offset + length];
+            if data.starts_with(b"mluc") {
+                let records = data.get(8..12).map_or(u64::MAX, |n| {
+                    u64::from(u32::from_be_bytes(n.try_into().unwrap()))
+                });
+                if records.saturating_mul(12).saturating_add(16) > length as u64 {
+                    return Err(Error::InvalidProfile(
+                        "ICC mluc tag claims more records than it holds".into(),
+                    ));
+                }
+            }
         }
         let p = lcms2::Profile::new_icc(bytes).map_err(|e| Error::InvalidProfile(e.to_string()))?;
         let hash = hash::sha256(bytes);

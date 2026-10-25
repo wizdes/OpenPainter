@@ -316,6 +316,40 @@ fn m45_legacy_oracle_defaults() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
+/// The checkpoint run on Linux (aarch64, glibc) missed the oracle above in 17
+/// Tile Reflection channels while the Mac passed: `f32::tan` is the system's
+/// `tanf`, and the two systems round it differently. Every distort must give the
+/// same bytes on every system, so pin the exact output hash (FNV-1a 64).
+#[test]
+fn m45_tile_reflection_bytes_are_the_same_on_every_system() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let mut hashes = Vec::new();
+    for name in ["plasma_512x384.png", "plasma_alpha_512x384.png"] {
+        let input = op_formats::png::decode_png(
+            &std::fs::read(root.join("tests/fixtures").join(name)).unwrap(),
+        )
+        .unwrap();
+        let out = effect::reference_rgba8(
+            "effect.distort.tile_reflection",
+            input.width,
+            input.height,
+            &input.pixels,
+        )
+        .unwrap();
+        let hash = out.iter().fold(0xcbf2_9ce4_8422_2325_u64, |h, &b| {
+            (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+        });
+        hashes.push(format!("{name} {hash:016x}"));
+    }
+    assert_eq!(
+        hashes,
+        [
+            "plasma_512x384.png ad8cf1a500192468",
+            "plasma_alpha_512x384.png 0b79a4b9824d98f7",
+        ]
+    );
+}
+
 #[test]
 fn m45_warps_sample_across_tile_seam_and_image_edge() {
     use std::sync::atomic::{AtomicBool, Ordering};
