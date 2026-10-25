@@ -629,6 +629,162 @@ fn box_blur(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(output_tex, vec2<i32>(id.xy), (sum + vec4<u32>(4u)) / vec4<u32>(9u));
 }
 
+fn m48_div_u64(hi: u32, lo: u32, divisor: u32) -> u32 {
+  var left = 0u;
+  var right = 256u;
+  while left + 1u < right {
+    let guess = (left + right) / 2u;
+    let low_part = (divisor & 65535u) * guess;
+    let upper_part = (divisor >> 16u) * guess;
+    let shifted = upper_part << 16u;
+    let product_lo = shifted + low_part;
+    let product_hi = (upper_part >> 16u) + select(0u, 1u, product_lo < shifted);
+    if product_hi < hi || (product_hi == hi && product_lo <= lo) {
+      left = guess;
+    } else {
+      right = guess;
+    }
+  }
+  return left;
+}
+
+fn m48_mean(pos: vec2<i32>, circular: bool) -> vec4<u32> {
+  let radius = i32(p.mode);
+  if radius == 0 { return textureLoad(input_tex, pos, 0); }
+  let boost = bitcast<i32>(p.opacity);
+  let exponent = select(1.0 / (1.0 - f32(boost) / 50.0), 1.0 + f32(boost) / 50.0, boost >= 0);
+  let stride = select(1, max(1, 11 - i32(p.masked)), circular);
+  var sum = vec3<u32>(0u);
+  var sum_hi = vec3<u32>(0u);
+  var corrected = vec3<f32>(0.0);
+  var alpha = 0u;
+  var area = 0u;
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      if circular && (dx * dx + dy * dy > radius * radius || ((dx % stride + stride) % stride) != 0 || ((dy % stride + stride) % stride) != 0) { continue; }
+      let xy = pos + vec2<i32>(dx, dy);
+      if xy.x < 0 || xy.y < 0 || xy.x >= i32(p.width) || xy.y >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, xy, 0);
+      area += 1u;
+      alpha += c.a;
+      let old = sum;
+      sum += c.rgb * c.a;
+      sum_hi += vec3<u32>(sum < old);
+      if boost != 0 { corrected += pow(vec3<f32>(c.rgb) / 255.0, vec3<f32>(exponent)) * f32(c.a); }
+    }
+  }
+  if area == 0u { return textureLoad(input_tex, pos, 0); }
+  if alpha == 0u { return vec4<u32>(0u); }
+  if boost == 0 {
+    var rounded = sum + vec3<u32>(alpha / 2u);
+    let rounded_hi = sum_hi + vec3<u32>(rounded < sum);
+    return vec4<u32>(m48_div_u64(rounded_hi.r, rounded.r, alpha),
+      m48_div_u64(rounded_hi.g, rounded.g, alpha),
+      m48_div_u64(rounded_hi.b, rounded.b, alpha), alpha / area);
+  }
+  let color = pow(corrected / f32(alpha), vec3<f32>(1.0 / exponent)) * 255.0;
+  return vec4<u32>(vec3<u32>(clamp(color + 0.5, vec3<f32>(0.0), vec3<f32>(255.0))), alpha / area);
+}
+@compute @workgroup_size(16, 16)
+fn effect_bokeh(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  textureStore(output_tex, vec2<i32>(id.xy), m48_mean(vec2<i32>(id.xy), true));
+}
+@compute @workgroup_size(16, 16)
+fn effect_square(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  textureStore(output_tex, vec2<i32>(id.xy), m48_mean(vec2<i32>(id.xy), false));
+}
+@compute @workgroup_size(16, 16)
+fn effect_sketch(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let pos = vec2<i32>(id.xy);
+  let radius = i32(p.mode);
+  if radius == 0 { textureStore(output_tex, pos, textureLoad(input_tex, pos, 0)); return; }
+  let stride = clamp((11 - i32(p.masked)) / 3, 1, 3);
+  var hist: array<u32, 256>;
+  var area = 0u;
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      let xy = pos + vec2<i32>(dx, dy);
+      if dx * dx + dy * dy > radius * radius || ((dx % stride + stride) % stride) != 0 || ((dy % stride + stride) % stride) != 0 || xy.x < 0 || xy.y < 0 || xy.x >= i32(p.width) || xy.y >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, xy, 0);
+      let lum = (19595u * c.r + 38470u * c.g + 7471u * c.b) >> 16u;
+      hist[lum] += 1u;
+      area += 1u;
+    }
+  }
+  let rank = (area - 1u) * p.opacity / 100u;
+  var cumulative = 0u;
+  var chosen = 0u;
+  for (var bin = 0u; bin < 256u; bin++) {
+    if cumulative + hist[bin] > rank { chosen = bin; break; }
+    cumulative += hist[bin];
+  }
+  var remaining = rank - cumulative;
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      let xy = pos + vec2<i32>(dx, dy);
+      if dx * dx + dy * dy > radius * radius || ((dx % stride + stride) % stride) != 0 || ((dy % stride + stride) % stride) != 0 || xy.x < 0 || xy.y < 0 || xy.x >= i32(p.width) || xy.y >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, xy, 0);
+      let lum = (19595u * c.r + 38470u * c.g + 7471u * c.b) >> 16u;
+      if lum != chosen { continue; }
+      if remaining == 0u { textureStore(output_tex, pos, c); return; }
+      remaining -= 1u;
+    }
+  }
+}
+@compute @workgroup_size(16, 16)
+fn effect_unfocus(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let radius = i32(p.mode);
+  let cutoff = ((2 * radius + 1) * (2 * radius + 1) + 2) / 4;
+  var sum = vec3<u32>(0u);
+  var sum_hi = vec3<u32>(0u);
+  var alpha = 0u;
+  var area = 0u;
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      let xy = vec2<i32>(id.xy) + vec2<i32>(dx, dy);
+      if dx * dx + dy * dy > cutoff || xy.x < 0 || xy.y < 0 || xy.x >= i32(p.width) || xy.y >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, xy, 0);
+      area += 1u;
+      alpha += c.a;
+      let old = sum;
+      sum += c.rgb * c.a;
+      sum_hi += vec3<u32>(sum < old);
+    }
+  }
+  let divisor = area * 255u;
+  textureStore(output_tex, vec2<i32>(id.xy), vec4<u32>(
+    m48_div_u64(sum_hi.r, sum.r, divisor), m48_div_u64(sum_hi.g, sum.g, divisor),
+    m48_div_u64(sum_hi.b, sum.b, divisor), alpha / area));
+}
+@compute @workgroup_size(16, 16)
+fn effect_surface(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let pos = vec2<i32>(id.xy);
+  let center = textureLoad(input_tex, pos, 0);
+  let radius = i32(p.mode);
+  let threshold = i32(p.opacity);
+  let cutoff = ((2 * radius + 1) * (2 * radius + 1) + 2) / 4;
+  var sum = vec3<u32>(0u);
+  var divisor = vec3<u32>(0u);
+  for (var dy = -radius; dy <= radius; dy++) {
+    for (var dx = -radius; dx <= radius; dx++) {
+      let xy = pos + vec2<i32>(dx, dy);
+      if dx * dx + dy * dy > cutoff || xy.x < 0 || xy.y < 0 || xy.x >= i32(p.width) || xy.y >= i32(p.height) { continue; }
+      let c = textureLoad(input_tex, xy, 0);
+      let diff = abs(vec3<i32>(c.rgb) - vec3<i32>(center.rgb));
+      let weight = vec3<u32>(max(vec3<i32>(0), vec3<i32>(255) - (diff * 96 + vec3<i32>(threshold / 2)) / threshold));
+      sum += c.rgb * weight;
+      divisor += weight;
+    }
+  }
+  let color = (sum + divisor / vec3<u32>(2u)) / max(divisor, vec3<u32>(1u));
+  textureStore(output_tex, pos, vec4<u32>(color, center.a));
+}
+
 @compute @workgroup_size(16, 16)
 fn effect_fragment(@builtin(global_invocation_id) id: vec3<u32>) {
   if id.x >= p.width || id.y >= p.height { return; }

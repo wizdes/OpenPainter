@@ -120,7 +120,7 @@ fn registered_ops() {
         top: make(),
     };
     let results = op_gpu::parity::run(&mut gpu, &inputs).unwrap();
-    // 49 composite, tool, resample, adjustment, artistic, distort, noise, photo and stylize ops, plus 6 blur kernels.
+    // 49 composite, tool, resample, adjustment, artistic, distort, noise, photo and stylize ops, plus 11 blur kernels.
     assert_eq!(
         results
             .iter()
@@ -128,7 +128,7 @@ fn registered_ops() {
             .count(),
         49
     );
-    assert_eq!(results.len(), 55);
+    assert_eq!(results.len(), 60);
     assert!(
         results
             .iter()

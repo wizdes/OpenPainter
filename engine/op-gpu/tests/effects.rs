@@ -1,6 +1,88 @@
 use op_gpu::{GpuContext, NoiseParams};
 use op_ops::effect::{self, GpuKernel};
 
+#[test]
+fn m48_gpu_parameter_endpoints_match_cpu_on_metal() {
+    let mut gpu = GpuContext::new().expect("GPU adapter");
+    #[cfg(target_os = "macos")]
+    assert_eq!(format!("{:?}", gpu.info().backend), "Metal");
+    let (width, height) = (5u32, 3u32);
+    let bytes: Vec<u8> = (0..width * height)
+        .flat_map(|i| {
+            [
+                (i * 17) as u8,
+                (255 - i * 9) as u8,
+                (i * 13) as u8,
+                if i % 3 == 0 {
+                    0
+                } else if i % 3 == 1 {
+                    113
+                } else {
+                    255
+                },
+            ]
+        })
+        .collect();
+    for (id, values, params) in [
+        (
+            "effect.blur.bokeh",
+            [200, 100, 10],
+            serde_json::json!({"radius":200,"gamma_boost":100,"quality":10}),
+        ),
+        (
+            "effect.blur.sketch",
+            [200, 100, 10],
+            serde_json::json!({"radius":200,"percentile":100,"smoothness":10}),
+        ),
+        (
+            "effect.blur.square",
+            [200, -100, 0],
+            serde_json::json!({"radius":200,"gamma_boost":-100}),
+        ),
+        (
+            "effect.blur.surface",
+            [100, 100, 0],
+            serde_json::json!({"radius":100,"threshold":100}),
+        ),
+        (
+            "effect.blur.unfocus",
+            [200, 0, 0],
+            serde_json::json!({"radius":200}),
+        ),
+    ] {
+        let spec = effect::find(id).unwrap();
+        let kernel = spec.gpu.unwrap();
+        let before = gpu.dispatch_count();
+        let actual = gpu
+            .effect_kernel_with_params(kernel, width, height, &bytes, values)
+            .unwrap();
+        assert!(gpu.dispatch_count() > before, "{id} dispatched");
+        let prep = effect::Prepared {
+            width: width as i32,
+            height: height as i32,
+            ..Default::default()
+        };
+        let sample = |x: i32, y: i32| {
+            let i = (y as usize * width as usize + x as usize) * 4;
+            bytes[i..i + 4].try_into().unwrap()
+        };
+        for y in 0..height as i32 {
+            for x in 0..width as i32 {
+                let i = (y as usize * width as usize + x as usize) * 4;
+                let expected = (spec.render_cpu)(&sample, x, y, &prep, &params);
+                for channel in 0..4 {
+                    assert!(
+                        actual[i + channel].abs_diff(expected[channel]) <= 1,
+                        "{id} {x},{y} channel {channel}: {} vs {}",
+                        actual[i + channel],
+                        expected[channel]
+                    );
+                }
+            }
+        }
+    }
+}
+
 struct NoSpill;
 impl op_core::tiles::SpillIo for NoSpill {
     fn append(&self, _: &[u8]) -> std::io::Result<u64> {
@@ -53,6 +135,11 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
         let blur = matches!(
             kernel,
             GpuKernel::Gaussian
+                | GpuKernel::Bokeh
+                | GpuKernel::Sketch
+                | GpuKernel::Square
+                | GpuKernel::Surface
+                | GpuKernel::Unfocus
                 | GpuKernel::Fragment
                 | GpuKernel::Median
                 | GpuKernel::Motion
@@ -133,6 +220,11 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom
+                | GpuKernel::Bokeh
+                | GpuKernel::Sketch
+                | GpuKernel::Square
+                | GpuKernel::Surface
+                | GpuKernel::Unfocus
                 | GpuKernel::Pixelate
                 | GpuKernel::Bulge
                 | GpuKernel::Twist
