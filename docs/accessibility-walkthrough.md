@@ -281,17 +281,17 @@ Sheet
 ```
 Sheet
   StaticText = Hue:
-  Slider = 0
+  Slider "Hue" = 0
     ValueIndicator = 0
-  TextField = 0
+  TextField "Hue value, -180 to 180" = 0
   StaticText = Saturation:
-  Slider = 100
+  Slider "Saturation" = 100
     ValueIndicator = 100
-  TextField = 100
+  TextField "Saturation value, 0 to 200" = 100
   StaticText = Lightness:
-  Slider = 0
+  Slider "Lightness" = 0
     ValueIndicator = 0
-  TextField = 0
+  TextField "Lightness value, -100 to 100" = 0
   Button "Cancel"
   Button "OK"
 ```
@@ -627,9 +627,4 @@ Window (Dialog) "Settings"
 
 ## Unnamed controls
 
-- Hue / Saturation dialog: Slider = 0 <NSSliderCell of NSSlider>
-- Hue / Saturation dialog: TextField = 0 <NSTextFieldCell of NSTextField>
-- Hue / Saturation dialog: Slider = 100 <NSSliderCell of NSSlider>
-- Hue / Saturation dialog: TextField = 100 <NSTextFieldCell of NSTextField>
-- Hue / Saturation dialog: Slider = 0 <NSSliderCell of NSSlider>
-- Hue / Saturation dialog: TextField = 0 <NSTextFieldCell of NSTextField>
+None.
