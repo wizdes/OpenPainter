@@ -386,3 +386,5 @@ fn circle_pixel(cx: f64, cy: f64, r: f64, x: f64, y: f64) -> f64 {
         + signed_area(a, b, r))
     .clamp(0.0, 1.0)
 }
+
+pub mod r#move;

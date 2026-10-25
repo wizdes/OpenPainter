@@ -10,6 +10,7 @@ use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use op_ops::effect::{self, Rect};
 pub use op_ops::effect::{Param, ParamKind, ParamSchema};
 use op_tools::flood::{self, AlphaMode, FloodOptions, Sampling};
+use op_tools::r#move::{MoveKind, MoveOptions, MoveSession};
 use op_tools::{BrushSettings, StrokeSample, StrokeSession};
 use parking_lot::Mutex;
 use rayon::ThreadPool;
@@ -854,6 +855,10 @@ enum Message {
     StrokeAppend(Vec<StrokeSample>, Sender<Result<()>>),
     StrokeCommit(Sender<Result<()>>),
     StrokeCancel(Sender<Result<()>>),
+    MoveBegin(MoveKind, MoveOptions, Sender<Result<u64>>),
+    MoveUpdate(MoveOptions, Sender<Result<()>>),
+    MoveFinish(Sender<Result<()>>),
+    MoveCancel(Sender<Result<()>>),
     Stop(Sender<()>),
 }
 struct ActiveStroke {
@@ -869,6 +874,7 @@ struct Actor {
     selection_revision: u64,
     preview: Option<PreviewSession>,
     stroke: Option<ActiveStroke>,
+    move_session: Option<(u64, MoveSession)>,
     published: Arc<ArcSwap<Published>>,
     read_only: Arc<AtomicBool>,
     events: Sender<Event>,
@@ -930,9 +936,13 @@ impl Actor {
         self.read_only.store(true, Ordering::Release);
         self.preview = None;
         self.stroke = None;
+        self.move_session = None;
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if self.move_session.is_some() {
+            self.move_finish()?;
+        }
         if self.stroke.is_some() {
             return Err(Error::Busy);
         }
@@ -981,7 +991,7 @@ impl Actor {
         Ok(())
     }
     fn begin(&mut self, id: &str, params: Value, ticket: JobTicket) -> Result<u64> {
-        if self.stroke.is_some() {
+        if self.stroke.is_some() || self.move_session.is_some() {
             return Err(Error::Busy);
         }
         if self.read_only.load(Ordering::Acquire) {
@@ -1081,7 +1091,7 @@ impl Actor {
         if self.read_only.load(Ordering::Acquire) {
             return Err(Error::ReadOnly);
         }
-        if self.preview.is_some() || self.stroke.is_some() {
+        if self.preview.is_some() || self.stroke.is_some() || self.move_session.is_some() {
             return Err(Error::Busy);
         }
         let session = StrokeSession::new(
@@ -1098,6 +1108,63 @@ impl Actor {
             selection_revision: self.selection_revision,
         });
         Ok(id)
+    }
+    fn move_begin(&mut self, kind: MoveKind, options: MoveOptions) -> Result<u64> {
+        if self.read_only.load(Ordering::Acquire) {
+            return Err(Error::ReadOnly);
+        }
+        if self.preview.is_some() || self.stroke.is_some() || self.move_session.is_some() {
+            return Err(Error::Busy);
+        }
+        let session =
+            MoveSession::new(self.history.current_state().clone(), kind, options).map_err(bad)?;
+        let state = session.preview().map_err(bad)?;
+        let id = self.next_session.fetch_add(1, Ordering::Relaxed);
+        self.move_session = Some((id, session));
+        self.publish(Some(state));
+        Ok(id)
+    }
+    fn move_update(&mut self, options: MoveOptions) -> Result<()> {
+        let (_, session) = self
+            .move_session
+            .as_mut()
+            .ok_or_else(|| bad("no move session"))?;
+        session.update(options).map_err(bad)?;
+        let state = session.preview().map_err(bad)?;
+        self.publish(Some(state));
+        Ok(())
+    }
+    fn move_finish(&mut self) -> Result<()> {
+        let (_, session) = self
+            .move_session
+            .take()
+            .ok_or_else(|| bad("no move session"))?;
+        if session.target_layer != self.active_id() {
+            self.publish(None);
+            return Err(Error::Busy);
+        }
+        let kind = session.kind;
+        let state = session.finish().map_err(bad)?;
+        let label = match kind {
+            MoveKind::Pixels => "Move Selected Pixels",
+            MoveKind::Selection => "Move Selection",
+        };
+        self.history.commit(label, label, state);
+        if kind == MoveKind::Selection
+            || self.history.current_state().selection
+                != self
+                    .history
+                    .state(self.history.current_index() - 1)
+                    .unwrap()
+                    .selection
+        {
+            self.selection_revision += 1;
+        }
+        self.revision += 1;
+        self.publish(None);
+        self.event(EventKind::DocChanged, 0, json!({"revision":self.revision}));
+        self.event(EventKind::HistoryChanged, 0, json!({}));
+        Ok(())
     }
     fn stroke_append(&mut self, samples: &[StrokeSample]) -> Result<()> {
         if self.read_only.load(Ordering::Acquire) {
@@ -1220,6 +1287,14 @@ impl Actor {
                 Message::StrokeCommit(r) | Message::StrokeCancel(r) if stopping.is_some() => {
                     let _ = r.send(Err(Error::NoSuchDoc));
                 }
+                Message::MoveBegin(_, _, r) if stopping.is_some() => {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
+                Message::MoveUpdate(_, r) | Message::MoveFinish(r) | Message::MoveCancel(r)
+                    if stopping.is_some() =>
+                {
+                    let _ = r.send(Err(Error::NoSuchDoc));
+                }
                 Message::Run(op, ticket, reply) => {
                     let (result, rendering) = self.run_op(op, &ticket);
                     if !rendering && ticket.id != 0 {
@@ -1284,6 +1359,24 @@ impl Actor {
                     } else {
                         let _ = r.send(Err(bad("no stroke")));
                     }
+                }
+                Message::MoveBegin(kind, options, r) => {
+                    let _ = r.send(self.move_begin(kind, options));
+                }
+                Message::MoveUpdate(options, r) => {
+                    let _ = r.send(self.move_update(options));
+                }
+                Message::MoveFinish(r) => {
+                    let _ = r.send(self.move_finish());
+                }
+                Message::MoveCancel(r) => {
+                    let result = if self.move_session.take().is_some() {
+                        self.publish(None);
+                        Ok(())
+                    } else {
+                        Err(bad("no move session"))
+                    };
+                    let _ = r.send(result);
                 }
             }
             if stopping.is_some() && self.pending_jobs == 0 {
@@ -1413,6 +1506,7 @@ impl Engine {
             selection_revision: 0,
             preview: None,
             stroke: None,
+            move_session: None,
             published: published.clone(),
             read_only: read_only.clone(),
             events: self.events_tx.clone(),
@@ -1571,6 +1665,20 @@ impl Engine {
     }
     pub fn stroke_cancel(&self, id: u64) -> Result<()> {
         self.call(id, Message::StrokeCancel)?
+    }
+    /// Starts a move preview. Releasing and dragging another handle calls `move_update`;
+    /// only `move_finish` writes history.
+    pub fn move_begin(&self, id: u64, kind: MoveKind, options: MoveOptions) -> Result<u64> {
+        self.call(id, |r| Message::MoveBegin(kind, options, r))?
+    }
+    pub fn move_update(&self, id: u64, options: MoveOptions) -> Result<()> {
+        self.call(id, |r| Message::MoveUpdate(options, r))?
+    }
+    pub fn move_finish(&self, id: u64) -> Result<()> {
+        self.call(id, Message::MoveFinish)?
+    }
+    pub fn move_cancel(&self, id: u64) -> Result<()> {
+        self.call(id, Message::MoveCancel)?
     }
     pub fn query(&self, id: u64, query: &str, params: Value) -> Result<Vec<u8>> {
         let d = self.doc(id)?;
