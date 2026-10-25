@@ -1,5 +1,6 @@
 //! Sparse, deterministic brush strokes over immutable document tiles.
 pub mod flood;
+pub mod gradient;
 mod heal;
 // Clone and recolor arithmetic is ported from OpenPDN 3.36
 // src/tools/CloneStampTool.cs and src/tools/RecoloringTool.cs (MIT).
