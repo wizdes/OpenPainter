@@ -129,6 +129,12 @@ fn registry_follows_paint_net_menu_order() {
             ("Blurs", "effect.blur.motion"),
             ("Blurs", "effect.blur.radial"),
             ("Blurs", "effect.blur.zoom"),
+            ("Distort", "effect.distort.bulge"),
+            ("Distort", "effect.distort.frosted_glass"),
+            ("Distort", "effect.distort.pixelate"),
+            ("Distort", "effect.distort.polar_inversion"),
+            ("Distort", "effect.distort.tile_reflection"),
+            ("Distort", "effect.distort.twist"),
             ("Edit", "effect.fill.content_aware"),
         ]
     );

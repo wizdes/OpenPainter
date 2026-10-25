@@ -154,3 +154,51 @@ id = "effect.adjust.highlights_shadows"
 target = "own"
 reference = "provisional tone weighted shift; https://paint.net/doc/latest/AdjustmentsMenu.html; 5.1 capture pending"
 tolerance = "exact"
+
+[[effect]]
+id = "effect.distort.bulge"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Bulge_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "new controls provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.distort.frosted_glass"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Frosted_Glass_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "new controls provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.distort.pixelate"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Pixelate_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "new controls provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.distort.polar_inversion"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Polar_Inversion_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "new controls provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.distort.tile_reflection"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Tile_Reflection_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "new controls provisional until Paint.NET 5.1 capture"
+
+[[effect]]
+id = "effect.distort.twist"
+target = "legacy-3.36"
+reference = "tests/oracle/legacy336/effects/Twist_*.png"
+tolerance = "1/255 per channel"
+docs = "https://www.getpaint.net/doc/latest/EffectsDistortMenu.html"
+own_5_1 = "new controls provisional until Paint.NET 5.1 capture"

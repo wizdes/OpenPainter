@@ -479,3 +479,84 @@ fn effect_motion(@builtin(global_invocation_id) id: vec3<u32>) {
   else if alpha > 0u { result = vec4<u32>(rgb/alpha,alpha/count); }
   textureStore(output_tex, vec2<i32>(id.xy), result);
 }
+@compute @workgroup_size(16, 16)
+fn effect_pixelate(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let size = max(1u, p.mode);
+  let left = (id.x / size) * size;
+  let top = (id.y / size) * size;
+  let right = min(left + size - 1u, p.width - 1u);
+  let bottom = min(top + size - 1u, p.height - 1u);
+  let a = textureLoad(input_tex, vec2<i32>(i32(left), i32(top)), 0);
+  let b = textureLoad(input_tex, vec2<i32>(i32(right), i32(top)), 0);
+  let c = textureLoad(input_tex, vec2<i32>(i32(left), i32(bottom)), 0);
+  let d = textureLoad(input_tex, vec2<i32>(i32(right), i32(bottom)), 0);
+  let alpha = a.a + b.a + c.a + d.a;
+  var out = vec4<u32>(0u);
+  if alpha > 0u {
+    out = vec4<u32>((a.rgb * a.a + b.rgb * b.a + c.rgb * c.a + d.rgb * d.a) / alpha, alpha / 4u);
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), out);
+}
+fn bilinear_clamp(x: f32, y: f32) -> vec4<u32> {
+  let sx = clamp(x, 0.0, f32(p.width - 1u));
+  let sy = clamp(y, 0.0, f32(p.height - 1u));
+  let ix = i32(floor(sx));
+  let iy = i32(floor(sy));
+  let fx = u32(256.0 * (sx - f32(ix)));
+  let fy = u32(256.0 * (sy - f32(iy)));
+  let x1 = min(ix + 1, i32(p.width) - 1);
+  let y1 = min(iy + 1, i32(p.height) - 1);
+  let a = textureLoad(input_tex, vec2<i32>(ix, iy), 0);
+  let b = textureLoad(input_tex, vec2<i32>(x1, iy), 0);
+  let c = textureLoad(input_tex, vec2<i32>(ix, y1), 0);
+  let d = textureLoad(input_tex, vec2<i32>(x1, y1), 0);
+  let wa = (256u - fx) * (256u - fy);
+  let wb = fx * (256u - fy);
+  let wc = (256u - fx) * fy;
+  let wd = fx * fy;
+  let alpha = a.a * wa + b.a * wb + c.a * wc + d.a * wd;
+  if (alpha + 32768u) >> 16u == 0u { return vec4<u32>(0u); }
+  let rgb = (a.rgb * a.a * wa + b.rgb * b.a * wb + c.rgb * c.a * wc + d.rgb * d.a * wd) / alpha;
+  return vec4<u32>(rgb, (alpha + 32768u) >> 16u);
+}
+@compute @workgroup_size(16, 16)
+fn effect_bulge(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let cx = f32(p.width) * 0.5;
+  let cy = f32(p.height) * 0.5;
+  let radius = min(cx, cy);
+  if radius <= 0.0 { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
+  let u = f32(id.x) - cx;
+  let v = f32(id.y) - cy;
+  let t = 1.0 - sqrt(u * u + v * v) / radius;
+  if t <= 0.0 { textureStore(output_tex, vec2<i32>(id.xy), textureLoad(input_tex, vec2<i32>(id.xy), 0)); return; }
+  let scale = 1.0 - (f32(bitcast<i32>(p.mode)) / 100.0) * t * t;
+  textureStore(output_tex, vec2<i32>(id.xy), bilinear_clamp(u * scale + cx, v * scale + cy));
+}
+fn blend4(a: vec4<u32>, b: vec4<u32>, c: vec4<u32>, d: vec4<u32>) -> vec4<u32> {
+  let alpha = a.a + b.a + c.a + d.a;
+  if alpha == 0u { return vec4<u32>(0u); }
+  return vec4<u32>((a.rgb * a.a + b.rgb * b.a + c.rgb * c.a + d.rgb * d.a) / alpha, alpha / 4u);
+}
+@compute @workgroup_size(16, 16)
+fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {
+  if id.x >= p.width || id.y >= p.height { return; }
+  let cx = f32(p.width) * 0.5;
+  let cy = f32(p.height) * 0.5;
+  let inv_radius = 2.0 / min(f32(p.width), f32(p.height));
+  var samples: array<vec4<u32>, 4>;
+  for (var i = 0; i < 4; i++) {
+    let oy = f32(i + 1) / 5.0 - 0.5;
+    let ox0 = f32(i + 1) * 2.0 / 5.0;
+    let ox = ox0 - floor(ox0) - 0.5;
+    let u = f32(id.x) - cx + ox;
+    let v = f32(id.y) - cy + oy;
+    let r = sqrt(u * u + v * v);
+    var theta = atan2(v, u);
+    let t = max(0.0, 1.0 - r * inv_radius);
+    theta += -9.0 * t * t * t;
+    samples[i] = bilinear_clamp(cx + r * cos(theta), cy + r * sin(theta));
+  }
+  textureStore(output_tex, vec2<i32>(id.xy), blend4(samples[0], samples[1], samples[2], samples[3]));
+}

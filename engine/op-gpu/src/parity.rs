@@ -38,6 +38,9 @@ impl GpuOp for EffectOp {
                 | GpuKernel::Motion
                 | GpuKernel::Radial
                 | GpuKernel::Zoom
+                | GpuKernel::Pixelate
+                | GpuKernel::Bulge
+                | GpuKernel::Twist
         ) {
             return op_ops::effect::reference_rgba8(
                 self.effect_id,

@@ -22,7 +22,7 @@ namespace PaintDotNet.PropertySystem {
     public abstract class Property { public object Name { get; } protected Property(object name) { Name=name; } }
     public sealed class Int32Property : Property { public int Value { get; set; } public Int32Property(object name,int value,int min,int max):base(name){Value=value;} }
     public sealed class DoubleProperty : Property { public double Value {get;set;} public DoubleProperty(object name,double value,double min,double max):base(name){Value=value;} }
-    public sealed class StaticListChoiceProperty : Property { public object Value {get;set;} public StaticListChoiceProperty(object name,Type[] values,int index,bool allowCustom):base(name){Value=values[index];} }
+    public sealed class StaticListChoiceProperty : Property { public object Value {get;set;} public StaticListChoiceProperty(object name,Type[] values,int index,bool allowCustom):base(name){Value=values[index];} public StaticListChoiceProperty(object name,object[] values,int index):base(name){Value=values[index];} }
     public sealed class BooleanProperty : Property { public bool Value { get; set; } public BooleanProperty(object name,bool value):base(name){Value=value;} }
     public sealed class DoubleVectorProperty : Property { public double ValueX {get;set;} public double ValueY {get;set;} public PaintDotNet.Pair<double,double> Value {get=>PaintDotNet.Pair.Create(ValueX,ValueY);set{ValueX=value.First;ValueY=value.Second;}} public DoubleVectorProperty(object name,PaintDotNet.Pair<double,double> value,PaintDotNet.Pair<double,double> min,PaintDotNet.Pair<double,double> max):base(name){Value=value;} }
     public abstract class PropertyCollectionRule { }
@@ -44,7 +44,7 @@ namespace PaintDotNet {
         public static ImageResource GetImageResource(string name)=>new();
     }
     public sealed class ImageResource { public Image Reference=>null; public static ImageResource FromImage(Image image)=>new(); }
-    public sealed class RenderArgs { public Surface Surface {get;} public int Width=>Surface.Width; public int Height=>Surface.Height; public RenderArgs(Surface surface){Surface=surface;} }
+    public sealed class RenderArgs { public Surface Surface {get;} public int Width=>Surface.Width; public int Height=>Surface.Height; public Rectangle Bounds=>Surface.Bounds; public RenderArgs(Surface surface){Surface=surface;} }
 }
 namespace PaintDotNet.Effects {
     using PaintDotNet.IndirectUI;
@@ -63,7 +63,8 @@ namespace PaintDotNet.Effects {
     public abstract class PropertyBasedEffect {
         public static ControlInfo CreateDefaultConfigUI(PropertyCollection properties)=>new();
     }
-    public sealed class EffectEnvironmentParameters { public PaintDotNet.ColorBgra PrimaryColor {get;}=PaintDotNet.ColorBgra.Black; public PaintDotNet.ColorBgra SecondaryColor {get;}=PaintDotNet.ColorBgra.White; public PaintDotNet.Surface SourceSurface {get;}=null; }
+    public sealed class SelectionRegion { private readonly Rectangle bounds; public SelectionRegion(Rectangle bounds){this.bounds=bounds;} public Rectangle GetBoundsInt()=>bounds; }
+    public sealed class EffectEnvironmentParameters { public SelectionRegion GetSelection(Rectangle bounds)=>new(bounds); public PaintDotNet.ColorBgra PrimaryColor {get;}=PaintDotNet.ColorBgra.Black; public PaintDotNet.ColorBgra SecondaryColor {get;}=PaintDotNet.ColorBgra.White; public PaintDotNet.Surface SourceSurface {get;}=null; }
     public abstract class InternalPropertyBasedEffect : PropertyBasedEffect {
         protected RenderArgs DstArgs {get;private set;}
         protected RenderArgs SrcArgs {get;private set;}

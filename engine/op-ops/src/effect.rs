@@ -179,6 +179,9 @@ pub enum GpuKernel {
     Motion,
     Radial,
     Zoom,
+    Pixelate,
+    Bulge,
+    Twist,
 }
 #[derive(Clone, Debug)]
 pub struct ArithmeticContract {
@@ -310,6 +313,12 @@ pub fn registered() -> Vec<EffectSpec> {
         crate::effects::motion_blur::spec(),
         crate::effects::radial_blur::spec(),
         crate::effects::zoom_blur::spec(),
+        crate::effects::bulge::spec(),
+        crate::effects::frosted_glass::spec(),
+        crate::effects::pixelate::spec(),
+        crate::effects::polar_inversion::spec(),
+        crate::effects::tile_reflection::spec(),
+        crate::effects::twist::spec(),
         crate::effects::content_aware::spec(),
     ]
 }

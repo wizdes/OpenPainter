@@ -188,6 +188,8 @@ impl GpuContext {
         let values = match kernel {
             op_ops::effect::GpuKernel::Posterize => [16, 16, 16],
             op_ops::effect::GpuKernel::Sepia => [50, 0, 0],
+            op_ops::effect::GpuKernel::Pixelate => [2, 0, 0],
+            op_ops::effect::GpuKernel::Bulge => [45, 0, 0],
             _ => [0, 0, 0],
         };
         self.effect_kernel_with_params(kernel, width, height, bytes, values)
@@ -213,6 +215,8 @@ impl GpuContext {
                 values.iter().all(|value| (2..=64).contains(value))
             }
             op_ops::effect::GpuKernel::Sepia => (0..=100).contains(&values[0]),
+            op_ops::effect::GpuKernel::Pixelate => (1..=100).contains(&values[0]),
+            op_ops::effect::GpuKernel::Bulge => (-200..=100).contains(&values[0]),
             _ => true,
         };
         if !valid {
@@ -258,6 +262,9 @@ impl GpuContext {
             op_ops::effect::GpuKernel::Motion => "effect_motion",
             op_ops::effect::GpuKernel::Radial => "effect_radial",
             op_ops::effect::GpuKernel::Zoom => "effect_zoom",
+            op_ops::effect::GpuKernel::Pixelate => "effect_pixelate",
+            op_ops::effect::GpuKernel::Bulge => "effect_bulge",
+            op_ops::effect::GpuKernel::Twist => "effect_twist",
         };
         let pipeline = self.pipeline(&module, entry);
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

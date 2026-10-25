@@ -120,15 +120,15 @@ fn registered_ops() {
         top: make(),
     };
     let results = op_gpu::parity::run(&mut gpu, &inputs).unwrap();
-    // 32 composite, tool, resample and adjustment ops, plus the 6 blur kernels.
+    // 35 non-blur ops, including three Distort kernels, plus the 6 blur kernels.
     assert_eq!(
         results
             .iter()
             .filter(|(id, _, _)| !id.starts_with("effect.blur."))
             .count(),
-        32
+        35
     );
-    assert_eq!(results.len(), 38);
+    assert_eq!(results.len(), 41);
     assert!(
         results
             .iter()
