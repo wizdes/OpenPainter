@@ -5,13 +5,14 @@
 #
 # 1. Builds the Release app fresh (`make -C mac app`) unless --no-build.
 # 2. scripts/size-report.sh: app bundle under perf/budgets.toml app_bundle_mb.
-# 3. scripts/launch-time.sh --first-effect (20 runs by default): median launch
-#    to a usable canvas under cold_launch_ms, no effect pipeline before
-#    OP_READY, first GPU effect on the GPU. Median and p95 are printed.
-# 4. Regression limits: launch median and bundle size may not grow more than
-#    regression_pct (10%) over perf/baseline.toml. The baseline names the
-#    machine it was recorded on; on another machine the check fails until a
-#    baseline is recorded there (numbers from different Macs do not compare).
+# 3. scripts/launch-time.sh --first-effect (20 runs by default): launch to a
+#    usable canvas with median under cold_launch_ms and p95 under
+#    cold_launch_p95_ms, no effect pipeline before OP_READY, first GPU effect
+#    on the GPU.
+# 4. scripts/perf-compare.sh: launch median, launch p95, first-effect median
+#    and bundle size may not grow more than regression_pct (10%) over
+#    perf/baseline.toml. It refuses numbers from another machine, and a
+#    purged-cache run against an unpurged baseline (or the other way round).
 # --record-baseline writes perf/baseline.toml from this run (after checks 2
 # and 3 pass) instead of comparing.
 set -euo pipefail
@@ -65,6 +66,11 @@ launch_p95="$(value "$numbers" launch_p95_ms)"
 effect_median="$(value "$numbers" first_effect_median_ms)"
 effect_p95="$(value "$numbers" first_effect_p95_ms)"
 purged="$(value "$numbers" purged)"
+{
+  echo "machine = \"$machine\""
+  echo "cache_purged = $purged"
+  echo "app_bundle_mb = $size_mb"
+} >> "$numbers"
 
 if (( status != 0 )); then
   echo "FAIL perf-check: a budget check failed (see above)" >&2
@@ -94,27 +100,7 @@ EOF
 fi
 
 echo "== Regression limits (perf/baseline.toml)"
-if [[ ! -f "$baseline" ]]; then
-  echo "FAIL regression: no perf/baseline.toml; run scripts/perf-check.sh --record-baseline" >&2
-  exit 1
-fi
-base_machine="$(value "$baseline" machine)"
-if [[ "$base_machine" != "$machine" ]]; then
-  echo "FAIL regression: the baseline is from \"$base_machine\", this is \"$machine\"; record one here with --record-baseline" >&2
-  exit 1
-fi
-pct="$(value "$budgets" regression_pct)"
-check() {  # name measured base unit
-  local limit
-  limit="$(awk -v b="$3" -v p="$pct" 'BEGIN {printf "%.2f", b * (1 + p / 100)}')"
-  if awk -v m="$2" -v l="$limit" 'BEGIN {exit !(m > l)}'; then
-    echo "FAIL regression: $1 $2 $4 is more than $pct% over the baseline $3 $4 (limit $limit $4)" >&2
-    return 1
-  fi
-  echo "PASS regression: $1 $2 $4 (baseline $3 $4, limit $limit $4)"
-}
-check "launch median" "$launch_median" "$(value "$baseline" launch_median_ms)" ms || status=1
-check "app bundle" "$size_mb" "$(value "$baseline" app_bundle_mb)" MB || status=1
+"$repo_root/scripts/perf-compare.sh" "$numbers" "$baseline" || status=1
 echo "Summary: launch median $launch_median ms, p95 $launch_p95 ms; first GPU effect median $effect_median ms, p95 $effect_p95 ms; bundle $size_mb MB"
 if (( status != 0 )); then
   echo "FAIL perf-check" >&2

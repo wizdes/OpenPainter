@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds the Rust staticlib the app links: engine/target/release/libop_ffi.a.
+# Builds the Rust staticlib the app links: engine/target/app-release/libop_ffi.a
+# (the app-release cargo profile: release with fat LTO, engine/Cargo.toml).
 # Runs with a clean environment so an Xcode build and `make -C mac engine` use
 # the same flags (Xcode exports SDK and arch variables that change cargo's
 # fingerprints) and so the C parts (lcms2) target macOS 15 like the app.
@@ -18,4 +19,4 @@ exec env -i \
   PATH="$toolchain:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
   MACOSX_DEPLOYMENT_TARGET=15.0 \
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" \
-  cargo rustc -p op-ffi --release --crate-type staticlib
+  cargo rustc -p op-ffi --profile app-release --crate-type staticlib

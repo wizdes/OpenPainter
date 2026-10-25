@@ -19,10 +19,13 @@
 # before every run (true cold launches). Otherwise nothing is purged and the
 # script says so; perf-check.sh then runs it right after a fresh build.
 #
-# Fails when: the median OP_READY time is over perf/budgets.toml
-# cold_launch_ms; any run made an effect pipeline before OP_READY; with
-# --first-effect, a run printed no OP_READY counts, no OP_FIRST_EFFECT line, or
-# ran the effect on the CPU. --out writes the numbers as key = value lines.
+# Fails (never skips) when: no app is given; a run printed no OP_READY line,
+# no pipeline counts on it, or view=0 (the empty start window is not a usable
+# canvas); any run made an effect pipeline before OP_READY; the median
+# OP_READY time is over perf/budgets.toml cold_launch_ms or the p95 over
+# cold_launch_p95_ms; with --first-effect, a run printed no OP_FIRST_EFFECT
+# line or ran the effect on the CPU. --out writes the numbers as key = value
+# lines.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,8 +50,9 @@ while (( $# > 0 )); do
   esac
 done
 if [[ -z "$app_path" ]]; then
-  echo "SKIP launch time: no app path"
-  exit 0
+  echo "Usage: scripts/launch-time.sh [--first-effect] [--runs N] [--document FILE] [--out FILE] path/to/App.app" >&2
+  echo "FAIL launch time: no app path" >&2
+  exit 2
 fi
 if [[ ! "$runs" =~ ^[1-9][0-9]*$ ]]; then
   echo "--runs needs a positive whole number" >&2
@@ -81,9 +85,10 @@ read_budget() {
     "$repo_root/perf/budgets.toml"
 }
 budget="$(read_budget cold_launch_ms)"
+p95_budget="$(read_budget cold_launch_p95_ms)"
 aim="$(read_budget cold_launch_aim_ms)"
-if [[ ! "$budget" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-  echo "Invalid cold_launch_ms budget" >&2
+if [[ ! "$budget" =~ ^[0-9]+([.][0-9]+)?$ || ! "$p95_budget" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+  echo "Invalid cold_launch_ms or cold_launch_p95_ms budget in perf/budgets.toml" >&2
   exit 2
 fi
 
@@ -119,7 +124,7 @@ for my $run (1 .. $runs) {
         open(STDERR, ">", "$logdir/run-$run.err") or die "stderr: $!\n";
         exec {$binary} $binary, $document, "-ApplePersistenceIgnoreState", "YES" or die "exec failed: $!\n";
     }
-    my ($ready, $effects, $effect_ms, $gpu, $failed);
+    my ($ready, $effects, $views, $effect_ms, $gpu, $failed);
     eval {
         local $SIG{ALRM} = sub { die "run $run: 30 s launch watchdog expired\n" };
         alarm 30;
@@ -128,7 +133,12 @@ for my $run (1 .. $runs) {
                 $ready = $1;
                 my $rest = $2;
                 $effects = $1 if $rest =~ /\beffect=([0-9]+)\b/;
-                $failed = "run $run: OP_READY has no pipeline counts:$rest" if $first_effect && !defined $effects;
+                $views = $1 if $rest =~ /\bview=([0-9]+)\b/;
+                if (!defined $effects || !defined $views) {
+                    $failed = "run $run: OP_READY has no pipeline counts (effect=, view=):$rest";
+                } elsif ($views < 1) {
+                    $failed = "run $run: OP_READY came with no canvas view (view=$views); the start window is not a usable canvas";
+                }
                 last if !$first_effect || defined $failed;
             } elsif ($line =~ /^OP_FIRST_EFFECT ([0-9]+(?:\.[0-9]+)?) gpu=([01])\s*$/) {
                 ($effect_ms, $gpu) = ($1, $2);
@@ -149,7 +159,7 @@ for my $run (1 .. $runs) {
     $error ||= "run $run: app exited without OP_READY <ms>\n" if !defined $ready;
     $error ||= "run $run: app exited without OP_FIRST_EFFECT <ms>\n" if $first_effect && !defined $effect_ms;
     die $error . stderr_tail($run) if $error;
-    printf "%s %s %s %s\n", $ready, $effects // "-", $effect_ms // "-", $gpu // "-";
+    printf "%s %s %s %s\n", $ready, $effects, $effect_ms // "-", $gpu // "-";
 }
 ' "$binary" "$document" "$runs" "$first_effect" "$purge" "$logdir"
 )"
@@ -165,14 +175,12 @@ stats() {  # column -> "median p95" (p95 is the nearest-rank value)
 }
 read -r ready_median ready_p95 < <(stats 1)
 echo "Cold launch median: $ready_median ms over $runs runs; budget: $budget ms"
-echo "Process start to usable canvas (OP_READY): median $ready_median ms, p95 $ready_p95 ms; aim < ${aim:-?} ms"
+echo "Process start to usable canvas (OP_READY): median $ready_median ms, p95 $ready_p95 ms; aim < ${aim:-?} ms; p95 budget: $p95_budget ms"
 
 status=0
 effect_median="-"; effect_p95="-"
-max_effect_pipelines="$(echo "$results" | awk '$2 != "-" {if ($2 > m) m = $2; n++} END {if (n) print m + 0; else print "-"}')"
-if [[ "$max_effect_pipelines" == "-" ]]; then
-  echo "SKIP lazy-pipeline check: the app printed no pipeline counts on OP_READY"
-elif (( max_effect_pipelines > 0 )); then
+max_effect_pipelines="$(echo "$results" | awk '{if ($2 > m) m = $2} END {print m + 0}')"
+if (( max_effect_pipelines > 0 )); then
   echo "FAIL lazy pipelines: a launch made $max_effect_pipelines effect pipeline(s) before OP_READY" >&2
   status=1
 else
@@ -199,6 +207,10 @@ if [[ -n "$out_file" ]]; then
 fi
 if awk -v measured="$ready_median" -v limit="$budget" 'BEGIN {exit !(measured > limit)}'; then
   echo "FAIL launch time: median exceeds budget" >&2
+  exit 1
+fi
+if awk -v measured="$ready_p95" -v limit="$p95_budget" 'BEGIN {exit !(measured > limit)}'; then
+  echo "FAIL launch time: p95 $ready_p95 ms exceeds the $p95_budget ms budget" >&2
   exit 1
 fi
 if (( status != 0 )); then

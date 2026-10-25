@@ -4,12 +4,17 @@
 #   make -C mac launch-time  scripts/launch-time.sh --first-effect on the Release app
 #   (scripts/perf-check.sh runs every speed and size gate, M58)
 #   make -C mac trace      `OpenPainter --trace` on a generated 6000x4000 PNG
-# Order: engine (cargo build -p op-ffi --release) -> xcodegen -> xcodebuild.
+# Order: engine (scripts/build-engine.sh) -> xcodegen -> xcodebuild.
 DERIVED := build/DerivedData
 APP := $(DERIVED)/Build/Products/Release/OpenPainter.app
-XCB := xcodebuild -project OpenPainter.xcodeproj -scheme OpenPainter -derivedDataPath $(DERIVED)
+# M58: Swift packages resolve only to the versions in the tracked
+# mac/Package.resolved (Sparkle's exact revision), which `project` copies into
+# the generated project. After changing a package in project.yml, run
+# `make -C mac resolve` and commit the new Package.resolved.
+RESOLVED := OpenPainter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+XCB := xcodebuild -project OpenPainter.xcodeproj -scheme OpenPainter -derivedDataPath $(DERIVED) -onlyUsePackageVersionsFromResolvedFile
 
-.PHONY: all engine project app test launch-time trace clean
+.PHONY: all engine project resolve app test launch-time trace clean
 all: app
 
 engine:
@@ -17,6 +22,14 @@ engine:
 
 project:
 	xcodegen generate --spec project.yml --quiet
+	mkdir -p $(dir $(RESOLVED))
+	cp Package.resolved $(RESOLVED)
+
+resolve:
+	xcodegen generate --spec project.yml --quiet
+	rm -f $(RESOLVED)
+	xcodebuild -project OpenPainter.xcodeproj -scheme OpenPainter -derivedDataPath $(DERIVED) -resolvePackageDependencies
+	cp $(RESOLVED) Package.resolved
 
 app: engine project
 	$(XCB) -configuration Release build

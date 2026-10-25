@@ -17,7 +17,7 @@ fn main() {
         })
         .with_src(std::path::Path::new(&crate_dir).join("src/lib.rs"))
         .with_include_guard("OPENPAINTER_H")
-        .with_header("/* Build order: cargo build -p op-ffi --release before swift build.\n * Callbacks must copy event payloads and must not call op_*; re-entry returns OP_ERR_BUSY.\n * Inputs are borrowed for the call. Free outputs with op_buffer_free or op_pixels_free. */")
+        .with_header("/* Build order: mac/scripts/build-engine.sh before swift build.\n * Callbacks must copy event payloads and must not call op_*; re-entry returns OP_ERR_BUSY.\n * Inputs are borrowed for the call. Free outputs with op_buffer_free or op_pixels_free. */")
         .with_language(cbindgen::Language::C)
         .generate().expect("generate C header").write_to_file(header);
 }

@@ -50,7 +50,57 @@ final class ShellFixture {
         workspace.panels.hideAll()
         for p in workspace.panels.panels.values { p.close() }
         engine.close()
-        defaults.removePersistentDomain(forName: suite)
+        removeDefaultsSuite(suite)
+    }
+}
+
+/// Deletes a test's preferences domain and its plist file.
+/// `removePersistentDomain` alone leaves an empty
+/// ~/Library/Preferences/<suite>.plist behind (M58 found thousands), and
+/// objects that still hold the domain can write that empty file again after
+/// the test ends, so the suite is also swept once more when the test bundle
+/// finishes (`PreferencesJanitor`).
+@MainActor
+func removeDefaultsSuite(_ suite: String) {
+    PreferencesJanitor.shared.remove(suite)
+}
+
+/// Deletes test preference domains now and again when the test bundle ends.
+@MainActor
+final class PreferencesJanitor: NSObject, XCTestObservation {
+    static let shared = PreferencesJanitor()
+    private var suites: Set<String> = []
+    private var observing = false
+
+    static func file(_ suite: String) -> URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences/\(suite).plist")
+    }
+
+    func remove(_ suite: String) {
+        if !observing {
+            observing = true
+            XCTestObservationCenter.shared.addTestObserver(self)
+        }
+        suites.insert(suite)
+        Self.wipe(suite)
+    }
+
+    static func wipe(_ suite: String) {
+        UserDefaults.standard.removePersistentDomain(forName: suite)
+        CFPreferencesAppSynchronize(suite as CFString)
+        try? FileManager.default.removeItem(at: file(suite))
+    }
+
+    nonisolated func testBundleDidFinish(_ testBundle: Bundle) {
+        MainActor.assumeIsolated {
+            // Late writers (released defaults objects) have had their turn by now.
+            RunLoop.main.run(until: Date().addingTimeInterval(2))
+            for suite in suites { Self.wipe(suite) }
+            let left = suites.filter { FileManager.default.fileExists(atPath: Self.file($0).path) }
+            if !left.isEmpty {
+                FileHandle.standardError.write(Data("PreferencesJanitor: \(left.count) test preference files came back: \(left.sorted())\n".utf8))
+            }
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-/* Build order: cargo build -p op-ffi --release before swift build.
+/* Build order: mac/scripts/build-engine.sh before swift build.
  * Callbacks must copy event payloads and must not call op_*; re-entry returns OP_ERR_BUSY.
  * Inputs are borrowed for the call. Free outputs with op_buffer_free or op_pixels_free. */
 

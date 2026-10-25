@@ -1,6 +1,6 @@
 # XcodeGen spec for the Mac app. Never hand-edit the generated .xcodeproj.
 # Build order (also in `make -C mac`): the Rust staticlib first
-# (engine/target/release/libop_ffi.a, built by the "Build engine" phase of
+# (engine/target/app-release/libop_ffi.a, built by the "Build engine" phase of
 # OpenPainterKit), then EngineBridge, OpenPainterKit and the app.
 name: OpenPainter
 options:
@@ -66,7 +66,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.yili.OpenPainterKit
         GENERATE_INFOPLIST_FILE: YES
-        LIBRARY_SEARCH_PATHS: $(SRCROOT)/../engine/target/release
+        LIBRARY_SEARCH_PATHS: $(SRCROOT)/../engine/target/app-release
         OTHER_LDFLAGS: [-lop_ffi, -liconv, -lobjc]
         SKIP_INSTALL: YES
       configs:
@@ -74,11 +74,11 @@ targets:
           # A framework keeps its exported symbols; only local ones go.
           STRIP_STYLE: non-global
     preBuildScripts:
-      - name: Build engine (cargo rustc -p op-ffi --release --crate-type staticlib)
+      - name: Build engine (mac/scripts/build-engine.sh)
         script: exec "$SRCROOT/scripts/build-engine.sh"
         basedOnDependencyAnalysis: false
         outputFiles:
-          - $(SRCROOT)/../engine/target/release/libop_ffi.a
+          - $(SRCROOT)/../engine/target/app-release/libop_ffi.a
   OpenPainter:
     type: application
     platform: macOS
@@ -115,6 +115,10 @@ targets:
         # "Signing feeds"); M60 signs both with the release key.
         SURequireSignedFeed: true
         SUVerifyUpdateBeforeExtraction: true
+        # Sparkle 2.10 accepts a badly signed feed again once its first
+        # failure is older than this many seconds (20 days when unset;
+        # SUAppcastDriver.m). 0 means a bad feed is always rejected.
+        SUSignedFeedFailureExpirationInterval: 0
         # M19: every format OpenPainter writes is an Editor type (Save, Save
         # As, Save a Copy). WebP and AVIF are written only where
         # CGImageDestinationCopyTypeIdentifiers lists them;

@@ -1,5 +1,7 @@
 cold_launch_ms = 3000
 cold_launch_aim_ms = 1000
+# M58 fix: p95 of the 20 launches; the plan names no p95 budget, so it uses the same 3 s.
+cold_launch_p95_ms = 3000
 app_bundle_mb = 75
 open_24mp_jpeg_ms = 1500
 gaussian_r10_24mp_gpu_ms = 500
