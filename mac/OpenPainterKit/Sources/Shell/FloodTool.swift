@@ -240,7 +240,8 @@ public final class FloodToolController {
             self.inFlight -= 1
             let status = event?.status ?? "timed out"
             if status != "ok", status != "dropped", status != "cancelled" {
-                self.editor.report("\(self.session?.tool.label ?? "Fill") failed: \(status)")
+                self.editor.report(Editor.failureText(self.session?.tool.label ?? "Fill", status: status,
+                                                      error: event?.json["error"] as? String))
             }
             if let begun, self.session?.serial == begun {
                 do {

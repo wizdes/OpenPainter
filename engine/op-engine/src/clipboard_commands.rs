@@ -8,7 +8,7 @@
 //! then erases. Paste puts the pixels on the active layer, selects them and
 //! turns on Move Selected Pixels. Paste into New Layer first adds a layer
 //! above the active one and makes it active.
-use crate::{Actor, Error, EventKind, Result, bad, flatten, internal};
+use crate::{Actor, Error, EventKind, Result, bad, doc_error, flatten, internal};
 use op_core::doc::{DocState, PolygonSet, SelectionSource, SelectionState};
 use op_core::selection::RasterMode;
 use op_core::tiles::{TILE_SIZE, TileCoord};
@@ -233,7 +233,7 @@ impl Actor {
         let label = if req.new_layer {
             let index = base.active_layer + 1;
             let name = format!("Layer {}", base.layers.len() + 1);
-            base = base.add_layer(index, name).map_err(internal)?;
+            base = base.add_layer(index, name).map_err(doc_error)?;
             base = base.set_active_layer(index).map_err(internal)?;
             PASTE_NEW_LAYER
         } else {

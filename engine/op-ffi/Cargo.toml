@@ -12,7 +12,7 @@ workspace = true
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-op-engine = { path = "../op-engine", features = ["test-commands"] }
+op-engine = { path = "../op-engine" }
 # Live strokes (src/stroke.rs) build op-tools stroke samples.
 op-tools = { path = "../op-tools" }
 # Moves (src/move_tool.rs) name the resampling mode.

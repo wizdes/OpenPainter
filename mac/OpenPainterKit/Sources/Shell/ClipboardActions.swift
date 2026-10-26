@@ -146,8 +146,13 @@ extension EditorWindowController: ClipboardActions {
             return target != .dialog && canCopyPixels
         case #selector(NSText.cut(_:)):
             return target != .dialog && editor.selection != nil && canCopyPixels
-        case #selector(NSText.paste(_:)), #selector(pasteIntoNewLayer(_:)):
+        case #selector(NSText.paste(_:)):
             return target != .dialog && editor.info.width > 0 && ImageClipboard.hasImage
+        case #selector(pasteIntoNewLayer(_:)):
+            // Fix round 3, item 6: off at 1,000 layers or the pixel total,
+            // as Add New Layer is.
+            return target != .dialog && editor.info.width > 0 && editor.isEnabled("layer.add")
+                && ImageClipboard.hasImage
         case #selector(pasteIntoNewImage(_:)):
             return target != .dialog && ImageClipboard.hasImage
         default:
@@ -219,6 +224,12 @@ extension EditorWindowController: ClipboardActions {
             done?(false)
             return
         }
+        // Fix round 3, item 6: a new layer past a limit says which one.
+        if newLayer, let limit = editor.layerLimit() {
+            editor.report(Editor.sentence(limit))
+            done?(false)
+            return
+        }
         finishSessions()
         if textTool.isEditing { textTool.finish() }
         let canvas = CGSize(width: editor.info.width, height: editor.info.height)
@@ -272,7 +283,11 @@ extension EditorWindowController: ClipboardActions {
             start = try editor.document.pasteBegin(pixels, x: origin.x, y: origin.y, newLayer: newLayer,
                                                    resampling: workspace.tools.settings.moveResampling.rawValue)
         } catch {
-            editor.report("\(name) failed: \(error)")
+            if newLayer, let limit = editor.layerLimit() {
+                editor.report(Editor.sentence(limit))
+            } else {
+                editor.report("\(name) failed: \(error)")
+            }
             return false
         }
         editor.refresh()

@@ -140,13 +140,39 @@ public final class Editor {
                 guard let self else { return }
                 let event = await self.document.engine.result(of: ticket, timeout: .seconds(120))
                 if let status = event?.status, status != "ok" {
-                    self.report("\(command) failed: \(status)")
+                    self.report(Self.failureText(command, status: status, error: event?.json["error"] as? String))
                 }
                 self.refresh()
             }
             return ticket
         } catch {
             report("\(command) failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Fix round 3, item 6: the status-bar text for a failed command. A
+    /// limit (1,000 layers, the 16 GiB pixel total, no room for a selection
+    /// mask) shows the engine's own words; other failures name the status.
+    public static func failureText(_ label: String, status: String, error: String?) -> String {
+        if status == "limit", let error, !error.isEmpty { return sentence(error) }
+        return "\(label) failed: \(status)"
+    }
+
+    /// `text` with a capital first letter and a final period.
+    public static func sentence(_ text: String) -> String {
+        var out = text.prefix(1).uppercased() + text.dropFirst()
+        if let last = out.last, !".!?".contains(last) { out += "." }
+        return out
+    }
+
+    /// Fix round 3, item 6: why one more layer cannot be added (the
+    /// engine's text), or nil when it can.
+    public func layerLimit() -> String? {
+        do {
+            return (try document.query("doc.layer_limit") as? [String: Any])?["limit"] as? String
+        } catch {
+            report("could not read the layer limit: \(error)")
             return nil
         }
     }

@@ -1,5 +1,6 @@
 use super::{
-    CommandSpec, Outcome, Param, ParamKind, ParamSchema, Result, RunCtx, always, bad, internal,
+    CommandSpec, Outcome, Param, ParamKind, ParamSchema, Result, RunCtx, always, bad, doc_error,
+    internal,
 };
 use op_core::doc::{DocState, LayerBlendMode, MaskGrid, SelectionSource, SelectionState};
 use op_core::selection::{RasterMode, Selection};
@@ -205,7 +206,7 @@ fn finish(
     mut source: impl FnMut(u32, u32) -> Option<(u32, u32)>,
     affine: [f64; 6],
 ) -> Result<Outcome> {
-    let mut next = s.empty_image_like(w, h).map_err(internal)?;
+    let mut next = s.empty_image_like(w, h).map_err(doc_error)?;
     for i in 0..s.layers.len() {
         ctx.check()?;
         next = write(next, i, &pixel(i, &read(s, i)?)?)?;

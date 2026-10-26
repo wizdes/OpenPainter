@@ -10,6 +10,7 @@
 // flatten prompt first; the open document keeps its layers, as paint.net does
 // (https://www.getpaint.net/doc/latest/FileMenu.html, Save and Save All).
 import Foundation
+import ImageIO
 import UniformTypeIdentifiers
 
 extension ImageFormats {
@@ -57,6 +58,37 @@ extension ImageFormats {
     /// The file name extension for a save type.
     public static func fileExtension(_ type: String) -> String? {
         type == opaintIdentifier ? opaintExtension : UTType(type)?.preferredFilenameExtension
+    }
+
+    /// Fix round 3, item 5: why plain Save must not write `url` back, as
+    /// status-bar notes (empty when it may): content whose type differs
+    /// from the one its name implies (a PNG named .jpg would become a
+    /// JPEG), more than one frame or page (an animated GIF, a multi-page
+    /// TIFF: Save writes one), or a color model OpenPainter converts to RGB
+    /// (CMYK, Lab). Open, Revert and Recover use it. It reads the file's
+    /// header only.
+    public static func plainSaveReasons(_ url: URL, contentType: String) -> [String] {
+        var reasons: [String] = []
+        let ext = url.pathExtension
+        if let named = saveType(forExtension: ext), named != contentType {
+            reasons.append("This file is a \(shortName(contentType)) image named .\(ext); "
+                + "Save asks where to save so it is not rewritten as \(shortName(named)).")
+        }
+        guard contentType != opaintIdentifier,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil)
+        else { return reasons }
+        let frames = CGImageSourceGetCount(source)
+        if frames > 1 {
+            reasons.append("This file holds \(frames) frames or pages; OpenPainter opened the first. "
+                + "Save asks where to save so the others are kept.")
+        }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
+        if let model = props?[kCGImagePropertyColorModel as String] as? String,
+           model != (kCGImagePropertyColorModelRGB as String), model != (kCGImagePropertyColorModelGray as String) {
+            reasons.append("This file is \(model); OpenPainter converted it to RGB. "
+                + "Save asks where to save so the \(model) original is kept.")
+        }
+        return reasons
     }
 
     /// The type a URL saves as, from its extension (used when a type name is a

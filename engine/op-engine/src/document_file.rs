@@ -104,6 +104,20 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 impl Engine {
+    /// Tests only (the `test-commands` feature, fix round 3 item 7): a
+    /// transparent image of `layers` layers made as a file reader makes one,
+    /// without the slot the engine keeps for a selection mask. An `.opaint`
+    /// file may fill all 16 GiB when it stores no mask.
+    #[cfg(feature = "test-commands")]
+    pub fn test_open_unbudgeted(&self, width: u32, height: u32, layers: usize) -> Result<u64> {
+        let store = store()?;
+        let mut state = DocState::new(store.clone(), width, height, 72.0).map_err(internal)?;
+        for i in 1..layers {
+            state = state.add_layer_unbudgeted(i, "").map_err(internal)?;
+        }
+        self.spawn_document(state, store)
+    }
+
     /// File > New: one layer named "Background" filled with `background`
     /// (straight RGBA8; paint.net's White, Secondary color or Transparent).
     pub fn new_document(

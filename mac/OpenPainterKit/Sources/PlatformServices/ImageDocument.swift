@@ -157,15 +157,29 @@ open class ImageDocument: NSDocument, EditorHost {
                     NSLocalizedDescriptionKey: "The image could not be reverted (\(error)).",
                 ])
             }
+            // Fix round 3, item 3: Revert read a new file; its type, depth,
+            // frames and color model decide what Save may do from now on.
+            applySaveProtection(loaded, url: url)
         } else {
             engineDocument = loaded.document
-            contentType = loaded.sourceType
-            saveNeedsNewFile = loaded.reducedDepth || !ImageFormats.saveTypes().contains(loaded.sourceType)
+            applySaveProtection(loaded, url: url)
             startRecovery(originalURL: url)
         }
         pixelSize = loaded.pixelSize
         metadata = loaded.metadata
-        importNotes = loaded.notes
+    }
+
+    /// Fix round 2, items 1 and 3, fix round 3, items 3 and 5: plain Save
+    /// asks where to save when the loaded file holds more than OpenPainter
+    /// writes back (more than 8 bits per channel, a type it cannot write,
+    /// content whose type differs from its name, more than one frame or
+    /// page, CMYK or another converted color model). The notes say why.
+    private func applySaveProtection(_ loaded: LoadedImage, url: URL) {
+        let reasons = ImageFormats.plainSaveReasons(url, contentType: loaded.sourceType)
+        contentType = loaded.sourceType
+        saveNeedsNewFile = loaded.reducedDepth || !ImageFormats.saveTypes().contains(loaded.sourceType)
+            || !reasons.isEmpty
+        importNotes = loaded.notes + reasons
     }
 
     /// Revert to Saved: reads the file into the open engine document, then
@@ -175,12 +189,19 @@ open class ImageDocument: NSDocument, EditorHost {
         // every open session in the engine, so the tools drop theirs too
         // (no engine call, no wait); none is left pointing at a session the
         // reverted image no longer has.
-        MainActor.assumeIsolated { editor?.windowController?.abandonToolSessions() }
+        // Fix round 3, item 4: only after the Revert worked. A Revert that
+        // failed (the file is gone or cannot be read) left the image and
+        // its sessions as they were, so the tools keep theirs.
         try super.revert(toContentsOf: url, ofType: typeName)
         MainActor.assumeIsolated {
+            editor?.windowController?.abandonToolSessions()
             if let editor { editor.name = displayName }
             syncEditedState()
+            if !importNotes.isEmpty { editor?.report(importNotes.joined(separator: " ")) }
         }
+        // Fix round 3, item 3: the recovery record's original type is the
+        // reverted file's.
+        pointRecoveryAtFile()
     }
 
     // MARK: Unsaved state
@@ -232,20 +253,27 @@ open class ImageDocument: NSDocument, EditorHost {
         }
     }
 
+    /// How long Close and Quit wait for the engine's queued work. Tests
+    /// shorten it.
+    nonisolated(unsafe) public static var settleTimeout: Duration = .seconds(600)
+
     /// Fix round 2, item 2: runs `done` once the engine ran everything
     /// queued so far (a text update or a fill posted just before), so the
     /// edited state read afterwards is current. It never blocks the main
-    /// thread.
+    /// thread. Fix round 3, item 1: `done(false)` when the wait failed or
+    /// timed out; the edited state is then not known, and Close and Quit
+    /// treat the image as edited.
     @MainActor
-    public func afterQueuedWork(_ done: @escaping @MainActor () -> Void) {
+    public func afterQueuedWork(_ done: @escaping @MainActor (Bool) -> Void) {
         editor?.windowController?.flushToolUpdates()
-        guard let doc = engineDocument else { return done() }
+        guard let doc = engineDocument else { return done(true) }
         let reply = MainReply<Bool>(main: { [weak self] ok in
             if !ok { self?.editor?.report("The image did not answer in time; its unsaved state may be out of date.") }
             self?.syncEditedState()
-            done()
+            done(ok)
         })
-        Task.detached { reply.send(await doc.settle()) }
+        let timeout = Self.settleTimeout
+        Task.detached { reply.send(await doc.settle(timeout: timeout)) }
     }
 
     // MARK: Save, Save As, Save a Copy
@@ -432,12 +460,19 @@ open class ImageDocument: NSDocument, EditorHost {
         for wc in windowControllers { wc.window?.title = displayName }
         syncEditedState()
         // M57: the next recovery record names the file the image now has.
-        if let dir = recoveryDir, let doc = engineDocument {
-            do {
-                try doc.attachRecovery(dir: dir, originalURL: fileURL, originalType: contentType ?? fileType,
-                                       timing: RecoveryCenter.timing)
-            } catch {
-                editor?.report("The recovery copy could not be pointed at the saved file (\(error)).")
+        pointRecoveryAtFile()
+    }
+
+    /// Points the recovery record at the image's file and its content type
+    /// (after a save, and after Revert: fix round 3, item 3).
+    private func pointRecoveryAtFile() {
+        guard let dir = recoveryDir, let doc = engineDocument else { return }
+        do {
+            try doc.attachRecovery(dir: dir, originalURL: fileURL, originalType: contentType ?? fileType,
+                                   timing: RecoveryCenter.timing)
+        } catch {
+            MainActor.assumeIsolated {
+                editor?.report("The recovery copy could not be pointed at the file (\(error)).")
             }
         }
     }
@@ -655,6 +690,7 @@ open class ImageDocument: NSDocument, EditorHost {
             contentType = kept
             saveNeedsNewFile = kept.map { !ImageFormats.saveTypes().contains($0) } ?? true
                 || ImageFormats.holdsMoreThan8Bits(url)
+                || kept.map { !ImageFormats.plainSaveReasons(url, contentType: $0).isEmpty } ?? false
         } else {
             fileType = ImageFormats.opaintIdentifier
         }
@@ -682,6 +718,13 @@ open class ImageDocument: NSDocument, EditorHost {
     override open func canClose(withDelegate delegate: Any, shouldClose shouldCloseSelector: Selector?,
                                 contextInfo: UnsafeMutableRawPointer?) {
         MainActor.assumeIsolated {
+            // Fix round 3, item 2: Close pressed again while the review
+            // runs is answered "do not close" at once; the running review
+            // decides, and closes the image if it may.
+            if isReviewingUnsaved {
+                Self.callBack(delegate, shouldCloseSelector, self, false, contextInfo)
+                return
+            }
             reviewUnsaved { [weak self] ok in
                 guard let self else { return }
                 Self.callBack(delegate, shouldCloseSelector, self, ok, contextInfo)
@@ -689,21 +732,46 @@ open class ImageDocument: NSDocument, EditorHost {
         }
     }
 
+    /// Fix round 3, item 2: the callers waiting for the unsaved-changes
+    /// review that runs now (nil when none runs).
+    @MainActor private var reviewWaiters: [@MainActor (Bool) -> Void]?
+
+    /// True while an unsaved-changes review (Close or Quit) runs.
+    @MainActor public var isReviewingUnsaved: Bool { reviewWaiters != nil }
+
     /// Asks about unsaved work (nothing to ask when there is none) and calls
-    /// `done(true)` when the document may close.
+    /// `done(true)` when the document may close. Fix round 3, item 2: only
+    /// one review runs per image; a request made while one runs (Quit after
+    /// Close) gets that review's answer.
     @MainActor
     public func reviewUnsaved(_ done: @escaping @MainActor (Bool) -> Void) {
-        // Fix round 2, item 2: decide once the engine ran what was queued
-        // (a text update or a fill sent just before Close).
-        afterQueuedWork { [weak self] in
-            guard let self else { return done(true) }
-            self.reviewSettled(done)
+        if reviewWaiters != nil {
+            reviewWaiters?.append(done)
+            return
+        }
+        reviewWaiters = [done]
+        runReview { [weak self] ok in
+            guard let self else { return done(ok) }
+            let waiters = self.reviewWaiters ?? []
+            self.reviewWaiters = nil
+            for waiter in waiters { waiter(ok) }
         }
     }
 
     @MainActor
-    private func reviewSettled(_ done: @escaping @MainActor (Bool) -> Void) {
-        guard isDocumentEdited else {
+    private func runReview(_ done: @escaping @MainActor (Bool) -> Void) {
+        // Fix round 2, item 2: decide once the engine ran what was queued
+        // (a text update or a fill sent just before Close). Fix round 3,
+        // item 1: when that wait failed, the state is not known: ask.
+        afterQueuedWork { [weak self] settled in
+            guard let self else { return done(true) }
+            self.reviewSettled(assumeEdited: !settled, done)
+        }
+    }
+
+    @MainActor
+    private func reviewSettled(assumeEdited: Bool, _ done: @escaping @MainActor (Bool) -> Void) {
+        guard isDocumentEdited || assumeEdited else {
             done(true)
             return
         }
@@ -751,7 +819,7 @@ open class ImageDocument: NSDocument, EditorHost {
     private func closeAfterSave(_ done: @escaping @MainActor (Bool) -> Void) {
         if isDocumentEdited {
             editor?.report("The image changed while it was being saved.")
-            reviewUnsaved(done)
+            runReview(done)
         } else {
             done(true)
         }
@@ -877,7 +945,12 @@ open class ImageDocument: NSDocument, EditorHost {
         }
     }
 
+    /// Fix round 3, item 2: Close and Quit may both end in a close.
+    nonisolated(unsafe) private var didClose = false
+
     override open func close() {
+        guard !didClose else { return }
+        didClose = true
         MainActor.assumeIsolated {
             // The window controller detached the canvas view when its window closed.
             for case let wc as EditorWindowController in windowControllers { wc.canvas.detach() }
@@ -996,23 +1069,29 @@ open class ImageDocumentController: NSDocumentController {
                                      didReviewAllSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
         // Fix round 2, item 2: each image's queued work runs first, so an
         // edit sent just before Quit counts.
-        settle(documents.compactMap { $0 as? ImageDocument }) { images in
-            let edited = images.filter(\.isDocumentEdited)
+        settle(documents.compactMap { $0 as? ImageDocument }) { edited in
             review(edited) { ok in
                 callDidReviewAll(delegate, didReviewAllSelector, controller, ok, contextInfo)
             }
         }
     }
 
-    /// Calls `done` with `docs` once each one's queued engine work ran.
+    /// Calls `done` once each one's queued engine work ran, with the
+    /// documents that may hold unsaved work: edited ones, ones whose wait
+    /// failed or timed out (fix round 3, item 1), and ones whose review
+    /// already runs (fix round 3, item 2: Quit joins it).
     @MainActor
     static func settle(_ docs: [ImageDocument], _ done: @escaping @MainActor ([ImageDocument]) -> Void) {
         var left = docs.count
-        guard left > 0 else { return done(docs) }
+        guard left > 0 else { return done([]) }
+        var unknown = Set<ObjectIdentifier>()
         for d in docs {
-            d.afterQueuedWork {
+            d.afterQueuedWork { ok in
+                if !ok { unknown.insert(ObjectIdentifier(d)) }
                 left -= 1
-                if left == 0 { done(docs) }
+                if left == 0 {
+                    done(docs.filter { unknown.contains(ObjectIdentifier($0)) || $0.isDocumentEdited || $0.isReviewingUnsaved })
+                }
             }
         }
     }

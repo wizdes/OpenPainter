@@ -1130,6 +1130,7 @@ dependencies = [
  "lcms2",
  "op-color",
  "op-core",
+ "op-engine",
  "op-formats",
  "op-gpu",
  "op-ops",

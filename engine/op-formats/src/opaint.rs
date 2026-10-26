@@ -409,6 +409,19 @@ struct SavePlan {
     selection_as_mask: bool,
 }
 
+/// Fix round 3, item 7: true when a save of `doc` stores its selection as a
+/// mask image (a coverage selection, or a shape whose outline is too long
+/// for `stack.xml`), which counts against the 16 GiB total like a layer.
+pub fn stores_selection_mask(doc: &DocState) -> bool {
+    match &doc.selection {
+        SelectionState::Active(SelectionSource::Coverage(_)) => true,
+        SelectionState::Active(SelectionSource::Geometry(_)) => {
+            make_xml(doc, false).map_or(true, |xml| xml.len() > MAX_STACK_XML)
+        }
+        SelectionState::None => false,
+    }
+}
+
 /// Checks `doc` against every limit the reader enforces and builds its
 /// `stack.xml` (release review items 3, 11 and 12a). An error says which
 /// limit, and nothing has been written yet.

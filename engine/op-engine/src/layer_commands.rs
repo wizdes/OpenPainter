@@ -1,7 +1,9 @@
 //! Layers panel commands (M20): duplicate, merge down, move up and down, move
 //! (drag reorder), visibility and Layer Properties (previewable), plus the
 //! per-layer content key and the `layer.thumbnail` query.
-use super::{CommandSpec, Outcome, Param, ParamKind, ParamSchema, Result, RunCtx, bad, internal};
+use super::{
+    CommandSpec, Outcome, Param, ParamKind, ParamSchema, Result, RunCtx, bad, doc_error, internal,
+};
 use op_core::doc::{DocState, LayerBlendMode, LayerState};
 use op_core::pixel::Rgba8;
 use op_core::tiles::{TILE_SIZE, TileData};
@@ -99,7 +101,7 @@ fn always(_: &DocState) -> bool {
 }
 
 fn duplicate(_: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
-    let next = s.duplicate_layer(s.active_layer).map_err(internal)?;
+    let next = s.duplicate_layer(s.active_layer).map_err(doc_error)?;
     // The copy sits above the original and becomes the active layer.
     Ok(Outcome::State(
         next.set_active_layer(s.active_layer + 1)

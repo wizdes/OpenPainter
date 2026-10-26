@@ -106,12 +106,15 @@ fn status(e: Error) -> OpStatus {
         Error::Busy => OpStatus::OP_ERR_BUSY,
         Error::Internal(_) => OpStatus::OP_ERR_INTERNAL,
         Error::Cancelled => OpStatus::OP_ERR_CANCELLED,
+        // Fix round 3, item 6: a request the image cannot hold; the text is
+        // in the JobFinished payload and in the `doc.layer_limit` query.
+        Error::Limit(_) => OpStatus::OP_ERR_BAD_ARGUMENT,
     }
 }
 fn status_code(name: &str) -> OpStatus {
     match name {
         "ok" => OpStatus::OP_OK,
-        "bad_argument" => OpStatus::OP_ERR_BAD_ARGUMENT,
+        "bad_argument" | "limit" => OpStatus::OP_ERR_BAD_ARGUMENT,
         "no_such_doc" => OpStatus::OP_ERR_NO_SUCH_DOC,
         "read_only" => OpStatus::OP_ERR_READ_ONLY,
         "panic" => OpStatus::OP_ERR_PANIC,

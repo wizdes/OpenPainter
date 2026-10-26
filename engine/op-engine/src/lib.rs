@@ -68,6 +68,10 @@ pub enum Error {
     Internal(String),
     #[error("job was cancelled")]
     Cancelled,
+    /// Fix round 3, item 6: a limit the image would pass (1,000 layers, the
+    /// 16 GiB pixel total). The text is the plain limit message the app shows.
+    #[error("{0}")]
+    Limit(String),
 }
 impl Error {
     /// The short name used as `status` in JobFinished payloads.
@@ -80,6 +84,7 @@ impl Error {
             Error::Busy => "busy",
             Error::Internal(_) => "internal",
             Error::Cancelled => "cancelled",
+            Error::Limit(_) => "limit",
         }
     }
 }
@@ -89,6 +94,15 @@ fn internal(e: impl std::fmt::Display) -> Error {
 }
 fn bad(e: impl std::fmt::Display) -> Error {
     Error::BadArgument(e.to_string())
+}
+/// Fix round 3, item 6: an image error, with the layer and pixel limits as
+/// `Error::Limit` (their text reaches the user) and the rest as internal.
+pub(crate) fn doc_error(e: op_core::doc::DocError) -> Error {
+    use op_core::doc::DocError;
+    match e {
+        DocError::TooManyLayers | DocError::TooManyPixels => Error::Limit(e.to_string()),
+        other => internal(other),
+    }
 }
 /// The JobFinished payload for a finished operation: `{"status":"ok"}` or
 /// `{"status":<error name>,"error":<text>}`.
@@ -188,19 +202,20 @@ fn always(_: &DocState) -> bool {
 }
 /// Why `id` is off now. Fix round 2, items 7 and 8: a command that adds a
 /// layer says which limit stops it.
-fn disabled_reason(id: &str, s: &DocState) -> String {
+/// Fix round 3, item 6: a limit is an `Error::Limit`.
+fn disabled_reason(id: &str, s: &DocState) -> Error {
     if matches!(
         id,
         "layer.add" | "layer.duplicate" | "layer.import_from_file"
     ) {
         if s.layers.len() >= op_core::doc::MAX_LAYERS {
-            return op_core::doc::DocError::TooManyLayers.to_string();
+            return doc_error(op_core::doc::DocError::TooManyLayers);
         }
         if let Err(e) = op_core::doc::check_pixel_budget(s.layers.len() + 1, s.width, s.height) {
-            return e.to_string();
+            return doc_error(e);
         }
     }
-    "command disabled".into()
+    bad("command disabled")
 }
 fn can_delete(s: &DocState) -> bool {
     s.layers.len() > 1
@@ -211,7 +226,7 @@ fn add(_: &RunCtx, s: &DocState, p: &Value) -> Result<Outcome> {
     let index = s.active_layer + 1;
     Ok(Outcome::State(
         s.add_layer(index, p["name"].as_str().unwrap())
-            .map_err(internal)?
+            .map_err(doc_error)?
             .set_active_layer(index)
             .map_err(internal)?,
     ))
@@ -899,6 +914,29 @@ pub(crate) fn check_selection(state: &DocState) -> Result<()> {
     }
     Ok(())
 }
+/// Fix round 3, item 7: the text when a selection would need a mask the
+/// 16 GiB total has no room for.
+pub(crate) const MASK_LIMIT: &str = "the selection cannot be kept: the image already holds the 16 GiB of pixels an .opaint file can hold, and this kind of selection is saved as a mask image. Use a rectangle, ellipse or lasso selection, or delete a layer";
+/// Fix round 3, item 7: a new selection that a save stores as a mask is
+/// refused when the 16 GiB total has no room for that mask (an image loaded
+/// from a full `.opaint` file), so every image stays savable and
+/// recoverable. A selection that did not change is not checked again.
+pub(crate) fn check_mask_room(
+    state: &DocState,
+    before: &op_core::doc::SelectionState,
+) -> Result<()> {
+    if state.selection == *before || has_mask_room(state) {
+        return Ok(());
+    }
+    if op_formats::opaint::stores_selection_mask(state) {
+        return Err(Error::Limit(MASK_LIMIT.into()));
+    }
+    Ok(())
+}
+/// True when the layers plus one selection mask fit in the 16 GiB total.
+pub(crate) fn has_mask_room(state: &DocState) -> bool {
+    op_core::doc::check_pixel_budget(state.layers.len(), state.width, state.height).is_ok()
+}
 /// The flattened composite of `state` as straight RGBA8, row by row.
 pub(crate) fn flatten(state: &DocState) -> Result<Vec<u8>> {
     let len = (state.width as usize)
@@ -1076,7 +1114,9 @@ struct Actor {
     preview_serial: AtomicU64,
     gpu: Arc<gpu_effects::GpuShared>,
     /// Tests (`test.panic_on_finish`): the next finish of the open sessions
-    /// panics, as a broken tool would (fix round 2, item 9).
+    /// panics, as a broken tool would (fix round 2, item 9). Fix round 3,
+    /// item 8: only in builds with the `test-commands` feature.
+    #[cfg(feature = "test-commands")]
     panic_on_finish: bool,
 }
 /// Fix round 2, items 2 and 5: a queued command that only answers once the
@@ -1086,6 +1126,9 @@ pub const SYNC_COMMAND: &str = "doc.sync";
 /// JobFinished comes after the sessions are finished, so Save can wait for it
 /// without blocking the app's main thread.
 pub const FINISH_SESSIONS_COMMAND: &str = "doc.finish_sessions";
+/// Tests only (fix round 3, item 8): without the `test-commands` feature,
+/// as in the app's library, it is an unknown command.
+const TEST_PANIC_ON_FINISH: &str = "test.panic_on_finish";
 impl Actor {
     /// Release review item 1: an open tool session whose Finish would change
     /// the image or the selection. An empty text box and a move that has not
@@ -1110,6 +1153,7 @@ impl Actor {
     /// edit, each as its own history step, so a save writes what the screen
     /// shows. Empty sessions stay open.
     fn finish_edit_sessions(&mut self) -> Result<()> {
+        #[cfg(feature = "test-commands")]
         if std::mem::take(&mut self.panic_on_finish) {
             panic!("test panic while finishing the open sessions");
         }
@@ -1248,7 +1292,8 @@ impl Actor {
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
-        if id == "test.panic_on_finish" {
+        #[cfg(feature = "test-commands")]
+        if id == TEST_PANIC_ON_FINISH {
             self.panic_on_finish = true;
             return Ok(());
         }
@@ -1356,7 +1401,7 @@ impl Actor {
         let spec = spec(id)?;
         let params = spec.params.validate(params).map_err(bad)?;
         if !(spec.enabled)(self.history.current_state()) {
-            return Err(bad(disabled_reason(id, self.history.current_state())));
+            return Err(disabled_reason(id, self.history.current_state()));
         }
         let (amend, params) = select_crop_commands::amend_base(id, params, &self.history);
         let base = amend.as_ref().unwrap_or(self.history.current_state());
@@ -1366,6 +1411,7 @@ impl Actor {
         let selection = self.history.current_state().selection.clone();
         if let Outcome::State(state) | Outcome::Replace(state) = &outcome {
             check_selection(state)?;
+            check_mask_room(state, &selection)?;
         }
         let changed = match outcome {
             Outcome::State(state) => {
@@ -1428,6 +1474,11 @@ impl Actor {
             .into_iter()
             .find(|s| s.id == id && s.previewable)
             .ok_or_else(|| bad("command cannot preview"))?;
+        // Fix round 3, item 7: the Magic Wand's selection is a mask; it is
+        // refused at once when the 16 GiB total has no room for one.
+        if id == "tool.magic_wand" && !has_mask_room(self.history.current_state()) {
+            return Err(Error::Limit(MASK_LIMIT.into()));
+        }
         let params = spec.params.validate(params).map_err(bad)?;
         let session = self.next_session.fetch_add(1, Ordering::Relaxed);
         self.preview = Some(PreviewSession {
@@ -1981,7 +2032,8 @@ impl Actor {
         let state = session.preview().map_err(bad)?;
         // Release review item 11: a transform that would put the selection
         // outline at a point that is not finite is refused; the move stays.
-        if let Err(e) = check_selection(&state) {
+        let current = &self.history.current_state().selection;
+        if let Err(e) = check_selection(&state).and_then(|()| check_mask_room(&state, current)) {
             session.update(before).map_err(bad)?;
             return Err(e);
         }
@@ -2001,7 +2053,8 @@ impl Actor {
         let kind = session.kind;
         let paste = session.label().map(str::to_owned);
         let state = session.finish().map_err(bad)?;
-        if let Err(e) = check_selection(&state) {
+        let current = &self.history.current_state().selection;
+        if let Err(e) = check_selection(&state).and_then(|()| check_mask_room(&state, current)) {
             self.publish(None);
             return Err(e);
         }
@@ -2520,6 +2573,7 @@ impl Engine {
             pending_jobs: 0,
             preview_serial: AtomicU64::new(0),
             gpu: self.gpu.clone(),
+            #[cfg(feature = "test-commands")]
             panic_on_finish: false,
         };
         let join = std::thread::spawn(move || actor.run(rx));
@@ -2611,7 +2665,7 @@ impl Engine {
                     || id == "tool.select"
                     || id == SYNC_COMMAND
                     || id == FINISH_SESSIONS_COMMAND
-                    || id == "test.panic_on_finish"
+                    || (cfg!(feature = "test-commands") && id == TEST_PANIC_ON_FINISH)
                 {
                     return Ok(());
                 }
@@ -2802,6 +2856,13 @@ impl Engine {
             }
             // Fix round 2, item 10: the edited flag alone, for checks that
             // run often (menu and toolbar validation).
+            // Fix round 3, item 6: why one more layer cannot be added (the
+            // 1,000-layer limit or the 16 GiB total), or null when it can.
+            "doc.layer_limit" => {
+                let limit = (!s.state.can_add_layer())
+                    .then(|| disabled_reason("layer.add", &s.state).to_string());
+                serde_json::to_vec(&json!({ "limit": limit })).map_err(internal)
+            }
             "doc.dirty" => serde_json::to_vec(&json!({
                 "dirty": s.history.dirty,
                 "revision": s.revision,

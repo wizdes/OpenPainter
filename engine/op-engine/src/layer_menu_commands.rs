@@ -1,7 +1,7 @@
 //! Remaining Layers menu commands: active-layer transforms and file import.
 use super::{
-    CommandSpec, Outcome, Param, ParamKind, ParamSchema, Result, RunCtx, bad, image_commands,
-    internal,
+    CommandSpec, Outcome, Param, ParamKind, ParamSchema, Result, RunCtx, bad, doc_error,
+    image_commands, internal,
 };
 use op_color::{Profile, RenderingIntent};
 use op_core::doc::DocState;
@@ -111,7 +111,7 @@ fn import_from_file(ctx: &RunCtx, s: &DocState, params: &Value) -> Result<Outcom
     let index = s.active_layer + 1;
     let next = s
         .add_layer(index, name)
-        .map_err(internal)?
+        .map_err(doc_error)?
         .set_active_layer(index)
         .map_err(internal)?;
     // Write against the image dimensions. The layer retains complete edge and
