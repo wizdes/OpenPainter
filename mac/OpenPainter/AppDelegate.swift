@@ -58,7 +58,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// M57: closed images' recovery writers finish deleting their copies
     /// (each close already moved its folder out of the way); wait at most 2 s.
+    /// Fix round 4, item 3: closes still running in the engine (behind slow
+    /// work) get the same 2 s; a stuck one does not stop Quit.
     func applicationWillTerminate(_ notification: Notification) {
+        if !ImageDocument.waitForEngineCloses(timeout: 2) {
+            FileHandle.standardError.write(Data("OpenPainter: an image was still closing at Quit\n".utf8))
+        }
         AppEngine.shared.waitForRecoveryWriters(timeout: .seconds(2))
     }
 

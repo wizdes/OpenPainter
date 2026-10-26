@@ -146,6 +146,14 @@ extension Document {
         try engine.withHandle { h in try checkStatus(op_recovery_detach(h, id, deleteRecord)) }
     }
 
+    /// Fix round 4, item 3: stops recovery at once without waiting for the
+    /// writer or the document's queued work (`op_recovery_stop`); with
+    /// `deleteRecord`, the record is gone from the recovery folder when it
+    /// returns.
+    public func stopRecovery(deleteRecord: Bool) throws {
+        try engine.withHandle { h in try checkStatus(op_recovery_stop(h, id, deleteRecord)) }
+    }
+
     /// `doc.recovery`: `enabled`, `acknowledged_revision`, `error`, `writes`, `failures`.
     public func recoveryStatus() throws -> [String: Any] {
         try query("doc.recovery") as? [String: Any] ?? [:]

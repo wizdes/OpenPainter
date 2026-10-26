@@ -96,6 +96,11 @@ public final class FloodToolController {
     /// command from elsewhere (a menu, a panel) commits the session in the
     /// engine and moves the revision; the session then ends here too.
     private var baseRevision: Int?
+    /// Fix round 4, item 2: the serial of the last session whose start the
+    /// engine refused (the 16 GiB total has no room for the wand's mask).
+    /// Later commands sent for that session fail too; the refusal already
+    /// said why, so their failures are not shown over it.
+    private var refusedSerial: Int?
 
     var editor: Editor { controller.editor }
     var tools: ToolState { controller.workspace.tools }
@@ -141,7 +146,7 @@ public final class FloodToolController {
             session = s
             sent = Self.encode(p)
             baseRevision = nil
-            track(ticket, begun: s.serial)
+            track(ticket, for: s, begun: true)
         } catch {
             editor.report("\(tool.label) failed: \(error)")
         }
@@ -151,9 +156,9 @@ public final class FloodToolController {
     /// Keeps the open result as one history step. False when none is open.
     @discardableResult
     public func finish() -> Bool {
-        guard session != nil else { return false }
+        guard let s = session else { return false }
         end()
-        do { track(try editor.document.floodFinish()) } catch { editor.report("Finish failed: \(error)") }
+        do { track(try editor.document.floodFinish(), for: s) } catch { editor.report("Finish failed: \(error)") }
         return true
     }
 
@@ -167,9 +172,9 @@ public final class FloodToolController {
     /// Drops the open result. False when none is open.
     @discardableResult
     public func cancel() -> Bool {
-        guard session != nil else { return false }
+        guard let s = session else { return false }
         end()
-        do { track(try editor.document.floodCancel()) } catch { editor.report("Cancel failed: \(error)") }
+        do { track(try editor.document.floodCancel(), for: s) } catch { editor.report("Cancel failed: \(error)") }
         return true
     }
 
@@ -204,7 +209,7 @@ public final class FloodToolController {
         // An encoding failure (nil) always sends.
         guard data == nil || data != sent else { return }
         sent = data
-        do { track(try editor.document.floodUpdate(p)) } catch { editor.report("\(s.tool.label) failed: \(error)") }
+        do { track(try editor.document.floodUpdate(p), for: s) } catch { editor.report("\(s.tool.label) failed: \(error)") }
     }
 
     private func toolsChanged() {
@@ -231,7 +236,10 @@ public final class FloodToolController {
     /// Waits for the ticket off the main actor's way, then shows the result:
     /// the live (or final) selection outline and the refreshed document. A
     /// stale render ("dropped") is not an error: a newer one follows.
-    private func track(_ ticket: UInt64, begun: Int? = nil) {
+    /// Fix round 4, item 2: when the engine refuses a session's start, the
+    /// session ends here too (no Finish control, no handle) and the
+    /// refusal's text stays in the status bar.
+    private func track(_ ticket: UInt64, for s: Session, begun: Bool = false) {
         inFlight += 1
         let document = editor.document
         Task { @MainActor [weak self] in
@@ -240,10 +248,16 @@ public final class FloodToolController {
             self.inFlight -= 1
             let status = event?.status ?? "timed out"
             if status != "ok", status != "dropped", status != "cancelled" {
-                self.editor.report(Editor.failureText(self.session?.tool.label ?? "Fill", status: status,
-                                                      error: event?.json["error"] as? String))
+                if begun {
+                    self.refusedSerial = s.serial
+                    if self.session?.serial == s.serial { self.end() }
+                }
+                if begun || self.refusedSerial != s.serial {
+                    self.editor.report(Editor.failureText(s.tool.label, status: status,
+                                                          error: event?.json["error"] as? String))
+                }
             }
-            if let begun, self.session?.serial == begun {
+            if begun, self.session?.serial == s.serial {
                 do {
                     self.baseRevision = (try document.info()["revision"] as? NSNumber)?.intValue
                 } catch {

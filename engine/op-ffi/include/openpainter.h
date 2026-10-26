@@ -533,6 +533,15 @@ enum OpStatus op_recovery_attach(struct OpEngine *p,
 enum OpStatus op_recovery_flush(struct OpEngine *p, uint64_t doc);
 
 /**
+ * Fix round 4, item 3: stops recovery for `doc` at once, as a close does
+ * first (with `delete_record`, the folder is moved out of the way before
+ * this returns and deleted in the background). It never waits for the
+ * document's queued work or for a write in progress, so the app calls it
+ * on the main thread before it hands the close itself to another thread.
+ */
+enum OpStatus op_recovery_stop(struct OpEngine *p, uint64_t doc, bool delete_record);
+
+/**
  * Stops recovery for `doc`. With `delete_record` false the record stays on
  * disk and its folder is let go, as after a crash (tests use this); with
  * true the folder is deleted, as on a clean close.

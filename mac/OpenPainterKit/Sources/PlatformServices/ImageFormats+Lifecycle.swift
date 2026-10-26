@@ -77,7 +77,10 @@ extension ImageFormats {
         guard contentType != opaintIdentifier,
               let source = CGImageSourceCreateWithURL(url as CFURL, nil)
         else { return reasons }
-        let frames = CGImageSourceGetCount(source)
+        // Fix round 4, item 1: only formats that hold animation or pages
+        // count. A camera JPEG with an MPF preview or a depth image may
+        // report more than one image, and plain Save keeps working on it.
+        let frames = framedTypes.contains(contentType) ? CGImageSourceGetCount(source) : 1
         if frames > 1 {
             reasons.append("This file holds \(frames) frames or pages; OpenPainter opened the first. "
                 + "Save asks where to save so the others are kept.")
@@ -90,6 +93,12 @@ extension ImageFormats {
         }
         return reasons
     }
+
+    /// Fix round 4, item 1: the types whose extra images are frames or
+    /// pages that plain Save would drop (GIF, TIFF, APNG, WebP).
+    static let framedTypes: Set<String> = [
+        "com.compuserve.gif", "public.tiff", "public.png", "org.webmproject.webp",
+    ]
 
     /// The type a URL saves as, from its extension (used when a type name is a
     /// dynamic or unknown identifier).

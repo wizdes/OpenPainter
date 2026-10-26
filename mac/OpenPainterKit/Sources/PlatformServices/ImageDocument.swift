@@ -664,7 +664,8 @@ open class ImageDocument: NSDocument, EditorHost {
         doc.makeWindowControllers()
         doc.showWindows()
         doc.syncEditedState()
-        doc.editor?.report("Recovered with the changes that were not saved.")
+        // Fix round 4, item 5: with the notes on why Save asks where.
+        doc.editor?.report((["Recovered with the changes that were not saved."] + doc.importNotes).joined(separator: " "))
         return doc
     }
 
@@ -688,9 +689,24 @@ open class ImageDocument: NSDocument, EditorHost {
             let kept = record.originalType
             fileType = kept ?? UTType(filenameExtension: url.pathExtension)?.identifier ?? "public.data"
             contentType = kept
-            saveNeedsNewFile = kept.map { !ImageFormats.saveTypes().contains($0) } ?? true
-                || ImageFormats.holdsMoreThan8Bits(url)
-                || kept.map { !ImageFormats.plainSaveReasons(url, contentType: $0).isEmpty } ?? false
+            // Fix round 4, item 5: the notes say why, as Open's do.
+            var notes: [String] = []
+            if let kept {
+                if !ImageFormats.saveTypes().contains(kept) {
+                    notes.append("OpenPainter cannot write \(ImageFormats.shortName(kept)) files; "
+                        + "Save asks where to save so the original is kept.")
+                }
+                notes += ImageFormats.plainSaveReasons(url, contentType: kept)
+            } else {
+                notes.append("This recovery copy does not say what type its file was; "
+                    + "Save asks where to save so the original is kept.")
+            }
+            if ImageFormats.holdsMoreThan8Bits(url) {
+                notes.append("The file holds more than 8 bits per channel and OpenPainter keeps 8; "
+                    + "Save asks where to save so the original is kept.")
+            }
+            importNotes = notes
+            saveNeedsNewFile = !notes.isEmpty
         } else {
             fileType = ImageFormats.opaintIdentifier
         }
@@ -743,14 +759,17 @@ open class ImageDocument: NSDocument, EditorHost {
     /// `done(true)` when the document may close. Fix round 3, item 2: only
     /// one review runs per image; a request made while one runs (Quit after
     /// Close) gets that review's answer.
+    /// Fix round 4, item 4: `unsettled` says the caller's own wait for the
+    /// image's queued work just failed or timed out (Quit's first step), so
+    /// the review asks at once instead of waiting again.
     @MainActor
-    public func reviewUnsaved(_ done: @escaping @MainActor (Bool) -> Void) {
+    public func reviewUnsaved(unsettled: Bool = false, _ done: @escaping @MainActor (Bool) -> Void) {
         if reviewWaiters != nil {
             reviewWaiters?.append(done)
             return
         }
         reviewWaiters = [done]
-        runReview { [weak self] ok in
+        runReview(unsettled: unsettled) { [weak self] ok in
             guard let self else { return done(ok) }
             let waiters = self.reviewWaiters ?? []
             self.reviewWaiters = nil
@@ -759,10 +778,11 @@ open class ImageDocument: NSDocument, EditorHost {
     }
 
     @MainActor
-    private func runReview(_ done: @escaping @MainActor (Bool) -> Void) {
+    private func runReview(unsettled: Bool = false, _ done: @escaping @MainActor (Bool) -> Void) {
         // Fix round 2, item 2: decide once the engine ran what was queued
         // (a text update or a fill sent just before Close). Fix round 3,
         // item 1: when that wait failed, the state is not known: ask.
+        if unsettled { return reviewSettled(assumeEdited: true, done) }
         afterQueuedWork { [weak self] settled in
             guard let self else { return done(true) }
             self.reviewSettled(assumeEdited: !settled, done)
@@ -958,10 +978,36 @@ open class ImageDocument: NSDocument, EditorHost {
         super.close()
         if let doc = engineDocument {
             engineDocument = nil
+            Self.closeEngineDocument(doc)
+        }
+    }
+
+    /// Fix round 4, item 3: engine closes still running.
+    nonisolated private static let engineCloses = DispatchGroup()
+
+    /// Closes `doc` in the engine off the main thread. The engine's close
+    /// waits for the image's queued work (after a wait that timed out, that
+    /// work may be stuck), so the window closes at once and neither the
+    /// main thread nor other images wait for it. It stops the image's
+    /// recovery record here, on the calling thread, as the engine's
+    /// close did before, so a Quit right after never finds the record.
+    static func closeEngineDocument(_ doc: Document) {
+        do { try doc.stopRecovery(deleteRecord: true) } catch {
+            FileHandle.standardError.write(Data("OpenPainter: stopping the recovery copy failed: \(error)\n".utf8))
+        }
+        engineCloses.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { engineCloses.leave() }
             do { try doc.close() } catch {
                 FileHandle.standardError.write(Data("OpenPainter: closing the document failed: \(error)\n".utf8))
             }
         }
+    }
+
+    /// Waits up to `timeout` for the engine closes still running (Quit
+    /// calls it). False when some were still running at the limit.
+    public static func waitForEngineCloses(timeout: TimeInterval) -> Bool {
+        engineCloses.wait(timeout: .now() + timeout) == .success
     }
 
     // MARK: EditorHost
@@ -1067,12 +1113,35 @@ open class ImageDocumentController: NSDocumentController {
     @MainActor
     public static func reviewUnsaved(_ documents: [NSDocument], controller: NSDocumentController, delegate: Any?,
                                      didReviewAllSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
-        // Fix round 2, item 2: each image's queued work runs first, so an
-        // edit sent just before Quit counts.
-        settle(documents.compactMap { $0 as? ImageDocument }) { edited in
-            review(edited) { ok in
-                callDidReviewAll(delegate, didReviewAllSelector, controller, ok, contextInfo)
+        // Fix round 4, item 6: Quit joins a review that already runs (Close
+        // pressed first) at once, before any wait. Joining later could miss
+        // its answer: the review may end while Quit waits for queued work,
+        // and Quit would then ask a second time.
+        let images = documents.compactMap { $0 as? ImageDocument }
+        let running = images.filter(\.isReviewingUnsaved)
+        joinRunningReviews(running) { ok in
+            guard ok else { return callDidReviewAll(delegate, didReviewAllSelector, controller, false, contextInfo) }
+            let rest = images.filter { image in !running.contains { $0 === image } }
+            // Fix round 2, item 2: each image's queued work runs first, so an
+            // edit sent just before Quit counts.
+            settle(rest) { edited, unsettled in
+                review(edited, unsettled: unsettled) { ok in
+                    callDidReviewAll(delegate, didReviewAllSelector, controller, ok, contextInfo)
+                }
             }
+        }
+    }
+
+    /// Fix round 4, item 6: waits for each running review in turn and gets
+    /// its answer; an image answered with Save or Don't Save closes.
+    /// Cancel stops at once.
+    @MainActor
+    static func joinRunningReviews(_ docs: [ImageDocument], _ done: @escaping @MainActor (Bool) -> Void) {
+        guard let first = docs.first else { return done(true) }
+        first.reviewUnsaved { ok in
+            guard ok else { return done(false) }
+            first.close()
+            joinRunningReviews(Array(docs.dropFirst()), done)
         }
     }
 
@@ -1081,16 +1150,20 @@ open class ImageDocumentController: NSDocumentController {
     /// failed or timed out (fix round 3, item 1), and ones whose review
     /// already runs (fix round 3, item 2: Quit joins it).
     @MainActor
-    static func settle(_ docs: [ImageDocument], _ done: @escaping @MainActor ([ImageDocument]) -> Void) {
+    /// Fix round 4, item 4: `done` also gets the documents whose wait
+    /// failed or timed out, so their review does not wait again.
+    static func settle(_ docs: [ImageDocument],
+                       _ done: @escaping @MainActor ([ImageDocument], Set<ObjectIdentifier>) -> Void) {
         var left = docs.count
-        guard left > 0 else { return done([]) }
+        guard left > 0 else { return done([], []) }
         var unknown = Set<ObjectIdentifier>()
         for d in docs {
             d.afterQueuedWork { ok in
                 if !ok { unknown.insert(ObjectIdentifier(d)) }
                 left -= 1
                 if left == 0 {
-                    done(docs.filter { unknown.contains(ObjectIdentifier($0)) || $0.isDocumentEdited || $0.isReviewingUnsaved })
+                    done(docs.filter { unknown.contains(ObjectIdentifier($0)) || $0.isDocumentEdited || $0.isReviewingUnsaved },
+                         unknown)
                 }
             }
         }
@@ -1099,15 +1172,16 @@ open class ImageDocumentController: NSDocumentController {
     /// Asks about each document in turn; a document answered with Save or
     /// Don't Save closes, as AppKit's own review does. Cancel stops at once.
     @MainActor
-    public static func review(_ docs: [ImageDocument], done: @escaping @MainActor (Bool) -> Void) {
+    public static func review(_ docs: [ImageDocument], unsettled: Set<ObjectIdentifier> = [],
+                              done: @escaping @MainActor (Bool) -> Void) {
         guard let first = docs.first else {
             done(true)
             return
         }
-        first.reviewUnsaved { ok in
+        first.reviewUnsaved(unsettled: unsettled.contains(ObjectIdentifier(first))) { ok in
             guard ok else { return done(false) }
             first.close()
-            review(Array(docs.dropFirst()), done: done)
+            review(Array(docs.dropFirst()), unsettled: unsettled, done: done)
         }
     }
 

@@ -155,6 +155,11 @@ public final class Engine: @unchecked Sendable {
     /// which calls `op_view_set` from inside the detach call (M38 found the hang).
     private let lock = NSRecursiveLock()
     private var handle: OpaquePointer?
+    /// Fix round 4, item 3: document closes running without `lock` (each
+    /// waits for its document's queued work). `close()` waits for them
+    /// before it frees the engine.
+    private let closes = NSCondition()
+    private var closesRunning = 0
     private let sinkRef: Unmanaged<EventSink>
     let sink: EventSink
     public let events: AsyncStream<EngineEvent>
@@ -189,6 +194,9 @@ public final class Engine: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard let h = handle else { return }
+        closes.lock()
+        while closesRunning > 0 { closes.wait() }
+        closes.unlock()
         handle = nil
         op_engine_free(h)
         sink.markFreed()
@@ -286,8 +294,24 @@ public final class Engine: @unchecked Sendable {
         return try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
     }
 
+    /// Fix round 4, item 3: `op_doc_close` waits for the document's queued
+    /// work, with no time limit. It runs without the engine lock, so calls
+    /// for other documents (and their canvases) go on meanwhile; the engine
+    /// is not freed until it returns.
     fileprivate func closeDoc(_ doc: UInt64) throws {
-        try withHandle { h in try check(op_doc_close(h, doc)) }
+        let h = try withHandle { h in
+            closes.lock()
+            closesRunning += 1
+            closes.unlock()
+            return h
+        }
+        defer {
+            closes.lock()
+            closesRunning -= 1
+            closes.broadcast()
+            closes.unlock()
+        }
+        try check(op_doc_close(h, doc))
     }
 }
 
