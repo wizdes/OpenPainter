@@ -122,6 +122,10 @@ public final class FloodToolController {
         editor.observe(self) { [weak self] in self?.editorChanged() }
     }
 
+    /// How long a fill or wand command may take before it counts as failed
+    /// ("timed out"). Tests shorten it.
+    public static var resultTimeout: Duration = .seconds(120)
+
     static func command(_ tool: PaintTool) -> String {
         tool == .magicWand ? "tool.magic_wand" : "tool.paint_bucket"
     }
@@ -238,19 +242,29 @@ public final class FloodToolController {
     /// stale render ("dropped") is not an error: a newer one follows.
     /// Fix round 4, item 2: when the engine refuses a session's start, the
     /// session ends here too (no Finish control, no handle) and the
-    /// refusal's text stays in the status bar.
+    /// refusal's text stays in the status bar. Fix round 5, item 1: when
+    /// the start failed in another way, the session is cancelled in the
+    /// engine as well, so both sides agree that none is open.
     private func track(_ ticket: UInt64, for s: Session, begun: Bool = false) {
         inFlight += 1
         let document = editor.document
         Task { @MainActor [weak self] in
-            let event = await document.engine.result(of: ticket, timeout: .seconds(120))
+            let event = await document.engine.result(of: ticket, timeout: Self.resultTimeout)
             guard let self else { return }
             self.inFlight -= 1
             let status = event?.status ?? "timed out"
             if status != "ok", status != "dropped", status != "cancelled" {
                 if begun {
                     self.refusedSerial = s.serial
-                    if self.session?.serial == s.serial { self.end() }
+                    if self.session?.serial == s.serial {
+                        // Fix round 5, item 1: "limit" and "busy" mean the
+                        // engine refused the start and opened no session.
+                        // Any other failure (a draw that failed, "timed
+                        // out") may leave the engine's session open, and
+                        // the next command would commit a fill the user
+                        // never saw: cancel it in the engine too.
+                        if status == "limit" || status == "busy" { self.end() } else { self.cancel() }
+                    }
                 }
                 if begun || self.refusedSerial != s.serial {
                     self.editor.report(Editor.failureText(s.tool.label, status: status,

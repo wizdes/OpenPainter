@@ -968,6 +968,10 @@ open class ImageDocument: NSDocument, EditorHost {
     /// Fix round 3, item 2: Close and Quit may both end in a close.
     nonisolated(unsafe) private var didClose = false
 
+    /// Fix round 5, item 2: true once the document closed (or has no
+    /// engine image any more); it has nothing left to ask about.
+    @MainActor var isClosed: Bool { didClose || engineDocument == nil }
+
     override open func close() {
         guard !didClose else { return }
         didClose = true
@@ -1171,12 +1175,17 @@ open class ImageDocumentController: NSDocumentController {
 
     /// Asks about each document in turn; a document answered with Save or
     /// Don't Save closes, as AppKit's own review does. Cancel stops at once.
+    /// Fix round 5, item 2: a document closed meanwhile (the user closed it
+    /// while Quit asked about another one) is skipped, not asked about.
     @MainActor
     public static func review(_ docs: [ImageDocument], unsettled: Set<ObjectIdentifier> = [],
                               done: @escaping @MainActor (Bool) -> Void) {
         guard let first = docs.first else {
             done(true)
             return
+        }
+        if first.isClosed {
+            return review(Array(docs.dropFirst()), unsettled: unsettled, done: done)
         }
         first.reviewUnsaved(unsettled: unsettled.contains(ObjectIdentifier(first))) { ok in
             guard ok else { return done(false) }
