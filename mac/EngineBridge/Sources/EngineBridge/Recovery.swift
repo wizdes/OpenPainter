@@ -18,6 +18,9 @@ public struct RecoveryRecord: Sendable, Equatable {
     public let revision: UInt64?
     /// The file the document came from or was last saved to (nil: untitled).
     public let originalURL: URL?
+    /// Fix round 2, item 3: the type of that file's content as detected when
+    /// it was opened (nil in records written before this was kept).
+    public let originalType: String?
     public let time: Date?
     public let width: Int?
     public let height: Int?
@@ -32,6 +35,7 @@ public struct RecoveryRecord: Sendable, Equatable {
         problem = j["problem"] as? String
         revision = (j["revision"] as? NSNumber)?.uint64Value
         originalURL = (j["original_url"] as? String).flatMap { URL(string: $0) }
+        originalType = j["original_type"] as? String
         time = (j["time_unix"] as? Double).map { Date(timeIntervalSince1970: $0) }
         width = j["width"] as? Int
         height = j["height"] as? Int
@@ -113,12 +117,15 @@ extension Engine {
 
 extension Document {
     /// Turns on recovery records in `dir` (`<root>/<doc-uuid>`). Calling it
-    /// again only updates `originalURL` (after a Save As).
-    public func attachRecovery(dir: URL, originalURL: URL?, timing: RecoveryTiming = RecoveryTiming(),
-                               testFailAfterBytes: Int? = nil) throws {
+    /// again only updates `originalURL` and `originalType` (after a Save As).
+    /// `originalType` is the content type of the original file (fix round 2,
+    /// item 3), so Recover never guesses it from the file name.
+    public func attachRecovery(dir: URL, originalURL: URL?, originalType: String? = nil,
+                               timing: RecoveryTiming = RecoveryTiming(), testFailAfterBytes: Int? = nil) throws {
         var params = timing.json
         params["dir"] = dir.path
         params["original_url"] = originalURL?.absoluteString ?? NSNull()
+        params["original_type"] = originalType ?? NSNull()
         if let testFailAfterBytes { params["test_fail_after_bytes"] = testFailAfterBytes }
         let json = try jsonData(params)
         try engine.withHandle { h in

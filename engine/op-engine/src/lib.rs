@@ -186,6 +186,22 @@ pub enum Outcome {
 fn always(_: &DocState) -> bool {
     true
 }
+/// Why `id` is off now. Fix round 2, items 7 and 8: a command that adds a
+/// layer says which limit stops it.
+fn disabled_reason(id: &str, s: &DocState) -> String {
+    if matches!(
+        id,
+        "layer.add" | "layer.duplicate" | "layer.import_from_file"
+    ) {
+        if s.layers.len() >= op_core::doc::MAX_LAYERS {
+            return op_core::doc::DocError::TooManyLayers.to_string();
+        }
+        if let Err(e) = op_core::doc::check_pixel_budget(s.layers.len() + 1, s.width, s.height) {
+            return e.to_string();
+        }
+    }
+    "command disabled".into()
+}
 fn can_delete(s: &DocState) -> bool {
     s.layers.len() > 1
 }
@@ -656,7 +672,7 @@ fn specs() -> Vec<CommandSpec> {
                     default: Some(json!("Layer")),
                 }],
             },
-            enabled: always,
+            enabled: |s| s.can_add_layer(),
             run: add,
             previewable: false,
         },
@@ -1059,7 +1075,17 @@ struct Actor {
     /// The last `Published::preview_serial` handed out.
     preview_serial: AtomicU64,
     gpu: Arc<gpu_effects::GpuShared>,
+    /// Tests (`test.panic_on_finish`): the next finish of the open sessions
+    /// panics, as a broken tool would (fix round 2, item 9).
+    panic_on_finish: bool,
 }
+/// Fix round 2, items 2 and 5: a queued command that only answers once the
+/// commands before it ran, so the app can read the edited state afterwards.
+pub const SYNC_COMMAND: &str = "doc.sync";
+/// Fix round 2, item 5: the queued form of `Engine::finish_sessions`; its
+/// JobFinished comes after the sessions are finished, so Save can wait for it
+/// without blocking the app's main thread.
+pub const FINISH_SESSIONS_COMMAND: &str = "doc.finish_sessions";
 impl Actor {
     /// Release review item 1: an open tool session whose Finish would change
     /// the image or the selection. An empty text box and a move that has not
@@ -1084,6 +1110,9 @@ impl Actor {
     /// edit, each as its own history step, so a save writes what the screen
     /// shows. Empty sessions stay open.
     fn finish_edit_sessions(&mut self) -> Result<()> {
+        if std::mem::take(&mut self.panic_on_finish) {
+            panic!("test panic while finishing the open sessions");
+        }
         if self
             .preview
             .as_ref()
@@ -1113,6 +1142,30 @@ impl Actor {
             .is_some_and(|(_, s)| s.has_changes())
         {
             self.move_finish()?;
+        }
+        Ok(())
+    }
+    /// Fix round 2, item 4: a new move, stroke or gradient first ends the
+    /// open text, line/curve and shape sessions (as another tool does), so
+    /// the new session starts from the image the screen shows and nothing
+    /// open is lost under it. An empty text box is dropped.
+    fn end_other_sessions(&mut self) -> Result<()> {
+        if self
+            .text_session
+            .as_ref()
+            .is_some_and(|(_, s)| s.runs().is_empty())
+        {
+            self.text_session = None;
+            self.publish(None);
+        }
+        if self.text_session.is_some() {
+            self.text_finish()?;
+        }
+        if self.line_session.is_some() {
+            self.line_finish()?;
+        }
+        if self.shape_session.is_some() {
+            self.shape_finish()?;
         }
         Ok(())
     }
@@ -1195,6 +1248,10 @@ impl Actor {
         self.publish(None);
     }
     fn command(&mut self, id: &str, params: Value, ticket: &JobTicket) -> Result<()> {
+        if id == "test.panic_on_finish" {
+            self.panic_on_finish = true;
+            return Ok(());
+        }
         // M31: an open Magic Wand or Paint Bucket session (flood_commands.rs).
         if self
             .preview
@@ -1299,7 +1356,7 @@ impl Actor {
         let spec = spec(id)?;
         let params = spec.params.validate(params).map_err(bad)?;
         if !(spec.enabled)(self.history.current_state()) {
-            return Err(bad("command disabled"));
+            return Err(bad(disabled_reason(id, self.history.current_state())));
         }
         let (amend, params) = select_crop_commands::amend_base(id, params, &self.history);
         let base = amend.as_ref().unwrap_or(self.history.current_state());
@@ -1467,11 +1524,11 @@ impl Actor {
                     || self.stroke.is_some()
                     || self.move_session.is_some()
                     || self.gradient_session.is_some()
-                    || self.text_session.is_some()
                 {
                     return Err(Error::Busy);
                 }
                 let (options, start, end) = gradient_commands::begin(params)?;
+                self.end_other_sessions()?;
                 let session =
                     GradientSession::new(self.history.current_state().clone(), options, start, end)
                         .map_err(bad)?;
@@ -1872,7 +1929,7 @@ impl Actor {
         .map_err(bad)?;
         self.begin_stroke_session(session)
     }
-    fn check_stroke_begin(&self) -> Result<()> {
+    fn check_stroke_begin(&mut self) -> Result<()> {
         if self.read_only.load(Ordering::Acquire) {
             return Err(Error::ReadOnly);
         }
@@ -1880,11 +1937,10 @@ impl Actor {
             || self.stroke.is_some()
             || self.move_session.is_some()
             || self.gradient_session.is_some()
-            || self.text_session.is_some()
         {
             return Err(Error::Busy);
         }
-        Ok(())
+        self.end_other_sessions()
     }
     fn begin_stroke_session(&mut self, session: StrokeSession) -> Result<u64> {
         let id = self.next_session.fetch_add(1, Ordering::Relaxed);
@@ -1906,6 +1962,7 @@ impl Actor {
         {
             return Err(Error::Busy);
         }
+        self.end_other_sessions()?;
         let session =
             MoveSession::new(self.history.current_state().clone(), kind, options).map_err(bad)?;
         let state = session.preview().map_err(bad)?;
@@ -2060,6 +2117,10 @@ impl Actor {
         }
         let render = matches!(op, Op::PreviewBegin(..) | Op::PreviewUpdate(_));
         let result = catch_unwind(AssertUnwindSafe(|| match op {
+            Op::Command(id, _) if id == SYNC_COMMAND => Ok(None),
+            Op::Command(id, _) if id == FINISH_SESSIONS_COMMAND => {
+                self.finish_edit_sessions().map(|_| None)
+            }
             Op::Command(id, p) => self.command(&id, p, ticket).map(|_| None),
             Op::PreviewBegin(id, p) => self.begin(&id, p, ticket.clone()).map(Some),
             Op::PreviewUpdate(p) => self.update(p, ticket.clone()).map(|_| None),
@@ -2124,6 +2185,12 @@ impl Actor {
                 Message::File(op, r) => {
                     let result = catch_unwind(AssertUnwindSafe(|| self.file_op(op)))
                         .unwrap_or(Err(Error::Panic));
+                    // Fix round 2, item 9: a panic inside a file operation
+                    // (finishing the open sessions for a save) leaves the
+                    // document read-only, as on the command path.
+                    if result == Err(Error::Panic) {
+                        self.mark_read_only();
+                    }
                     let _ = r.send(result);
                 }
                 Message::MoveUpdate(_, r) | Message::MoveFinish(r) | Message::MoveCancel(r)
@@ -2453,6 +2520,7 @@ impl Engine {
             pending_jobs: 0,
             preview_serial: AtomicU64::new(0),
             gpu: self.gpu.clone(),
+            panic_on_finish: false,
         };
         let join = std::thread::spawn(move || actor.run(rx));
         self.docs.lock().insert(
@@ -2541,6 +2609,9 @@ impl Engine {
                     || id.starts_with("tool.shape.")
                     || id.starts_with("tool.text.")
                     || id == "tool.select"
+                    || id == SYNC_COMMAND
+                    || id == FINISH_SESSIONS_COMMAND
+                    || id == "test.panic_on_finish"
                 {
                     return Ok(());
                 }
@@ -2729,6 +2800,13 @@ impl Engine {
                 }
                 serde_json::to_vec(&info).map_err(internal)
             }
+            // Fix round 2, item 10: the edited flag alone, for checks that
+            // run often (menu and toolbar validation).
+            "doc.dirty" => serde_json::to_vec(&json!({
+                "dirty": s.history.dirty,
+                "revision": s.revision,
+            }))
+            .map_err(internal),
             "doc.pixels" => s.pixels(
                 params
                     .get("preview")

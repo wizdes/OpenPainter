@@ -27,7 +27,7 @@ pub const MAX_PROFILE: usize = 16 * 1024 * 1024;
 /// selection mask (release review item 12a: a small file of many layers that
 /// all point at one highly compressed PNG would otherwise decode for a very
 /// long time). 16 GiB: for example 16 layers of a 16384 x 16384 image.
-pub const MAX_DECODED_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+pub use op_core::doc::MAX_DECODED_BYTES;
 pub use op_core::doc::{MAX_LAYER_NAME_CHARS, MAX_LAYERS};
 /// The `DocState::metadata` key that holds the app's kept image metadata
 /// (EXIF, XMP and IPTC as the Mac app holds them, as text). The writer puts
@@ -420,13 +420,6 @@ fn plan_save(doc: &DocState) -> Result<SavePlan> {
             doc.layers.len()
         )));
     }
-    let masks = u64::from(matches!(doc.selection, SelectionState::Active(_)));
-    if (doc.layers.len() as u64 + masks).saturating_mul(raw) > MAX_DECODED_BYTES {
-        return Err(invalid(format!(
-            "the image's layers hold more than {} GiB of pixels, the most an .opaint file can hold",
-            MAX_DECODED_BYTES >> 30
-        )));
-    }
     if let Some(l) = doc
         .layers
         .iter()
@@ -473,6 +466,22 @@ fn plan_save(doc: &DocState) -> Result<SavePlan> {
         return Err(invalid(format!(
             "the layer list would need {} bytes; an .opaint file holds at most {MAX_STACK_XML}",
             xml.len()
+        )));
+    }
+    // Fix round 2, item 7: the mask counts only when the file stores one
+    // (a coverage selection, or a shape too long for stack.xml), as the
+    // reader counts it.
+    let masks = u64::from(
+        selection_as_mask
+            || matches!(
+                doc.selection,
+                SelectionState::Active(SelectionSource::Coverage(_))
+            ),
+    );
+    if (doc.layers.len() as u64 + masks).saturating_mul(raw) > MAX_DECODED_BYTES {
+        return Err(invalid(format!(
+            "the image's layers hold more than {} GiB of pixels, the most an .opaint file can hold",
+            MAX_DECODED_BYTES >> 30
         )));
     }
     Ok(SavePlan {
@@ -665,7 +674,7 @@ fn load_opaint_from_reader<R: Read + std::io::Seek>(
     let dpi: f64 = parse_required(&root, "op:dpi")?;
     let mut doc = DocState::new(store, width, height, dpi).map_err(other)?;
     for i in 1..layers.len() {
-        doc = doc.add_layer(i, "").map_err(other)?;
+        doc = doc.add_layer_unbudgeted(i, "").map_err(other)?;
     }
     let mut ids = HashSet::new();
     for (i, attrs) in layers.iter().enumerate() {
@@ -1075,6 +1084,35 @@ fn thumbnail(merged: &DecodedImage) -> DecodedImage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Fix round 2, item 7: the writer counts a selection mask only when the
+    /// file stores one, as the reader does. 16 layers of 16384 x 16384 fill
+    /// the 16 GiB exactly; a shape selection (kept as its outline) still
+    /// saves, a coverage selection (a stored mask) does not.
+    #[test]
+    fn the_writer_counts_a_mask_only_when_the_file_stores_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let mut doc = DocState::new(store, 16384, 16384, 72.0).unwrap();
+        for i in 1..16 {
+            doc = doc.add_layer_unbudgeted(i, "").unwrap();
+        }
+        assert!(plan_save(&doc).is_ok(), "no selection");
+        let shape = doc.set_selection(SelectionState::Active(SelectionSource::Geometry(Arc::new(
+            PolygonSet::rectangle(1.0, 1.0, 10.0, 10.0),
+        ))));
+        assert!(
+            plan_save(&shape).is_ok(),
+            "a shape selection stores no mask"
+        );
+        let mask = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
+            MaskGrid::new(16384, 16384, vec![0; 16384 * 16384]).unwrap(),
+        ))));
+        let err = plan_save(&mask)
+            .err()
+            .expect("a stored mask is past the total");
+        assert!(err.to_string().contains("16 GiB"), "{err}");
+    }
 
     #[test]
     fn failed_and_interrupted_save_preserve_target() {

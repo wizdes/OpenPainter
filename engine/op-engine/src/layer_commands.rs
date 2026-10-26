@@ -203,7 +203,7 @@ pub(super) fn specs() -> Vec<CommandSpec> {
         CommandSpec {
             id: "layer.duplicate",
             params: none(),
-            enabled: always,
+            enabled: |s| s.can_add_layer(),
             run: duplicate,
             previewable: false,
         },

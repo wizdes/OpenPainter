@@ -107,6 +107,14 @@ public final class TextToolController: TextInputHost {
         end()
     }
 
+    /// Fix round 2, item 6: ends editing without an engine command, after
+    /// the engine itself dropped the session (Revert).
+    public func abandon() {
+        guard isEditing else { return }
+        input.inputContext?.discardMarkedText()
+        end()
+    }
+
     /// Drops the text: the image and its history stay as they were.
     public func cancel() {
         guard isEditing, let editor else { return }

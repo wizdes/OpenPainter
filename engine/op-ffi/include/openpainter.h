@@ -517,8 +517,9 @@ enum OpStatus op_gpu_pipeline_counts(struct OpPipelineCounts *out);
 
 /**
  * Turns on recovery records for `doc`. `json`: `{"dir":"<root>/<doc-uuid>",
- * "original_url":"file:///x.opaint"|null, "settle_ms":30000,
- * "max_interval_ms":120000}`. Calling it again only updates `original_url`.
+ * "original_url":"file:///x.opaint"|null, "original_type":"public.png"|null,
+ * "settle_ms":30000, "max_interval_ms":120000}`. Calling it again only
+ * updates `original_url` and `original_type`.
  */
 enum OpStatus op_recovery_attach(struct OpEngine *p,
                                  uint64_t doc,

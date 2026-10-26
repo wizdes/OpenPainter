@@ -14,6 +14,10 @@ public struct LoadedImage: @unchecked Sendable {
     public let notes: [String]
     /// The source's ImageIO type, or "public.png" for the engine's PNG reader.
     public let sourceType: String
+    /// Fix round 2, item 1: the file holds more than 8 bits per channel (a
+    /// 16-bit PNG or TIFF, a float or HDR image) and the document holds the
+    /// 8-bit conversion, so saving over the file would lose its depth.
+    public var reducedDepth = false
 }
 
 public enum DocumentLoaderError: Error, LocalizedError, Equatable {
@@ -40,6 +44,7 @@ public enum DocumentLoader {
         var metadata = ImageMetadata()
         var notes: [String] = []
         var type = "public.png"
+        var reducedDepth = false
         switch ImageFormats.route(for: url) {
         case .unsupported:
             throw DocumentLoaderError.unsupported(name)
@@ -47,6 +52,12 @@ public enum DocumentLoader {
             do { doc = try engine.openPNG(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
             // M50: the engine reads the pixels and pHYs; EXIF and XMP come from ImageIO.
             metadata = ImageIOImporter.metadata(url: url)
+            // Fix round 2, item 1: the engine converts a 16-bit PNG to 8 bits,
+            // and says so as the ImageIO route does.
+            if let depth = pngBitDepth(url), depth > 8 {
+                reducedDepth = true
+                notes.append("Converted from \(depth)-bit to 8 bits per channel (OpenPainter stores 8-bit).")
+            }
         case .native:
             do { doc = try engine.openOpaint(path: url.path) } catch { throw DocumentLoaderError.engine(name, "\(error)") }
             type = ImageFormats.opaintIdentifier
@@ -64,6 +75,7 @@ public enum DocumentLoader {
             metadata = image.metadata
             notes = image.notes
             type = image.sourceType
+            reducedDepth = image.sourceBitsPerComponent > 8 || notes.contains { $0.hasPrefix("HDR image") }
         }
         if type != ImageFormats.opaintIdentifier, !metadata.isEmpty {
             // Release review item 5: .opaint saves and recovery records keep it.
@@ -80,8 +92,22 @@ public enum DocumentLoader {
             try? doc.close()
             throw DocumentLoaderError.empty(name)
         }
-        return LoadedImage(document: doc, pixelSize: CGSize(width: w, height: h), metadata: metadata, notes: notes,
-                           sourceType: type)
+        var loaded = LoadedImage(document: doc, pixelSize: CGSize(width: w, height: h), metadata: metadata,
+                                 notes: notes, sourceType: type)
+        loaded.reducedDepth = reducedDepth
+        return loaded
+    }
+
+    /// The bit depth in a PNG file's header (IHDR, which must come first),
+    /// or nil when `url` is not a readable PNG.
+    public static func pngBitDepth(_ url: URL) -> Int? {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? h.close() }
+        guard let head = try? h.read(upToCount: 29), head.count == 29,
+              head.prefix(8) == Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+              head.subdata(in: 12..<16) == Data("IHDR".utf8)
+        else { return nil }
+        return Int(head[24])
     }
 
     /// The metadata an engine document keeps (from an .opaint file or a

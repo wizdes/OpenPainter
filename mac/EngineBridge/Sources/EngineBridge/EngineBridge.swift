@@ -15,6 +15,20 @@ public enum EngineError: Error, Equatable, Sendable {
     case cancelled
     case closed
 
+    /// The error for a JobFinished status name, such as "read_only".
+    public init?(name: String) {
+        switch name {
+        case "bad_argument": self = .badArgument
+        case "no_such_doc": self = .noSuchDoc
+        case "read_only": self = .readOnly
+        case "panic": self = .panic
+        case "busy": self = .busy
+        case "internal": self = .internal
+        case "cancelled": self = .cancelled
+        default: return nil
+        }
+    }
+
     init?(_ status: OpStatus) {
         switch status {
         case OP_OK: return nil
@@ -304,10 +318,43 @@ public final class Document: Sendable {
         return event
     }
 
+    /// Fix round 2, item 10: how many full `doc.info` reads ran in this
+    /// process (tests check that frequent checks use `isDirty()` instead).
+    public static var infoReads: Int { infoReadCount.load(ordering: .relaxed) }
+    private static let infoReadCount = Atomic<Int>(0)
+
     /// `doc.info`: size, layers, active layer, history, dirty and read_only flags.
     public func info() throws -> [String: Any] {
+        Self.infoReadCount.add(1, ordering: .relaxed)
         let data = try engine.query(doc: id, id: "doc.info", json: Data())
         return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
+    /// Fix round 2, item 10: `doc.dirty`, the edited flag alone (true while
+    /// the current step is not the saved one or an edit session is open).
+    /// Cheap enough for menu and toolbar validation.
+    public func isDirty() throws -> Bool {
+        let data = try engine.query(doc: id, id: "doc.dirty", json: Data())
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        return json["dirty"] as? Bool ?? false
+    }
+
+    /// Fix round 2, items 2 and 5: waits, without blocking the caller's
+    /// thread, until the engine ran every command queued before this call
+    /// (`doc.sync`). False when the engine did not answer in time.
+    public func settle(timeout: Duration = .seconds(600)) async -> Bool {
+        guard let ticket = try? dispatch("doc.sync") else { return false }
+        return await engine.result(of: ticket, timeout: timeout)?.status == "ok"
+    }
+
+    /// Fix round 2, item 5: `finishSessions()` as a queued command, awaited
+    /// without blocking the caller's thread. Throws the engine's error.
+    public func finishSessionsQueued(timeout: Duration = .seconds(600)) async throws {
+        let ticket = try dispatch("doc.finish_sessions")
+        guard let event = await engine.result(of: ticket, timeout: timeout) else { throw EngineError.busy }
+        guard event.status == "ok" else {
+            throw EngineError(name: event.status ?? "") ?? .internal
+        }
     }
 
     /// Any `op_query` on this document, decoded as JSON.

@@ -157,6 +157,13 @@ public final class FloodToolController {
         return true
     }
 
+    /// Fix round 2, item 6: forgets the open result without an engine
+    /// command, after the engine itself dropped it (Revert).
+    public func abandon() {
+        guard session != nil else { return }
+        end()
+    }
+
     /// Drops the open result. False when none is open.
     @discardableResult
     public func cancel() -> Bool {

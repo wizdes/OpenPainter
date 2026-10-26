@@ -25,6 +25,10 @@ pub enum DocError {
     Tile(#[from] TileError),
     #[error("an image can have at most {MAX_LAYERS} layers")]
     TooManyLayers,
+    #[error(
+        "the image would hold more than 16 GiB of pixels across its layers, the most an .opaint file can hold"
+    )]
+    TooManyPixels,
 }
 
 /// The most layers an image can have. The `.opaint` reader refuses files with
@@ -34,6 +38,22 @@ pub const MAX_LAYERS: usize = 1000;
 /// when a layer is made, renamed, duplicated or loaded, so a name can never
 /// make a file's `stack.xml` too large to read (release review item 3).
 pub const MAX_LAYER_NAME_CHARS: usize = 1024;
+
+/// The most decoded pixel bytes an `.opaint` file can hold: every layer plus
+/// the stored selection mask, at 4 bytes per pixel (release review item 12a).
+pub const MAX_DECODED_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+
+/// Fix round 2, item 7: the pixel total the engine lets an image reach.
+/// `layers` layers of `width` x `height` plus one slot kept for a selection
+/// mask must fit in `MAX_DECODED_BYTES`, so every image the engine makes can
+/// be saved and recovered whatever selection it gets later.
+pub fn check_pixel_budget(layers: usize, width: u32, height: u32) -> Result<()> {
+    let raw = u64::from(width) * u64::from(height) * 4;
+    if (layers as u64 + 1).saturating_mul(raw) > MAX_DECODED_BYTES {
+        return Err(DocError::TooManyPixels);
+    }
+    Ok(())
+}
 
 /// `name` cut to `MAX_LAYER_NAME_CHARS` characters.
 pub fn cap_layer_name(name: String) -> String {
@@ -278,6 +298,14 @@ impl DocState {
             store,
         })
     }
+    /// A new canvas size may not take the layers past the pixel total; a
+    /// size that adds no pixels (a rotation, a crop) always may.
+    fn check_new_size(&self, width: u32, height: u32) -> Result<()> {
+        if u64::from(width) * u64::from(height) <= u64::from(self.width) * u64::from(self.height) {
+            return Ok(());
+        }
+        check_pixel_budget(self.layers.len(), width, height)
+    }
     fn advanced(&self) -> Self {
         let mut next = self.clone();
         next.revision = self.revision.saturating_add(1);
@@ -358,6 +386,20 @@ impl DocState {
             .fetch_max(id.0.saturating_add(1), Ordering::Relaxed);
     }
     pub fn add_layer(&self, index: usize, name: impl Into<String>) -> Result<Self> {
+        check_pixel_budget(self.layers.len() + 1, self.width, self.height)?;
+        self.add_layer_unbudgeted(index, name)
+    }
+    /// True when one more layer is allowed (the layer count and the pixel
+    /// total): Add New Layer, Duplicate Layer and Import from File are off
+    /// otherwise (fix round 2, item 8).
+    pub fn can_add_layer(&self) -> bool {
+        self.layers.len() < MAX_LAYERS
+            && check_pixel_budget(self.layers.len() + 1, self.width, self.height).is_ok()
+    }
+    /// `add_layer` without the pixel total check, for a file reader that
+    /// checked the file's own limit (an `.opaint` file may fill all 16 GiB
+    /// when it stores no selection mask).
+    pub fn add_layer_unbudgeted(&self, index: usize, name: impl Into<String>) -> Result<Self> {
         if index > self.layers.len() {
             return Err(DocError::LayerIndex);
         }
@@ -412,6 +454,7 @@ impl DocState {
         if self.layers.len() >= MAX_LAYERS {
             return Err(DocError::TooManyLayers);
         }
+        check_pixel_budget(self.layers.len() + 1, self.width, self.height)?;
         let mut next = self.advanced();
         layer.id = LayerId(
             self.next_layer_id
@@ -487,6 +530,7 @@ impl DocState {
         if width == 0 || height == 0 {
             return Err(DocError::Dimensions);
         }
+        self.check_new_size(width, height)?;
         let max_x = (width as u64).div_ceil(TILE_SIZE as u64);
         let max_y = (height as u64).div_ceil(TILE_SIZE as u64);
         let mut next = self.advanced();
@@ -554,6 +598,7 @@ impl DocState {
         if width == 0 || height == 0 {
             return Err(DocError::Dimensions);
         }
+        self.check_new_size(width, height)?;
         let mut next = self.advanced();
         next.width = width;
         next.height = height;

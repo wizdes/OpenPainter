@@ -73,6 +73,19 @@ public enum ImageFormats {
         return ids.contains(type) ? .imageIO(type) : .unsupported
     }
 
+    /// Fix round 2, items 1 and 3: true when the file at `url` holds more
+    /// than 8 bits per channel (a 16-bit PNG or TIFF, a float image), read
+    /// from its header only. OpenPainter keeps 8 bits, so it never saves
+    /// over such a file without asking where.
+    public static func holdsMoreThan8Bits(_ url: URL) -> Bool {
+        if let depth = DocumentLoader.pngBitDepth(url) { return depth > 8 }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
+        else { return false }
+        let depth = (props[kCGImagePropertyDepth as String] as? NSNumber)?.intValue ?? 8
+        return depth > 8 || (props[kCGImagePropertyIsFloat as String] as? Bool ?? false)
+    }
+
     /// A short list of what opens, for messages.
     public static let openSummary = "OpenPainter (.opaint), PNG, JPEG, BMP, GIF, TIFF, WebP, HEIC, HEIF, AVIF and Camera RAW"
 }

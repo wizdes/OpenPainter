@@ -19,6 +19,9 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
     public internal(set) var commandButtons: [String: ShellButton] = [:]
     /// The seven command buttons, then More, left to right.
     public internal(set) var commandBarButtons: [ShellButton] = []
+    /// How many times the command bar re-read its enabled states (tests;
+    /// fix round 2, item 10).
+    public internal(set) var commandBarRefreshes = 0
     /// Opens the menu with the other commands (CommandBar.swift).
     public internal(set) var moreButton: ShellButton!
     /// Sends a command button's or More item's action (tests record it).
@@ -90,6 +93,21 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate,
         if textTool.isEditing, !textTool.model.text.isEmpty { textTool.finish() }
         if moveTool.hasChanges { moveTool.finish() }
         flood.finish()
+    }
+
+    /// Fix round 2, item 6: Revert replaced the image and the engine dropped
+    /// every open session, so the text box, the move and the live fill end
+    /// here too, without sending anything (there is nothing left to end).
+    public func abandonToolSessions() {
+        textTool.abandon()
+        moveTool.abandon()
+        flood.abandon()
+    }
+
+    /// Fix round 2, item 2: sends a move's last transform now (drags send
+    /// once per run-loop turn), so Close and Quit see it.
+    public func flushToolUpdates() {
+        moveTool.flush()
     }
 
     /// Shows the window, the panels, and fits the image into the clear area.

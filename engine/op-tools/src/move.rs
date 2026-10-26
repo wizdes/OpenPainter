@@ -186,12 +186,12 @@ impl MoveSession {
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
     }
-    /// True for a paste session.
     /// True when finishing would change the image or the selection: pasted
     /// pixels, a transform other than identity, or a copy.
     pub fn has_changes(&self) -> bool {
         self.float.is_some() || self.options.transform != Affine::identity() || self.options.copy
     }
+    /// True for a paste session.
     pub fn is_paste(&self) -> bool {
         self.float.is_some()
     }

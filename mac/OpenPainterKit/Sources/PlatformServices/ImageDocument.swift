@@ -54,6 +54,14 @@ open class ImageDocument: NSDocument, EditorHost {
     nonisolated(unsafe) public private(set) var metadata = ImageMetadata()
     /// Status-bar notes from the import, such as a 16-bit to 8-bit conversion.
     nonisolated(unsafe) private var importNotes: [String] = []
+    /// Fix round 2, item 3: the type of the opened file's content (from its
+    /// bytes, not its name), kept in the recovery record.
+    nonisolated(unsafe) public private(set) var contentType: String?
+    /// Fix round 2, items 1 and 3: plain Save would write over a file that
+    /// holds more than OpenPainter can write back (a 16-bit PNG, Camera RAW
+    /// named .png, HEIF, PSD), so Save asks where to save, as Save As does,
+    /// until the image has been saved to a file it can write.
+    nonisolated(unsafe) public private(set) var saveNeedsNewFile = false
     public private(set) var editor: Editor?
     private var pendingSaveDone: (@MainActor (Bool) -> Void)?
     /// M50: options chosen on the sheet for this image, per format.
@@ -151,6 +159,8 @@ open class ImageDocument: NSDocument, EditorHost {
             }
         } else {
             engineDocument = loaded.document
+            contentType = loaded.sourceType
+            saveNeedsNewFile = loaded.reducedDepth || !ImageFormats.saveTypes().contains(loaded.sourceType)
             startRecovery(originalURL: url)
         }
         pixelSize = loaded.pixelSize
@@ -161,9 +171,11 @@ open class ImageDocument: NSDocument, EditorHost {
     /// Revert to Saved: reads the file into the open engine document, then
     /// refreshes the window, panels and marks at once.
     override open func revert(toContentsOf url: URL, ofType typeName: String) throws {
-        // Release review item 1: open tools end first, so none is left
-        // pointing at a session the reverted image no longer has.
-        MainActor.assumeIsolated { finishOpenSessions() }
+        // Release review item 1, fix round 2 items 5 and 6: Revert drops
+        // every open session in the engine, so the tools drop theirs too
+        // (no engine call, no wait); none is left pointing at a session the
+        // reverted image no longer has.
+        MainActor.assumeIsolated { editor?.windowController?.abandonToolSessions() }
         try super.revert(toContentsOf: url, ofType: typeName)
         MainActor.assumeIsolated {
             if let editor { editor.name = displayName }
@@ -177,10 +189,12 @@ open class ImageDocument: NSDocument, EditorHost {
     /// engine also reports dirty while a tool session that changes the image
     /// is open (text, paste or move, a live Magic Wand or Paint Bucket).
     /// A closed document (no engine document) has nothing left to save.
+    /// Fix round 2, item 10: `doc.dirty` reads the flag alone (menu and
+    /// toolbar validation ask often), not the whole `doc.info`.
     override open var isDocumentEdited: Bool {
         guard let doc = engineDocument else { return false }
-        guard let info = try? doc.info() else { return super.isDocumentEdited }
-        return info["dirty"] as? Bool ?? false
+        guard let dirty = try? doc.isDirty() else { return super.isDocumentEdited }
+        return dirty
     }
 
     /// Brings NSDocument's change count, the window's edited dot and the
@@ -194,17 +208,44 @@ open class ImageDocument: NSDocument, EditorHost {
     /// Release review item 1: finishes every open tool session (each as its
     /// own history step) so a save writes what the screen shows. The tools
     /// end first; then the engine finishes any session they do not own
-    /// (line, shape, gradient) and waits for the commands they sent.
+    /// (line, shape, gradient) after the commands they sent. Fix round 2,
+    /// item 5: the engine does this as a queued command and `done` runs when
+    /// it answered, so the main thread never waits behind queued work (a
+    /// large fill). `done(false)`: the sessions could not be finished, and
+    /// the status bar says why.
     @MainActor
-    public func finishOpenSessions() {
+    public func finishOpenSessions(_ done: @escaping @MainActor (Bool) -> Void) {
         editor?.windowController?.finishToolSessions()
-        guard let doc = engineDocument else { return }
-        do {
-            try doc.finishSessions()
-        } catch {
-            editor?.report("The open tool could not be finished: \(error).")
+        guard let doc = engineDocument else { return done(true) }
+        let reply = MainReply<(any Error)?>(main: { [weak self] error in
+            if let error { self?.editor?.report("The open tool could not be finished: \(error).") }
+            self?.syncEditedState()
+            done(error == nil)
+        })
+        Task.detached {
+            do {
+                try await doc.finishSessionsQueued()
+                reply.send(nil)
+            } catch {
+                reply.send(error)
+            }
         }
-        syncEditedState()
+    }
+
+    /// Fix round 2, item 2: runs `done` once the engine ran everything
+    /// queued so far (a text update or a fill posted just before), so the
+    /// edited state read afterwards is current. It never blocks the main
+    /// thread.
+    @MainActor
+    public func afterQueuedWork(_ done: @escaping @MainActor () -> Void) {
+        editor?.windowController?.flushToolUpdates()
+        guard let doc = engineDocument else { return done() }
+        let reply = MainReply<Bool>(main: { [weak self] ok in
+            if !ok { self?.editor?.report("The image did not answer in time; its unsaved state may be out of date.") }
+            self?.syncEditedState()
+            done()
+        })
+        Task.detached { reply.send(await doc.settle()) }
     }
 
     // MARK: Save, Save As, Save a Copy
@@ -218,13 +259,22 @@ open class ImageDocument: NSDocument, EditorHost {
     }
 
     /// Save on an untitled image or on a format OpenPainter cannot write (such
-    /// as Camera RAW) asks where to save, as Save As does.
+    /// as Camera RAW) asks where to save, as Save As does. Fix round 2, items
+    /// 1 and 3: so does Save on an image whose file holds more than
+    /// OpenPainter writes back (16 bits per channel) or whose content is a
+    /// type it cannot write, whatever the file's name says.
     override open func save(_ sender: Any?) {
-        if fileURL != nil, let type = fileType, !ImageFormats.saveTypes().contains(type) {
+        if fileURL != nil, !plainSaveAllowed {
             saveAs(sender)
             return
         }
         super.save(sender)
+    }
+
+    /// True when Save may write the image back to its own file.
+    public var plainSaveAllowed: Bool {
+        guard let type = fileType, ImageFormats.saveTypes().contains(type) else { return false }
+        return !saveNeedsNewFile
     }
 
     /// The layer count now (1 when unknown).
@@ -285,6 +335,11 @@ open class ImageDocument: NSDocument, EditorHost {
                         self.editor?.report("The image was saved, but could not be marked as saved: \(error).")
                     }
                 }
+                if error == nil, saveOperation == .saveAsOperation, let self {
+                    // The image now has a file it writes in full.
+                    self.saveNeedsNewFile = false
+                    self.contentType = typeName
+                }
                 self?.afterSave()
                 // M57: a failed save says why in the status bar too; the
                 // image and its history stay as they were.
@@ -293,12 +348,36 @@ open class ImageDocument: NSDocument, EditorHost {
             completionHandler(error)
         }
         // Release review item 1: Save, Save As, Save a Copy and the Save of
-        // Close and Quit write what the screen shows.
-        MainActor.assumeIsolated { finishOpenSessions() }
-        let type = ImageFormats.saveTypes().contains(typeName)
-            ? typeName : (ImageFormats.saveType(forExtension: url.pathExtension) ?? typeName)
+        // Close and Quit write what the screen shows. Fix round 2, item 5:
+        // the save goes on when the engine finished them, without blocking
+        // the main thread meanwhile.
         let fromUI = saveFromUI
         saveFromUI = false
+        MainActor.assumeIsolated {
+            finishOpenSessions { [weak self] ok in
+                guard let self else { return completionHandler(CocoaError(.userCancelled)) }
+                guard ok else {
+                    let error = NSError(domain: "OpenPainter", code: 4, userInfo: [
+                        NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” could not be saved.",
+                        NSLocalizedFailureReasonErrorKey: "The open tool could not be finished.",
+                        NSLocalizedRecoverySuggestionErrorKey: "Your changes are still open. The last saved file was not changed.",
+                    ])
+                    self.reportSaveFailure(error)
+                    return completionHandler(error)
+                }
+                self.continueSave(to: url, ofType: typeName, for: saveOperation, fromUI: fromUI,
+                                  finish: finish, completionHandler: completionHandler)
+            }
+        }
+    }
+
+    /// The rest of a save once the open sessions are finished: the options
+    /// sheet, the flatten prompt, then AppKit's save.
+    private func continueSave(to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType,
+                              fromUI: Bool, finish: @escaping ((any Error)?) -> Void,
+                              completionHandler: @escaping ((any Error)?) -> Void) {
+        let type = ImageFormats.saveTypes().contains(typeName)
+            ? typeName : (ImageFormats.saveType(forExtension: url.pathExtension) ?? typeName)
         let flattenThenSave = { [weak self] in
             guard let self else { return }
             guard ImageFormats.isFlat(type), self.layerCount > 1, saveOperation != .autosaveElsewhereOperation,
@@ -354,8 +433,48 @@ open class ImageDocument: NSDocument, EditorHost {
         syncEditedState()
         // M57: the next recovery record names the file the image now has.
         if let dir = recoveryDir, let doc = engineDocument {
-            try? doc.attachRecovery(dir: dir, originalURL: fileURL, timing: RecoveryCenter.timing)
+            do {
+                try doc.attachRecovery(dir: dir, originalURL: fileURL, originalType: contentType ?? fileType,
+                                       timing: RecoveryCenter.timing)
+            } catch {
+                editor?.report("The recovery copy could not be pointed at the saved file (\(error)).")
+            }
         }
+    }
+
+    /// Fix round 2, item 13: AppKit's safe save cannot replace a file that
+    /// is a symbolic link ("The file doesn't exist"), so a save through a
+    /// link writes the file the link points at itself. The link stays a
+    /// link, the target keeps its permissions, and the document keeps the
+    /// link as its file.
+    override open func writeSafely(to url: URL, ofType typeName: String,
+                                   for saveOperation: NSDocument.SaveOperationType) throws {
+        let target = Self.saveTarget(url)
+        guard target != url else {
+            return try super.writeSafely(to: url, ofType: typeName, for: saveOperation)
+        }
+        // The writers replace the target in one step (a temporary file
+        // renamed over it); its permissions are put back afterwards.
+        let fm = FileManager.default
+        let mode = try? fm.attributesOfItem(atPath: target.path)[.posixPermissions]
+        try write(to: target, ofType: typeName, for: saveOperation, originalContentsURL: target)
+        if let mode {
+            do {
+                try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: target.path)
+            } catch {
+                MainActor.assumeIsolated {
+                    editor?.report("The file was saved, but its permissions could not be kept (\(error)).")
+                }
+            }
+        }
+    }
+
+    /// `url` itself, or the file at the end of its symbolic links when it is one.
+    static func saveTarget(_ url: URL) -> URL {
+        guard url.isFileURL, (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil else {
+            return url
+        }
+        return url.resolvingSymlinksInPath()
     }
 
     override open func write(to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType,
@@ -422,7 +541,8 @@ open class ImageDocument: NSDocument, EditorHost {
         guard let root = RecoveryCenter.root, let doc = engineDocument else { return false }
         let dir = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
         do {
-            try doc.attachRecovery(dir: dir, originalURL: recoveryOriginal ?? fileURL, timing: RecoveryCenter.timing,
+            try doc.attachRecovery(dir: dir, originalURL: recoveryOriginal ?? fileURL,
+                                   originalType: contentType ?? fileType, timing: RecoveryCenter.timing,
                                    testFailAfterBytes: RecoveryCenter.testFailAfterBytes)
             recoveryDir = dir
             recoveryStartError = nil
@@ -523,11 +643,18 @@ open class ImageDocument: NSDocument, EditorHost {
         metadata = DocumentLoader.keptMetadata(opened)
         if !untitled, let url = record.originalURL, url.isFileURL {
             fileURL = url
-            // Release review item 2: a file OpenPainter cannot write (Camera
-            // RAW, HEIF, PSD, ...) keeps its own type, as when it is opened,
-            // so Save becomes Save As and the original is never written.
-            fileType = ImageFormats.saveType(forExtension: url.pathExtension)
-                ?? UTType(filenameExtension: url.pathExtension)?.identifier ?? "public.data"
+            // Release review item 2, fix round 2 item 3: the type is the one
+            // detected from the file's content when it was opened, never one
+            // guessed from its name (a Camera RAW file named .png). A type
+            // OpenPainter cannot write (Camera RAW, HEIF, PSD, ...), no kept
+            // type (an older record), or a file deeper than 8 bits per
+            // channel makes Save ask where to save, so the original is never
+            // written over.
+            let kept = record.originalType
+            fileType = kept ?? UTType(filenameExtension: url.pathExtension)?.identifier ?? "public.data"
+            contentType = kept
+            saveNeedsNewFile = kept.map { !ImageFormats.saveTypes().contains($0) } ?? true
+                || ImageFormats.holdsMoreThan8Bits(url)
         } else {
             fileType = ImageFormats.opaintIdentifier
         }
@@ -566,6 +693,16 @@ open class ImageDocument: NSDocument, EditorHost {
     /// `done(true)` when the document may close.
     @MainActor
     public func reviewUnsaved(_ done: @escaping @MainActor (Bool) -> Void) {
+        // Fix round 2, item 2: decide once the engine ran what was queued
+        // (a text update or a fill sent just before Close).
+        afterQueuedWork { [weak self] in
+            guard let self else { return done(true) }
+            self.reviewSettled(done)
+        }
+    }
+
+    @MainActor
+    private func reviewSettled(_ done: @escaping @MainActor (Bool) -> Void) {
         guard isDocumentEdited else {
             done(true)
             return
@@ -582,7 +719,7 @@ open class ImageDocument: NSDocument, EditorHost {
 
     @MainActor
     private func saveBeforeClosing(_ done: @escaping @MainActor (Bool) -> Void) {
-        if let url = fileURL, let type = fileType, ImageFormats.saveTypes().contains(type) {
+        if let url = fileURL, let type = fileType, plainSaveAllowed {
             save(to: url, ofType: type, for: .saveOperation) { [weak self] error in
                 MainActor.assumeIsolated {
                     if let error, !Self.isUserCancelled(error) { self?.showError(error) }
@@ -766,6 +903,25 @@ open class ImageDocument: NSDocument, EditorHost {
     }
 }
 
+/// Fix round 2, items 2 and 5: hands an engine answer, awaited off the main
+/// thread, back to the main thread as a run-loop block. A run-loop block
+/// also runs inside a nested run loop (a sheet, a tracking loop or a test
+/// that spins the run loop), where a main-actor task would wait.
+final class MainReply<Value>: @unchecked Sendable {
+    private let main: @MainActor (Value) -> Void
+
+    init(main: @escaping @MainActor (Value) -> Void) {
+        self.main = main
+    }
+
+    func send(_ value: Value) {
+        let main = main
+        nonisolated(unsafe) let value = value
+        RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { main(value) } }
+        CFRunLoopWakeUp(CFRunLoopGetMain())
+    }
+}
+
 /// The app's document controller: File > New shows the New Image dialog, and
 /// Quit reviews each image with unsaved work in turn (Save, Don't Save,
 /// Cancel). Cancel stops the quit and keeps the app and that window open.
@@ -838,9 +994,26 @@ open class ImageDocumentController: NSDocumentController {
     @MainActor
     public static func reviewUnsaved(_ documents: [NSDocument], controller: NSDocumentController, delegate: Any?,
                                      didReviewAllSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
-        let edited = documents.compactMap { $0 as? ImageDocument }.filter(\.isDocumentEdited)
-        review(edited) { ok in
-            callDidReviewAll(delegate, didReviewAllSelector, controller, ok, contextInfo)
+        // Fix round 2, item 2: each image's queued work runs first, so an
+        // edit sent just before Quit counts.
+        settle(documents.compactMap { $0 as? ImageDocument }) { images in
+            let edited = images.filter(\.isDocumentEdited)
+            review(edited) { ok in
+                callDidReviewAll(delegate, didReviewAllSelector, controller, ok, contextInfo)
+            }
+        }
+    }
+
+    /// Calls `done` with `docs` once each one's queued engine work ran.
+    @MainActor
+    static func settle(_ docs: [ImageDocument], _ done: @escaping @MainActor ([ImageDocument]) -> Void) {
+        var left = docs.count
+        guard left > 0 else { return done(docs) }
+        for d in docs {
+            d.afterQueuedWork {
+                left -= 1
+                if left == 0 { done(docs) }
+            }
         }
     }
 

@@ -154,7 +154,7 @@ pub(super) fn specs() -> Vec<CommandSpec> {
                 default: None,
             }],
         },
-        enabled: always,
+        enabled: |s| s.can_add_layer(),
         run: import_from_file,
         previewable: false,
     }))

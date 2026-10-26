@@ -98,6 +98,11 @@ pub struct Manifest {
     pub revision: u64,
     /// The file the document was opened from or last saved to, if any.
     pub original_url: Option<String>,
+    /// The app's type for that file's content, as detected when it was
+    /// opened (such as "com.adobe.raw-image" for a RAW file named .png), so
+    /// Recover never picks a type from the file name (fix round 2, item 3).
+    #[serde(default)]
+    pub original_type: Option<String>,
     /// Seconds since 1970 when the record was committed.
     pub time_unix: f64,
     /// The snapshot's file name in the record folder.
@@ -154,6 +159,7 @@ impl RecordInfo {
             "problem": self.problem,
             "revision": m.map(|m| m.revision),
             "original_url": m.and_then(|m| m.original_url.clone()),
+            "original_type": m.and_then(|m| m.original_type.clone()),
             "time_unix": m.map(|m| m.time_unix),
             "width": m.map(|m| m.width),
             "height": m.map(|m| m.height),
@@ -283,6 +289,7 @@ fn write_temp(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<PathBuf> 
 #[derive(Default)]
 pub(crate) struct Shared {
     original: Option<String>,
+    original_type: Option<String>,
     base: Option<FileStamp>,
     /// True while a record's manifest is in the folder.
     on_disk: bool,
@@ -362,6 +369,7 @@ fn write_record(
         format: FORMAT,
         revision,
         original_url: guard.original.clone(),
+        original_type: guard.original_type.clone(),
         time_unix: now_unix(),
         snapshot: name.clone(),
         snapshot_bytes: bytes,
@@ -778,7 +786,7 @@ enum Ctl {
     /// A clean save happened: take the file's stamp again and delete the record.
     Saved,
     /// The document's file changed (Save As): its URL and stamp.
-    SetOriginal(Option<String>, Option<FileStamp>),
+    SetOriginal(Option<String>, Option<String>, Option<FileStamp>),
     /// Stop. `delete`: a clean close; `tomb` is where close already moved
     /// the folder (deleted here), or None to delete it from its own path.
     Stop { delete: bool, tomb: Option<PathBuf> },
@@ -1030,9 +1038,10 @@ impl WriterState {
                     let _ = reply.send(self.write_now());
                 }
                 Ok(Ctl::Saved) => self.saved(),
-                Ok(Ctl::SetOriginal(url, base)) => {
+                Ok(Ctl::SetOriginal(url, kind, base)) => {
                     let mut shared = self.shared.lock();
                     shared.original = url;
+                    shared.original_type = kind;
                     shared.base = base;
                 }
                 Ok(Ctl::Stop { delete, tomb }) => {
@@ -1145,15 +1154,29 @@ impl Engine {
         original_url: Option<String>,
         options: RecoveryOptions,
     ) -> Result<()> {
+        self.recovery_attach_typed(doc, dir, original_url, None, options)
+    }
+
+    /// `recovery_attach` with the content type of the original file (fix
+    /// round 2, item 3); records keep it as `original_type`.
+    pub fn recovery_attach_typed(
+        &self,
+        doc: u64,
+        dir: impl AsRef<Path>,
+        original_url: Option<String>,
+        original_type: Option<String>,
+        options: RecoveryOptions,
+    ) -> Result<()> {
         let base = stamp_of(original_url.as_deref());
-        self.recovery_attach_impl(doc, dir.as_ref(), original_url, base, options, false)
+        let original = (original_url, original_type);
+        self.recovery_attach_impl(doc, dir.as_ref(), original, base, options, false)
     }
 
     fn recovery_attach_impl(
         &self,
         doc: u64,
         dir: &Path,
-        original_url: Option<String>,
+        (original_url, original_type): (Option<String>, Option<String>),
         base: Option<FileStamp>,
         options: RecoveryOptions,
         adopt: bool,
@@ -1167,7 +1190,8 @@ impl Engine {
                 ));
             }
             // Applied by the writer, so this never waits for a record write.
-            let _ = w.tx.send(Ctl::SetOriginal(original_url, base));
+            let _ =
+                w.tx.send(Ctl::SetOriginal(original_url, original_type, base));
             return Ok(());
         }
         // A scan may hold the folder for a moment; wait for it.
@@ -1184,6 +1208,7 @@ impl Engine {
         let saves = Arc::new(AtomicU64::new(0));
         let shared = Arc::new(Mutex::new(Shared {
             original: original_url,
+            original_type,
             base,
             on_disk,
         }));
@@ -1244,7 +1269,10 @@ impl Engine {
             self.recovery_attach_impl(
                 doc,
                 dir,
-                manifest.original_url.clone(),
+                (
+                    manifest.original_url.clone(),
+                    manifest.original_type.clone(),
+                ),
                 manifest.base_file,
                 options,
                 true,
@@ -1340,7 +1368,7 @@ impl Engine {
         let doc = self.open_opaint(dir.join(&manifest.snapshot))?;
         let opened = (|| {
             self.mark_unsaved(doc)?;
-            self.recovery_attach_impl(doc, dir, None, None, options, true)
+            self.recovery_attach_impl(doc, dir, (None, None), None, options, true)
         })();
         if let Err(e) = opened {
             let _ = self.close(doc);

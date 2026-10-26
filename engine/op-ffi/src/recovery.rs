@@ -32,8 +32,9 @@ fn dir_arg(params: &Value) -> Result<String, OpStatus> {
 }
 
 /// Turns on recovery records for `doc`. `json`: `{"dir":"<root>/<doc-uuid>",
-/// "original_url":"file:///x.opaint"|null, "settle_ms":30000,
-/// "max_interval_ms":120000}`. Calling it again only updates `original_url`.
+/// "original_url":"file:///x.opaint"|null, "original_type":"public.png"|null,
+/// "settle_ms":30000, "max_interval_ms":120000}`. Calling it again only
+/// updates `original_url` and `original_type`.
 #[unsafe(no_mangle)]
 pub extern "C" fn op_recovery_attach(
     p: *mut OpEngine,
@@ -58,7 +59,14 @@ pub extern "C" fn op_recovery_attach(
             .get("original_url")
             .and_then(Value::as_str)
             .map(str::to_owned);
-        match e.core().recovery_attach(doc, dir, url, options(&params)) {
+        let kind = params
+            .get("original_type")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        match e
+            .core()
+            .recovery_attach_typed(doc, dir, url, kind, options(&params))
+        {
             Ok(()) => OpStatus::OP_OK,
             Err(x) => status(x),
         }

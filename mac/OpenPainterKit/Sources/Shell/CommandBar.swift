@@ -107,12 +107,23 @@ extension EditorWindowController {
         stack.addArrangedSubview(line)
         commandBarButtons = buttons
         optionsBar.commandBar = stack
+        // Fix round 2, item 10: the bar refreshes when its state can change
+        // (engine events and selection through the editor, the tool, the key
+        // window, a sheet), not after every event: a 200-event stroke reads
+        // nothing.
         workspace.tools.observe(self) { [weak self] in self?.refreshCommandBar() }
+        editor.observe(self) { [weak self] in self?.refreshCommandBar() }
         if let window {
-            // AppKit sends this after each event, as it does to validate toolbar items.
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didUpdateNotification, object: window, queue: .main
-            ) { [weak self] _ in MainActor.assumeIsolated { self?.refreshCommandBar() } }
+            let names: [Notification.Name] = [
+                NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                NSWindow.didBecomeMainNotification, NSWindow.willBeginSheetNotification,
+                NSWindow.didEndSheetNotification,
+            ]
+            for name in names {
+                NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refreshCommandBar() }
+                }
+            }
         }
         refreshCommandBar()
     }
@@ -149,6 +160,7 @@ extension EditorWindowController {
     /// Enabled states (the main menu's validation) and the Magic Wand's pressed state.
     func refreshCommandBar() {
         guard !commandBarButtons.isEmpty else { return }
+        commandBarRefreshes += 1
         let commands = Self.barCommands.flatMap { $0 }
         let menu = NSMenu()
         menu.autoenablesItems = true

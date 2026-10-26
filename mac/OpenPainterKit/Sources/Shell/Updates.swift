@@ -61,10 +61,19 @@ public final class UpdateMenuTarget: NSObject, UpdateMenuActions {
     public var present: (NSAlert) -> Void = { _ = $0.runModal() }
     private(set) var controller: SPUStandardUpdaterController?
 
+    /// Fix round 2, item 14: true inside an XCTest run. The updater never
+    /// starts there, so no test can reach the real feed over the network
+    /// (the tests that drive Sparkle make their own updater on a local feed).
+    public static let runningUnderTests: Bool = {
+        let env = ProcessInfo.processInfo.environment
+        return env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil
+            || env["XCTestSessionIdentifier"] != nil || NSClassFromString("XCTestCase") != nil
+    }()
+
     /// Starts Sparkle (scheduled checks) when the settings are complete. Does
-    /// nothing while the public key is empty. Safe to call twice.
+    /// nothing while the public key is empty, or under XCTest. Safe to call twice.
     public func startIfSetUp() {
-        guard settings.isSetUp, controller == nil else { return }
+        guard settings.isSetUp, controller == nil, !Self.runningUnderTests else { return }
         controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     }
 

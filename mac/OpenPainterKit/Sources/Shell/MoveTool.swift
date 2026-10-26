@@ -288,6 +288,15 @@ public final class MoveToolController: NSObject, CanvasPointerSink {
         return true
     }
 
+    /// Fix round 2, item 6: ends the session without an engine command,
+    /// after the engine itself dropped it (Revert).
+    public func abandon() {
+        guard active else { return }
+        endSession()
+        resetBox()
+        redraw()
+    }
+
     /// Drops the session: pixels, selection and history stay as they were.
     /// False when none was open.
     @discardableResult
