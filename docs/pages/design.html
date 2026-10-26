@@ -214,11 +214,11 @@ footer { color: var(--muted); font-size: 15px; margin-top: 40px; }
 
 <section>
   <h2>How "exactly right" is checked</h2>
-  <p class="col">Each image operation is tested against a known-correct result, at most 1 step out of 255 per color channel. The references come from three places. When they disagree, the first one in this list wins:</p>
+  <p class="col">Each image operation is tested against a known-correct result. Two outside reviews showed that one reference cannot serve every operation: paint.net 5 rewrote most effects, and its old integer math differs from modern float math. So every operation gets a row in a target table. The row says which paint.net version it copies, which reference proves it, and how close it must be (usually 1 step out of 255 per channel).</p>
   <div class="grid2">
-    <div class="card"><h3><span class="chip c-acc">1</span> Real paint.net 5.1</h3><p>Captures made on your Windows PC. The same input image and the same settings, saved as PNG. This is the gold standard.</p></div>
-    <div class="card"><h3><span class="chip c-acc">2</span> paint.net 3.36 source</h3><p>The MIT-licensed code. Ported line for line, so its own math becomes the check.</p></div>
-    <div class="card"><h3><span class="chip c-acc">3</span> Pinta's 126 test images</h3><p>Expected outputs that ship with Pinta (MIT), a long-lived paint.net clone.</p></div>
+    <div class="card"><h3><span class="chip c-acc">5.1</span> Real paint.net 5.1.12</h3><p>Pinned on your Windows PC. Captured outputs (saved PNGs, never screenshots) for every effect whose behavior changed in paint.net 5.</p></div>
+    <div class="card"><h3><span class="chip c-acc">3.36</span> The paint.net 3.36 code, actually run</h3><p>The MIT source compiled and run in a Linux VM, so ported effects are checked against the real old code, not against a copy of it.</p></div>
+    <div class="card"><h3><span class="chip c-acc">f64</span> Exact formulas</h3><p>Layer blending follows your float-math choice. It is checked against a 64-bit formula. Brushes, shapes and text are checked against reviewed images and geometry tests.</p></div>
     <div class="card"><h3><span class="chip c-gpu">GPU</span> CPU twin</h3><p>Every GPU shader is compared against its CPU version on Apple's GPU, and also on Linux with a software GPU, so it can never drift.</p></div>
   </div>
   <h3>Three test levels</h3>
@@ -273,6 +273,10 @@ footer { color: var(--muted); font-size: 15px; margin-top: 40px; }
       <li>Text uses Apple's CoreText; Windows and Linux get their own shaper later</li>
       <li>paint.net captures run on your Windows PC; if that fails, paint.net 3.36 source plus Pinta</li>
       <li>This Mac has 8 GB of RAM, so I run 2 builders at a time, not 3</li>
+      <li>Linux checks run in a small Linux VM on this Mac, not on the Linode server, which has 1 GB of RAM and runs your sites</li>
+      <li>The target is paint.net 5.1.12, pinned. 5.2's 8 new effects are not in version 1</li>
+      <li>Layer blending uses float math (your choice), as paint.net 5.2 does, not 3.36's integer rounding</li>
+      <li>The plan grew to 60 milestones and about 620 agent hours after the reviews</li>
     </ul></div>
   </div>
 </section>

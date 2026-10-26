@@ -35,7 +35,7 @@ h1 { font: 800 clamp(34px, 6vw, 54px)/1.02 var(--display); margin: 10px 0 12px; 
 h2 { font: 600 24px/1.2 var(--display); margin: 0 0 6px; text-wrap: balance; }
 .lede { font-size: 18px; color: var(--muted); max-width: 70ch; margin: 0; }
 .ask { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin-top: 16px; max-width: 75ch; }
-.strip { display: grid; grid-template-columns: repeat(50, 1fr); gap: 3px; margin: 26px 0 6px; }
+.strip { display: grid; grid-template-columns: repeat(60, 1fr); gap: 3px; margin: 26px 0 6px; }
 .strip i { aspect-ratio: 1; border-radius: 3px; background: var(--todo); display: block; }
 .strip i.done { background: var(--done); } .strip i.doing { background: var(--doing); }
 .strip i.cp { outline: 2px solid var(--fg); outline-offset: 1px; }
@@ -74,8 +74,8 @@ footer { color: var(--muted); font-size: 14.5px; margin-top: 36px; }
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">OpenPainter · build plan · updated 24 Oct 2026</div>
-  <h1>50 milestones to version 1.0</h1>
+  <div class="eyebrow">OpenPainter · build plan · revision 2</div>
+  <h1>60 milestones to version 1.0</h1>
   <p class="lede">Six phases, each with a bar a real user would notice. A checkpoint comes every five milestones: the full tests, the Linux run, the speed and size bars, an outside review, and an update page for you.</p>
   <div class="ask"><strong>What I need from you:</strong> nothing. Work continues with no stops. If you want a milestone moved, cut or added, say so and I will update this page.</div>
   <div class="strip" id="strip" aria-label="Progress, one cell per milestone"></div>
@@ -98,78 +98,88 @@ footer { color: var(--muted); font-size: 14.5px; margin-top: 36px; }
   <ul class="notin">
     <li>.pdn and PSD import</li><li>Layer masks, groups, adjustment layers</li><li>16-bit, float or HDR pixels; CMYK editing</li>
     <li>Animated GIF and WebP frames</li><li>A public plugin system, scripting, batch processing</li><li>Windows, Linux and iPad apps (the engine stays ready for them)</li>
-    <li>Printing, cloud sync, an App Store build</li><li>AI generative fill beyond content-aware fill and background removal</li>
+    <li>Printing, cloud sync, an App Store build</li><li>The 8 new effects in paint.net 5.2 (the target is the pinned 5.1.12)</li><li>AI generative fill beyond content-aware fill and background removal</li>
   </ul>
 </section>
 
-<footer>Source of truth: <code>docs/MILESTONES.md</code> in github.com/wizdes/OpenPainter. Hours are agent working hours; the total is about 300. With 2 builders at a time, that is roughly 150 to 180 hours of wall time.</footer>
+<footer>Source of truth: <code>docs/MILESTONES.md</code> in github.com/wizdes/OpenPainter. Hours are agent working hours; the total is about 620. Revision 2 grew from 50 milestones and 300 hours after two outside reviews found real gaps (see docs/reviews/step0-decisions.md). With 2 builders at a time, expect roughly 350 hours of wall time.</footer>
 </div>
 
 <script>
-const STATUS = {}; // e.g. {"M01":"done","M02":"doing"}
-const UPDATED = "24 Oct 2026";
+const STATUS = {"M01":"done"};
+const UPDATED = "24 Oct 2026, revision 2";
 const PHASES = [
-  { n: 1, name: "Foundations", bar: "The app opens a PNG and shows it with correct color, zoom and pan. The engine has layers, blend modes, unlimited undo and GPU results that match the CPU.", cps: ["CP1","CP2"] },
-  { n: 2, name: "Usable photo editor", bar: "Open a JPEG, HEIC or RAW photo. Crop at an aspect ratio and straighten, resize, run Levels and Curves, undo from History, and save with the color profile kept.", cps: ["CP3","CP4"] },
-  { n: 3, name: "Selections, painting, first effects", bar: "Everyday paint.net work: every selection tool, moving and rotating pixels, copy and paste, pen-pressure brushes, fills, gradients, and the common blur, sharpen, noise and stylize effects.", cps: ["CP5","CP6"] },
-  { n: 4, name: "Drawing tools, text, more effects", bar: "Every paint.net tool works, including text, lines and shapes that stay editable until Finish. Saving controls quality and metadata. Most of the Effects menu exists.", cps: ["CP7","CP8"] },
-  { n: 5, name: "Retouch and full parity", bar: "Healing brush, content-aware fill and remove background work. Every adjustment and effect is in paint.net's menu order and passes its accuracy check.", cps: ["CP9"] },
-  { n: 6, name: "Polish and release", bar: "A stranger downloads a signed app from GitHub, installs it, and edits photos day to day. The launch, size and accuracy bars are all met.", cps: ["CP10"] },
+  { n: 1, name: "Foundations", bar: "The app opens a PNG and shows it with correct color, zoom and pan. The engine has layers, the 14 blend modes, unlimited undo, live previews, and GPU results proven against the CPU on Mac and Linux." },
+  { n: 2, name: "Usable photo editor", bar: "Open a JPEG, HEIC or RAW photo. Crop at an aspect ratio and straighten, resize, run Levels, Curves and the other adjustments, undo from History, and save with the color profile kept. Unsaved work is never lost without a prompt." },
+  { n: 3, name: "Selections and moving pixels", bar: "Every selection tool, Magic Wand and Paint Bucket with live tolerance, moving and rotating pixels, copy and paste, and the common blurs." },
+  { n: 4, name: "Painting, drawing, more effects", bar: "Pen-pressure brushes, colors and palettes, gradients, clone and recolor, lines and shapes that stay editable until Finish, and most of the effects." },
+  { n: 5, name: "Text, all effects, retouch", bar: "The Text tool, every effect in paint.net 5.1.12's menus, healing brush, content-aware fill and remove background." },
+  { n: 6, name: "Polish and release", bar: "A stranger downloads a signed app from GitHub, installs it, and edits photos day to day. The launch, size and accuracy bars are all met." },
 ];
 // [id, phase, lane, star, hours, name, exit gate]
 const M = [
- ["M01",1,"E",0,4,"Repo and test harness","Fast tests pass on Mac and Linux; the harness rejects a 2/255 difference and accepts 1/255."],
- ["M02",1,"O",0,8,"Reference images and paint.net capture","One command on the Windows PC captures Gaussian blur and Invert on 3 images, or a written fallback."],
- ["M03",1,"E",0,4,"Pixel core","Ported pixel operations match paint.net 3.36 on 10,000 random pixels."],
- ["M04",1,"E",1,8,"Tiles and undo history","200 random edits on a 24 MP image, undo all: identical to the start. Jumping 50 steps under 200 ms."],
- ["M05",1,"E",1,6,"Layers and the 15 blend modes","Every mode at 5 opacities within ±1/255 of paint.net's math."],
- ["M06",1,"O",1,7,"GPU backend and GPU-vs-CPU checker","GPU layer blending matches the CPU on Apple GPU and on Linux."],
- ["M07",1,"E",0,5,"Engine to Swift bridge","A Swift test opens an image, adds a layer, inverts, undoes and reads pixels back, with no leaks."],
- ["M08",1,"U",0,4,"Main window design: 3 mockups","3 rendered mockups, two critiques, one picked and specified."],
- ["M09",1,"U",0,8,"App shell and Metal canvas","A 24 MP photo pans at 60 fps; zoom steps match paint.net."],
- ["M10",1,"E",1,7,"Color management","sRGB→P3→sRGB within ±1/255; an Adobe RGB photo matches Preview within ΔE 1."],
- ["M11",2,"U",0,6,"Open and save all formats","30 files per format round-trip; RAW from 3 camera makes; photo rotation honored."],
- ["M12",2,"E",0,4,"Layered .opaint file","20 layers round-trip exactly; 10,000 damaged files cause no crash."],
- ["M13",2,"U",0,6,"Main window and floating panels","F5–F8 toggle every panel; panel positions survive a relaunch."],
- ["M14",2,"U",0,6,"Layers and History panels","Make 3 layers, set a blend mode, jump back in History and redo; pixels match."],
- ["M15",2,"O",0,6,"Resize, canvas size, flip, rotate","Each resampling mode within ±1/255 of the references."],
- ["M16",2,"E",1,8,"Selection engine","All 5 selection modes correct on 50 random shape pairs; smooth edges within ±1/255."],
- ["M17",2,"U",0,7,"Crop tool and image dialogs","Crop at 3:2 with a 2.5° straighten gives the expected size."],
- ["M18",2,"O",0,6,"Adjustments, part 1","Auto-Level, B&W, Brightness/Contrast, Invert, Posterize, Sepia, Hue/Sat match references."],
- ["M19",2,"O",0,7,"Curves, Levels, Exposure, Highlights/Shadows","All four within ±1/255 of the references."],
- ["M20",2,"U",0,6,"Effect dialogs with live preview","Preview under 100 ms on 12 MP; Cancel changes nothing; Cmd+F repeats."],
- ["M21",3,"U",0,6,"Lasso, ellipse, rectangle select; Edit menu","Each tool in each of the 5 modes matches the engine."],
- ["M22",3,"E",1,7,"Magic Wand and Paint Bucket","Masks pixel-exact against paint.net 5.1 on 10 images × 4 tolerances."],
- ["M23",3,"E",1,8,"Move pixels and move selection","Rotate and scale within ±1/255; 100 drags undo as one step."],
- ["M24",3,"U",0,4,"Copy and paste","Paste from Preview keeps pixels and color profile; paste opens with handles."],
- ["M25",3,"O",0,7,"Blurs, part 1","7 blurs match references; Gaussian r=50 on 24 MP under 1 s."],
- ["M26",3,"U",0,6,"Colors window and Color Picker","A paint.net palette file loads its 96 colors; hex round-trips."],
- ["M27",3,"E",1,8,"Brushes with pen pressure","Recorded strokes replay to the reference; pen-to-screen under 16 ms."],
- ["M28",3,"E",0,6,"Gradient tool","5 gradient types × 2 modes within ±1/255."],
- ["M29",3,"O",0,6,"Artistic and Stylize effects","7 effects match references and the GPU check."],
- ["M30",3,"O",0,6,"Noise and Photo effects","7 effects match; random noise is the same every run."],
- ["M31",4,"E",0,5,"Clone Stamp and Recolor","Recorded strokes replay to the reference."],
- ["M32",4,"E",1,7,"Line/Curve and edit-until-Finish","Lines within ±1/255; edits before Finish make one history step."],
- ["M33",4,"O",0,6,"Distort effects, part 1","6 effects match references and the GPU check."],
- ["M34",4,"E",0,7,"Shapes (29 presets)","29 shapes × fill, outline, both, within ±1/255."],
- ["M35",4,"O",0,6,"Render effects","Clouds, fractals, turbulence, Voronoi: same seed, same result on CPU and GPU."],
- ["M36",4,"U",1,8,"Text tool","Editable until Finish; one history step; typing in other languages works."],
- ["M37",4,"O",0,7,"Blurs, part 2 (paint.net 5 only)","Bokeh, Sketch, Square, Surface match paint.net 5.1 captures."],
- ["M38",4,"E",0,6,"Save options and photo metadata","Quality settings work per format; EXIF kept or GPS stripped as chosen."],
- ["M39",4,"O",0,7,"Distort part 2 and Quantize","Crystalize, Dents, Morphology, Quantize match captures."],
- ["M40",4,"O",0,7,"Object effects and 3D Rotate/Zoom","Drop shadow and friends match; Import from File converts color."],
- ["M41",5,"E",0,7,"Healing brush and spot heal","No visible seams; blend error under threshold on 10 cases."],
- ["M42",5,"O",1,8,"Content-aware fill","Under 5 s at 12 MP; quality target met on 10 test holes."],
- ["M43",5,"U",0,3,"Remove background","Mask overlap ≥ 90% with hand-made masks on 10 photos."],
- ["M44",5,"O",1,7,"GPU match sweep and speed table","No effect outside ±1/255; nothing over 3 s at 24 MP."],
- ["M45",5,"U",0,6,"Menus complete in paint.net order","Menu order checked by script; Cmd+F works for every effect."],
- ["M46",6,"U",0,5,"View menu, Settings, light and dark","Rulers correct in px, in, cm; both appearances look right."],
- ["M47",6,"E",0,7,"Autosave, crash recovery, stress","Kill the app mid-edit and get the image back; 1 h of fuzzing, no crash."],
- ["M48",6,"U",0,5,"Speed and size bars","Cold launch under 3 s; app under 75 MB; checked by script."],
- ["M49",6,"U",0,5,"Shortcuts and accessibility","paint.net shortcuts mapped to Cmd; every control has a VoiceOver label."],
- ["M50",6,"U",0,5,"Release","Signed DMG on GitHub opens with no warning; yili.dev page live."],
+ ["M01",1,"E",0,4,"Repo and test harness","Fast tests pass on Mac and in the Linux VM; the harness rejects a 2/255 difference and accepts 1/255."],
+ ["M02",1,"O",0,10,"paint.net 5.1.12 catalog and captures","Real 5.1.12 menus, tools and effects listed; an accuracy target per operation; capture of Gaussian and Invert repeats with identical results."],
+ ["M03",1,"O",0,10,"paint.net 3.36 reference runner","The real 3.36 pixel code runs in the Linux VM and produces reference images for ported operations."],
+ ["M04",1,"E",0,6,"Pixel core and math rules","All 65,536 byte products exact; legacy rounding reproduced; PNG round-trip keeps every byte."],
+ ["M05",1,"E",1,12,"Tile memory manager","Random edits under an 8 MB budget keep every byte; disk-full and bad reads fail cleanly."],
+ ["M06",1,"E",1,12,"Document and undo history","Every undo, redo and jump matches a simple reference model exactly."],
+ ["M07",1,"E",1,10,"Layers and the 14 blend modes","Every mode within ±1/255 of the exact formula, including low alpha and 100-layer stacks."],
+ ["M08",1,"O",1,14,"GPU engine and GPU-vs-CPU checker","GPU blending matches the CPU on Apple GPU and on Linux, with proof the GPU ran."],
+ ["M09",1,"U",1,10,"Canvas display test (go / no-go)","Correct color after 200 resizes, screen moves and sleep; display path chosen."],
+ ["M10",1,"E",0,12,"Engine core, live previews, Swift bridge","100 preview updates make one undo step; Cancel restores everything; no leaks or stray callbacks."],
+ ["M11",1,"U",0,5,"Main window design: 3 mockups","3 mockups, two critiques, one picked and specified."],
+ ["M12",1,"U",0,12,"App shell and canvas","A 6000×4000 photo pans at 59+ fps with no stall over 50 ms."],
+ ["M13",1,"E",1,12,"Color management","Profile conversions within a stated ΔE00 bound for 6 profile types; no Homebrew links."],
+ ["M14",1,"O",0,10,"Effect framework","Tiled results equal whole-image results; Invert Alpha keeps hidden colors."],
+ ["M15",1,"U",0,10,"Floating panels, menus, shortcuts","F5–F8 toggle panels; panels stay reachable; keys route correctly in every context."],
+ ["M16",2,"E",0,12,"Open and save PNG, JPEG, BMP, GIF, TIFF, WebP","All 8 photo rotations correct; damaged files fail cleanly."],
+ ["M17",2,"U",0,8,"HEIC, AVIF, RAW; drag and drop","Named camera files open with correct size, rotation and color."],
+ ["M18",2,"E",0,8,"Layered .opaint file","Exact round-trip; valid OpenRaster; a crash mid-save keeps the old file."],
+ ["M19",2,"U",0,8,"New, Save As, Revert, unsaved prompt","Quitting with unsaved work always asks first."],
+ ["M20",2,"U",0,10,"Layers and History panels","Panel actions equal engine results byte for byte."],
+ ["M21",2,"O",0,12,"Resize, canvas size, rotate, Auto Crop","Every paint.net 5.1 resize mode within its accuracy target."],
+ ["M22",2,"E",1,12,"Selection engine","5 modes correct on 50 shape pairs; soft edges exact against analytic coverage."],
+ ["M23",2,"U",0,10,"Crop tool and image dialogs","Crop at 3:2 with straighten gives the exact expected pixels."],
+ ["M24",2,"U",0,10,"Effect dialogs with live preview","100 quick changes then OK make one undo step; first preview under 100 ms."],
+ ["M25",2,"O",0,10,"Adjustments, part 1","Auto-Level, B&W, Brightness/Contrast, Hue/Sat, Posterize, Sepia, Temperature/Tint pass."],
+ ["M26",2,"O",0,10,"Curves, Levels, Exposure, Highlights/Shadows","Same case set as part 1, all passing."],
+ ["M27",2,"U",0,6,"Color Profile dialogs","Assign changes no pixels; Convert matches the engine."],
+ ["M28",2,"U",0,6,"Phase 2 end-to-end test","Open, crop, Curves, undo, save, reopen: pixels match the engine run."],
+ ["M29",3,"U",0,10,"Selection tools and Edit menu","Every tool × mode matches independently built masks."],
+ ["M30",3,"E",1,12,"Magic Wand and Paint Bucket engine","Masks exact against references on 10 images × 4 tolerances."],
+ ["M31",3,"U",0,6,"Wand and Bucket controls","Changing tolerance after the click updates live and commits once."],
+ ["M32",3,"E",1,14,"Move pixels engine","An unmoved selection stays byte-exact; rotate and scale within ±1/255."],
+ ["M33",3,"U",0,8,"Move tool handles","Drag scripts match engine results."],
+ ["M34",3,"U",0,6,"Copy and paste","Color profile kept; paste opens with handles; one undo step."],
+ ["M35",3,"O",0,12,"Blurs, part 1","Gaussian, Motion, Radial, Zoom, Median, Fragment pass; Gaussian r=50 on 24 MP under 1 s."],
+ ["M36",4,"U",0,10,"Colors window and Color Picker","paint.net palette files load; picker clips at edges."],
+ ["M37",4,"E",1,14,"Brush engine","Same stroke gives identical pixels however the pen events arrive."],
+ ["M38",4,"U",0,8,"Brushes with pen pressure","Pen-to-screen median under 16 ms on a 24 MP image."],
+ ["M39",4,"E",0,10,"Gradient tool","5 types × 2 modes; preview equals the final result."],
+ ["M40",4,"O",0,10,"Artistic and Stylize effects","Each effect passes its full checked case list."],
+ ["M41",4,"O",0,12,"Noise and Photo effects","Each effect passes; random noise repeats exactly with the same seed."],
+ ["M42",4,"E",0,8,"Clone Stamp and Recolor","One undo step per stroke; source offset rules correct."],
+ ["M43",4,"E",1,12,"Line/Curve, editable until Finish","Edits, Escape, undo while editing and Finish all behave; one undo step."],
+ ["M44",4,"E",0,14,"Shapes","Every preset shape × fill, outline, both has a geometry test and a reviewed image."],
+ ["M45",4,"O",0,12,"Distort effects, part 1","Bulge, Frosted Glass, Pixelate, Polar Inversion, Tile Reflection, Twist pass."],
+ ["M46",5,"U",1,20,"Text tool","Japanese and Chinese input, emoji, right-to-left text; one undo step on Finish."],
+ ["M47",5,"O",0,8,"Render effects","Same seed, same pixels on CPU and GPU."],
+ ["M48",5,"O",0,12,"Blurs, part 2","Bokeh, Sketch, Square, Surface pass."],
+ ["M49",5,"O",0,14,"Distort part 2, Quantize, Drop Shadow, 3D Rotate/Zoom","Each passes; Import from File converts color."],
+ ["M50",5,"E",0,10,"Save options and photo metadata","GPS stripped everywhere when asked; lossless keeps pixels."],
+ ["M51",5,"E",0,12,"Healing brush and spot heal","Blend error ≤ 1e-5 on test cases; untouched pixels unchanged."],
+ ["M52",5,"O",1,24,"Content-aware fill","PSNR ≥ 30 dB and SSIM ≥ 0.95 on test holes; 12 MP under 5 s."],
+ ["M53",5,"U",0,5,"Remove background","Mask overlap ≥ 90% on each of 10 named photos."],
+ ["M54",5,"O",1,14,"Accuracy and speed sweep","Every operation within its target; speed table published."],
+ ["M55",5,"U",0,8,"Menus complete in paint.net order","Menu list matches paint.net 5.1.12 exactly."],
+ ["M56",6,"U",0,8,"View menu, Settings, light and dark","Rulers correct in px, in, cm at several zooms."],
+ ["M57",6,"E",0,12,"Autosave, crash recovery, stress","Kill the app mid-edit and get the work back; fuzzing finds no crash."],
+ ["M58",6,"U",0,8,"Speed, size and auto-updates","Cold launch under 3 s; app under 75 MB; signed update feed."],
+ ["M59",6,"U",0,8,"Keyboard and accessibility","Open, edit and save with the keyboard only; VoiceOver walkthrough."],
+ ["M60",6,"U",0,8,"Release","Signed, notarized download opens on a clean account; yili.dev page live."],
 ];
-const CP_AFTER = {"M05":"CP1","M10":"CP2","M15":"CP3","M20":"CP4","M25":"CP5","M30":"CP6","M35":"CP7","M40":"CP8","M45":"CP9","M50":"CP10 · v1.0"};
+const CP_AFTER = {"M05":"CP1","M10":"CP2","M15":"CP3 · update page 1","M20":"CP4","M25":"CP5","M30":"CP6","M35":"CP7 · update page 2","M40":"CP8","M45":"CP9 · update page 3","M50":"CP10","M55":"CP11 · update page 4","M60":"CP12 · v1.0"};
 let filter = "all";
 try { const f = localStorage.getItem("op-ms-filter"); if (f) filter = f; } catch (e) {}
 
@@ -182,7 +192,7 @@ function render() {
   const hAll = M.reduce((a, m) => a + m[4], 0);
   const doing = M.filter(m => st(m[0]) === "doing").map(m => m[0]).join(", ") || "none";
   document.getElementById("stats").innerHTML =
-    `<span><b>${done}</b> of 50 done</span><span><b>${hDone}</b> of ${hAll} h</span><span>in progress: <b>${doing}</b></span><span>updated ${UPDATED}</span>`;
+    `<span><b>${done}</b> of 60 done</span><span><b>${hDone}</b> of ${hAll} h</span><span>in progress: <b>${doing}</b></span><span>updated ${UPDATED}</span>`;
   const keep = m => filter === "all" || (filter === "star" ? m[3] : filter === "open" ? st(m[0]) !== "done" : m[2] === filter);
   document.getElementById("phases").innerHTML = PHASES.map(p => {
     const ms = M.filter(m => m[1] === p.n);
