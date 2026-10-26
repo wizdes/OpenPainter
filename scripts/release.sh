@@ -511,7 +511,7 @@ if ! (cd "$mac" && env \
 fi
 grep -E '^Test Case .*(passed|failed|skipped)|M60 release' "$test_log" | sort -u
 grep -q 'Executed 3 tests, with 0 failures' "$test_log" || fail 'expected 3 executed tests with 0 failures'
-! grep -qE 'skipped|Skipped' "$test_log" || fail 'a release check test was skipped'
+! grep -qE "^Test Case '.*' skipped|Executed [0-9]+ tests?, with [1-9][0-9]* tests? skipped" "$test_log" || fail 'a release check test was skipped'
 pass
 
 step='no zip left'
