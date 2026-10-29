@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+  <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eceef3"/></linearGradient>
+  <filter id="tileShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#1b2440" flood-opacity=".14"/></filter>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="34"/></filter>
+  <filter id="bleed" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.013" numOctaves="3" seed="33" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="18" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <!-- darker pigment pooled at the wash edge, the main watercolor tell -->
+  <filter id="edge" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+    <feMorphology in="SourceAlpha" operator="erode" radius="5" result="er"/>
+    <feComposite in="SourceAlpha" in2="er" operator="out" result="ring"/>
+    <feGaussianBlur in="ring" stdDeviation="2.5" result="ringb"/>
+    <feComposite in="SourceGraphic" in2="ringb" operator="in" result="ec"/>
+    <feColorMatrix in="ec" type="matrix" values=".58 0 0 0 0  0 .52 0 0 0  0 0 .66 0 0  0 0 0 .6 0" result="dark"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="dark"/></feMerge>
+  </filter>
+  <filter id="grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="11"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 .2  0 0 0 0 .25  0 0 0 0 .4  0 0 0 -1.6 1.05"/>
+  </filter>
+  <filter id="granule" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="2" seed="36"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.25"/>
+  </filter>
+  <filter id="brushShadow" x="-20%" y="-50%" width="140%" height="200%"><feDropShadow dx="6" dy="10" stdDeviation="8" flood-color="#25202b" flood-opacity=".2"/></filter>
+</defs><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" filter="url(#tileShadow)"/>
+<rect x="101.5" y="101.5" width="821" height="821" rx="184" fill="none" stroke="#000" stroke-opacity=".06" stroke-width="3"/><mask id="w0c" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><g fill="#fff" filter="url(#bleed)"><path d="M292 226 C 380 214 460 236 560 222 C 650 210 720 230 770 226 Q 804 230 806 268 C 812 360 794 450 808 540 C 820 640 798 700 802 760 Q 800 798 762 800 C 680 812 600 790 500 806 C 420 818 340 794 268 802 Q 226 804 222 762 C 214 680 236 600 222 500 C 210 410 232 330 224 270 Q 226 228 292 226 Z"/></g></mask>
+<g filter="url(#edge)"><g mask="url(#w0c)">
+  <rect x="162" y="162" width="700" height="700" fill="#ff9fb8"/>
+  <g filter="url(#soft)"><ellipse cx="251" cy="483" rx="220.4" ry="176.32000000000002" fill="#e43f9a"/><ellipse cx="396" cy="338" rx="174" ry="139.20000000000002" fill="#7a3fd2"/><ellipse cx="367" cy="715" rx="162.4" ry="129.92000000000002" fill="#7a3fd2"/><ellipse cx="512" cy="541" rx="174" ry="139.20000000000002" fill="#ff7aa8"/><ellipse cx="657" cy="425" rx="174" ry="139.20000000000002" fill="#ffae74"/><ellipse cx="790.4" cy="628" rx="185.6" ry="148.48" fill="#ffe066"/><ellipse cx="715" cy="251" rx="116" ry="92.80000000000001" fill="#ffd08a"/></g>
+  <rect x="162" y="162" width="700" height="700" filter="url(#granule)" opacity=".13"/>
+  <rect x="162" y="162" width="700" height="700" filter="url(#grain)" opacity=".18"/>
+</g></g><clipPath id="tileclip"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath><g clip-path="url(#tileclip)"><g filter="url(#brushShadow)"><g transform="translate(818 -50) rotate(117) scale(1.578125 -1.578125)">
+  <linearGradient id="b0h" x1="0" y1="-19.5" x2="0" y2="19.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7a4a22"/><stop offset=".28" stop-color="#d79a5b"/><stop offset=".55" stop-color="#a8682f"/><stop offset="1" stop-color="#5a3214"/></linearGradient>
+  <linearGradient id="b0f" x1="0" y1="-19.5" x2="0" y2="19.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7d828b"/><stop offset=".3" stop-color="#f6f8fb"/><stop offset=".55" stop-color="#bfc4cb"/><stop offset="1" stop-color="#5f646c"/></linearGradient>
+  <linearGradient id="b0t" x1="490" y1="0" x2="640" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e2c79c"/><stop offset=".24" stop-color="#d4b07a"/><stop offset=".38" stop-color="#e43f9a"/><stop offset="1" stop-color="#e43f9a"/></linearGradient>
+  <linearGradient id="b0ts" x1="0" y1="-19.5" x2="0" y2="19.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity=".2"/><stop offset=".3" stop-color="#fff" stop-opacity=".12"/><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient>
+  <path d="M8 -10.4 C 120 -14.3 260 -19.5 335 -19.5 L 402 -16.900000000000002 L 402 16.900000000000002 L 335 19.5 C 260 19.5 120 14.3 8 10.4 Q 0 0 8 -10.4 Z" fill="url(#b0h)"/>
+  <path d="M400 -18.2 L 492 -15.600000000000001 L 492 15.600000000000001 L 400 18.2 Z" fill="url(#b0f)"/>
+  <path d="M412 -17.81 V 17.81 M420 -17.55 V 17.55" stroke="#5c6168" stroke-opacity=".55" stroke-width="2.4"/>
+  <path d="M490 -15.600000000000001 C 520 -22.1 560 -22.1 590 -13 Q 625 -3.9000000000000004 644 0 Q 625 3.9000000000000004 590 13 C 560 22.1 520 22.1 490 15.600000000000001 Z" fill="url(#b0t)"/>
+  <path d="M490 -15.600000000000001 C 520 -22.1 560 -22.1 590 -13 Q 625 -3.9000000000000004 644 0 Q 625 3.9000000000000004 590 13 C 560 22.1 520 22.1 490 15.600000000000001 Z" fill="url(#b0ts)"/>
+  <path d="M512 -9.1 Q 570 -7.800000000000001 628 -1.3 M512 0 Q 575 0 636 0 M512 9.1 Q 570 7.800000000000001 628 1.3" stroke="#3a1f10" stroke-opacity=".15" stroke-width=".9" fill="none" stroke-linecap="round"/>
+  <path d="M60 -7.800000000000001 C 160 -10.4 280 -13 390 -11.700000000000001" stroke="#fff" stroke-opacity=".14" stroke-width="2" fill="none" stroke-linecap="round"/>
+</g></g></g></svg>

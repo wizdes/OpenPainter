@@ -261,6 +261,7 @@ plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$info"; }
 [[ "$(plist SUVerifyUpdateBeforeExtraction)" == true ]] || fail 'SUVerifyUpdateBeforeExtraction is not on'
 [[ "$(plist LSMinimumSystemVersion)" == 15.0 ]] || fail 'LSMinimumSystemVersion is not 15.0'
 [[ "$(plist CFBundleIdentifier)" == dev.yili.OpenPainter ]] || fail 'wrong bundle identifier'
+[[ "$(plist CFBundleIconName)" == AppIcon && -f "$app/Contents/Resources/AppIcon.icns" ]] || fail 'the app icon is missing (AppIcon in Assets.xcassets)'
 printf 'Built %s %s (%s), %s\n' "$(plist CFBundleIdentifier)" "$version" "$build_number" "$(du -sh "$app" | cut -f1)"
 pass
 

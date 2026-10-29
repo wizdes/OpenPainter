@@ -102,6 +102,13 @@ targets:
       # copy step for "Sparkle-product").
       - package: Sparkle
         product: Sparkle
+    settings:
+      base:
+        # The app icon (OpenPainter/Assets.xcassets/AppIcon.appiconset), drawn
+        # by design/icon/icon.svg. Everything stays inside the rounded tile:
+        # macOS 26 and later shrink an icon that breaks the tile edge onto a
+        # gray tile.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: OpenPainter/Info.plist
       properties:
