@@ -234,17 +234,16 @@ internal static class Program
         if (root is null) throw new InvalidOperationException("UI Automation could not find paint.net window.");
         foreach (var effect in job.Effects ?? new List<JsonElement>())
         {
-            // Setting parameters is W14's work. Refuse them rather than capture defaults by mistake.
-            if (effect.TryGetProperty("parameters", out var given) && given.ValueKind == JsonValueKind.Object &&
-                given.EnumerateObject().Any())
-                throw new NotSupportedException("This driver captures default parameters only.");
+            var given = effect.TryGetProperty("parameters", out var p) && p.ValueKind == JsonValueKind.Object
+                ? p.EnumerateObject().ToList()
+                : new List<JsonProperty>();
             ApplyThroughMenu(root, pid, desktop, effect.GetProperty("id").GetString()
-                ?? throw new InvalidDataException("Effect id is empty."));
+                ?? throw new InvalidDataException("Effect id is empty."), given);
         }
         OpenMenuItem(root, "Effects", null, "OpenPainter Capture");
     }
 
-    private static void ApplyThroughMenu(AutomationElement root, uint pid, IntPtr desktop, string id)
+    private static void ApplyThroughMenu(AutomationElement root, uint pid, IntPtr desktop, string id, List<JsonProperty> parameters)
     {
         // Ids are <assembly>/<category>/<submenu>/<name>, as the catalog writes them.
         var parts = id.Split('/');
@@ -264,19 +263,37 @@ internal static class Program
         {
             Thread.Sleep(1500);
             SaveWindowImage(dialog, Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_SHOT"));
+            var dumpPath = Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_CONTROLS");
+            if (dumpPath is not null) File.WriteAllLines(dumpPath, Native.DescribeChildren(dialog));
+            if (parameters.Count > 0 && FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) == IntPtr.Zero)
+                throw new InvalidOperationException($"{name} has no dialog, so its parameters cannot be set.");
+            foreach (var parameter in parameters)
+                Native.SetLabelledNumber(dialog, parameter.Name, parameter.Value.GetRawText());
+            if (parameters.Count > 0)
+            {
+                Thread.Sleep(1000);
+                SaveWindowImage(dialog, Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_SET_SHOT"));
+            }
             // The menu invoke stays in progress while the modal dialog is open,
             // so UI Automation calls into this process wait. A window message
             // to the dialog's focused control does not, and it stays inside
             // the app: this is not SendInput.
             // A window that has gone was a progress window: the effect has no dialog.
             if (FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) != IntPtr.Zero)
-                Native.PressEnter(dialog);
+            {
+                if (parameters.Count > 0) Native.ClickButton(dialog, "OK");
+                else Native.PressEnter(dialog);
+            }
             var closing = Stopwatch.StartNew();
             while (FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) != IntPtr.Zero)
             {
                 if (closing.Elapsed > TimeSpan.FromSeconds(60)) throw new TimeoutException($"{name} did not finish.");
                 Thread.Sleep(100);
             }
+        }
+        else if (parameters.Count > 0)
+        {
+            throw new InvalidOperationException($"{name} opened no dialog, so its parameters cannot be set.");
         }
         Thread.Sleep(500);
     }

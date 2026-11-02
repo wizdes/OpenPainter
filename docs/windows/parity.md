@@ -27,6 +27,18 @@ Input: one 64 by 64 opaque gradient PNG, with default parameters, run twice on a
 | Noise | Add Noise | **Different** | Not repeatable with defaults. A random seed is the likely cause, not proven. |
 | Render | Clouds | **Different** | Same as Add Noise |
 
+## Setting effect parameters (W4, 2026-11-02)
+
+The driver can now set number settings in a real effect dialog. This was the largest risk to W14.
+
+| Check | Result |
+| --- | --- |
+| Gaussian Blur, Radius 7, two runs | Same hash, `c6d77420f6865b9a`, and the dialog screenshot shows 7.0 |
+| Gaussian Blur, default Radius 2 | Different hash, `487636cc678e2210` |
+| A label the dialog does not have | Fails with "Dialog has no label named" |
+
+A survey opened every effect once, on 2026-11-02. All 54 ran. 5 have no dialog. 16 have a list box, which cannot be set yet. Each effect's controls and labels are in `pdn-5.1-controls.json`. Only one effect's number setting has been tested so far. Lists, check boxes, color wheels, curves and random seeds are still W14's work.
+
 ## Fallback list for W14
 
 - **Add Noise, Clouds, and other effects with a seed:** need a fixed seed, or a comparison that does not use hashes.

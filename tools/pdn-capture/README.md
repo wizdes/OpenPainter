@@ -46,12 +46,12 @@ For a job with more than one effect, the driver starts a fresh pinned process fo
 
 1. The driver starts the pin on a hidden desktop with the input PNG, one effect per process.
 2. UI Automation opens the effect's real menu item. The dialog stays open on the hidden desktop.
-3. A posted Enter message presses OK. UI Automation cannot do this: the menu invoke stays in progress while the modal dialog is open, so later calls into the process wait.
+3. A posted Enter message presses OK, or a posted click when settings were typed, because Tab leaves focus on the reset button. UI Automation cannot do this: the menu invoke stays in progress while the modal dialog is open, so later calls into the process wait.
 4. UI Automation opens **OpenPainter Capture**, and the plugin writes the current layer as a PNG. It renders nothing itself.
 
 Limits, measured on 2026-11-02:
 
-- **Default parameters only.** The driver refuses a job that sets parameters.
+- **Number settings work; other kinds do not yet.** A job gives `"parameters": { "Radius": 7 }`. The name is the label shown in the dialog. The driver types the value by window message, presses Tab, and reads the box back. A wrong label, a value that does not stick, or an effect with no dialog fails by name. Lists, check boxes, color wheels, curves and random seeds cannot be set yet.
 - **The plugin API route did not work.** `IEffectsService2` lists 54 built-in effects, and each offers `IBitmapEffectRenderer`. `SetToken` refuses null, and `IEffectConfigForm.Token` throws "Operation is not valid", even after `SetEffect` and with the dialog open. Built-in effects arrive as closed proxies, so no parameter schema is public. The catalog therefore has names and categories, with no parameters.
 - **Effects with a random seed differ between runs.** Add Noise and Clouds gave different hashes on two runs with default parameters. They need a fixed seed, or a comparison that does not use hashes, in W14.
 - A failed menu invoke can print "Invoke failed: Catastrophic failure" when the dialog closes. The run still reports its own result.

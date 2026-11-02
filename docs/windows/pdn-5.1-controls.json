@@ -1,0 +1,805 @@
+[
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//auto-level",
+  "controls": {},
+  "labels": []
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//black and white",
+  "controls": {},
+  "labels": []
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//brightness / contrast",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Brightness",
+   "Contrast"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//curves",
+  "controls": {
+   "Window": 8,
+   "ComboBox": 1,
+   "Static": 2
+  },
+  "labels": [
+   "Transfer Map",
+   "Luminosity",
+   "Tip: Right-click to remove control points.",
+   "&Reset",
+   "OK",
+   "Cancel"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//exposure",
+  "controls": {
+   "Window": 11,
+   "Edit": 1,
+   "Static": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//highlights / shadows",
+  "controls": {
+   "Window": 29,
+   "Edit": 4,
+   "Static": 4
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Highlights",
+   "Shadows",
+   "Clarity",
+   "Radius"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//hue / saturation",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Hue",
+   "Saturation",
+   "Lightness"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//invert alpha",
+  "controls": {},
+  "labels": []
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//invert colors",
+  "controls": {},
+  "labels": []
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//levels",
+  "controls": {
+   "Window": 32,
+   "Edit": 5
+  },
+  "labels": [
+   "Output Histogram",
+   "Output",
+   "Input",
+   "Input Histogram",
+   "B",
+   "G",
+   "R",
+   "OK",
+   "Auto",
+   "Reset",
+   "Cancel"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//posterize",
+  "controls": {},
+  "labels": []
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//sepia",
+  "controls": {
+   "Window": 11,
+   "Edit": 1,
+   "Static": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Intensity"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/adjustment//temperature / tint",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Temperature",
+   "Tint"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/donotdisplay//rotate / zoom",
+  "controls": {
+   "Window": 51,
+   "Edit": 7,
+   "Static": 8,
+   "ComboBox": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Roll / Rotate",
+   "Pan",
+   "Zoom",
+   "Quality",
+   "Tiling Mode:",
+   "Sampling:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/artistic/ink sketch",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Ink Outline",
+   "Coloring"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/artistic/oil painting",
+  "controls": {
+   "Window": 19,
+   "Edit": 2,
+   "Static": 3,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Brush size",
+   "Granularity",
+   "Kernel Shape:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/artistic/pencil sketch",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Pencil tip size",
+   "Range"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/bokeh blur",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Gamma Boost",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/fragment blur",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Fragment Count",
+   "Distance",
+   "Rotation"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/gaussian blur",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Gamma Boost",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/median blur",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Percentile",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/motion blur",
+  "controls": {
+   "Window": 22,
+   "Edit": 2,
+   "Static": 3,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Angle",
+   "Distance",
+   "Centered",
+   "Edge Behavior:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/radial blur",
+  "controls": {
+   "Window": 30,
+   "Edit": 4,
+   "Static": 4
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Angle",
+   "Center",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/sketch blur",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Percentile",
+   "Smoothness"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/square blur",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Gamma Boost"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/surface blur",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Threshold"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/blurs/zoom blur",
+  "controls": {
+   "Window": 36,
+   "Edit": 5,
+   "Static": 5
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Distance",
+   "Focus",
+   "Center",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/bulge",
+  "controls": {
+   "Window": 32,
+   "Edit": 4,
+   "Static": 5,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Bulge",
+   "Center",
+   "Edge Behavior:",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/crystalize",
+  "controls": {
+   "Window": 20,
+   "Edit": 2,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Cell Size",
+   "Quality",
+   "&Randomize"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/dents",
+  "controls": {
+   "Window": 44,
+   "Edit": 6,
+   "Static": 7
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Scale",
+   "Refraction",
+   "Detail",
+   "Turbulence",
+   "Angle",
+   "Quality",
+   "&Randomize"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/frosted glass",
+  "controls": {
+   "Window": 32,
+   "Edit": 4,
+   "Static": 5
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Maximum Scatter Radius",
+   "Minimum Scatter Radius",
+   "Diffusion",
+   "Smoothness",
+   "&Randomize"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/morphology",
+  "controls": {
+   "Window": 22,
+   "Edit": 2,
+   "Static": 3,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Width",
+   "Height",
+   "Linked",
+   "Mode:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/pixelate",
+  "controls": {
+   "Window": 28,
+   "Edit": 3,
+   "Static": 5,
+   "ComboBox": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Cell size",
+   "Anchor",
+   "Scale Down:",
+   "Scale Up:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/polar inversion",
+  "controls": {
+   "Window": 32,
+   "Edit": 4,
+   "Static": 5,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Scale",
+   "Offset",
+   "Edge Behavior:",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/tile reflection",
+  "controls": {
+   "Window": 31,
+   "Edit": 4,
+   "Static": 5,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Angle",
+   "Tile Size",
+   "Curvature",
+   "Edge Behavior:",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/distort/twist",
+  "controls": {
+   "Window": 36,
+   "Edit": 5,
+   "Static": 5
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Amount / Direction",
+   "Size",
+   "Center",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/noise/add noise",
+  "controls": {
+   "Window": 26,
+   "Edit": 3,
+   "Static": 4
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Intensity",
+   "Color Saturation",
+   "Coverage",
+   "Randomize"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/noise/reduce noise",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Strength"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/object/drop shadow",
+  "controls": {
+   "Window": 46,
+   "Edit": 7,
+   "Static": 9
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Shadow Radius",
+   "Distance",
+   "Angle",
+   "Opacity",
+   "Color",
+   "R:",
+   "G:",
+   "B:",
+   "Only draw shadow",
+   "This effect requires a layer with transparency. Make sure that the object you want a drop shadow for is on its own layer."
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/photo/glow",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Radius",
+   "Brightness",
+   "Contrast"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/photo/sharpen",
+  "controls": {
+   "Window": 17,
+   "Edit": 2,
+   "Static": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Amount",
+   "Threshold"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/photo/soften portrait",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Softness",
+   "Lighting",
+   "Warmth"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/photo/straighten",
+  "controls": {
+   "Window": 13,
+   "Edit": 1,
+   "Static": 2,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Angle",
+   "Sampling:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/photo/vignette",
+  "controls": {
+   "Window": 30,
+   "Edit": 4,
+   "Static": 4
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Center",
+   "Radius",
+   "Strength"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/render/clouds",
+  "controls": {
+   "Window": 22,
+   "SysTabControl32": 1,
+   "Edit": 2,
+   "Static": 4,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Clouds",
+   "Scale",
+   "Roughness",
+   "Blend Mode:",
+   "&Randomize"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/render/julia fractal",
+  "controls": {
+   "Window": 31,
+   "Edit": 4,
+   "Static": 5,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Factor",
+   "Zoom",
+   "Angle",
+   "Quality",
+   "Blend Mode:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/render/mandelbrot fractal",
+  "controls": {
+   "Window": 34,
+   "Edit": 4,
+   "Static": 5,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Factor",
+   "Zoom",
+   "Angle",
+   "Quality",
+   "Invert Colors",
+   "Blend Mode:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/render/turbulence",
+  "controls": {
+   "Window": 30,
+   "Edit": 3,
+   "Static": 6,
+   "ComboBox": 2
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Octaves",
+   "Period",
+   "Size",
+   "Noise:",
+   "&Randomize",
+   "Blend Mode:"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/stylize/edge detect",
+  "controls": {
+   "Window": 22,
+   "Edit": 2,
+   "Static": 3,
+   "ComboBox": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Strength",
+   "Blurring",
+   "Algorithm:",
+   "Overlay Edges"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/stylize/emboss",
+  "controls": {
+   "Window": 11,
+   "Edit": 1,
+   "Static": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Angle"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/stylize/outline",
+  "controls": {
+   "Window": 23,
+   "Edit": 3,
+   "Static": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Thickness",
+   "Intensity",
+   "Quality"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects.gpu/effect/stylize/relief",
+  "controls": {
+   "Window": 11,
+   "Edit": 1,
+   "Static": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Angle"
+  ]
+ },
+ {
+  "id": "paintdotnet.effects/effect/color/quantize",
+  "controls": {
+   "Window": 25,
+   "ComboBox": 1,
+   "Static": 4,
+   "Edit": 3
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Algorithm:",
+   "Colors",
+   "Dithering level",
+   "Transparency threshold",
+   "Pixels with an alpha value less than the threshold will be fully transparent."
+  ]
+ },
+ {
+  "id": "paintdotnet.effects/effect/photo/red eye removal",
+  "controls": {
+   "Window": 11,
+   "Edit": 1,
+   "Static": 1
+  },
+  "labels": [
+   "OK",
+   "Cancel",
+   "Strength",
+   "For best results, first use the selection tools to select each eye."
+  ]
+ }
+]
