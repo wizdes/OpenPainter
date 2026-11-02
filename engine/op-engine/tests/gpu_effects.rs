@@ -433,7 +433,7 @@ fn gpu_creation_failure_falls_back_with_reason_in_doc_info() {
 
 #[test]
 fn timeout_turns_gpu_off_and_named_errors_reach_cpu() {
-    let source = image(32, 32);
+    let source = image(W, H);
     for (error, expected) in [
         ("wait_timeout", "GPU wait timed out"),
         ("job_too_long", "GPU job is too large"),
@@ -447,8 +447,8 @@ fn timeout_turns_gpu_off_and_named_errors_reach_cpu() {
         )
         .unwrap();
         let cpu = Engine::with_options(None, options(true)).unwrap();
-        let t = test.import_pixels(32, 32, &source, None).unwrap();
-        let c = cpu.import_pixels(32, 32, &source, None).unwrap();
+        let t = test.import_pixels(W, H, &source, None).unwrap();
+        let c = cpu.import_pixels(W, H, &source, None).unwrap();
         test.dispatch(t, "effect.adjust.sepia", json!({})).unwrap();
         cpu.dispatch(c, "effect.adjust.sepia", json!({})).unwrap();
         let after = info(&test, t);
@@ -460,6 +460,10 @@ fn timeout_turns_gpu_off_and_named_errors_reach_cpu() {
             "{after}"
         );
         assert_eq!(pixels(&test, t), pixels(&cpu, c));
+        assert!(
+            after["gpu_effects"]["gpu_dispatches"].as_u64().unwrap() > 0,
+            "{after}"
+        );
         if error == "wait_timeout" {
             assert_eq!(after["gpu"], false);
             assert!(
@@ -470,8 +474,40 @@ fn timeout_turns_gpu_off_and_named_errors_reach_cpu() {
             );
             test.dispatch(t, "effect.adjust.sepia", json!({})).unwrap();
             assert_eq!(info(&test, t)["gpu_effects"]["cpu_runs"], 2);
+        } else {
+            assert_eq!(after["gpu"], true, "{after}");
         }
     }
+}
+
+#[cfg(windows)]
+#[test]
+fn warp_default_median_2048_runs_on_gpu_and_matches_cpu() {
+    if std::env::var("OP_GPU_ADAPTER").as_deref() != Ok("warp") {
+        return;
+    }
+    let (width, height) = (2048, 2048);
+    let source = image(width, height);
+    let gpu = Engine::with_options(None, EngineOptions::default()).unwrap();
+    let cpu = Engine::with_options(None, options(true)).unwrap();
+    let g = gpu.import_pixels(width, height, &source, None).unwrap();
+    let c = cpu.import_pixels(width, height, &source, None).unwrap();
+    gpu.dispatch(g, "effect.blur.median", json!({})).unwrap();
+    cpu.dispatch(c, "effect.blur.median", json!({})).unwrap();
+    let state = info(&gpu, g);
+    assert_eq!(state["gpu_effects"]["gpu_runs"], 1, "{state}");
+    assert_eq!(state["gpu_effects"]["cpu_runs"], 0, "{state}");
+    assert!(
+        state["gpu_effects"]["last_chunks"].as_u64().unwrap() > 1,
+        "{state}"
+    );
+    assert_close(
+        "effect.blur.median",
+        "2048x2048 default",
+        tolerance(GpuKernel::Median),
+        &pixels(&cpu, c),
+        &pixels(&gpu, g),
+    );
 }
 
 #[test]

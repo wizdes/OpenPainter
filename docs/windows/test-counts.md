@@ -2,11 +2,11 @@
 
 Source counts are literal `#[test]` attributes. Windows counts are tests that finished (passed or failed), including the two focused manual runs. Ignored tests are listed separately. A property-test macro can make the Windows count larger than the literal count. Mac runtime counts: **NOT RUN**.
 
-The measured files contain **114** literal test-bearing Rust files and **687** literal test attributes. **623** Windows tests finished across the logged checks; **7** normal-run tests were ignored. The final non-GPU workspace run had **29** failed tests. The manual huge-document and GPU color checks add two failures, for **31** observed failed tests.
+At the W1 baseline, the measured files contained **114** literal test-bearing Rust files and **687** literal test attributes. These are historical W1 counts, not current totals. **623** Windows tests finished across the logged checks; **7** normal-run tests were ignored. The final non-GPU workspace run had **29** failed tests. The manual huge-document and GPU color checks add two failures, for **31** observed failed tests.
 
 ## W2 run on Windows (2026-11-02)
 
-Root ran these as `agent` on the final code, from `engine/`, with `CARGO_INCREMENTAL=0` and `CARGO_PROFILE_DEV_DEBUG=0`. The counts at the top of this file are still the W1 baseline.
+Root ran these as `agent` on the W2 code at that time, from `engine/`, with `CARGO_INCREMENTAL=0` and `CARGO_PROFILE_DEV_DEBUG=0`. The counts at the top of this file are still the W1 baseline.
 
 | Command | Result |
 | --- | --- |
@@ -73,7 +73,7 @@ Mac: `cargo check -p op-engine -p op-cli --tests --target aarch64-apple-darwin` 
 - Attaching to the same folder again before the old writer stops is refused. The app uses a new folder for each document.
 - Crashes during close are tested with hand-built folder states, not with real kills at those steps.
 
-## Counts by source file
+## W1 counts by source file (historical)
 
 | File under engine/ | Source `#[test]` | Windows ran | Why the counts differ |
 | --- | ---: | ---: | --- |
@@ -292,37 +292,76 @@ Two earlier failures were intermittent. `op-engine/tests/jobs.rs:461` ended twic
 - W19: stress the C-interface job queue under load.
 - Tool setup: install the missing Apple target outside this builder's owned paths, then rerun the cross-target check and Mac runtime tests.
 
-## W3 Windows GPU check (2026-11-02, third builder run)
+## W3 Windows GPU check (2026-11-02, fourth builder run)
 
-Windows pins DX12. `OP_GPU_ADAPTER=hardware` selected the RTX 3060 Ti, and `OP_GPU_ADAPTER=warp` selected Microsoft Basic Render Driver. Every long command ran from `engine/` with `CARGO_INCREMENTAL=0`, `CARGO_PROFILE_DEV_DEBUG=0`, `--no-fail-fast -j 8`, and a log under `engine/target/w3c-*.log`.
+The code pins DX12 on Windows and uses `OP_GPU_ADAPTER=hardware` for the RTX 3060 Ti or `OP_GPU_ADAPTER=warp` for Microsoft Basic Render Driver. Commands below use `CARGO_INCREMENTAL=0`, `CARGO_PROFILE_DEV_DEBUG=0`, `--no-fail-fast -j 8`, and logs under `engine/target/w3d-*.log`. These are builder-account checks. The host binary built, but this account has no desktop session, so presented-frame scenarios are **NOT RUN** here. Root's earlier host passes in `w3-host.md` belong to the previous commit.
 
-| Command | RTX | WARP |
+| Check | RTX | WARP |
 | --- | --- | --- |
-| `cargo test -p op-gpu --no-fail-fast -j 8 -- --test-threads=1` | 71 passed, 0 failed, 1 ignored | 71 passed, 0 failed, 1 ignored |
-| `cargo test -p op-ffi --no-fail-fast -j 8 -- --test-threads=1` | 19 passed, 0 failed | 19 passed, 0 failed |
-| `cargo test -p op-engine --test m54_parity --no-fail-fast -j 8 -- --test-threads=1` | 9 passed, 1 failed, 2 ignored | 9 passed, 1 failed, 2 ignored |
-| `cargo test -p op-engine --test engine --test jobs --no-fail-fast -j 8 -- --test-threads=1` | engine 11 passed; jobs 12 passed | engine 11 passed; jobs 12 passed |
-| `cargo test -p op-engine --test gpu_effects --no-fail-fast -j 8 -- --test-threads=1` | 12 passed, 0 failed | 12 passed, 0 failed |
+| `cargo test -p op-gpu --no-fail-fast -j 8 -- --test-threads=1` | 73 passed, 0 failed, 1 ignored | 73 passed, 0 failed, 1 ignored |
+| `cargo test -p op-ffi --no-fail-fast -j 8 -- --test-threads=1` | 23 passed, 0 failed | 23 passed, 0 failed |
+| `cargo test -p op-engine --test m54_parity --test engine --test jobs --test gpu_effects --no-fail-fast -j 8 -- --test-threads=1` | gpu_effects 13 passed; engine 11 passed; jobs 12 passed; M54 9 passed, 1 failed, 2 ignored | gpu_effects 13 passed; engine 11 passed; jobs 12 passed; M54 9 passed, 1 failed, 2 ignored |
+| `cargo test -p op-engine --lib --no-fail-fast -j 8 -- --test-threads=1` | 28 passed, 0 failed | 28 passed, 0 failed |
+| `cargo build --manifest-path tools/win32-host/Cargo.toml -j 8` | Built | Same binary; **NOT RUN** under builder account |
 
-The M54 failure is `m54_legacy_rows_hold_on_small_fixtures_through_the_tiled_path`. The existing Mandelbrot reference differs by up to 23 of 255 levels. No effect output, assertion, or tolerance changed. The two ignored M54 tests write release reports outside this builder's paths. An initial RTX full GPU run failed the existing Median parity test because a new guard counted neighbors beyond a 40 by 30 image. That exact test failed before and passed after the estimate was clipped to the image. The final full GPU runs passed.
+The M54 failure is the existing `m54_legacy_rows_hold_on_small_fixtures_through_the_tiled_path`. Six Mandelbrot captures differ by one channel, worst 23 levels against a tolerance of 1. No CPU effect output, older assertion, or tolerance changed. The two ignored M54 tests write release reports outside builder-owned paths.
 
-### Saved checks and throughput
+### Saved regression checks
 
-The WARP lock test panics under the lock on one thread, then runs a GPU job on another. With the old lock handling temporarily restored, the saved test failed 0/1 with `NoAdapter("WARP device creation lock: poisoned lock")` (`w3c-warp-lock-clean-before.log`). After restoring the fix, it passed 1/1 (`w3c-warp-lock-clean-after.log`). An earlier attempted before run failed at compile because another new test referred to a helper not yet added; that run was not used as proof. The saved Median and Outline guard tests, shader-marker unit test, RSWOP display-profile unit test, and engine timeout and JobTooLong CPU fallback test passed in the final suites. A timed-out GPU device is kept until process exit, with the reason printed, so dropping active DX12 work cannot panic. WARP Twist completed at 3000 by 2700 in 47.465 s, waiting after each 64 MB coordinate chunk. Failed CPU or GPU coordinate allocation returns a named error.
+- The retry test failed before the retry change with `assertion failed: retry_frame(3, 1, false)` (0 passed, 1 failed, `w3d-retry-red.log`). It passed after the change (1 passed, `w3d-retry-green.log`). The view-info and live-view wait tests also run without a surface.
+- The chunk test failed before the time cap with `edge=2048` (0 passed, 1 failed, `w3d-timed-red.log`). It passed after the cap (1 passed, `w3d-timed-green.log`).
+- The timeout hook test failed with `gpu_dispatches:0` before the hook moved after the first submission (0 passed, 1 failed, `w3d-timeout-red.log`). It passed after the change (1 passed, `w3d-timeout-green.log`). A separate zero-deadline wait test submits real GPU work and passed on RTX and WARP.
+- Default Median at 2048 by 2048 ran on WARP, used more than one GPU chunk, made no CPU fallback, and matched CPU bytes at the existing tolerance: 1 passed in 79.55 s (`w3d-median-2048-warp.log`). The updated 3000 by 400 WARP Twist test compares patterned bytes with the CPU across a chunk seam.
+- The failed-surface target-count test and the sent-display-profile test passed in the `op-gpu` and `op-ffi` library suites. The new host checks device recreation after three earlier errors, one failed device recreate, one failed surface recreate, a second view on the same HWND, and a panic with no device removal. Those host checks are **NOT RUN** until root uses the signed-in account.
 
-Warm RTX jobs, after a warm-up call each, measured Outline 12,845,056 estimated neighbor-loop iterations in 13.688 ms, Median 15,859,712 in 8.681 ms, and Unfocus 1,982,464 in 8.322 ms. These are small jobs with readback included; they do not guarantee the time of a large job. The Windows limit is 250 million estimated loop iterations per dispatch. Median counts eight rank-search passes and clips its count to image bounds. Other radius kernels use their full loop bounds. WARP Outline took 395.828 ms for 12,845,056 iterations.
+### Warm RTX times and chunk cap
 
-### Host and open checks
+The timing test keeps the kernel pipeline between calls, warms each size, and takes the middle of three elapsed times. It includes upload and readback. It asserts that every measured call finishes under 1 s. These are measured times, not throughput claims.
 
-The Win32 host built and ran on both adapters, but neither presented a frame on its private desktop. DX12 returned `Validation Error: In Surface::configure: Invalid surface`. Normal frame waits ended with `OP_ERR_BUSY`. The destroyed-HWND check passed and validation error counters were zero. The WARP first frame failed before the `RemoveDevice` call, so real removal and idle recovery are **NOT RUN**. The host output and run steps are in `docs/windows/w3-host.md`. The code drops old-device holders before recreation, checks idle loss each second, retries failed recreation after two seconds, and retries failed frames after 100 ms. Those paths are not proved by a real presented frame.
+| Kernel and parameters | Small | Large | Time-cap output edge before device limit |
+| --- | --- | --- | ---: |
+| Outline radius 3 | 512×512: 5.279 ms | 1024×1024: 18.608 ms | 2014 px |
+| Median radius 3 | 512×512: 1.541 ms | 768×768: 2.675 ms | 708 px |
+| Unfocus radius 5 | 512×512: 1.281 ms | 1024×1024: 3.367 ms | 1275 px |
+| Gaussian radius 5 | 512×512: 1.621 ms | 1024×1024: 3.245 ms | 3005 px; default edge caps at 2048 |
+| Median default radius 10 | **NOT RUN as a per-submission timing** | WARP parity above passed | 218 px |
 
-On 2026-11-02, one Vulkan-path test process spun for nine minutes with two threads at full CPU. One stack sample showed a thread inside `nvoglv64.dll`, NVIDIA's OpenGL and Vulkan driver, in `DllMain` during `LdrShutdownThread`, looping over `SwitchToThread` and `GetExitCodeThread`. Another thread was in `LdrInitializeThunk` with `OPENGL32.dll` on its stack. This evidence fits the W1 hang, but it is one sample of one process and W1 was never sampled. With DX12 pinned, `the_opengl_and_vulkan_drivers_are_not_loaded` checks that `nvoglv64.dll` and `vulkan-1.dll` are not loaded.
+Windows now chooses an output chunk edge from a 200-million estimated-work-unit cap, then applies the GPU texture and buffer limits. Gaussian uses its separable sample count. Turbulence, Fragment, Bulge, Vignette, Add Noise, Twist, and Clouds have estimates. The cached WGSL module and pipelines are reused between chunks. The cap is an estimate based on four RTX kernels; a two-size timing pass for every other kernel is **NOT RUN**. The claim that every kernel stays near 0.2 s on RTX or below 2 s on a GPU ten times slower is **unproved**. Whole-image kernels can still fall back when the image exceeds device limits. These are open parts of the long-job requirement.
 
-Mac runtime and cross-target compile checks are **NOT RUN** on this Windows machine. Mac still selects Metal and the Mac shader source files are unchanged. `poll_gpu` keeps Mac's indefinite wait and error mapping; its deadline applies only on Windows. Real HWND color and direct display checks are **NOT RUN** because no frame presented.
-The full `cargo test --workspace --no-fail-fast -j 8` check is **NOT RUN** in this builder run; the package and target commands above are the final measured counts.
+### Scope and limits
+
+On RTX, `four_warp_devices_create_and_run_together`, `warp_lock_survives_a_panicking_worker`, `warp_default_twist_matches_cpu_at_3000_by_400`, and `warp_default_median_2048_runs_on_gpu_and_matches_cpu` return early. On WARP, `warm_pipeline_timings_at_two_sizes_stay_below_one_second_on_rtx` returns early. The nine Mac view tests in `op-ffi` return early on both Windows adapters. Thus their counted passes do not prove those paths. The host scenarios require root's signed-in desktop session.
+
+Root ran `cargo check --workspace --tests --target aarch64-apple-darwin` with a stub C compiler, and it passes. This checks types only: it links and runs nothing. Mac runtime tests are **NOT RUN**. Mac keeps its old display-table failure return and GPU shader path.
+
+### Root's final run on this code, 2026-11-02
+
+| Suite | RTX | WARP |
+| --- | --- | --- |
+| `op-gpu` | 73 passed, 1 ignored | 73 passed, 1 ignored |
+| `op-ffi` | 23 passed | 23 passed |
+| `op-engine` `gpu_effects` | 13 passed | 13 passed |
+| `op-engine` `engine` | 11 passed | 11 passed |
+| `op-engine` `jobs` | 12 passed | 12 passed |
+| `op-engine` `m54_parity` | 9 passed, 1 failed, 2 ignored | 9 passed, 1 failed, 2 ignored |
+
+The one failure is `m54_legacy_rows_hold_on_small_fixtures_through_the_tiled_path`, the known Mandelbrot row that W14 owns.
+
+### Unresolved: a crash when a WARP device is removed during attach and detach
+
+Root ran the reviewer's stress program with `OP_GPU_ADAPTER=warp`, `stress 18 0 1`, as the signed-in user. **It crashed in 5 of 5 runs on this code.**
+
+- What the log shows: after `DX12 device lost`, a thread panics at `wgpu_core.rs:2169` in `Buffer::get_mapped_range`, because the `mip params` buffer is invalid. Then `0xc0000005` is raised at offset `0xb0110` in `D3D10Warp.dll`, on a driver thread with no engine frames on its stack. `recreating lost DX12 canvas device` prints at about the same moment.
+- What was tried: a process-wide lock around WARP work. It did not stop the crash.
+- What it needs to happen: the software adapter, a forced `RemoveDevice`, and a second window attaching and detaching in a loop. The RTX was not tested, because `RemoveDevice` signals all devices' monitored fences. So it is not known whether a real device loss on a real GPU can do this.
+- The three single-removal window scenarios pass on WARP, so a device removal with no attach and detach running at that moment does recover.
+- The cause is not known. Root stopped here because this path is rare, and W3's brief set a limit of one attempt. W18 must try again with a saved test; until then a crash here is possible.
+
+Recovery assumes one engine per process. Another engine's device can block recreation. A hung GPU that is never reported removed can wait forever in wgpu present or configure. A wgpu queue dropped with unfinished work can panic. The timed-out effect device stays in a non-polled slot; confirmed removal releases it, and engine drop retains it with a printed reason if removal never happened. The WARP removal plus second-window attach loop that crashed in `D3D10Warp.dll` is **NOT RUN** under the builder account; root must run the host and reviewer stress case. See `w3-host.md`.
 
 ### One-line follow-ups
 
-- Find why DX12 rejects a private-desktop surface, then rerun WARP removal, idle recovery, configure retry, display fallback, and two-view isolation.
-- Run Mac compile and runtime view checks on a Mac.
-- Resolve the existing Mandelbrot reference difference in W14.
+- W18: find the cause of the WARP removal crash during attach and detach, with a saved test (see Unresolved above).
+- GPU timing: measure every kernel at two sizes on RTX and adjust the per-kernel time estimate before claiming the 0.2 s target.
+- Mac: install the Apple target, run the cross-target check, then run Mac view tests on a Mac.
+- W14: resolve the old Mandelbrot reference difference without changing the W3 tolerance.

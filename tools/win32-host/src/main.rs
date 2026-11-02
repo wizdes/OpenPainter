@@ -1,6 +1,7 @@
 #![cfg(windows)]
 
 use op_ffi::*;
+use std::ffi::CString;
 use std::ffi::c_void;
 use std::ptr;
 
@@ -104,6 +105,55 @@ fn attach(engine: *mut OpEngine, doc: u64, hwnd: isize) -> Result<u64, String> {
     )?;
     check(view != 0, "op_view_attach returned zero")?;
     Ok(view)
+}
+
+fn effect_gpu_live(engine: *mut OpEngine, doc: u64) -> Result<(), String> {
+    let command = CString::new("effect.adjust.sepia").unwrap();
+    let mut ticket = 0;
+    status(
+        op_dispatch(engine, doc, command.as_ptr(), ptr::null(), 0, &mut ticket),
+        "effect dispatch",
+    )?;
+    check(ticket != 0, "effect dispatch returned no ticket")?;
+    let query = CString::new("doc.info").unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        let mut buffer = OpBuffer {
+            ptr: ptr::null_mut(),
+            len: 0,
+        };
+        status(
+            op_query(engine, doc, query.as_ptr(), ptr::null(), 0, &mut buffer),
+            "effect GPU info",
+        )?;
+        let bytes = unsafe { std::slice::from_raw_parts(buffer.ptr, buffer.len) };
+        let text = String::from_utf8_lossy(bytes).into_owned();
+        op_buffer_free(&mut buffer);
+        if text.contains("\"gpu\":true") && text.contains("\"gpu_runs\":1") {
+            return Ok(());
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(format!("effect GPU did not become live: {text}"));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+fn wait_errors(engine: *mut OpEngine, view: u64, wanted: u64) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        let current = info(engine, view)?;
+        if current.frame_errors >= wanted {
+            return Ok(());
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(format!(
+                "frame errors stayed at {}, wanted {wanted}",
+                current.frame_errors
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 }
 
 fn scenario(name: &str, failures: &mut usize, check: impl FnOnce() -> Result<(), String>) {
@@ -459,9 +509,11 @@ fn run() -> Result<(), String> {
                     "initial set",
                 )?;
                 wait(engine, view, 1)?;
+                effect_gpu_live(engine, doc)?;
+                std::thread::sleep(std::time::Duration::from_millis(200));
                 let before = info(engine, view)?;
                 op_ffi::view_test_remove_device(engine)?;
-                wait(engine, view, 2)?;
+                wait(engine, view, before.frames + 1)?;
                 let after = info(engine, view)?;
                 check(
                     (after.drawable_width, after.drawable_height) == (64, 48),
@@ -481,8 +533,175 @@ fn run() -> Result<(), String> {
             let detach = status(op_view_detach(engine, view), "RemoveDevice detach");
             result.and(detach)
         });
+        scenario(
+            "RemoveDevice-retry-three-errors-second-view",
+            &mut failures,
+            || {
+                let view = attach(engine, doc, hwnd)?;
+                let result = (|| {
+                    status(
+                        op_view_set(engine, view, &state(64.0, 48.0, &[])),
+                        "retry initial set",
+                    )?;
+                    wait(engine, view, 1)?;
+                    let p3 = op_color::Profile::builtin("display-p3")
+                        .map_err(|e| format!("recovery P3 profile: {e}"))?;
+                    let next_frame = info(engine, view)?.frames + 1;
+                    status(
+                        op_view_set(engine, view, &state(64.0, 48.0, &p3.bytes())),
+                        "retry P3 set",
+                    )?;
+                    wait(engine, view, next_frame)?;
+                    for index in 0..3 {
+                        let before = info(engine, view)?.frame_errors;
+                        op_ffi::view_test_fail_next_configure();
+                        status(
+                            op_view_set(engine, view, &state(65.0 + index as f64, 48.0, &[])),
+                            "retry error set",
+                        )?;
+                        wait_errors(engine, view, before + 1)?;
+                    }
+                    let before = info(engine, view)?;
+                    check(
+                        before.frame_errors >= 3 && before.configures > 0,
+                        "three frame errors were not recorded",
+                    )?;
+                    op_ffi::view_test_fail_next_recreate();
+                    op_ffi::view_test_remove_device(engine)?;
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    let pending = info(engine, view)?;
+                    check(
+                        pending.frame_errors >= before.frame_errors,
+                        "frame error count went backward during recovery",
+                    )?;
+                    check(
+                        pending.configures >= before.configures,
+                        "configure count went backward during recovery",
+                    )?;
+                    check(
+                        op_view_wait_frames(engine, view, pending.frames + 1, 100, ptr::null_mut())
+                            == OpStatus::OP_ERR_BUSY,
+                        "live view did not stay registered during failed recreate",
+                    )?;
+                    wait(engine, view, pending.frames + 1)?;
+                    let after = info(engine, view)?;
+                    check(
+                        after.frame_errors >= pending.frame_errors
+                            && after.configures > before.configures,
+                        "recovery did not keep its counters or configure a new surface",
+                    )?;
+                    check(
+                        after.doc_uploads > before.doc_uploads
+                            && after.table_builds >= before.table_builds
+                            && after.mip_builds >= before.mip_builds,
+                        "recovery did not keep upload, table, or mip counts",
+                    )?;
+                    status(
+                        op_view_set(engine, view, &state(67.0, 48.0, &[])),
+                        "length-zero profile set",
+                    )?;
+                    check(
+                        info(engine, view)?.display_icc_len == p3.bytes().len() as u64,
+                        "length-zero set forgot the app's P3 profile",
+                    )?;
+                    // Windows allows one swap chain per window, after recovery too.
+                    // The second view gets a named error, and the first keeps drawing.
+                    let second = attach(engine, doc, hwnd)?;
+                    let second_result = (|| {
+                        status(
+                            op_view_set(engine, second, &state(64.0, 48.0, &[])),
+                            "second view set",
+                        )?;
+                        wait_errors(engine, second, 1)?;
+                        let next = info(engine, view)?.frames + 1;
+                        status(
+                            op_view_set(engine, view, &state(68.0, 48.0, &[])),
+                            "first view set beside the second",
+                        )?;
+                        wait(engine, view, next)
+                    })();
+                    let second_detach =
+                        status(op_view_detach(engine, second), "second view detach");
+                    second_result.and(second_detach)
+                })();
+                let detach = status(op_view_detach(engine, view), "retry view detach");
+                result.and(detach)
+            },
+        );
+        scenario("RemoveDevice-surface-retry", &mut failures, || {
+            let view = attach(engine, doc, hwnd)?;
+            let result = (|| {
+                status(
+                    op_view_set(engine, view, &state(64.0, 48.0, &[])),
+                    "surface retry set",
+                )?;
+                wait(engine, view, 1)?;
+                let before = info(engine, view)?;
+                op_ffi::view_test_fail_next_surface_recreate();
+                op_ffi::view_test_remove_device(engine)?;
+                wait_errors(engine, view, before.frame_errors + 1)?;
+                let pending = info(engine, view)?;
+                check(
+                    pending.configures >= before.configures,
+                    "surface failure lost configure count",
+                )?;
+                check(
+                    op_view_wait_frames(engine, view, pending.frames + 1, 100, ptr::null_mut())
+                        == OpStatus::OP_ERR_BUSY,
+                    "surface failure detached a live view",
+                )?;
+                wait(engine, view, pending.frames + 1)?;
+                let after = info(engine, view)?;
+                check(
+                    after.configures > before.configures
+                        && after.frame_errors >= pending.frame_errors,
+                    "surface retry did not recover with its counts",
+                )?;
+                let mut counters = OpViewCounters::default();
+                status(
+                    op_view_counters(engine, &mut counters),
+                    "surface retry counters",
+                )?;
+                check(
+                    counters.live_layers == 1,
+                    &format!("surface retry live_layers={}", counters.live_layers),
+                )
+            })();
+            let detach = status(op_view_detach(engine, view), "surface retry detach");
+            result.and(detach)
+        });
+        scenario("frame-panic-keeps-device", &mut failures, || {
+            let view = attach(engine, doc, hwnd)?;
+            let result = (|| {
+                status(
+                    op_view_set(engine, view, &state(64.0, 48.0, &[])),
+                    "panic initial set",
+                )?;
+                wait(engine, view, 1)?;
+                let before = info(engine, view)?;
+                op_ffi::view_test_panic_next_frame();
+                status(
+                    op_view_set(engine, view, &state(64.0, 48.0, &[])),
+                    "panic retry set",
+                )?;
+                wait_errors(engine, view, before.frame_errors + 1)?;
+                wait(engine, view, before.frames + 1)?;
+                let after = info(engine, view)?;
+                check(
+                    after.configures == before.configures,
+                    "a frame panic rebuilt a device that Windows did not remove",
+                )
+            })();
+            let detach = status(op_view_detach(engine, view), "panic view detach");
+            result.and(detach)
+        });
     } else {
         println!("RemoveDevice-idle: NOT RUN (OP_GPU_ADAPTER is not warp)");
+        println!(
+            "RemoveDevice-retry-three-errors-second-view: NOT RUN (OP_GPU_ADAPTER is not warp)"
+        );
+        println!("RemoveDevice-surface-retry: NOT RUN (OP_GPU_ADAPTER is not warp)");
+        println!("frame-panic-keeps-device: NOT RUN (OP_GPU_ADAPTER is not warp)");
     }
 
     let mut final_counters = OpViewCounters::default();

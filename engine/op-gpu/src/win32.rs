@@ -13,9 +13,16 @@ pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 static FAIL_NEXT_CONFIGURE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 #[cfg(feature = "test-hooks")]
+static FAIL_NEXT_SURFACE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+#[cfg(feature = "test-hooks")]
 #[doc(hidden)]
 pub fn test_fail_next_configure() {
     FAIL_NEXT_CONFIGURE.store(true, Ordering::SeqCst);
+}
+#[cfg(feature = "test-hooks")]
+#[doc(hidden)]
+pub fn test_fail_next_surface() {
+    FAIL_NEXT_SURFACE.store(true, Ordering::SeqCst);
 }
 
 #[link(name = "user32")]
@@ -57,6 +64,7 @@ pub struct Win32Target {
     configured: Option<(u32, u32)>,
     display_icc: Vec<u8>,
     counters: Arc<WindowCounters>,
+    counted: bool,
     pub stats: WindowStats,
 }
 
@@ -102,10 +110,12 @@ impl Win32Target {
             configured: None,
             display_icc,
             counters,
+            counted: false,
             stats: WindowStats::default(),
         };
         target.resume(instance)?;
         target.counters.live_targets.fetch_add(1, Ordering::SeqCst);
+        target.counted = true;
         Ok(target)
     }
 
@@ -122,12 +132,18 @@ impl Win32Target {
         self.surface.is_none()
     }
     pub fn suspend(&mut self) {
+        let _warp_guard = crate::windows_warp_guard().expect("WARP surface destruction lock");
         if self.surface.take().is_some() {
             self.counters.live_surfaces.fetch_sub(1, Ordering::SeqCst);
         }
         self.configured = None;
     }
     pub fn resume(&mut self, instance: &wgpu::Instance) -> Result<(), String> {
+        let _warp_guard = crate::windows_warp_guard().map_err(|e| e.to_string())?;
+        #[cfg(feature = "test-hooks")]
+        if FAIL_NEXT_SURFACE.swap(false, Ordering::SeqCst) {
+            return Err("create DX12 HWND surface failed: test hook".into());
+        }
         if self.surface.is_some() {
             return Ok(());
         }
@@ -229,7 +245,29 @@ impl Win32Target {
 impl Drop for Win32Target {
     fn drop(&mut self) {
         self.suspend();
-        self.counters.live_targets.fetch_sub(1, Ordering::SeqCst);
+        if self.counted {
+            self.counters.live_targets.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_surface_does_not_decrement_uncounted_target() {
+        let counters = Arc::new(WindowCounters::default());
+        drop(Win32Target {
+            hwnd: 0,
+            surface: None,
+            configured: None,
+            display_icc: Vec::new(),
+            counters: counters.clone(),
+            counted: false,
+            stats: WindowStats::default(),
+        });
+        assert_eq!(counters.live_targets.load(Ordering::SeqCst), 0);
     }
 }
 

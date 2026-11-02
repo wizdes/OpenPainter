@@ -189,6 +189,13 @@ fn every_neighborhood_kernel_has_a_sample_estimate() {
         GpuKernel::Morphology,
         GpuKernel::Sharpen,
         GpuKernel::ReduceNoise,
+        GpuKernel::Turbulence,
+        GpuKernel::Fragment,
+        GpuKernel::Bulge,
+        GpuKernel::Vignette,
+        GpuKernel::AddNoise,
+        GpuKernel::Twist,
+        GpuKernel::Clouds,
     ] {
         assert!(
             op_gpu::windows_kernel_samples(kernel, [3, 3, 0]).is_some(),
@@ -198,30 +205,57 @@ fn every_neighborhood_kernel_has_a_sample_estimate() {
 }
 
 #[test]
-fn measure_short_neighborhood_jobs() {
+fn warm_pipeline_timings_at_two_sizes_stay_below_one_second_on_rtx() {
+    if std::env::var("OP_GPU_ADAPTER").as_deref() != Ok("hardware") {
+        return;
+    }
     let mut gpu = GpuContext::new().unwrap();
     for (kernel, values, name) in [
         (GpuKernel::Outline, [3, 50, 0], "Outline"),
-        (GpuKernel::Median, [5, 50, 0], "Median"),
+        (GpuKernel::Median, [3, 50, 0], "Median"),
         (GpuKernel::Unfocus, [5, 0, 0], "Unfocus"),
+        (GpuKernel::Gaussian, [5, 0, 0], "Gaussian"),
     ] {
-        let (width, height) = if name == "Outline" {
-            (512u32, 512u32)
+        let mut times = Vec::new();
+        let sizes = if name == "Median" {
+            [(512u32, 512u32), (768u32, 768u32)]
         } else {
-            (128u32, 128u32)
+            [(512u32, 512u32), (1024u32, 1024u32)]
         };
-        let pixels = vec![127u8; (width * height * 4) as usize];
-        gpu.effect_kernel_with_params(kernel, width, height, &pixels, values)
-            .unwrap();
-        let start = std::time::Instant::now();
-        gpu.effect_kernel_with_params(kernel, width, height, &pixels, values)
-            .unwrap();
-        let samples = op_gpu::windows_kernel_samples(kernel, values).unwrap()
-            * u64::from(width)
-            * u64::from(height);
+        for (width, height) in sizes {
+            let pixels = vec![127u8; (width * height * 4) as usize];
+            // The first call creates the pipeline. Measure the next three calls.
+            let run = |gpu: &mut GpuContext| {
+                if kernel == GpuKernel::Gaussian {
+                    gpu.gaussian_timed(width, height, &pixels, values[0] as u32)
+                        .unwrap()
+                        .0
+                } else {
+                    gpu.effect_kernel_with_params(kernel, width, height, &pixels, values)
+                        .unwrap()
+                }
+            };
+            run(&mut gpu);
+            let mut samples = Vec::new();
+            for _ in 0..3 {
+                let before = gpu.dispatch_count();
+                let start = std::time::Instant::now();
+                let output = run(&mut gpu);
+                samples.push(start.elapsed().as_secs_f64() * 1000.0);
+                assert_eq!(output.len(), pixels.len());
+                assert!(gpu.dispatch_count() > before);
+            }
+            samples.sort_by(f64::total_cmp);
+            assert!(
+                samples[1] < 1000.0,
+                "{name} {width}x{height}: {} ms",
+                samples[1]
+            );
+            times.push(samples[1]);
+        }
         eprintln!(
-            "throughput {name}: {samples} estimated loop iterations in {:.3} ms",
-            start.elapsed().as_secs_f64() * 1000.0
+            "warm {name}: {}x{} {:.3} ms; {}x{} {:.3} ms",
+            sizes[0].0, sizes[0].1, times[0], sizes[1].0, sizes[1].1, times[1]
         );
     }
 }
@@ -270,20 +304,28 @@ fn twist_matches_cpu_across_more_than_one_chunk() {
 }
 
 #[test]
-fn warp_default_twist_completes_at_3000_by_2700() {
+fn warp_default_twist_matches_cpu_at_3000_by_400() {
     if std::env::var("OP_GPU_ADAPTER").as_deref() != Ok("warp") {
         return;
     }
     let mut gpu = GpuContext::new().unwrap();
-    let (width, height) = (3000u32, 2700u32);
-    let source = vec![128u8; (width * height * 4) as usize];
+    let (width, height) = (3000u32, 400u32);
+    let mut seed = 0x573e_1492u32;
+    let source: Vec<u8> = (0..u64::from(width) * u64::from(height) * 4)
+        .map(|_| {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            (seed >> 24) as u8
+        })
+        .collect();
     let start = std::time::Instant::now();
     let result = gpu
         .effect_kernel(GpuKernel::Twist, width, height, &source)
         .unwrap();
-    assert_eq!(result.len(), source.len());
+    let expected =
+        op_ops::effect::reference_rgba8("effect.distort.twist", width, height, &source).unwrap();
+    assert_eq!(result, expected, "Twist differs at the 3000x400 chunk seam");
     eprintln!(
-        "WARP Twist 3000x2700: {:.3} s",
+        "WARP Twist 3000x400: {:.3} s",
         start.elapsed().as_secs_f64()
     );
 }

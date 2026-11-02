@@ -59,7 +59,7 @@ fn bind(
     })
 }
 impl GpuContext {
-    fn cached_gaussian_pipeline(
+    pub(crate) fn cached_gaussian_pipeline(
         &mut self,
         label: &'static str,
         source: &'static str,

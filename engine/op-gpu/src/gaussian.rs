@@ -32,6 +32,7 @@ fn intermediate(
         view_formats: &[],
     })
 }
+#[cfg(not(windows))]
 fn pipeline(gpu: &GpuContext, label: &'static str, source: &'static str) -> wgpu::ComputePipeline {
     let module = gpu
         .device
@@ -96,11 +97,21 @@ impl GpuContext {
                 contents: bytemuck::cast_slice(&[width, height, radius, 0u32]),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
+        #[cfg(windows)]
+        let vertical = self
+            .cached_gaussian_pipeline("Gaussian vertical", include_str!("gaussian_vertical.wgsl"));
+        #[cfg(not(windows))]
         let vertical = pipeline(
             self,
             "Gaussian vertical",
             include_str!("gaussian_vertical.wgsl"),
         );
+        #[cfg(windows)]
+        let horizontal = self.cached_gaussian_pipeline(
+            "Gaussian horizontal",
+            include_str!("gaussian_horizontal.wgsl"),
+        );
+        #[cfg(not(windows))]
         let horizontal = pipeline(
             self,
             "Gaussian horizontal",

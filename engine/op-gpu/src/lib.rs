@@ -55,6 +55,102 @@ mod patch_tests {
         );
         assert_eq!(super::replace_shader_marker("x", "x", "y"), "y");
     }
+
+    #[test]
+    fn zero_deadline_expires_while_submitted_work_is_pending() {
+        let gpu = super::GpuContext::new().unwrap();
+        let shader = gpu
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("wait timeout test"),
+                source: wgpu::ShaderSource::Wgsl(
+                    r#"
+                @group(0) @binding(0) var<storage, read_write> result: array<u32>;
+                @compute @workgroup_size(1)
+                fn main() {
+                    var value = 1u;
+                    for (var i = 0u; i < 10000000u; i = i + 1u) {
+                        value = value * 1664525u + 1013904223u;
+                    }
+                    result[0] = value;
+                }
+            "#
+                    .into(),
+                ),
+            });
+        let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("wait timeout result"),
+            size: 4,
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
+        let layout = gpu
+            .device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("wait timeout layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+        let bind = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("wait timeout bind"),
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        let pipeline_layout = gpu
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("wait timeout pipeline layout"),
+                bind_group_layouts: &[&layout],
+                push_constant_ranges: &[],
+            });
+        let pipeline = gpu
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("wait timeout pipeline"),
+                layout: Some(&pipeline_layout),
+                module: &shader,
+                entry_point: Some("main"),
+                compilation_options: Default::default(),
+                cache: None,
+            });
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: None,
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.dispatch_workgroups(1, 1, 1);
+        }
+        gpu.queue.submit(Some(encoder.finish()));
+        let result = super::poll_gpu_with_timeout(
+            &gpu.device,
+            "submitted test work",
+            std::time::Duration::ZERO,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(super::GpuError::WaitTimeout("submitted test work"))
+            ),
+            "{result:?}"
+        );
+        super::poll_gpu(&gpu.device, "test cleanup").unwrap();
+    }
 }
 
 #[derive(Debug, Error)]
@@ -75,12 +171,20 @@ pub enum GpuError {
 pub type Result<T> = std::result::Result<T, GpuError>;
 
 pub fn poll_gpu(device: &wgpu::Device, operation: &'static str) -> Result<()> {
+    poll_gpu_with_timeout(device, operation, std::time::Duration::from_secs(30))
+}
+
+pub fn poll_gpu_with_timeout(
+    device: &wgpu::Device,
+    operation: &'static str,
+    timeout: std::time::Duration,
+) -> Result<()> {
     // Windows has a deadline so DX12 cannot block a worker forever. Metal
     // keeps its original indefinite wait and the same error mapping.
     #[cfg(windows)]
     let poll = wgpu::PollType::Wait {
         submission_index: None,
-        timeout: Some(std::time::Duration::from_secs(30)),
+        timeout: Some(timeout),
     };
     #[cfg(not(windows))]
     let poll = wgpu::PollType::wait_indefinitely();
@@ -131,6 +235,10 @@ pub fn windows_kernel_samples(kernel: op_ops::effect::GpuKernel, values: [i32; 3
         K::Zoom => Some(64),
         K::Pixelate => Some(4),
         K::EdgeDetect | K::Emboss | K::Relief => Some(9),
+        K::Turbulence => Some(u64::from((values[0] as u32 & 15).max(1)) * 16),
+        K::Fragment => Some(16),
+        K::Bulge | K::Vignette | K::AddNoise | K::Twist => Some(4),
+        K::Clouds => Some(64),
         _ => None,
     }
 }
@@ -211,7 +319,7 @@ pub fn windows_adapter() -> Result<(wgpu::Instance, wgpu::Adapter)> {
                     && info.device_type == wgpu::DeviceType::Cpu
                     && info.name.to_ascii_lowercase().contains("basic render")
             })
-            .ok_or_else(|| GpuError::NoAdapter("DX12 WARP adapter was not found".into()))?
+            .ok_or_else(|| GpuError::NoAdapter("DX12 WARP adapter was not found; a holder of a removed device may remain in this process".into()))?
     } else {
         let adapter =
             pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
@@ -260,6 +368,8 @@ pub struct GpuContext {
     lost: Arc<AtomicBool>,
     dispatches: u64,
     pipelines: HashMap<&'static str, wgpu::ComputePipeline>,
+    #[cfg(windows)]
+    shader_module: Option<wgpu::ShaderModule>,
     upload_ring: UploadRing,
     readback_ring: ReadbackRing,
 }
@@ -280,12 +390,7 @@ impl GpuContext {
         let output = self.texture(dw, dh);
         let acc = self.accumulator(dw, dh);
         let params = self.params(dw, dh, 0, 255, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("resample nearest"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("resample nearest");
         let pipeline = self.pipeline(&module, "resample_nearest");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
         self.dispatch(&pipeline, &bind, dw, dh)?;
@@ -307,12 +412,7 @@ impl GpuContext {
         let output = self.texture(dw, dh);
         let acc = self.accumulator(dw, dh);
         let params = self.params(dw, dh, 0, 255, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("resample bicubic"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("resample bicubic");
         let pipeline = self.pipeline(&module, "resample_bicubic");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
         self.dispatch(&pipeline, &bind, dw, dh)?;
@@ -334,12 +434,7 @@ impl GpuContext {
         let output = self.texture(dw, dh);
         let acc = self.accumulator(dw, dh);
         let params = self.params(dw, dh, 0, 255, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("resample bilinear"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("resample bilinear");
         let pipeline = self.pipeline(&module, "resample_bilinear");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
         self.dispatch(&pipeline, &bind, dw, dh)?;
@@ -364,12 +459,7 @@ impl GpuContext {
         let output = self.texture(dw, dh);
         let acc = self.accumulator(dw, dh);
         let params = self.params(dw, dh, 0, 255, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("resample super sampling"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("resample super sampling");
         let pipeline = self.pipeline(&module, "resample_super_sampling");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
         self.dispatch(&pipeline, &bind, dw, dh)?;
@@ -493,12 +583,7 @@ impl GpuContext {
                 usage: wgpu::BufferUsages::STORAGE,
             });
         let params = self.params(width, height, 0, 0, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("effect kernels"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("effect kernels");
         let pipeline = self.pipeline(&module, "effect_clouds");
         let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
         self.dispatch(&pipeline, &bind, width, height)?;
@@ -542,12 +627,7 @@ impl GpuContext {
                 usage: wgpu::BufferUsages::STORAGE,
             });
         let params = self.params(width, height, 0, 0, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("effect kernels"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("effect kernels");
         let pipeline = self.pipeline(&module, "effect_add_noise");
         let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
         self.dispatch(&pipeline, &bind, width, height)?;
@@ -578,12 +658,7 @@ impl GpuContext {
                 usage: wgpu::BufferUsages::STORAGE,
             });
         let params = self.params(width, height, warmth as u32, 0, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("photo effect kernels"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("photo effect kernels");
         let pipeline = self.pipeline(
             &module,
             if soften {
@@ -659,12 +734,7 @@ impl GpuContext {
         let rows_per_chunk = (binding_limit / row_bytes).max(1) as u32;
         let input = self.upload(width, height, bytes)?;
         let output = self.texture(width, height);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Windows exact Twist coordinates"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("Windows exact Twist coordinates");
         let pipeline = self.pipeline(&module, "effect_twist");
         let cx = width as f64 * 0.5;
         let cy = height as f64 * 0.5;
@@ -892,12 +962,7 @@ impl GpuContext {
                 ]),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("effect kernels"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("effect kernels");
         let entry = match kernel {
             op_ops::effect::GpuKernel::InvertColors => "effect_invert_colors",
             op_ops::effect::GpuKernel::InvertAlpha => "effect_invert_alpha",
@@ -984,12 +1049,7 @@ impl GpuContext {
                 usage: wgpu::BufferUsages::STORAGE,
             });
         let params = self.params(width, height, 0, 0, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("effect kernels"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("effect kernels");
         let entry = if luminosity {
             "effect_lut_luminosity"
         } else {
@@ -1023,8 +1083,18 @@ impl GpuContext {
             required_features: enabled_features,
             ..Default::default()
         };
-        let (device, queue) = pollster::block_on(adapter.request_device(&desc))
-            .map_err(|e| GpuError::NoAdapter(e.to_string()))?;
+        let (device, queue) = pollster::block_on(adapter.request_device(&desc)).map_err(|e| {
+            #[cfg(windows)]
+            {
+                GpuError::NoAdapter(format!(
+                    "{e}; a holder of a removed device may remain in this process"
+                ))
+            }
+            #[cfg(not(windows))]
+            {
+                GpuError::NoAdapter(e.to_string())
+            }
+        })?;
         let lost = Arc::new(AtomicBool::new(false));
         let signal = lost.clone();
         device.set_device_lost_callback(move |_, _| {
@@ -1044,6 +1114,8 @@ impl GpuContext {
             lost,
             dispatches: 0,
             pipelines: HashMap::new(),
+            #[cfg(windows)]
+            shader_module: None,
             upload_ring: UploadRing::new(),
             readback_ring: ReadbackRing::new(),
         })
@@ -1067,6 +1139,18 @@ impl GpuContext {
     }
     pub fn simulate_device_loss(&self) {
         self.lost.store(true, Ordering::SeqCst);
+    }
+    #[cfg(windows)]
+    pub fn device_removed(&self) -> bool {
+        use windows::Win32::Graphics::Direct3D12::ID3D12Device;
+        let raw: ID3D12Device = unsafe {
+            self.device
+                .as_hal::<wgpu::hal::api::Dx12>()
+                .expect("Windows effects use DX12")
+                .raw_device()
+                .clone()
+        };
+        unsafe { raw.GetDeviceRemovedReason().is_err() }
     }
     fn texture(&self, width: u32, height: u32) -> wgpu::Texture {
         self.device.create_texture(&wgpu::TextureDescriptor {
@@ -1402,6 +1486,23 @@ pub struct LayerInput<'a> {
 }
 
 impl GpuContext {
+    fn shader_module(&mut self, label: &'static str) -> wgpu::ShaderModule {
+        #[cfg(windows)]
+        if let Some(module) = &self.shader_module {
+            return module.clone();
+        }
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(label),
+                source: kernel_shader_source(),
+            });
+        #[cfg(windows)]
+        {
+            self.shader_module = Some(module.clone());
+        }
+        module
+    }
     fn pipeline(
         &mut self,
         module: &wgpu::ShaderModule,
@@ -1621,12 +1722,7 @@ impl GpuContext {
             return Err(GpuError::InvalidImage);
         }
         let zero = vec![0; width as usize * height as usize * 4];
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("compositor"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("compositor");
         let layer_pipeline = self.pipeline(&module, "layer");
         let finish_pipeline = self.pipeline(&module, "finish");
         let acc = self.accumulator(width, height);
@@ -1722,12 +1818,7 @@ impl GpuContext {
                 )
                 .map(|(pixels, _)| pixels),
             ToolCompositeMode::Overwrite => {
-                let module = self
-                    .device
-                    .create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("overwrite"),
-                        source: kernel_shader_source(),
-                    });
+                let module = self.shader_module("overwrite");
                 let pipeline = self.pipeline(&module, "overwrite");
                 let input = self.upload(width, height, src)?;
                 let mask_texture = self.upload_mask(width, height, mask)?;
@@ -1779,12 +1870,7 @@ impl GpuContext {
                 ],
             ),
             ToolCompositeMode::Overwrite => {
-                let module = self
-                    .device
-                    .create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("overwrite"),
-                        source: kernel_shader_source(),
-                    });
+                let module = self.shader_module("overwrite");
                 let pipeline = self.pipeline(&module, "overwrite");
                 let input = self.upload(width, height, src)?;
                 let output = self.texture(width, height);
@@ -1807,12 +1893,7 @@ impl GpuContext {
         let output = self.texture(width, height);
         let acc = self.accumulator(width, height);
         let params = self.params(width, height, 0, 255, false);
-        let module = self
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("box blur"),
-                source: kernel_shader_source(),
-            });
+        let module = self.shader_module("box blur");
         let pipeline = self.pipeline(&module, "box_blur");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
         self.dispatch(&pipeline, &bind, width, height)?;

@@ -101,6 +101,8 @@ enum Slot {
     Untried,
     Ready(Box<Device>),
     Off(String),
+    #[cfg(windows)]
+    TimedOut(Box<Device>, String),
 }
 
 #[derive(Default)]
@@ -129,7 +131,10 @@ impl GpuShared {
     #[cfg(windows)]
     pub(crate) fn release_for_canvas_recovery(&self) {
         let mut slot = self.slot.lock();
-        if matches!(*slot, Slot::Ready(_)) {
+        let _warp_guard = op_gpu::windows_warp_guard().expect("WARP effect device release lock");
+        if matches!(*slot, Slot::Ready(_))
+            || matches!(&*slot, Slot::TimedOut(device, _) if device.ctx.device_removed())
+        {
             *slot = Slot::Untried;
         }
     }
@@ -154,6 +159,8 @@ impl GpuShared {
                 Value::Null,
             ),
             Slot::Off(reason) => (false, Some(reason.clone()), Value::Null),
+            #[cfg(windows)]
+            Slot::TimedOut(_, reason) => (false, Some(reason.clone()), Value::Null),
             Slot::Ready(device) => {
                 let info = device.ctx.info();
                 let l = device.limits;
@@ -199,6 +206,14 @@ impl GpuShared {
     }
     /// Starts the GPU on first use. Returns the reason when there is none.
     fn ensure(&self, slot: &mut Slot) -> std::result::Result<(), String> {
+        #[cfg(windows)]
+        if matches!(slot, Slot::Ready(device) if device.ctx.device_removed()) {
+            *slot = Slot::Untried;
+        }
+        #[cfg(windows)]
+        if matches!(slot, Slot::TimedOut(device, _) if device.ctx.device_removed()) {
+            *slot = Slot::Untried;
+        }
         if matches!(slot, Slot::Untried) {
             let created = match &self.options.simulate_gpu_failure {
                 Some(message) => Err(format!("GPU creation failed: {message}")),
@@ -229,13 +244,38 @@ impl GpuShared {
         }
         match slot {
             Slot::Off(reason) => Err(reason.clone()),
+            #[cfg(windows)]
+            Slot::TimedOut(_, reason) => Err(reason.clone()),
             _ => Ok(()),
         }
     }
     /// Turns the GPU off for the rest of the engine's life and logs it once.
+    #[cfg(not(windows))]
     fn disable(&self, slot: &mut Slot, reason: String) {
         eprintln!("op-engine: GPU turned off, using the CPU path from now on: {reason}");
         *slot = Slot::Off(reason);
+    }
+}
+
+#[cfg(windows)]
+impl Drop for GpuShared {
+    fn drop(&mut self) {
+        let _warp_guard = op_gpu::windows_warp_guard().expect("WARP effect engine release lock");
+        let slot = self.slot.get_mut();
+        match std::mem::replace(slot, Slot::Untried) {
+            Slot::Ready(device) => drop(device),
+            Slot::TimedOut(device, reason) => {
+                if device.ctx.device_removed() {
+                    drop(device);
+                } else {
+                    eprintln!(
+                        "op-engine: retaining unfinished GPU device at engine drop because it was not removed: {reason}"
+                    );
+                    std::mem::forget(device);
+                }
+            }
+            Slot::Untried | Slot::Off(_) => {}
+        }
     }
 }
 
@@ -675,6 +715,9 @@ fn chunks(bounds: Rect, doc: &DocState, plan: &Plan, limits: &Limits) -> Option<
             }]
         });
     }
+    #[cfg(windows)]
+    let edge = timed_chunk_edge(limits, plan)? as i64;
+    #[cfg(not(windows))]
     let edge = limits.chunk_for(plan.halo)? as i64;
     let halo = i64::from(plan.halo);
     let (bx, by) = (i64::from(bounds.x), i64::from(bounds.y));
@@ -699,6 +742,28 @@ fn chunks(bounds: Rect, doc: &DocState, plan: &Plan, limits: &Limits) -> Option<
         y += h;
     }
     Some(out)
+}
+
+#[cfg(windows)]
+fn timed_chunk_edge(limits: &Limits, plan: &Plan) -> Option<u32> {
+    // One estimated work unit is one shader sample. Keep each submission
+    // below 200 million units, including all input pixels in the halo.
+    let work_per_pixel = match plan.call {
+        Call::Params(kernel, values) => {
+            op_gpu::windows_kernel_samples(kernel, values).unwrap_or(64)
+        }
+        Call::Gaussian(radius) => u64::from(radius).saturating_mul(4).saturating_add(2),
+        Call::Glow(radius, _, _) | Call::Soften(radius, _, _) => {
+            u64::from(radius).saturating_mul(4).saturating_add(2)
+        }
+        Call::Lut(_, _) => 4,
+        Call::Noise(_) | Call::Clouds(_) => 64,
+    }
+    .max(1);
+    let max_input = ((200_000_000 / work_per_pixel) as f64).sqrt().floor() as u64;
+    let room = max_input.checked_sub(2 * u64::from(plan.halo))?;
+    let edge = limits.chunk_for(plan.halo)?.min(room as u32);
+    (edge >= 16).then_some(edge)
 }
 
 /// What the GPU path decided.
@@ -798,7 +863,11 @@ fn render(
         let (iw, ih) = (chunk.input.width, chunk.input.height);
         let before = device.ctx.dispatch_count();
         let result = catch_unwind(AssertUnwindSafe(|| {
-            match shared.options.simulate_gpu_dispatch_error {
+            match shared
+                .options
+                .simulate_gpu_dispatch_error
+                .filter(|_| before > 0)
+            {
                 Some("wait_timeout") => return Err(GpuError::WaitTimeout("simulated dispatch")),
                 Some("job_too_long") => return Err(GpuError::JobTooLong("simulated dispatch")),
                 _ => {}
@@ -811,6 +880,11 @@ fn render(
         let pixels = match result {
             Ok(Ok(pixels)) => pixels,
             Ok(Err(GpuError::DeviceLost)) => {
+                #[cfg(windows)]
+                if device.ctx.device_removed() {
+                    *slot = Slot::Untried;
+                }
+                #[cfg(not(windows))]
                 shared.disable(&mut slot, "the GPU device was lost".into());
                 return Ok(Outcome::Cpu("the GPU device was lost".into()));
             }
@@ -818,6 +892,13 @@ fn render(
                 let reason = format!("GPU wait timed out ({e})");
                 // wgpu may still own an active DX12 submission. Dropping its
                 // device here can panic, so retain it for this process's life.
+                #[cfg(windows)]
+                if let Slot::Ready(device) =
+                    std::mem::replace(&mut *slot, Slot::Off(reason.clone()))
+                {
+                    *slot = Slot::TimedOut(device, reason.clone());
+                }
+                #[cfg(not(windows))]
                 if let Slot::Ready(device) =
                     std::mem::replace(&mut *slot, Slot::Off(reason.clone()))
                 {
@@ -835,6 +916,12 @@ fn render(
             }
             Ok(Err(e)) => return Ok(Outcome::Cpu(format!("GPU error ({e})"))),
             Err(_) => {
+                #[cfg(windows)]
+                if device.ctx.device_removed() {
+                    *slot = Slot::Untried;
+                    return Ok(Outcome::Cpu("the GPU device was lost".into()));
+                }
+                #[cfg(not(windows))]
                 shared.disable(&mut slot, "GPU work panicked".into());
                 return Ok(Outcome::Cpu("GPU work panicked".into()));
             }
@@ -947,6 +1034,19 @@ mod tests {
         assert!(l.fits(2048, 2048));
         assert!(!l.fits(4097, 10));
         assert!(!l.fits(4096, 4096));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn timed_chunks_keep_default_median_on_gpu() {
+        let l = limits(4096, 256 * 1024 * 1024, 2048);
+        let plan = Plan::new(Call::Params(GpuKernel::Median, [5, 50, 0]), 5);
+        let edge = timed_chunk_edge(&l, &plan).expect("default Median has room beyond its halo");
+        assert!(edge >= 16 && edge < 2048, "edge={edge}");
+        let input = edge + 10;
+        assert!(
+            op_gpu::windows_job_too_long(GpuKernel::Median, input, input, [5, 50, 0]).is_none()
+        );
     }
 
     #[test]
