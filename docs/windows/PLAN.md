@@ -1,12 +1,12 @@
 # OpenPainter for Windows: plan
 
-Status: revision 2, approved by the user on 2026-11-01. W0 has started on branch `windows`. Written 2026-11-01 on the Windows PC. A fresh Opus reviewer read revision 1; `docs/windows/reviews/plan-review.md` records each finding. Astra reviews revision 2 now that root can reach the `agent` account.
+Status: revision 3. The user approved revision 2 on 2026-11-01, and this revision adds the fixes from its review. W0 is closed and W1 is building on branch `windows`. Fresh Opus reviewers read revisions 1 and 2; `docs/windows/reviews/` records each finding. Astra has not reviewed any revision: its slot stayed full for 45 minutes on 2026-11-01. Root retries at the end of Phase A.
 
 ## 1. The short version
 
 The Rust engine moves to Windows with modest changes. The Mac app (Swift) does not move, so Windows gets a new C# app. This PC has paint.net 5.1.12, so effects and behavior can be compared with the real thing. That comparison was blocked for the whole Mac build (old milestone M02). Fixes go into the shared engine, so the Mac app gets them too.
 
-The work is 21 milestones, W0 to W20, about 350 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
+The work is 21 milestones, W0 to W20, about 410 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
 
 ```
 Engine (Rust, shared) --> C interface --> Mac app (Swift, exists)
@@ -57,14 +57,16 @@ Avalonia 12 with C# and NativeAOT (C# compiled to one native program) is my work
 
 The Mac draws those overlays in Swift (`mac/OpenPainterKit/Sources/Shell/SelectionOverlay.swift`), so WinUI has a real advantage here. Avalonia stays first because headless testing removes most of the need to touch the user's screen, and that was QuickEdit's largest source of trouble. WPF lost because its Native AOT is not ready. All-Rust Win32 lost because every control and screen-reader path would be hand-built.
 
-W5 chooses WinUI 3 if Avalonia fails any of: overlays at full frame rate, pen pressure, text input with IME, Narrator, launch budget, or tests against the AOT build.
+W5 chooses WinUI 3 if Avalonia fails any of: overlays at full frame rate on a visible screen, pointer and IME input on the canvas itself, Narrator, a launch under 3 s, or tests against the AOT build. Real pen pressure cannot be measured here (no pen), so W5 checks that the pressure API delivers replayed values and marks a real pen NOT RUN.
+
+**W5 stops for decision 4.** Its real-window checks cannot close NOT RUN, because 122 hours of work depend on the choice. **If WinUI wins, root re-plans W7 to W18 before they start**, with new test layers and budgets, because WinUI tests need a real window and builders have none.
 
 ### 3.2 How paint.net is used
 
-- **Own pinned copy.** The portable 5.1.12 ZIP goes to `C:\agent-work\pdn-5.1.12`, updates off, hash recorded. Only root runs it.
-- **The user's copy is never touched.** Stop processes by PID only, never by name. W0 tests safely whether a second copy hands work to the user's window, and whether portable mode writes to `%LOCALAPPDATA%`. If either happens, captures run only while the user's copy is closed.
+- **Own pinned copy.** The portable 5.1.12 ZIP goes to `C:\agent-work\pdn-5.1.12`, updates off, hash recorded. Only root runs it, as `yjli`, because it crashes at startup as `agent`. Any plugin that runs inside it is built by root from source root has read.
+- **The user's copy is never touched.** Stop processes by PID only, never by name. W0 found that portable mode writes to `%LOCALAPPDATA%\Paint.NET`, the folder the user's copy uses. So captures run only while the user's copy is closed (decision 4). The preflight fails when a `paintdotnet.exe` runs outside the pin, and root backs up that folder before the first capture.
 - **Outputs and behavior only.** Its license forbids derivative works. We compare pixels and behavior. We never decompile it or load private code, and we never copy its icons, help text or resources. Standard menu names stay as a compatibility list. The OpenPDN `.resx`, `.png` and GPC ban still applies.
-- **Captures use the public plugin API first.** The API exposes built-in effects to plugins, and CodeLab shows a plugin running an effect through `CreateInstance` and `CreateRenderer`. W4 tries this first, then UI Automation, then the OpenPDN oracle.
+- **Captures use the public plugin API first.** The API exposes built-in effects to plugins, and CodeLab shows a plugin running an effect through `CreateInstance` and `CreateRenderer`. W4 first checks that this needs no private types, and tries it if so, then UI Automation, then the OpenPDN oracle.
 - **Tools keep our own goldens.** `docs/ARCHITECTURE.md:205` says "Never capture pixels" for tools. Tools get reviewed shots and behavior checks against paint.net.
 - **The product page and Store listing never name paint.net** (user decision, 2026-10-25). W19 scans for it.
 
@@ -88,7 +90,7 @@ These extend the existing `cargo xtask check --tier`.
 | checkpoint | phase end | about 2 h, in parts | All real-window flows, GPU matrix on RTX and on WARP (software GPU), paint.net comparison, fuzz, Mac and Linux runs |
 | speed | release | root only | Launch, size, open, blur and brush next to paint.net, n=5 medians |
 
-The GPU matrix alone took 1,969 s on the Mac, so it has its own part. A part that is not reached prints NOT RUN and fails the level.
+The GPU matrix alone took 1,969 s on the Mac, so it has its own part. A part that is not reached prints NOT RUN and fails the level. Captured images are private, so outside that repo's access the comparison part prints NOT RUN and is listed as owed; it does not fail a Mac or Linux run.
 
 ### 4.2 What each QuickEdit answer changes
 
@@ -102,7 +104,7 @@ The GPU matrix alone took 1,969 s on the Mac, so it has its own part. A part tha
 | U13: the speed run was skipped, then stayed unrun for 5 releases | The release report prints the speed result or NOT RUN. |
 | U1: no real printing, because a print prompt broke later tests | Print is not in this version. No test opens a system print or network dialog. |
 | V1 to V4: Astra and Fable vote on hard questions | Same, in `docs/windows/decisions.md`. Root breaks a tie. |
-| QuickEdit's away log and "NOT RUN" rule | A milestone closes on headless checks, marked "window checks NOT RUN". A phase cannot close until they run or the user waives them. |
+| QuickEdit's away log and "NOT RUN" rule | A milestone closes on headless checks, marked "window checks NOT RUN". A phase cannot close until they run or the user waives them. W5 is the exception: it stops for them. |
 
 ### 4.3 QuickEdit's traps, with the Windows rule
 
@@ -128,51 +130,51 @@ Each test runs at the lowest layer that proves it.
 2. **Hidden desktop.** A real window on a second Windows desktop (`CreateDesktop`). W0 tests DX12 drawing, focus, UI Automation and capture there. It may not work.
 3. **Visible desktop.** Only what the others cannot prove, while the user is away with the screen unlocked (decision 4).
 
-Layers 2 and 3 run only as root, as `yjli`, and only on code root has already read and merged. Builders never run them. Heavy runs use below-normal priority and at most 8 build jobs. GPU runs check first that Sunshine and LM Studio are not busy. Sleep and GPU reset are simulated through a test hook, not done for real. Scaling tests use a test setting, not the system setting.
+Layers 2 and 3 run only as root, as `yjli`, and only on code root has already read and merged. Builders never run them. Layer 2 shares the clipboard with the user's desktop (not yet proven), so clipboard tests use a private test clipboard or run only in decision 4's time. Heavy runs use below-normal priority and at most 8 build jobs. GPU runs check first that Sunshine and LM Studio are not busy. Sleep and GPU reset are simulated through a test hook, not done for real. Scaling tests use a test setting, not the system setting.
 
 ## 5. The milestones
 
 Each milestone ends with a working build, a short hands-on script, and a row of speed numbers. Budgets are agent hours. When a milestone runs 50% over, root sends a note and cuts back to the done-test.
 
-### Phase A: engine on Windows, and the reference (52 h)
+### Phase A: engine on Windows, and the reference (66 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |
 | W0 | Machine and test setup | .NET 10 for both accounts. Pinned paint.net. `preflight.ps1`. Runner refresh. `.gitattributes`. Check tiers in `xtask`. Probes: hidden desktop, GPU over SSH as `agent`, second paint.net copy. | The preflight passes. A headless Avalonia test passes as `agent`. A one-page result says what each probe found. | 6 h | D1 |
-| W1 | Engine files and tests | Positional file reads, folder sync, atomic replace with retries when antivirus holds a file, drive letters, long paths, DLL build. Port all Unix-only tests, and the fuzz driver. Guard the `lcms2` panic. Find the Mandelbrot cause. | Per-file test counts are compared with the Mac; every file that does not run is named. All non-GPU tests pass. GPU tests are listed as waiting for W3. | 10 h | W0 |
-| W2 | Recovery redesign | Lock file moved outside the record folder, close-before-rename, a new same-file check, `TerminateProcess` kill test. `ARCHITECTURE.md` changes first. Mac behavior is kept. | Kill before, during and after a record write recovers on Windows and on the Mac. Fresh review of this change. | 8 h | W1 |
-| W3 | GPU and canvas on DX12 | One pinned backend for both device paths, WARP selector, backend assert. Small Win32 test host. Window handle in `op_view_attach`. Display profile from Windows. Device-lost hook. Shader compiler choice. A guard against long GPU jobs that trigger a Windows GPU reset. | M54 matrix 0 failures on RTX and WARP, and the test fails unless DX12 or WARP ran. Ported resize, switch and create-destroy scenarios pass. Color within ΔE00 1 of direct lcms2 transforms. Mac view tests still pass. | 14 h | W1 |
-| W4 | paint.net capture kit (old M02) | Plugin or driver. The real 5.1.12 catalog. `targets.toml` gains `pdn-5.1`. Private oracle repo. `parity.md` started. Fallback list. | One effect per family, twice, with the same hashes. The manifest pins build, parameters, ICC, inputs, GPU and driver. Catalog and fallback list committed. | 14 h | W0 |
+| W1 | Engine files and tests | Positional file reads, folder sync, atomic replace with retries when antivirus holds a file, in `recovery.rs`, `opaint.rs` and `document_file.rs`. Real `file:///C:/` and UNC URLs; backslash in manifest names. Drive letters, long paths, DLL build. Port all Unix-only tests, and the fuzz driver. Guard the `lcms2` panic. Find the Mandelbrot cause. | Per-file test counts against the source; every file that does not run is named. All non-GPU tests pass, except those listed as waiting for W2 or W3, and Mandelbrot if its fix would change Mac bytes (then it goes to the user's list). Fresh review of this change. | 14 h | W0 |
+| W2 | Recovery redesign | Lock file moved outside the record folder, no folder rename at `recovery.rs:618`, `659` or `677` while anything is open, a new same-file check, `TerminateProcess` kill test. `ARCHITECTURE.md` changes first. Mac behavior is kept, and records in the current layout still read. | Every test on W1's waiting list for W2 passes. Kill before, during and after a record write recovers. A clean close with another reader holding a file leaves no false recovery offer. Fresh review of this change. Mac run: NOT RUN until the phase-end Mac session. | 10 h | W1 |
+| W3 | GPU and canvas on DX12 | One pinned backend for both device paths, WARP selector, backend assert. Small Win32 test host. Window handle in `op_view_attach`. Display profile from Windows, and how DWM color management treats our output. Device-lost callback in the view host. Shader compiler choice. A guard against long GPU jobs that trigger a Windows GPU reset. | M54 matrix 0 failures on RTX and WARP, and the test fails unless DX12 or WARP ran. Ported resize, switch and create-destroy scenarios pass. Color within ΔE00 1 of direct lcms2 transforms. A real device removal, if `RemoveDevice` touches only our device, recovers the canvas; `simulate_device_loss` alone does not count. Mac view tests: NOT RUN until the phase-end Mac session. | 16 h | W1 |
+| W4 | paint.net capture kit (old M02) | Clean unpack of the pin, and write access removed for `agent`. Plugin or driver. The real 5.1.12 catalog. `targets.toml` gains `pdn-5.1`, and `m54_parity.rs` reads those rows. Private oracle repo. `parity.md` started. Fallback list. | One effect per family, twice, with the same hashes. The manifest pins build, parameters, ICC, inputs, GPU and driver. Catalog and fallback list committed. A `pdn-5.1` row with no capture fails or prints NOT RUN, and never passes. | 20 h | W0, D4 |
 
-### Phase B: the Windows app (122 h)
+### Phase B: the Windows app (160 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |
-| W5 | UI stack test | The same small shell in both stacks: canvas, marching ants, floating panel, menu, dialog, pen log, IME field. On AOT builds. | A table of launch, size, resize, overlay frame rate, Narrator, and what headless tests see. Astra and Fable vote. Written in `decisions.md` and `ARCHITECTURE.md`. | 12 h | W3 |
+| W5 | UI stack test | The same small shell in both stacks: canvas, marching ants, floating panel, menu, dialog, pointer log, and IME, focus and pointer input on the canvas itself. On AOT builds. UI Automation retried on the hidden desktop. | A table of launch, size, resize, overlay frame rate, IME, pointer, focus, Narrator, and what headless tests see, with no NOT RUN except a real pen. Astra and Fable vote. Written in `decisions.md` and `ARCHITECTURE.md`. | 14 h | W3, D4 |
 | W6 | Windows design and icons | At least 3 rendered mockups next to real paint.net shots, from `docs/design/SPEC.md`. Critique plus adversarial review. New icon set: open license only, no SF Symbols, no paint.net icons. | A side-by-side page with a pick. All icons exist with license records. | 8 h | W4, W5 |
-| W7 | App shell and canvas | `windows/` project. C# bridge generated from `opcli dump-catalog`. Window, strip, status bar, command row of 7 buttons, empty panels, menu bar, Zoom, Pan. Overlay path. Test vectors exported from the Swift tests. Harness. | Open a 24 MP PNG; pans at 60 fps on the RTX. Color check on the live window. Menu order matches the W4 catalog. | 14 h | W5, W6 |
-| W8 | Panels | Tools, History, Layers, Colors, Layer Properties, palettes, Windows shortcuts. Color math passes the Swift vectors. | Every panel action is tested headless. Shortcuts match the catalog with 0 differences. | 12 h | W7 |
-| W9 | Core tools | Selection tools and Wand first, then Brush, Eraser, Pencil, Bucket, Picker, Move, Crop, options row. Windows pointer input for pen. Overlays. | Replayed pointer logs give the engine's goldens. Undo returns every byte. Real pen is NOT RUN (no pen here). | 16 h | W8 |
-| W10 | Files | New, Open, Save, Save As, Save a Copy, Revert, Save All, Recent, drag and drop, clipboard, close prompts, save options, GPS and metadata strip, recovery sheet, file association, opening a second file in the running app. Windows Imaging codecs, with a clear message when one is missing. Local app data for recovery. | Save and reopen keep every byte. Kill mid-edit recovers. A codec table passes. Long paths are tested with the system setting's value recorded. | 14 h | W9, W2 |
-| W11 | Effects and menus complete | Dialogs from the schema, live preview, repeat-last, all Edit, Image, Layers, Adjustments and Effects items, Color Profile dialogs, Content-Aware Fill. | Every catalog item works or has a parity row. Preview equals the result. Cancel changes nothing. | 10 h | W9, W4 |
+| W7 | App shell and canvas | `windows/` project. A new `opcli dump-catalog` command and a generator for the C# bridge (neither exists yet). Window, strip, status bar, command row of 7 buttons, empty panels, menu bar, Zoom, Pan. Overlay path. Test vectors exported from the Swift tests. Harness. | A 24 MP PNG, loaded through a test hook because Open comes in W10, pans over a 30 s trace at 59 fps or more on average with no stall over 50 ms on the RTX. Color check on the live window. Menu order matches the W4 catalog. | 18 h | W5, W6 |
+| W8 | Panels | Tools, History, Layers, Colors, Layer Properties, palettes, Windows shortcuts. Color math passes the Swift vectors. | Every panel action is tested headless. Shortcuts match the catalog with 0 differences. Focus rules follow `Shell/FocusRouter.swift`. | 20 h | W7 |
+| W9 | Core tools | Selection tools and Wand first, then Brush, Eraser, Pencil, Bucket, Picker, Move, Crop, options row. Windows pointer input for pen. Overlays. | Replayed pointer logs give the engine's goldens. Undo returns every byte. Real pen is NOT RUN (no pen here). | 28 h | W8 |
+| W10 | Files | New, Open, Save, Save As, Save a Copy, Revert, Save All, Recent, drag and drop, clipboard, close prompts, save options, GPS and metadata strip, recovery sheet, file association, opening a second file in the running app. Windows Imaging codecs, with a clear message when one is missing. Local app data for recovery. | Save and reopen keep every byte. Kill mid-edit recovers. Clipboard copy and paste work. The codec table records what is installed and what shows the missing message. File association and second-file open work in an unpackaged build. Long paths are tested with the system setting's value recorded. Fresh review of this change. | 22 h | W9, W2 |
+| W11 | Effects and menus complete | Dialogs from the schema, live preview, repeat-last, all Edit, Image, Layers, Adjustments and Effects items except Remove Background (W16), Color Profile dialogs, Content-Aware Fill. | Every catalog item works, or is left out with the user's OK. Preview equals the result. Cancel changes nothing. | 18 h | W9, W10, W4 |
 | W12 | The 7 tools the Mac never connected | Gradient, Line/Curve, Shapes, Clone Stamp, Recolor, Healing Brush, Spot Heal. New C interface paths and new design. | Each is usable from its panel button, with live preview and Finish, and passes engine goldens or reviewed shots. | 20 h | W9 |
-| W13 | Text | DirectWrite layout, IME, right-to-left text, emoji, the text tool's live editing. | Same gates as Mac M46: IME, bidi and emoji reviewed goldens. Caret overlay at full frame rate. | 16 h | W9 |
+| W13 | Text | DirectWrite layout, IME, right-to-left text, emoji, the text tool's live editing. | Same gates as Mac M46: IME, bidi and emoji reviewed goldens. Caret overlay at full frame rate. Input methods for Japanese and Chinese need decision 8; without it those gates are NOT RUN. | 16 h | W9, D8 |
 
 ### Phase C: compare with paint.net, and improve (136 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |
-| W14 | Effect comparison and engine fixes | Full parameter matrix from 5.1.12. Report per effect, then the fixes, CPU and GPU, by family, side by side. Root captures, and builders get the images in their clone. | Every effect has a `pdn-5.1` row and a measured error at ±1/255, or sits on the user's list. Mac tests rerun. The budget is an estimate; the first 10 h produce the report, and root resets the budget from it. | 120 h | W3, W4, D3 |
-| W15 | Behavior sweep | The same scripted steps in both apps for menus, options, dialogs and non-pointer results. Fixes. | Every row in `parity.md` has one of the 3 endings. | 16 h | W10 to W14 |
+| W14 | Effect comparison and engine fixes | Full parameter matrix from 5.1.12. Report per effect, then the fixes, CPU and GPU, by family, side by side. Root captures, and builders get the images in their clone. | Every effect has a `pdn-5.1` row and a measured error at ±1/255, or sits on the user's list. If over 10% of effects land on that list, root stops and reports. Mac tests: NOT RUN until the phase-end Mac session. The budget is an estimate; the first 10 h produce the report, and root resets the budget from it. | 120 h | W3, W4, D3 |
+| W15 | Behavior sweep | The same scripted steps in both apps for menus, options, dialogs and non-pointer results. Fixes. | Every row in `parity.md` has one of the 3 endings. A "left out" row outside effects needs the user's OK. | 16 h | W10 to W14 |
 
-### Phase D: finish and release (42 h)
+### Phase D: finish and release (56 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |
-| W16 | View, Settings, background removal | Rulers, grid, zoom presets, light and dark, scaling, Settings. Remove Background with a model downloaded on request; MIT or Apache license only. | Rulers correct at 100%, 150%, 200% through a test setting. IoU 0.9 on the 10 photos, or the user decides. Mixed screens NOT RUN (one screen here). | 10 h | W9 |
-| W17 | Translation-ready text | All strings in resource files, as Mac M59 did. | A scan finds no hard-coded UI text. | 2 h | W11 |
-| W18 | Keyboard and accessibility | Full keyboard use, focus across panels, Narrator names. | A keyboard-only test passes. Accessibility Insights has no errors. The Narrator walk (it speaks aloud) runs in decision 4's time. | 6 h | W10, W11 |
-| W19 | Speed, sturdiness, release | Launch work, Windows fuzz, 200 MP, low disk, simulated sleep and GPU reset, 1,000-step history. Icon, MSIX, portable ZIP, update check, page. | Launch under 3 s, app under 75 MB. DLL dependency scan. No banned name on the page or listing. A second account runs it (decision 5). The page deploys from a Mac session only. | 18 h | W15, W18 |
+| W16 | View, Settings, background removal | Rulers, grid, zoom presets, light and dark, scaling, Settings. Remove Background: a model runner, a model downloaded on request with a hash check, MIT or Apache license only, and a privacy note. | Rulers correct at 100%, 150%, 200% through a test setting. IoU 0.9 on the 10 photos, or the user decides. Mixed screens NOT RUN (one screen here). | 18 h | W9 |
+| W17 | Translation-ready text | All strings in resource files, as Mac M59 did. | A scan finds no hard-coded UI text. W19 reruns the scan. | 2 h | W11, W12, W13, W16 |
+| W18 | Keyboard and accessibility | Full keyboard use, focus across panels, Narrator names. | A keyboard-only test passes for all tools and Settings. Accessibility Insights has no errors. The Narrator walk (it speaks aloud) runs in decision 4's time. | 6 h | W10 to W13, W16 |
+| W19 | Speed, sturdiness, release | Launch work, Windows fuzz, 200 MP, low disk, simulated sleep and GPU reset, 1,000-step history. Icon, MSIX with file association in its manifest, portable ZIP, update check off in the Store build, page, Windows App Certification Kit. | Launch under 3 s, app under 75 MB counting all DLLs. DLL dependency scan. No banned name on the page, listing or shipped strings. File association, second-file open and recovery work in the packaged build, and uninstall behavior for recovery records is known. A second account runs it (decision 5). The page deploys from a Mac session only. | 24 h | W15, W16, W17, W18 |
 | W20 | Mac and Linux catch-up | Mac test run and a Mac release with the engine fixes. Linux engine checks. | Mac and Linux suites pass. Mac release notes list the effect changes. Runs from a Mac session. | 6 h | W19 |
 
 ### Order
@@ -186,7 +188,7 @@ W0 +-- W1 +-- W2 ---------------------------+
           +------+-- W14 ------------------------------------+
 ```
 
-W14 runs beside the app work and needs no UI. W16, W17 and W18 run after W9, W11 and W10 respectively, and feed W19. Phase ends: W4, W13, W15, W20.
+W14 runs beside the app work and needs no UI, except W4's captures. W16, W17 and W18 run after their rows' needs, and all feed W19. Phase ends: W4, W13, W15, W20.
 
 ## 6. How each milestone runs
 
@@ -194,8 +196,9 @@ W14 runs beside the app work and needs no UI. W16, W17 and W18 run after W9, W11
 2. One builder makes the milestone in its own clone, split only above about 3,000 changed lines. Builders run Sol through the runner as `agent` on this PC. Opus is not an option: the runner refuses Claude on Windows, and a native builder would run beside `~/keys`. If no slot is free, root waits for one. If Sol fails, root builds it (workspace rule when every route is blocked). Rust-only work may also go to Linux builders once decision 2 allows it.
 3. Root runs the milestone level, then the window level when possible, and looks at the shots.
 4. Root merges to branch `windows`, updates `docs/windows/STATE.md` and pushes. Mac changes wait for phase ends.
-5. At a phase end: the checkpoint level, Astra plus a fresh Opus review, a change diagram, an update page, and a merge to main. The review deadline is set at launch: 900 s for Phase A, and 30 minutes for Phase B and C, since these reviews cover more code.
-6. A builder never commits, pushes or uses SSH. Root never deploys from this PC.
+5. W1, W2 and W10 get their own fresh review when they end, because they change code that holds users' files. Other milestones get root's check. This spaces reviews further apart than the workspace rule's one per milestone (choice to check).
+6. At a phase end: the checkpoint level, Astra plus a fresh Opus review, a change diagram, an update page, and a merge to main. The review deadline is set at launch: 900 s for Phase A, and 30 minutes for Phase B and C, since these reviews cover more code.
+7. A builder never commits, pushes or uses SSH. Root never deploys from this PC.
 
 ## 7. Not in this version
 
@@ -213,7 +216,8 @@ W14 runs beside the app work and needs no UI. W16, W17 and W18 run after W9, W11
 | The hidden desktop fails | Headless first; window checks run in the user's away time, and phases stay open until then. |
 | W14 is the largest unknown: paint.net 5 rewrote most effects, and we work from outputs alone | Report first, then the budget. A family that stays far off goes to the user. |
 | paint.net effects use Direct2D, and a driver update could change the hashes | The manifest pins GPU and driver. Root does not update the driver during W14. |
-| Engine changes break the Mac app, and root here cannot reach a Mac | Decision 2, or a Mac session at each phase end. Reported as NOT RUN until then. |
+| Engine changes break the Mac app, and root here cannot reach a Mac | Decision 2, or a Mac session at each phase end, which root asks the user to start. Reported as NOT RUN and listed as owed until then. `cargo check` for the Mac target cannot replace it: `lcms2-sys` needs a C compiler for that target. |
+| CPU effects may differ between systems through their math libraries, against `ARCHITECTURE.md`'s "CPU code is deterministic" | W1 finds the Mandelbrot cause and records the rule that applies across systems. |
 | The app looks too close to paint.net for the Store or its owner | Our own icons and design tokens. This is not legal advice; the user decides at W19. |
 | The Store takes days or rejects the app | The portable ZIP ships first. Its page states the SmartScreen warning. |
 | A pending Windows reboot, from the Build Tools install on 2026-10-30 | Not needed for this plan so far. Root asks before any reboot. |
@@ -224,15 +228,16 @@ State on 2026-11-01, when the user said to move forward:
 
 - Decision 1 is done. The user approved the key in another session, and `ssh agent@127.0.0.1` works.
 - Decisions 3, 6 and 7 take the recommendation, under the user's rule to not wait on them. The user can change decision 3 any time before W14.
-- Decisions 2, 4 and 5 still need the user. Until they answer, a Mac session runs Mac checks at phase ends, real-window checks report NOT RUN, and W19 stops for the Store login.
+- Decisions 2, 4, 5 and 8 still need the user. Until they answer, a Mac session runs Mac checks at phase ends, W4 and W5 stop, other real-window checks report NOT RUN, and W19 stops for the Store login.
 
 1. **SSH key for `agent` on this PC (needs your OK).** Root makes one key for `yjli` and adds it to `agent` here. Without it, Sol and Astra cannot run, and root builds everything itself. Recommended: yes.
 2. **The same key on the Macs and the Linux box (needs your OK).** This lets root run Mac and Linux checks from here. Without it, a Mac session runs them at phase ends. Recommended: yes.
 3. **The engine follows paint.net 5.1.12 when they differ.** Mac results change too, and 41 effect targets move from `legacy-3.36` to `pdn-5.1`. Recommended: yes, per "paint.net is the gold standard".
-4. **A time window for real windows on your screen.** The PC stays unlocked, and I run only what headless and the hidden desktop cannot prove. Narrator will speak aloud. Recommended: yes, tell me the hours.
-5. **How to ship.** Free Microsoft Store MSIX plus a portable ZIP, with no new spending. You log in to the Store account, and root makes one extra Windows account for the install test. Azure signing would cost about $9.99 a month, and SmartScreen would still warn at first. Recommended: Store plus ZIP.
+4. **A time window for real windows on your screen, with your paint.net closed.** The PC stays unlocked, and I run only what headless and the hidden desktop cannot prove. Narrator will speak aloud. W4 and W5 cannot finish without this, and W14 and W15 need paint.net closed too. Recommended: yes, tell me the hours.
+5. **How to ship.** Free Microsoft Store MSIX plus a portable ZIP, with no new spending. You log in to the Store account, and root makes one extra Windows account for the install test. Installing an MSIX before the Store may also need Developer Mode or a trusted certificate, which root asks about first. Azure signing would cost about $9.99 a month, and SmartScreen would still warn at first. Recommended: Store plus ZIP.
 6. **Captured images stay in a private repo.** People without access see those comparison tests report NOT RUN. It needs `gh auth login` on this PC. Recommended: yes.
 7. **Design pick at W6.** The 2026-10-25 no-prompts rule says I take my recommendation and continue. A new platform's look may deserve your eye. Recommended: I publish the page, continue with my pick, and you can change it later.
+8. **Input methods for W13.** Testing Japanese and Chinese text needs those input methods in your account, or in a new test account. Recommended: a new test account, asked again when W13 starts.
 
 ## 10. Choices to check
 
@@ -241,3 +246,6 @@ State on 2026-11-01, when the user said to move forward:
 - Windows 11 x64 is the only tested system.
 - Standard menu names stay in the public catalog as a compatibility list.
 - On Windows, when Sol has no slot, root waits instead of starting a native Opus builder as the workspace rule says, because of the `~/keys` wall.
+- Fresh reviews run at W1, W2, W10 and phase ends, not at every milestone.
+- Phase B and D budgets rose after comparing with the Mac's planned hours, but stay below them, because the engine work already exists.
+- A reader-held file during close, and W4's plugin, follow the rules in W2 and section 3.2.
