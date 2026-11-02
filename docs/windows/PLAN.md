@@ -1,6 +1,6 @@
 # OpenPainter for Windows: plan
 
-Status: revision 4. The user approved revision 2 on 2026-11-01. Revision 3 added the fixes from its review, and revision 4 adds the user's answers to decisions 2, 4 and 8, and their rule that the Mac app is the reference for UI. W0 is closed and W1 is building on branch `windows`. Fresh Opus reviewers read revisions 1 and 2; `docs/windows/reviews/` records each finding. Astra has not reviewed any revision: its slot stayed full for 45 minutes on 2026-11-01. Root retries at the end of Phase A.
+Status: revision 5, with Astra's end-of-Phase-A findings. W0 to W3 code is committed on branch `windows`. Earlier: revision 4. The user approved revision 2 on 2026-11-01. Revision 3 added the fixes from its review, and revision 4 adds the user's answers to decisions 2, 4 and 8, and their rule that the Mac app is the reference for UI.  Fresh Opus reviewers read revisions 1 and 2; `docs/windows/reviews/` records each finding. Astra reviewed revision 4 on 2026-11-02.
 
 ## 1. The short version
 
