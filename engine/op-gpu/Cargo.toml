@@ -23,3 +23,5 @@ objc = "0.2.7"
 op-testkit = { path = "../op-testkit" }
 proptest = "1"
 serde_json = "1"
+op-color = { path = "../op-color" }
+lcms2 = "6.2"

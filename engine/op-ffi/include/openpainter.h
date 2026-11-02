@@ -614,11 +614,11 @@ enum OpStatus op_stroke_end(struct OpEngine *p, uint64_t doc);
 enum OpStatus op_stroke_cancel(struct OpEngine *p, uint64_t doc);
 
 /**
- * Attaches a view of `doc` to a `CAMetalLayer`. The engine retains the layer
- * until the view is detached. Nothing is drawn until the first `op_view_set`.
+ * Attaches a view of `doc` to a `CAMetalLayer` on macOS or an HWND on Windows.
+ * The caller keeps the HWND alive until detach. Nothing is drawn until the first `op_view_set`.
  * Returns OP_ERR_NO_SUCH_DOC for an unknown document, OP_ERR_BAD_ARGUMENT for a
- * null pointer or an object that is not a CAMetalLayer, OP_ERR_INTERNAL when no
- * GPU device can be made, and OP_ERR_UNSUPPORTED off macOS.
+ * null pointer or an invalid native target, OP_ERR_INTERNAL when no GPU device
+ * can be made, and OP_ERR_UNSUPPORTED on other systems. Windows takes an HWND.
  */
 enum OpStatus op_view_attach(struct OpEngine *p, uint64_t doc, void *layer, uint64_t *out_view);
 

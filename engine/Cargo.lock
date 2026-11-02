@@ -1190,7 +1190,9 @@ name = "op-gpu"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "lcms2",
  "objc",
+ "op-color",
  "op-core",
  "op-ops",
  "op-testkit",

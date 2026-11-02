@@ -167,6 +167,7 @@ fn lut_on_gpu_matches_cpu_trilinear_within_one_level() {
     renderer.set_lut(&gpu.device, &gpu.queue, Some(&lut));
     let out = render(&gpu, &mut renderer, w, h, &params(1.0, 0.0, 0.0));
     let mut worst = 0f32;
+    let mut worst_at = (0usize, 0usize, 0f32, 0u8);
     for (i, px) in doc.chunks(4).enumerate() {
         let want = lut.apply([
             px[0] as f32 / 255.0,
@@ -175,11 +176,200 @@ fn lut_on_gpu_matches_cpu_trilinear_within_one_level() {
         ]);
         for c in 0..3 {
             let d = (out[i * 4 + c] as f32 - want[c] * 255.0).abs();
+            if d > worst {
+                worst_at = (i, c, want[c] * 255.0, out[i * 4 + c]);
+            }
             worst = worst.max(d);
         }
     }
     println!("worst GPU vs CPU LUT difference: {worst:.3} levels");
+    println!(
+        "worst at pixel {} channel {}: GPU {} CPU {} input {:?}",
+        worst_at.0,
+        worst_at.1,
+        worst_at.3,
+        worst_at.2,
+        &doc[worst_at.0 * 4..worst_at.0 * 4 + 4]
+    );
     assert!(worst <= 0.51 + 1e-3, "worst {worst}");
+}
+
+#[cfg(windows)]
+#[test]
+fn lut_output_rounds_the_rtx_failure_pixel_to_nearest_byte() {
+    let gpu = gpu().unwrap();
+    assert_eq!(gpu.info().backend, wgpu::Backend::Dx12);
+    let (width, height) = (256, 16);
+    let doc = chart(width, height);
+    let lut = Lut3d::from_fn(33, |[r, g, b]| {
+        let f = |v: f32| v.powf(2.2 / 1.8);
+        [f(0.9 * r + 0.1 * g), f(g), f(0.8 * b + 0.2 * r).min(1.0)]
+    });
+    let mut renderer = ViewRenderer::new(&gpu.device, wgpu::TextureFormat::Bgra8Unorm);
+    renderer
+        .set_document(&gpu.device, &gpu.queue, width, height, &doc)
+        .unwrap();
+    renderer.set_lut(&gpu.device, &gpu.queue, Some(&lut));
+    let out = render(&gpu, &mut renderer, width, height, &params(1.0, 0.0, 0.0));
+    let pixel = 2934usize;
+    let input = &doc[pixel * 4..pixel * 4 + 3];
+    assert_eq!(input, [135, 91, 125]);
+    let expected = lut.apply([
+        input[0] as f32 / 255.0,
+        input[1] as f32 / 255.0,
+        input[2] as f32 / 255.0,
+    ]);
+    assert_eq!(out[pixel * 4], (expected[0] * 255.0).round() as u8);
+}
+
+#[cfg(windows)]
+#[test]
+fn lut_float_target_matches_cpu_at_rtx_failure_color() {
+    let gpu = gpu().unwrap();
+    assert_eq!(gpu.info().backend, wgpu::Backend::Dx12);
+    let source = [135u8, 91, 125, 255];
+    let lut = Lut3d::from_fn(33, |[r, g, b]| {
+        let f = |v: f32| v.powf(2.2 / 1.8);
+        [f(0.9 * r + 0.1 * g), f(g), f(0.8 * b + 0.2 * r).min(1.0)]
+    });
+    let mut renderer = ViewRenderer::new(&gpu.device, wgpu::TextureFormat::Rgba32Float);
+    renderer
+        .set_document(&gpu.device, &gpu.queue, 1, 1, &source)
+        .unwrap();
+    renderer.set_lut(&gpu.device, &gpu.queue, Some(&lut));
+    let target = gpu.device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba32Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 256,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut encoder = gpu.device.create_command_encoder(&Default::default());
+    renderer
+        .encode(
+            &gpu.device,
+            &gpu.queue,
+            &mut encoder,
+            &target.create_view(&Default::default()),
+            &params(1.0, 0.0, 0.0),
+        )
+        .unwrap();
+    encoder.copy_texture_to_buffer(
+        target.as_image_copy(),
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(256),
+                rows_per_image: Some(1),
+            },
+        },
+        target.size(),
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    buffer.map_async(wgpu::MapMode::Read, .., |r| r.unwrap());
+    gpu.device
+        .poll(wgpu::PollType::wait_indefinitely())
+        .unwrap();
+    let mapped = buffer.get_mapped_range(..);
+    let got = f32::from_le_bytes(mapped[..4].try_into().unwrap()) * 255.0;
+    let want = lut.apply([
+        source[0] as f32 / 255.0,
+        source[1] as f32 / 255.0,
+        source[2] as f32 / 255.0,
+    ])[0]
+        * 255.0;
+    eprintln!("LUT float target red GPU {got} CPU {want}");
+    assert!((got - want).abs() <= 0.001, "GPU {got} CPU {want}");
+}
+
+#[cfg(windows)]
+#[test]
+fn view_color_matches_direct_lcms2_within_delta_e_2000_one() {
+    use lcms2::{CIELab, CIELabExt, CIExyY, Intent, PixelFormat, Transform};
+    let gpu = gpu().unwrap();
+    assert_eq!(gpu.info().backend, wgpu::Backend::Dx12);
+    let src = op_color::Profile::builtin("srgb").unwrap();
+    let dst = op_color::Profile::builtin("display-p3").unwrap();
+    let table = op_color::display_table(&src, &dst, 33).unwrap();
+    let lut = Lut3d {
+        n: 33,
+        data: table.into_iter().map(|c| [c[0], c[1], c[2], 1.0]).collect(),
+    };
+    let (width, height) = (256, 16);
+    let doc = chart(width, height);
+    let mut renderer = ViewRenderer::new(&gpu.device, wgpu::TextureFormat::Bgra8Unorm);
+    renderer
+        .set_document(&gpu.device, &gpu.queue, width, height, &doc)
+        .unwrap();
+    renderer.set_lut(&gpu.device, &gpu.queue, Some(&lut));
+    let actual = render(&gpu, &mut renderer, width, height, &params(1.0, 0.0, 0.0));
+    let inputs: Vec<[f32; 3]> = doc
+        .chunks_exact(4)
+        .map(|p| {
+            [
+                p[0] as f32 / 255.0,
+                p[1] as f32 / 255.0,
+                p[2] as f32 / 255.0,
+            ]
+        })
+        .collect();
+    let exact = op_color::convert_rgb_float(&src, &dst, &inputs).unwrap();
+    let d50 = CIExyY {
+        x: 0.34567,
+        y: 0.35850,
+        Y: 1.0,
+    };
+    let lab = lcms2::Profile::new_lab4_context(lcms2::GlobalContext::new(), &d50).unwrap();
+    let dst_raw = lcms2::Profile::new_icc(&dst.bytes()).unwrap();
+    let to_lab: Transform<[f64; 3], [f64; 3]> = Transform::new(
+        &dst_raw,
+        PixelFormat::RGB_DBL,
+        &lab,
+        PixelFormat::Lab_DBL,
+        Intent::RelativeColorimetric,
+    )
+    .unwrap();
+    let mut worst = 0.0f64;
+    for (i, want) in exact.iter().enumerate() {
+        let got = &actual[i * 4..i * 4 + 3];
+        let pair = [
+            want.map(f64::from),
+            [
+                got[0] as f64 / 255.0,
+                got[1] as f64 / 255.0,
+                got[2] as f64 / 255.0,
+            ],
+        ];
+        let mut labs = [[0.0f64; 3]; 2];
+        to_lab.transform_pixels(&pair, &mut labs);
+        let a = CIELab {
+            L: labs[0][0],
+            a: labs[0][1],
+            b: labs[0][2],
+        };
+        let b = CIELab {
+            L: labs[1][0],
+            a: labs[1][1],
+            b: labs[1][2],
+        };
+        worst = worst.max(a.cie2000_delta_e(&b, 1.0, 1.0, 1.0));
+    }
+    eprintln!("view color worst delta E 2000: {worst}");
+    assert!(worst <= 1.0, "worst delta E 2000 {worst}");
 }
 
 #[test]

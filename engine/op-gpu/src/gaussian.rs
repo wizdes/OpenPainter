@@ -84,9 +84,7 @@ impl GpuContext {
         }
         let upload_start = Instant::now();
         let source = self.upload(width, height, bytes)?;
-        self.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .map_err(|_| GpuError::DeviceLost)?;
+        crate::poll_gpu(&self.device, "Gaussian upload")?;
         let upload_ms = upload_start.elapsed().as_secs_f64() * 1000.0;
         let sums = intermediate(self, width, height, wgpu::TextureFormat::Rgba32Uint);
         let wc = intermediate(self, width, height, wgpu::TextureFormat::R32Uint);
@@ -167,9 +165,7 @@ impl GpuContext {
         let kernel_start = Instant::now();
         self.dispatch(&vertical, &first, width, height)?;
         self.dispatch(&horizontal, &second, width, height)?;
-        self.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .map_err(|_| GpuError::DeviceLost)?;
+        crate::poll_gpu(&self.device, "Gaussian kernels")?;
         let kernel_ms = kernel_start.elapsed().as_secs_f64() * 1000.0;
         let readback_start = Instant::now();
         let pixels = self.readback(&output, width, height)?;

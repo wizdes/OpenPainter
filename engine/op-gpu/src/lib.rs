@@ -4,6 +4,8 @@ pub mod gaussian;
 pub mod layer;
 pub mod pipeline_stats;
 pub mod presenter;
+#[cfg(windows)]
+pub mod win32;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -11,6 +13,31 @@ use std::sync::{
 };
 use thiserror::Error;
 use wgpu::util::DeviceExt;
+
+fn kernel_shader_source() -> wgpu::ShaderSource<'static> {
+    #[cfg(windows)]
+    {
+        let original = include_str!("kernels.wgsl");
+        assert!(
+            original.contains("if value == 0u || value == 255u { return value; }")
+                && original
+                    .contains("fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {"),
+            "Windows kernel shader patch marker is missing"
+        );
+        let source = original.replace(
+            "if value == 0u || value == 255u { return value; }",
+            "if value == 0u || value == 255u || gamma == 1.0 { return value; }",
+        ).replace(
+            "fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {",
+            "fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {\n  let out_y = id.y + p.mode;\n  if id.x >= p.width || out_y >= p.height { return; }\n  let base = (id.y * p.width + id.x) * 4u;\n  var exact_samples: array<vec4<u32>, 4>;\n  for (var sample = 0u; sample < 4u; sample++) {\n    let xy = acc[base + sample].xy;\n    exact_samples[sample] = bilinear_clamp(xy.x, xy.y);\n  }\n  textureStore(output_tex, vec2<i32>(i32(id.x), i32(out_y)), blend4(exact_samples[0], exact_samples[1], exact_samples[2], exact_samples[3]));\n  return;",
+        );
+        wgpu::ShaderSource::Wgsl(source.into())
+    }
+    #[cfg(not(windows))]
+    {
+        wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into())
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum GpuError {
@@ -22,11 +49,42 @@ pub enum GpuError {
     InvalidImage,
     #[error("GPU buffer mapping failed: {0}")]
     Map(String),
+    #[error("GPU wait exceeded its deadline during {0}")]
+    WaitTimeout(&'static str),
+    #[error("GPU job is too large for one Windows dispatch: {0}")]
+    JobTooLong(&'static str),
 }
 pub type Result<T> = std::result::Result<T, GpuError>;
 
-/// Selects one DX12 adapter for effects and canvas views on Windows.
+pub fn poll_gpu(device: &wgpu::Device, operation: &'static str) -> Result<()> {
+    #[cfg(windows)]
+    let poll = wgpu::PollType::Wait {
+        submission_index: None,
+        timeout: Some(std::time::Duration::from_secs(30)),
+    };
+    #[cfg(not(windows))]
+    let poll = wgpu::PollType::wait_indefinitely();
+    device.poll(poll).map(|_| ()).map_err(|error| match error {
+        wgpu::PollError::Timeout => GpuError::WaitTimeout(operation),
+        _ => GpuError::DeviceLost,
+    })
+}
+
+/// Keeps WARP device creation and submitted work from running at the same time in this process.
 #[cfg(windows)]
+pub fn windows_warp_guard() -> Result<Option<std::sync::MutexGuard<'static, ()>>> {
+    static WARP_CREATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    if std::env::var("OP_GPU_ADAPTER").as_deref() == Ok("warp") {
+        Ok(Some(WARP_CREATE.lock().map_err(|e| {
+            GpuError::NoAdapter(format!("WARP device creation lock: {e}"))
+        })?))
+    } else {
+        Ok(None)
+    }
+}
+
+#[cfg(windows)]
+/// Selects one DX12 adapter for effects and canvas views on Windows.
 pub fn windows_adapter() -> Result<(wgpu::Instance, wgpu::Adapter)> {
     let choice = std::env::var("OP_GPU_ADAPTER").unwrap_or_else(|_| "hardware".into());
     if choice != "hardware" && choice != "warp" {
@@ -37,6 +95,13 @@ pub fn windows_adapter() -> Result<(wgpu::Instance, wgpu::Adapter)> {
     // FXC ships with Windows. DXC would require shipping dxcompiler.dll.
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::DX12,
+        backend_options: wgpu::BackendOptions {
+            dx12: wgpu::Dx12BackendOptions {
+                shader_compiler: wgpu::Dx12Compiler::Fxc,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
         ..Default::default()
     });
     let adapter = if choice == "warp" {
@@ -122,7 +187,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("resample nearest"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "resample_nearest");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
@@ -149,7 +214,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("resample bicubic"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "resample_bicubic");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
@@ -176,7 +241,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("resample bilinear"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "resample_bilinear");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
@@ -206,7 +271,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("resample super sampling"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "resample_super_sampling");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);
@@ -335,7 +400,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("effect kernels"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "effect_clouds");
         let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
@@ -384,7 +449,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("effect kernels"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "effect_add_noise");
         let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
@@ -420,7 +485,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("photo effect kernels"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(
             &module,
@@ -480,6 +545,72 @@ impl GpuContext {
             [lighting, -lighting / 2, 0],
         )?;
         self.photo_blend(width, height, &adjusted, bytes, true, warmth)
+    }
+
+    /// FXC uses 32-bit trigonometry; prepare the CPU's sample positions for the Windows shader.
+    #[cfg(windows)]
+    fn effect_twist_windows(&mut self, width: u32, height: u32, bytes: &[u8]) -> Result<Vec<u8>> {
+        Self::checked_len(width, height, bytes)?;
+        let row_bytes = (width as usize)
+            .checked_mul(4 * std::mem::size_of::<[f32; 4]>())
+            .ok_or(GpuError::InvalidImage)?;
+        // Coordinates take 64 bytes a pixel. Keep each buffer small, whatever
+        // the adapter would allow in one binding.
+        const TWIST_CHUNK_BYTES: usize = 64 << 20;
+        let binding_limit =
+            TWIST_CHUNK_BYTES.min(self.info.limits.max_storage_buffer_binding_size as usize);
+        let rows_per_chunk = (binding_limit / row_bytes).max(1) as u32;
+        let input = self.upload(width, height, bytes)?;
+        let output = self.texture(width, height);
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Windows exact Twist coordinates"),
+                source: kernel_shader_source(),
+            });
+        let pipeline = self.pipeline(&module, "effect_twist");
+        let cx = width as f64 * 0.5;
+        let cy = height as f64 * 0.5;
+        let radius = width.min(height) as f64 * 0.5;
+        for start in (0..height).step_by(rows_per_chunk as usize) {
+            let rows = rows_per_chunk.min(height - start);
+            let mut coordinates =
+                Vec::<[f32; 4]>::with_capacity(width as usize * rows as usize * 4);
+            for y in start..start + rows {
+                for x in 0..width {
+                    for sample in 0..4 {
+                        let fraction = (sample + 1) as f64 / 5.0;
+                        let xo = fraction * 2.0;
+                        let ox = (xo - xo.trunc() - 0.5) as f32;
+                        let oy = (fraction - 0.5) as f32;
+                        let u = (x as f32 - cx as f32 + ox) as f64;
+                        let v = (y as f32 - cy as f32 + oy) as f64;
+                        let r = u.hypot(v);
+                        let mut theta = v.atan2(u);
+                        let t = (1.0 - r / radius).max(0.0).powi(3);
+                        let amount = -30.0f64;
+                        theta += t * amount * amount * amount.signum() / 100.0;
+                        coordinates.push([
+                            (cx + r * theta.cos()) as f32,
+                            (cy + r * theta.sin()) as f32,
+                            0.0,
+                            0.0,
+                        ]);
+                    }
+                }
+            }
+            let table = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Windows Twist sample coordinates"),
+                    contents: bytemuck::cast_slice(&coordinates),
+                    usage: wgpu::BufferUsages::STORAGE,
+                });
+            let params = self.params(width, height, start, 0, false);
+            let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
+            self.dispatch(&pipeline, &bind, width, rows)?;
+        }
+        self.readback(&output, width, height)
     }
 
     /// Runs a pointwise effect with its three validated integer parameters.
@@ -570,6 +701,27 @@ impl GpuContext {
         if !valid {
             return Err(GpuError::InvalidImage);
         }
+        #[cfg(windows)]
+        {
+            let taps = match kernel {
+                op_ops::effect::GpuKernel::Morphology => (values[0] as u64) * (values[1] as u64),
+                op_ops::effect::GpuKernel::OilPainting => (2 * values[0] as u64 + 1).pow(2),
+                op_ops::effect::GpuKernel::Outline => (2 * values[0] as u64 + 1).pow(2),
+                _ => 0,
+            };
+            if taps > 0 && u64::from(width) * u64::from(height) * taps > 200_000_000 {
+                return Err(GpuError::JobTooLong(match kernel {
+                    op_ops::effect::GpuKernel::Morphology => "Morphology",
+                    op_ops::effect::GpuKernel::OilPainting => "Oil Painting",
+                    op_ops::effect::GpuKernel::Outline => "Outline",
+                    _ => unreachable!(),
+                }));
+            }
+        }
+        #[cfg(windows)]
+        if kernel == op_ops::effect::GpuKernel::Twist {
+            return self.effect_twist_windows(width, height, bytes);
+        }
         let input = self.upload(width, height, bytes)?;
         let output = self.texture(width, height);
         let acc = if matches!(
@@ -640,7 +792,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("effect kernels"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let entry = match kernel {
             op_ops::effect::GpuKernel::InvertColors => "effect_invert_colors",
@@ -732,7 +884,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("effect kernels"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let entry = if luminosity {
             "effect_lut_luminosity"
@@ -745,6 +897,8 @@ impl GpuContext {
         self.readback(&output, width, height)
     }
     pub fn new() -> Result<Self> {
+        #[cfg(windows)]
+        let _warp_create_guard = windows_warp_guard()?;
         #[cfg(windows)]
         let (_instance, adapter) = windows_adapter()?;
         #[cfg(not(windows))]
@@ -869,7 +1023,13 @@ impl GpuContext {
                 depth_or_array_layers: 1,
             },
         );
+        #[cfg(windows)]
+        let _warp_guard = windows_warp_guard()?;
         self.queue.submit(Some(encoder.finish()));
+        #[cfg(windows)]
+        if _warp_guard.is_some() {
+            poll_gpu(&self.device, "WARP upload")?;
+        }
         Ok(texture)
     }
     fn readback_pending(
@@ -902,11 +1062,17 @@ impl GpuContext {
                 depth_or_array_layers: 1,
             },
         );
+        #[cfg(windows)]
+        let _warp_guard = windows_warp_guard()?;
         self.queue.submit(Some(encoder.finish()));
         let (sender, receiver) = mpsc::channel();
         stage.map_async(wgpu::MapMode::Read, .., move |result| {
             let _ = sender.send(result);
         });
+        #[cfg(windows)]
+        if _warp_guard.is_some() {
+            poll_gpu(&self.device, "WARP readback")?;
+        }
         Ok(PendingReadback {
             stage,
             receiver,
@@ -961,9 +1127,7 @@ impl UploadRing {
         bytes: &[u8],
     ) -> Result<&'a wgpu::Buffer> {
         if self.submitted >= self.slots.len() {
-            device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .map_err(|_| GpuError::DeviceLost)?;
+            poll_gpu(device, "upload ring reuse")?;
             self.submitted = 0;
         }
         let count = self.slots.len();
@@ -1025,13 +1189,21 @@ struct PendingReadback {
 }
 impl PendingReadback {
     fn finish(self, ctx: &GpuContext) -> Result<(Vec<u8>, wgpu::Buffer)> {
-        ctx.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .map_err(|_| GpuError::DeviceLost)?;
-        self.receiver
+        poll_gpu(&ctx.device, "readback mapping")?;
+        #[cfg(windows)]
+        let mapped = self
+            .receiver
+            .recv_timeout(std::time::Duration::from_secs(30))
+            .map_err(|e| match e {
+                mpsc::RecvTimeoutError::Timeout => GpuError::WaitTimeout("readback callback"),
+                mpsc::RecvTimeoutError::Disconnected => GpuError::Map(e.to_string()),
+            })?;
+        #[cfg(not(windows))]
+        let mapped = self
+            .receiver
             .recv()
-            .map_err(|e| GpuError::Map(e.to_string()))?
             .map_err(|e| GpuError::Map(e.to_string()))?;
+        mapped.map_err(|e| GpuError::Map(e.to_string()))?;
         let mapped = self.stage.get_mapped_range(..);
         let width = self.width as usize;
         let height = self.height as usize;
@@ -1269,7 +1441,13 @@ impl GpuContext {
             pass.set_bind_group(0, bind, &[]);
             pass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
         }
+        #[cfg(windows)]
+        let _warp_guard = windows_warp_guard()?;
         self.queue.submit(Some(encoder.finish()));
+        #[cfg(windows)]
+        if _warp_guard.is_some() {
+            poll_gpu(&self.device, "WARP dispatch")?;
+        }
         self.dispatches += 1;
         Ok(())
     }
@@ -1343,7 +1521,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("compositor"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let layer_pipeline = self.pipeline(&module, "layer");
         let finish_pipeline = self.pipeline(&module, "finish");
@@ -1353,9 +1531,7 @@ impl GpuContext {
         for (layer_index, layer) in layers.iter().enumerate() {
             let start = std::time::Instant::now();
             let input = self.upload(width, height, layer.bytes)?;
-            self.device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .map_err(|_| GpuError::DeviceLost)?;
+            poll_gpu(&self.device, "composite upload")?;
             timing.upload_ms += start.elapsed().as_secs_f64() * 1000.0;
             let mask_texture = if layer_index + 1 == layers.len() {
                 coverage
@@ -1381,9 +1557,7 @@ impl GpuContext {
             );
             let start = std::time::Instant::now();
             self.dispatch(&layer_pipeline, &bind, width, height)?;
-            self.device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .map_err(|_| GpuError::DeviceLost)?;
+            poll_gpu(&self.device, "composite layer")?;
             timing.composite_ms += start.elapsed().as_secs_f64() * 1000.0;
             last_input = Some(input);
         }
@@ -1395,9 +1569,7 @@ impl GpuContext {
         let bind = self.bind(&finish_pipeline, &input, &acc, &params, &output, None);
         let start = std::time::Instant::now();
         self.dispatch(&finish_pipeline, &bind, width, height)?;
-        self.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .map_err(|_| GpuError::DeviceLost)?;
+        poll_gpu(&self.device, "composite finish")?;
         timing.composite_ms += start.elapsed().as_secs_f64() * 1000.0;
         let start = std::time::Instant::now();
         let pixels = self.readback(&output, width, height)?;
@@ -1450,7 +1622,7 @@ impl GpuContext {
                     .device
                     .create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("overwrite"),
-                        source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                        source: kernel_shader_source(),
                     });
                 let pipeline = self.pipeline(&module, "overwrite");
                 let input = self.upload(width, height, src)?;
@@ -1507,7 +1679,7 @@ impl GpuContext {
                     .device
                     .create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("overwrite"),
-                        source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                        source: kernel_shader_source(),
                     });
                 let pipeline = self.pipeline(&module, "overwrite");
                 let input = self.upload(width, height, src)?;
@@ -1535,7 +1707,7 @@ impl GpuContext {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("box blur"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into()),
+                source: kernel_shader_source(),
             });
         let pipeline = self.pipeline(&module, "box_blur");
         let bind = self.bind(&pipeline, &input, &acc, &params, &output, None);

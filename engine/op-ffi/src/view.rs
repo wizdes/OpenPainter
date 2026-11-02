@@ -165,9 +165,12 @@ struct Request {
     background: [f32; 4],
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 struct Render {
+    #[cfg(target_os = "macos")]
     target: op_gpu::layer::MetalLayerTarget,
+    #[cfg(windows)]
+    target: op_gpu::win32::Win32Target,
     renderer: op_gpu::presenter::ViewRenderer,
     doc_revision: Option<u64>,
     /// `Published::preview_serial` of the uploaded pixels (0: no preview).
@@ -185,7 +188,7 @@ struct Render {
     region_tiles: u64,
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 struct Render;
 
 struct FrameLog {
@@ -210,10 +213,14 @@ struct Gpu {
     device: wgpu::Device,
     queue: wgpu::Queue,
     validation_errors: Arc<AtomicU64>,
+    #[cfg(windows)]
+    lost: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Gpu {
     fn new() -> Result<Self, String> {
+        #[cfg(windows)]
+        let _warp_create_guard = op_gpu::windows_warp_guard().map_err(|e| e.to_string())?;
         #[cfg(windows)]
         let (instance, adapter) = op_gpu::windows_adapter().map_err(|e| e.to_string())?;
         #[cfg(not(windows))]
@@ -241,11 +248,23 @@ impl Gpu {
             count.fetch_add(1, Ordering::SeqCst);
             eprintln!("op-ffi view: wgpu uncaptured error: {e}");
         }));
+        #[cfg(windows)]
+        let lost = {
+            let lost = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let signal = lost.clone();
+            device.set_device_lost_callback(move |reason, message| {
+                eprintln!("op-ffi view: DX12 device lost ({reason:?}): {message}");
+                signal.store(true, Ordering::SeqCst);
+            });
+            lost
+        };
         Ok(Self {
             instance,
             device,
             queue,
             validation_errors,
+            #[cfg(windows)]
+            lost,
         })
     }
 }
@@ -265,6 +284,8 @@ struct Host {
     gpu: Mutex<Option<Arc<Gpu>>>,
     #[cfg(target_os = "macos")]
     counters: Arc<op_gpu::layer::LayerCounters>,
+    #[cfg(windows)]
+    counters: Arc<op_gpu::win32::WindowCounters>,
     next_view: AtomicU64,
     frames_total: AtomicU64,
 }
@@ -293,6 +314,8 @@ fn host_for(p: *mut OpEngine) -> Arc<Host> {
         gpu: Mutex::new(None),
         #[cfg(target_os = "macos")]
         counters: Arc::default(),
+        #[cfg(windows)]
+        counters: Arc::default(),
         next_view: AtomicU64::new(1),
         frames_total: AtomicU64::new(0),
     });
@@ -311,6 +334,33 @@ impl Host {
     fn gpu(&self) -> Result<Arc<Gpu>, OpStatus> {
         let mut slot = self.gpu.lock();
         if let Some(g) = slot.as_ref() {
+            #[cfg(windows)]
+            if g.lost.load(Ordering::SeqCst) {
+                eprintln!("op-ffi view: recreating lost DX12 canvas device");
+                let replacement = Arc::new(Gpu::new().map_err(|e| {
+                    eprintln!("op-ffi view: recreate DX12 device failed: {e}");
+                    OpStatus::OP_ERR_INTERNAL
+                })?);
+                for view in self.state.lock().views.values() {
+                    if let Some(render) = view.render.lock().as_mut() {
+                        render.target.suspend();
+                        render.target.resume(&replacement.instance).map_err(|e| {
+                            eprintln!("op-ffi view: recreate HWND surface failed: {e}");
+                            OpStatus::OP_ERR_INTERNAL
+                        })?;
+                        render.renderer = op_gpu::presenter::ViewRenderer::new(
+                            &replacement.device,
+                            op_gpu::win32::FORMAT,
+                        );
+                        render.doc_revision = None;
+                        render.shown = None;
+                        render.display_gen = 0;
+                        view.dirty.store(true, Ordering::Release);
+                    }
+                }
+                *slot = Some(replacement.clone());
+                return Ok(replacement);
+            }
             return Ok(g.clone());
         }
         let g = Arc::new(Gpu::new().map_err(|e| {
@@ -351,6 +401,11 @@ fn finish_view_inner(host: &Host, view: &View) {
     if render.is_some() {
         if let Some(gpu) = host.gpu.lock().clone() {
             // Work that references the drawable finishes before the layer goes.
+            #[cfg(windows)]
+            if let Err(e) = op_gpu::poll_gpu(&gpu.device, "view detach") {
+                eprintln!("op-ffi view: {e}");
+            }
+            #[cfg(not(windows))]
             let _ = gpu.device.poll(wgpu::PollType::wait_indefinitely());
         }
         drop(render);
@@ -391,8 +446,29 @@ fn render_loop(host: Arc<Host>) {
             }
             st.views.values().cloned().collect()
         };
+        #[cfg(windows)]
+        let gpu_lost = {
+            // wgpu runs the device-lost callback only from a poll, and nothing
+            // else polls this device. Without this the canvas never recovers.
+            let gpu = host.gpu.lock().clone();
+            gpu.is_some_and(|gpu| {
+                if let Err(e) = gpu.device.poll(wgpu::PollType::Poll) {
+                    eprintln!("op-ffi view: canvas device poll failed: {e}");
+                }
+                gpu.lost.load(Ordering::SeqCst)
+            })
+        };
         for v in views {
-            if !v.dirty.load(Ordering::Acquire) && !doc_changed(&host, &v) {
+            if !v.dirty.load(Ordering::Acquire) && !doc_changed(&host, &v) && {
+                #[cfg(windows)]
+                {
+                    !gpu_lost
+                }
+                #[cfg(not(windows))]
+                {
+                    true
+                }
+            } {
                 continue;
             }
             v.dirty.store(false, Ordering::Release);
@@ -404,17 +480,17 @@ fn render_loop(host: Arc<Host>) {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn record_error(v: &View, status: OpStatus) {
     if let Some(r) = v.render.lock().as_mut() {
         r.frame_errors += 1;
         r.last_error = status;
     }
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn record_error(_v: &View, _status: OpStatus) {}
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn doc_changed(host: &Host, v: &View) -> bool {
     let Ok(snap) = host.engine().core().snapshot(v.doc) else {
         return false;
@@ -426,12 +502,12 @@ fn doc_changed(host: &Host, v: &View) -> bool {
         .and_then(|r| r.doc_revision.map(|rev| (rev, r.doc_preview)));
     seen.is_some_and(|key| key != (snap.revision, snap.preview_serial))
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn doc_changed(_host: &Host, _v: &View) -> bool {
     false
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn render_one(host: &Host, v: &View) {
     use op_gpu::presenter::{CanvasParams, Lut3d, ViewParams};
     let Ok(gpu) = host.gpu() else { return };
@@ -558,6 +634,11 @@ fn render_one(host: &Host, v: &View) {
     if let Err(e) = result {
         return fail(r, OpStatus::OP_ERR_INTERNAL, e.to_string());
     }
+    #[cfg(windows)]
+    if let Err(e) = op_gpu::poll_gpu(&gpu.device, "view frame") {
+        return fail(r, OpStatus::OP_ERR_INTERNAL, e.to_string());
+    }
+    #[cfg(not(windows))]
     let _ = gpu.device.poll(wgpu::PollType::wait_indefinitely());
     let stamp = OpFrameStamp {
         time_ns: uptime_ns(),
@@ -580,7 +661,7 @@ fn render_one(host: &Host, v: &View) {
     host.frames_total.fetch_add(1, Ordering::Relaxed);
     v.frame_cv.notify_all();
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn render_one(_host: &Host, _v: &View) {}
 
 /// The 33^3 document -> display table; a document without a profile is sRGB.
@@ -665,11 +746,11 @@ pub(crate) fn doc_closing(p: *mut OpEngine, doc: u64) {
     }
 }
 
-/// Attaches a view of `doc` to a `CAMetalLayer`. The engine retains the layer
-/// until the view is detached. Nothing is drawn until the first `op_view_set`.
+/// Attaches a view of `doc` to a `CAMetalLayer` on macOS or an HWND on Windows.
+/// The caller keeps the HWND alive until detach. Nothing is drawn until the first `op_view_set`.
 /// Returns OP_ERR_NO_SUCH_DOC for an unknown document, OP_ERR_BAD_ARGUMENT for a
-/// null pointer or an object that is not a CAMetalLayer, OP_ERR_INTERNAL when no
-/// GPU device can be made, and OP_ERR_UNSUPPORTED off macOS.
+/// null pointer or an invalid native target, OP_ERR_INTERNAL when no GPU device
+/// can be made, and OP_ERR_UNSUPPORTED on other systems. Windows takes an HWND.
 #[unsafe(no_mangle)]
 pub extern "C" fn op_view_attach(
     p: *mut OpEngine,
@@ -692,7 +773,7 @@ pub extern "C" fn op_view_attach(
     })
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) -> OpStatus {
     let host = host_for(p);
     let gpu = match host.gpu() {
@@ -700,6 +781,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
         Err(s) => return s,
     };
     // SAFETY: the caller passes a live Objective-C object; its class is checked.
+    #[cfg(target_os = "macos")]
     let target = match unsafe {
         op_gpu::layer::MetalLayerTarget::new(&gpu.instance, layer, host.counters.clone())
     } {
@@ -710,7 +792,29 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             return OpStatus::OP_ERR_INTERNAL;
         }
     };
-    let renderer = op_gpu::presenter::ViewRenderer::new(&gpu.device, op_gpu::layer::FORMAT);
+    #[cfg(windows)]
+    let target = match unsafe {
+        op_gpu::win32::Win32Target::new(&gpu.instance, layer, host.counters.clone())
+    } {
+        Ok(t) => t,
+        Err(e) if e == "invalid HWND" => return OpStatus::OP_ERR_BAD_ARGUMENT,
+        Err(e) => {
+            eprintln!("op-ffi view: attach failed: {e}");
+            return OpStatus::OP_ERR_INTERNAL;
+        }
+    };
+    #[cfg(windows)]
+    let display_icc: Arc<[u8]> = Arc::from(target.display_icc());
+    #[cfg(windows)]
+    if let Err(e) = op_color::Profile::from_icc(&display_icc) {
+        eprintln!("op-ffi view: Windows display ICC is invalid: {e}");
+        return OpStatus::OP_ERR_INTERNAL;
+    }
+    #[cfg(target_os = "macos")]
+    let format = op_gpu::layer::FORMAT;
+    #[cfg(windows)]
+    let format = op_gpu::win32::FORMAT;
+    let renderer = op_gpu::presenter::ViewRenderer::new(&gpu.device, format);
     let id = host.next_view.fetch_add(1, Ordering::Relaxed);
     let view = Arc::new(View {
         doc,
@@ -723,8 +827,14 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             origin_x: 0.0,
             origin_y: 0.0,
             flags: 0,
+            #[cfg(target_os = "macos")]
             display_icc: None,
+            #[cfg(windows)]
+            display_icc: Some(display_icc),
+            #[cfg(target_os = "macos")]
             display_gen: 0,
+            #[cfg(windows)]
+            display_gen: 1,
             set: false,
             background: BACKGROUND,
         }),
@@ -758,7 +868,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
     OpStatus::OP_OK
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn attach(_p: *mut OpEngine, _doc: u64, _layer: *mut c_void, _out: *mut u64) -> OpStatus {
     OpStatus::OP_ERR_UNSUPPORTED
 }
@@ -945,7 +1055,7 @@ pub extern "C" fn op_view_info(p: *mut OpEngine, view: u64, out: *mut OpViewInfo
     })
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn fill_render_info(v: &View, info: &mut OpViewInfo) {
     if let Some(r) = v.render.lock().as_ref() {
         let s = &r.target.stats;
@@ -967,8 +1077,20 @@ fn fill_render_info(v: &View, info: &mut OpViewInfo) {
         info.region_tiles = r.region_tiles;
     }
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn fill_render_info(_v: &View, _info: &mut OpViewInfo) {}
+
+/// Test only: destroys the canvas device, so the test host can prove the canvas
+/// recovers. This is not `extern "C"`, so it is not in the C header.
+#[cfg(windows)]
+#[doc(hidden)]
+pub fn view_test_lose_device(p: *mut OpEngine) {
+    if let Some(host) = find_host(p)
+        && let Some(gpu) = host.gpu.lock().clone()
+    {
+        gpu.device.destroy();
+    }
+}
 
 /// Reads the engine-wide view counters (live views, retained layers, surfaces,
 /// wgpu objects, validation errors, frames).
@@ -986,6 +1108,11 @@ pub extern "C" fn op_view_counters(p: *mut OpEngine, out: *mut OpViewCounters) -
             c.live_views = host.state.lock().views.len() as u64;
             c.frames_total = host.frames_total.load(Ordering::Relaxed);
             #[cfg(target_os = "macos")]
+            {
+                c.live_layers = host.counters.live_targets.load(Ordering::SeqCst);
+                c.live_surfaces = host.counters.live_surfaces.load(Ordering::SeqCst);
+            }
+            #[cfg(windows)]
             {
                 c.live_layers = host.counters.live_targets.load(Ordering::SeqCst);
                 c.live_surfaces = host.counters.live_surfaces.load(Ordering::SeqCst);

@@ -7,6 +7,30 @@
 
 use crate::{GpuError, Result};
 
+fn presenter_shader_source(format: wgpu::TextureFormat) -> wgpu::ShaderSource<'static> {
+    #[cfg(windows)]
+    {
+        let source = if format == wgpu::TextureFormat::Bgra8Unorm {
+            assert!(
+                include_str!("presenter.wgsl").contains("return vec4<f32>(rgb, 1.0);"),
+                "Windows presenter shader patch marker is missing"
+            );
+            include_str!("presenter.wgsl").replace(
+                "return vec4<f32>(rgb, 1.0);",
+                "if (p.use_lut != 0u) { rgb = floor(rgb * 255.0 + vec3<f32>(0.5)) / 255.0; }\n    return vec4<f32>(rgb, 1.0);",
+            )
+        } else {
+            include_str!("presenter.wgsl").to_owned()
+        };
+        wgpu::ShaderSource::Wgsl(source.into())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = format;
+        wgpu::ShaderSource::Wgsl(include_str!("presenter.wgsl").into())
+    }
+}
+
 /// A 3D color table. `data[r + g * n + b * n * n]` is the output for the encoded
 /// input `(r, g, b) / (n - 1)`.
 #[derive(Debug, Clone)]
@@ -169,7 +193,7 @@ impl ViewRenderer {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("view renderer"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("presenter.wgsl").into()),
+            source: presenter_shader_source(format),
         });
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("view renderer bindings"),

@@ -1,0 +1,8 @@
+[package]
+name = "win32-host"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+op-ffi = { path = "../../engine/op-ffi" }
+op-color = { path = "../../engine/op-color" }
