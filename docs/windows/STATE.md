@@ -17,10 +17,10 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
   - Mac run owed. The Mac code type-checks only.
 - [x] W3: GPU and canvas on DX12, code committed 2026-11-02. Reviewed at the end of Phase A. Results: `test-counts.md`, `w3-host.md`.
   - Real device removal recovers on WARP, and is deliberately not run on the RTX. Mac run owed. The Mac code type-checks only.
-- [ ] W4: capture kit, committed at 244f671. Add Noise and Clouds are not repeatable, and parameters cannot be set yet. See `parity.md`. Its review comes at the end of Phase A.
+- [ ] W4: capture kit. Number settings work (`4b701b0`). Add Noise and Clouds are not repeatable. The review found ways to report success after the wrong operation, so a fix round is running. See `parity.md`.
 - [ ] W5 to W20: see `PLAN.md`
 
 ## Open items
 
 - This PC's key on the Macs (the user must add it). The Linux box is done. Decision 5 waits for W19.
-- Astra's review of the plan has not run. W1's code had Astra reviews.
+- Astra reviewed the plan at the end of Phase A; its plan findings are in `PLAN.md`. Open from it: `xtask` runs the whole workspace even for `fast`, and does not call the capture tests, the test program or the release matrix. Fix this before W7.

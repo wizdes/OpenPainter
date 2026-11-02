@@ -33,7 +33,6 @@
   "labels": [
    "Transfer Map",
    "Luminosity",
-   "Tip: Right-click to remove control points.",
    "&Reset",
    "OK",
    "Cancel"
@@ -559,8 +558,7 @@
    "R:",
    "G:",
    "B:",
-   "Only draw shadow",
-   "This effect requires a layer with transparency. Make sure that the object you want a drop shadow for is on its own layer."
+   "Only draw shadow"
   ]
  },
  {
@@ -784,8 +782,7 @@
    "Algorithm:",
    "Colors",
    "Dithering level",
-   "Transparency threshold",
-   "Pixels with an alpha value less than the threshold will be fully transparent."
+   "Transparency threshold"
   ]
  },
  {
@@ -798,8 +795,7 @@
   "labels": [
    "OK",
    "Cancel",
-   "Strength",
-   "For best results, first use the selection tools to select each eye."
+   "Strength"
   ]
  }
 ]
