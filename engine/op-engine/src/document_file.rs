@@ -90,7 +90,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
             Err(e) => return Err(internal(format!("cannot write {}: {e}", path.display()))),
         }
     };
-    let result = (move || {
+    let result = (|| {
         file.write_all(bytes)?;
         file.sync_all()?;
         // ReplaceFileW refuses a temporary file this process still holds open.
