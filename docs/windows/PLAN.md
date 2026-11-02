@@ -6,7 +6,7 @@ Status: revision 4. The user approved revision 2 on 2026-11-01. Revision 3 added
 
 The Rust engine moves to Windows with modest changes. The Mac app (Swift) does not move, so Windows gets a new C# app. This PC has paint.net 5.1.12, so effects and behavior can be compared with the real thing. That comparison was blocked for the whole Mac build (old milestone M02). Fixes go into the shared engine, so the Mac app gets them too.
 
-The work is 21 milestones, W0 to W20, about 415 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
+The work is 21 milestones, W0 to W20, about 420 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
 
 ```
 Engine (Rust, shared) --> C interface --> Mac app (Swift, exists)
