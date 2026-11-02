@@ -10,9 +10,9 @@ use op_core::doc::DocState;
 use op_core::history::History;
 use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use serde_json::json;
+use std::fs;
 #[cfg(unix)]
 use std::fs::File;
-use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

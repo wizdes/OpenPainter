@@ -4,7 +4,7 @@
 //! errors that were hidden, and a close that waited for a write.
 use op_engine::recovery::{self, RecordHooks, RecordStage, RecoveryOptions};
 use op_engine::{Engine, SaveFormat};
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use op_engine::{Event, EventKind};
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -398,4 +398,470 @@ fn file_url(path: &std::path::Path) -> String {
     } else {
         format!("file://{}", path.display())
     }
+}
+
+#[cfg(windows)]
+fn names_in(root: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<_> = std::fs::read_dir(root)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// A record left on disk with its writer stopped, as a crash would leave it.
+#[cfg(windows)]
+fn crashed_record(root: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let dir = root.join(name);
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 10), None).unwrap();
+    e.recovery_attach(doc, &dir, None, manual()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    e.recovery_flush(doc).unwrap();
+    e.recovery_detach(doc, false);
+    assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+    dir
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_clean_close_with_reader_does_not_offer_recovery() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("reader-close");
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 9), None).unwrap();
+    e.recovery_attach(doc, &dir, None, manual()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    e.recovery_flush(doc).unwrap();
+    let record = recovery::read_record(&dir).unwrap();
+    let reader = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(dir.join(record.snapshot))
+        .unwrap();
+    e.close(doc).unwrap();
+    assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+    // The writer has stopped and the snapshot could not go. No false offer.
+    assert!(dir.is_dir());
+    assert!(root.path().join(".reader-close.closed").exists());
+    assert!(recovery::scan(root.path()).is_empty());
+    drop(reader);
+    assert!(recovery::scan(root.path()).is_empty());
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_manifest_held_open_at_close_makes_no_false_offer() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("held-manifest");
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 12), None).unwrap();
+    e.recovery_attach(doc, &dir, None, manual()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    e.recovery_flush(doc).unwrap();
+    let reader = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(dir.join(recovery::MANIFEST))
+        .unwrap();
+    e.close(doc).unwrap();
+    assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+    assert!(dir.join(recovery::MANIFEST).exists());
+    // Only the marker stands between this manifest and a false offer.
+    assert!(recovery::scan(root.path()).is_empty());
+    drop(reader);
+    assert!(recovery::scan(root.path()).is_empty());
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
+/// Close used to delete the folder and lock before the writer stopped. A new
+/// owner could then take the path, and the old writer deleted its snapshot.
+#[cfg(windows)]
+#[test]
+fn windows_a_closing_writer_keeps_its_lock_until_it_stops() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("late-writer");
+    let (paused_tx, paused_rx) = std::sync::mpsc::channel::<()>();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel::<()>();
+    let resume_rx = Mutex::new(resume_rx);
+    let paused_tx = Mutex::new(paused_tx);
+    let hooks = RecordHooks {
+        on_stage: Some(Arc::new(move |stage| {
+            if matches!(stage, RecordStage::Committed) {
+                paused_tx.lock().unwrap().send(()).unwrap();
+                resume_rx.lock().unwrap().recv().unwrap();
+            }
+        })),
+        ..Default::default()
+    };
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 13), None).unwrap();
+    e.recovery_attach(
+        doc,
+        &dir,
+        None,
+        RecoveryOptions {
+            settle: Duration::from_millis(5),
+            max_interval: Duration::from_secs(60),
+            hooks,
+        },
+    )
+    .unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    paused_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    e.close(doc).unwrap();
+    // The old writer is still inside its write: the path must not be free.
+    let other = Engine::new(None).unwrap();
+    let doc2 = other
+        .import_pixels(64, 48, &noise(64, 48, 14), None)
+        .unwrap();
+    assert!(other.recovery_attach(doc2, &dir, None, manual()).is_err());
+    resume_tx.send(()).unwrap();
+    assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+    assert!(recovery::scan(root.path()).is_empty());
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+    // Now the path is free, and the new owner's record stays.
+    other.recovery_attach(doc2, &dir, None, manual()).unwrap();
+    other
+        .dispatch(doc2, "image.invert_colors", json!({}))
+        .unwrap();
+    other.recovery_flush(doc2).unwrap();
+    assert!(recovery::read_record(&dir).is_ok());
+}
+
+/// An unreadable manifest must never read as "no manifest", or a scan deletes
+/// the user's last good record.
+#[cfg(windows)]
+#[test]
+fn windows_a_manifest_that_cannot_be_checked_keeps_the_record() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "denied");
+    let icacls = |target: &std::path::Path, args: &[&str]| {
+        let status = std::process::Command::new("icacls")
+            .arg(target)
+            .args(args)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    let everyone = "*S-1-1-0:(RD,RA,REA,X)";
+    let manifest = dir.join(recovery::MANIFEST);
+    icacls(&manifest, &["/deny", everyone]);
+    icacls(&dir, &["/deny", everyone]);
+    let found = recovery::scan(root.path());
+    icacls(&dir, &["/remove:d", "*S-1-1-0"]);
+    icacls(&manifest, &["/remove:d", "*S-1-1-0"]);
+    assert!(found.is_empty(), "{found:?}");
+    assert!(dir.join(recovery::MANIFEST).exists());
+    let found = recovery::scan(root.path());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].is_valid(), "{:?}", found[0].problem);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_lock_that_cannot_be_opened_hides_the_record_for_one_scan_only() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "busy");
+    let held = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(root.path().join(".busy.owner.lock"))
+        .unwrap();
+    assert!(recovery::scan(root.path()).is_empty());
+    assert!(dir.join(recovery::MANIFEST).exists());
+    drop(held);
+    let found = recovery::scan(root.path());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].is_valid(), "{:?}", found[0].problem);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_writer_keeps_its_record_through_a_brief_lock_failure() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("writer-brief");
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 15), None).unwrap();
+    e.recovery_attach(doc, &dir, None, manual()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    let first = e.recovery_flush(doc).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    // A handle that refuses readers makes the writer's lock check fail. The
+    // writer's own write handle is allowed, because this one shares writes.
+    const FILE_SHARE_WRITE: u32 = 2;
+    const FILE_SHARE_DELETE: u32 = 4;
+    let held = std::fs::OpenOptions::new()
+        .write(true)
+        .share_mode(FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .open(root.path().join(".writer-brief.owner.lock"))
+        .unwrap();
+    let err = e.recovery_flush(doc).unwrap_err().to_string();
+    assert!(err.contains("cannot check lock"), "{err}");
+    assert_eq!(e.recovery_status(doc).unwrap().acknowledged, first);
+    assert!(recovery::read_record(&dir).is_ok());
+    drop(held);
+    let second = e.recovery_flush(doc).unwrap();
+    assert!(second > first, "{second:?} after {first:?}");
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_record_marked_closed_cannot_be_recovered() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "marked");
+    let marker = root.path().join(".marked.closed");
+    std::fs::write(&marker, b"").unwrap();
+    let e = Engine::new(None).unwrap();
+    assert!(e.recovery_open(&dir, manual()).is_err());
+    assert!(marker.exists());
+    assert!(recovery::scan(root.path()).is_empty());
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
+/// What each crash point leaves, built by hand, and what the next scan does.
+#[cfg(windows)]
+#[test]
+fn windows_each_crash_state_scans_correctly() {
+    let root = tempfile::tempdir().unwrap();
+    // After the lock, before the folder.
+    std::fs::write(root.path().join(".a.owner.lock"), b"").unwrap();
+    // After the folder, before the first record.
+    std::fs::create_dir(root.path().join("b")).unwrap();
+    std::fs::write(root.path().join(".b.owner.lock"), b"").unwrap();
+    // After the record: this one must be offered.
+    crashed_record(root.path(), "c");
+    // After the marker, before the manifest went.
+    let d = crashed_record(root.path(), "d");
+    std::fs::write(root.path().join(".d.closed"), b"").unwrap();
+    assert!(d.join(recovery::MANIFEST).exists());
+    // After the manifest went, before the folder.
+    let e = crashed_record(root.path(), "e");
+    std::fs::write(root.path().join(".e.closed"), b"").unwrap();
+    std::fs::remove_file(e.join(recovery::MANIFEST)).unwrap();
+    // After the folder, before the marker and lock.
+    std::fs::write(root.path().join(".f.closed"), b"").unwrap();
+    std::fs::write(root.path().join(".f.owner.lock"), b"").unwrap();
+    // After close renamed the folder, before the writer deleted it.
+    let hidden = root.path().join(".g.deleted-1-1");
+    std::fs::create_dir(&hidden).unwrap();
+    std::fs::write(hidden.join("snapshot-1-1-1.opaint"), b"x").unwrap();
+    std::fs::write(root.path().join(".g.closed"), b"").unwrap();
+    std::fs::write(root.path().join(".g.owner.lock"), b"").unwrap();
+    let found = recovery::scan(root.path());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].uuid, "c");
+    assert!(found[0].is_valid(), "{:?}", found[0].problem);
+    assert_eq!(names_in(root.path()), [".c.owner.lock", "c"]);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_old_layout_record_still_reads_and_its_lock_file_is_not_used() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "old-layout");
+    // A record as the old layout wrote it: a lock inside, none beside.
+    std::fs::write(dir.join(recovery::LOCK), b"").unwrap();
+    std::fs::remove_file(root.path().join(".old-layout.owner.lock")).unwrap();
+    let found = recovery::scan(root.path());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].is_valid(), "{:?}", found[0].problem);
+    let e = Engine::new(None).unwrap();
+    let (doc, _) = e.recovery_open(&dir, manual()).unwrap();
+    // The owner holds the lock beside the folder, so others stay out.
+    assert!(recovery::discard(&dir).is_err());
+    e.close(doc).unwrap();
+    assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
+/// Close used to delete whatever was at the path, even after losing the lock.
+#[cfg(windows)]
+#[test]
+fn windows_closing_a_former_owner_keeps_the_new_owners_record() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("former");
+    let old = Engine::new(None).unwrap();
+    let old_doc = old.import_pixels(64, 48, &noise(64, 48, 21), None).unwrap();
+    old.recovery_attach(old_doc, &dir, None, manual()).unwrap();
+    old.dispatch(old_doc, "image.invert_colors", json!({}))
+        .unwrap();
+    old.recovery_flush(old_doc).unwrap();
+    // Something outside deletes the lock file. A new owner then takes over.
+    std::fs::remove_file(root.path().join(".former.owner.lock")).unwrap();
+    let new = Engine::new(None).unwrap();
+    let new_doc = new.import_pixels(64, 48, &noise(64, 48, 22), None).unwrap();
+    new.recovery_attach(new_doc, &dir, None, manual()).unwrap();
+    new.dispatch(new_doc, "image.invert_colors", json!({}))
+        .unwrap();
+    new.recovery_flush(new_doc).unwrap();
+    old.close(old_doc).unwrap();
+    assert!(old.recovery_wait_stopped(Duration::from_secs(5)));
+    let record = recovery::read_record(&dir).expect("the new owner's record");
+    assert!(dir.join(record.snapshot).exists());
+    new.dispatch(new_doc, "image.invert_colors", json!({}))
+        .unwrap();
+    new.recovery_flush(new_doc).unwrap();
+}
+
+/// Another program holding a file is not damage. Listing the record as damaged
+/// would steer the user to Discard.
+#[cfg(windows)]
+#[test]
+fn windows_a_held_file_does_not_list_the_record_as_damaged() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "held-file");
+    let record = recovery::read_record(&dir).unwrap();
+    for name in [record.snapshot.as_str(), recovery::MANIFEST] {
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(dir.join(name))
+            .unwrap();
+        let found = recovery::scan(root.path());
+        assert!(found.is_empty(), "{name}: {found:?}");
+        drop(held);
+        let found = recovery::scan(root.path());
+        assert_eq!(found.len(), 1, "{name}: {found:?}");
+        assert!(found[0].is_valid(), "{name}: {:?}", found[0].problem);
+    }
+}
+
+/// A lock that can never be opened: attach gives the real reason, and a scan
+/// does not wait the full 2 s on each record.
+#[cfg(windows)]
+#[test]
+fn windows_a_lock_that_stays_denied_names_the_cause_and_scan_stays_quick() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "denied-lock");
+    let lock = root.path().join(".denied-lock.owner.lock");
+    let mut perms = std::fs::metadata(&lock).unwrap().permissions();
+    perms.set_readonly(true);
+    std::fs::set_permissions(&lock, perms.clone()).unwrap();
+    let start = Instant::now();
+    assert!(recovery::scan(root.path()).is_empty());
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "{:?}",
+        start.elapsed()
+    );
+    assert!(dir.join(recovery::MANIFEST).exists());
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 24), None).unwrap();
+    let err = e
+        .recovery_attach(doc, &dir, None, manual())
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("cannot open"), "{err}");
+    #[allow(clippy::permissions_set_readonly_false)]
+    perms.set_readonly(false);
+    std::fs::set_permissions(&lock, perms).unwrap();
+}
+
+/// The same check as item5_lock_retries_stop_within_their_time_limit, on the
+/// lock file Windows really uses.
+#[cfg(windows)]
+#[test]
+fn windows_lock_churn_stops_within_the_time_limit() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "churn");
+    let lock = root.path().join(".churn.owner.lock");
+    let stop = Arc::new(AtomicBool::new(false));
+    let (flag, path) = (stop.clone(), lock.clone());
+    let churn = std::thread::spawn(move || {
+        while !flag.load(Ordering::SeqCst) {
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::write(&path, b"");
+        }
+    });
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 25), None).unwrap();
+    let start = Instant::now();
+    let result = e.recovery_attach(doc, &dir, None, manual());
+    assert!(
+        start.elapsed() < Duration::from_secs(8),
+        "{:?}",
+        start.elapsed()
+    );
+    stop.store(true, Ordering::SeqCst);
+    churn.join().unwrap();
+    drop(result);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_discard_removes_everything() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = crashed_record(root.path(), "discard-all");
+    recovery::discard(&dir).unwrap();
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
+#[cfg(windows)]
+#[test]
+fn item5_a_failed_clean_up_is_reported_and_retried_on_windows() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("clear-windows");
+    let events: Arc<Mutex<Vec<Event>>> = Arc::default();
+    let sink = events.clone();
+    let e = Engine::new(Some(Arc::new(move |ev: Event| {
+        sink.lock().unwrap().push(ev)
+    })))
+    .unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 11), None).unwrap();
+    e.recovery_attach(doc, &dir, None, fast()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    wait(|| e.recovery_status(doc).unwrap().acknowledged);
+    let held = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(dir.join(recovery::MANIFEST))
+        .unwrap();
+    e.save_document(doc, root.path().join("x.opaint"), SaveFormat::Opaint, true)
+        .unwrap();
+    let failure = wait(|| {
+        events
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|ev| matches!(ev.kind, EventKind::Recovery) && ev.json["ok"] == json!(false))
+            .cloned()
+    });
+    assert!(
+        failure.json["error"]
+            .as_str()
+            .unwrap()
+            .contains("cannot delete"),
+        "{}",
+        failure.json
+    );
+    assert!(dir.join(recovery::MANIFEST).exists());
+    assert!(e.recovery_status(doc).unwrap().error.is_some());
+    assert!(
+        !events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|ev| ev.json["cleared"] == json!(true))
+    );
+    drop(held);
+    wait(|| (!dir.join(recovery::MANIFEST).exists()).then_some(()));
+    wait(|| {
+        events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|ev| ev.json["cleared"] == json!(true))
+            .then_some(())
+    });
 }

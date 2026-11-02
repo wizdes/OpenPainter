@@ -67,8 +67,24 @@ fn kill_at(dir: &std::path::Path, stage: &str) -> Run {
             _ => {}
         }
     }
-    // Child::kill sends SIGKILL on Unix: no destructor, no cleanup runs.
+    // The kill bypasses Rust destructors and recovery cleanup.
+    #[cfg(unix)]
     child.kill().unwrap();
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn TerminateProcess(process: std::os::windows::io::RawHandle, exit_code: u32) -> i32;
+        }
+        let ok = unsafe { TerminateProcess(child.as_raw_handle(), 1) };
+        assert_ne!(
+            ok,
+            0,
+            "TerminateProcess: {}",
+            std::io::Error::last_os_error()
+        );
+    }
     let status = child.wait().unwrap();
     assert!(!status.success());
     let leftovers = std::fs::read_dir(dir)
@@ -81,6 +97,18 @@ fn kill_at(dir: &std::path::Path, stage: &str) -> Run {
         edit: edit.expect("EDIT line"),
         leftovers,
     }
+}
+
+#[cfg(windows)]
+#[test]
+fn terminate_process_during_snapshot_keeps_the_last_record() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("terminate-mid-snapshot");
+    let run = kill_at(&dir, "snapshot-mid");
+    let latest = run.acks.last().unwrap().0;
+    let found = recovery::scan(root.path());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].manifest.as_ref().unwrap().revision, latest);
 }
 
 #[test]

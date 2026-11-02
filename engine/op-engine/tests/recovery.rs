@@ -256,9 +256,15 @@ fn a_failed_record_write_keeps_the_previous_record_and_reports_the_error() {
     e.recovery_attach(doc, &dir, None, failing).unwrap();
     e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
     let err = e.recovery_flush(doc).unwrap_err().to_string();
+    #[cfg(unix)]
     assert!(err.contains("No space left on device"), "{err}");
+    #[cfg(windows)]
+    assert!(err.contains("os error 112"), "{err}");
     let status = e.recovery_status(doc).unwrap();
+    #[cfg(unix)]
     assert!(status.error.as_deref().unwrap().contains("No space left"));
+    #[cfg(windows)]
+    assert!(status.error.as_deref().unwrap().contains("os error 112"));
     // The writer may also have retried on its own after the settle delay.
     assert!(status.failures >= 1);
     // The previous record is still whole and readable.
@@ -286,11 +292,19 @@ fn a_failed_record_write_keeps_the_previous_record_and_reports_the_error() {
             .find(|ev| matches!(ev.kind, EventKind::Recovery) && ev.json["ok"] == json!(false))
             .cloned()
     });
+    #[cfg(unix)]
     assert!(
         failure.json["error"]
             .as_str()
             .unwrap()
             .contains("No space left")
+    );
+    #[cfg(windows)]
+    assert!(
+        failure.json["error"]
+            .as_str()
+            .unwrap()
+            .contains("os error 112")
     );
 }
 

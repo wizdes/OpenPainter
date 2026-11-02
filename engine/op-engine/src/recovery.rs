@@ -7,6 +7,7 @@
 //!
 //! ```text
 //! <root>/<doc-uuid>/owner.lock         held (flock) while a live process owns it
+//!                                      (Windows: <root>/.<doc-uuid>.owner.lock, beside the folder)
 //! <root>/<doc-uuid>/manifest.json      the committed record
 //! <root>/<doc-uuid>/snapshot-<rev>-<n>.opaint
 //! ```
@@ -590,6 +591,7 @@ pub fn read_record(dir: &Path) -> std::result::Result<Manifest, String> {
     Ok(manifest)
 }
 
+#[cfg(any(unix, test))]
 fn same_file(a: &Path, b: &File) -> bool {
     #[cfg(unix)]
     {
@@ -600,41 +602,286 @@ fn same_file(a: &Path, b: &File) -> bool {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::io::AsRawHandle;
-        use windows_sys::Win32::Storage::FileSystem::{
-            BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
-        };
-        let Ok(a) = File::open(a) else {
-            return false;
-        };
-        let info = |file: &File| {
-            let mut info = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::zeroed();
-            let ok = unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) };
-            (ok != 0).then(|| unsafe { info.assume_init() })
-        };
-        match (info(&a), info(b)) {
-            (Some(a), Some(b)) => {
-                a.dwVolumeSerialNumber == b.dwVolumeSerialNumber
-                    && a.nFileIndexHigh == b.nFileIndexHigh
-                    && a.nFileIndexLow == b.nFileIndexLow
-            }
-            _ => false,
-        }
+        same_file_checked(a, b).unwrap_or(false)
     }
 }
 
-/// A record folder's lock (`owner.lock`, flock). While it is held no other
+#[cfg(windows)]
+fn same_file_checked(a: &Path, b: &File) -> std::io::Result<bool> {
+    Ok(file_identity(&File::open(a)?)? == file_identity(b)?)
+}
+
+/// Volume and file number: what makes two handles the same file.
+#[cfg(windows)]
+fn file_identity(file: &File) -> std::io::Result<(u32, u32, u32)> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
+    };
+    let mut info = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::zeroed();
+    if unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let info = unsafe { info.assume_init() };
+    Ok((
+        info.dwVolumeSerialNumber,
+        info.nFileIndexHigh,
+        info.nFileIndexLow,
+    ))
+}
+
+/// True only for "this exact file does not exist". Rust also calls a missing
+/// path or network share NotFound, and that says nothing about the file.
+#[cfg(windows)]
+fn file_is_gone(e: &std::io::Error) -> bool {
+    const FILE_NOT_FOUND: i32 = 2;
+    e.raw_os_error() == Some(FILE_NOT_FOUND)
+}
+
+/// A record folder's lock (`owner.lock`, flock; on Windows the file beside the
+/// folder, see `sibling_lock`). While it is held no other
 /// attach, scan or discard touches the folder, and the folder is deleted only
 /// while it is held (renamed to a tombstone first).
 pub(crate) struct FolderLock {
     file: File,
     dir: PathBuf,
+    path: PathBuf,
+}
+
+#[cfg(windows)]
+fn sibling_lock(dir: &Path) -> PathBuf {
+    let name = dir.file_name().unwrap_or_default().to_string_lossy();
+    parent_of(dir).join(format!(".{name}.owner.lock"))
+}
+
+#[cfg(windows)]
+fn closed_marker(dir: &Path) -> PathBuf {
+    let name = dir.file_name().unwrap_or_default().to_string_lossy();
+    parent_of(dir).join(format!(".{name}.closed"))
+}
+
+#[cfg(windows)]
+fn remove_sidecars(dir: &Path) -> std::result::Result<(), String> {
+    for path in [closed_marker(dir), sibling_lock(dir)] {
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(io_text("cannot delete", &path, e)),
+        }
+    }
+    sync_dir(parent_of(dir)).map_err(|e| io_text("cannot sync", parent_of(dir), e))
+}
+
+/// An error that clears by itself: a file being deleted, or opened by another
+/// program with no sharing. It says nothing about who owns the record.
+#[cfg(windows)]
+fn is_brief(e: &std::io::Error) -> bool {
+    const SHARING_VIOLATION: i32 = 32;
+    const LOCK_VIOLATION: i32 = 33;
+    e.kind() == std::io::ErrorKind::PermissionDenied
+        || matches!(
+            e.raw_os_error(),
+            Some(SHARING_VIOLATION) | Some(LOCK_VIOLATION)
+        )
+}
+
+/// Is the manifest there? A check that fails is an error, never "no": a scan
+/// deletes a folder with no manifest, and that must not follow from a file
+/// that could not be read.
+fn manifest_present(dir: &Path) -> std::result::Result<bool, String> {
+    let path = dir.join(MANIFEST);
+    #[cfg(windows)]
+    {
+        path.try_exists()
+            .map_err(|e| io_text("cannot check", &path, e))
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(path.exists())
+    }
+}
+
+/// Removes lock and closed-marker files whose record folder is gone. A crash
+/// can leave them, and the folder loop in `scan` never visits a plain file.
+#[cfg(windows)]
+fn sweep_sidecars(root: &Path) {
+    let entries = match fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+        Err(e) => {
+            eprintln!("op-engine: {}", io_text("cannot list", root, e));
+            return;
+        }
+    };
+    let mut names: Vec<String> = entries
+        .filter_map(|e| match e {
+            Ok(e) => Some(e),
+            Err(e) => {
+                eprintln!("op-engine: {}", io_text("cannot list", root, e));
+                None
+            }
+        })
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let name = name.strip_prefix('.')?;
+            let uuid = name
+                .strip_suffix(".owner.lock")
+                .or_else(|| name.strip_suffix(".closed"))?;
+            (!uuid.is_empty()).then(|| uuid.to_string())
+        })
+        .collect();
+    names.sort();
+    names.dedup();
+    for uuid in names {
+        let dir = root.join(&uuid);
+        match dir.try_exists() {
+            Ok(false) => {}
+            Ok(true) => continue,
+            Err(e) => {
+                eprintln!("op-engine: {}", io_text("cannot check", &dir, e));
+                continue;
+            }
+        }
+        let path = sibling_lock(&dir);
+        let file = match OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+        {
+            Ok(file) => file,
+            Err(e) => {
+                eprintln!("op-engine: {}", io_text("cannot open", &path, e));
+                continue;
+            }
+        };
+        match file.try_lock() {
+            Ok(()) => {}
+            // A live process is making this folder right now.
+            Err(std::fs::TryLockError::WouldBlock) => continue,
+            Err(std::fs::TryLockError::Error(e)) => {
+                eprintln!("op-engine: {}", io_text("cannot lock", &path, e));
+                continue;
+            }
+        }
+        let lock = FolderLock {
+            file,
+            dir: dir.clone(),
+            path,
+        };
+        match lock.held_io() {
+            Ok(true) if matches!(dir.try_exists(), Ok(false)) => {
+                if let Err(e) = remove_sidecars(&dir) {
+                    eprintln!("op-engine: {e}");
+                }
+            }
+            Ok(_) => {}
+            Err(e) => eprintln!("op-engine: {}", io_text("cannot check lock", &lock.path, e)),
+        }
+    }
 }
 
 impl FolderLock {
+    /// Windows: the lock is always the file beside the folder. No Windows
+    /// release ever used a lock inside the folder, so no live process can hold
+    /// one; an `owner.lock` found inside is an ordinary leftover file. A brief
+    /// failure to open or check the lock is retried; it does not mean lost.
+    #[cfg(windows)]
+    fn take(dir: &Path, create: bool, wait: Duration) -> std::result::Result<Option<Self>, String> {
+        Self::take_within(dir, create, wait, wait + Duration::from_secs(2))
+    }
+
+    /// `take`, giving up on retries after `limit`. A scan passes a short one,
+    /// so one bad lock file does not hold up the whole list.
+    #[cfg(windows)]
+    fn take_within(
+        dir: &Path,
+        create: bool,
+        wait: Duration,
+        limit: Duration,
+    ) -> std::result::Result<Option<Self>, String> {
+        let start = Instant::now();
+        let path = sibling_lock(dir);
+        let mut first = true;
+        let mut last_problem = None;
+        loop {
+            if !first {
+                if start.elapsed() >= limit {
+                    return Err(last_problem.unwrap_or_else(|| {
+                        format!(
+                            "the recovery folder {} kept changing while it was being locked",
+                            dir.display()
+                        )
+                    }));
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            first = false;
+            if !dir.is_dir() {
+                if !create {
+                    return Ok(None);
+                }
+                if let Some(lock) = Self::create_locked(dir, &mut last_problem)? {
+                    return Ok(Some(lock));
+                }
+                continue;
+            }
+            let file = match OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .write(true)
+                .open(&path)
+            {
+                Ok(f) => f,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) if is_brief(&e) && start.elapsed() < limit => {
+                    last_problem = Some(io_text("cannot open", &path, e));
+                    continue;
+                }
+                Err(e) => return Err(io_text("cannot open", &path, e)),
+            };
+            match file.try_lock() {
+                Ok(()) => {}
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    if start.elapsed() >= wait {
+                        return Ok(None);
+                    }
+                    continue;
+                }
+                Err(std::fs::TryLockError::Error(e)) => {
+                    return Err(io_text("cannot lock", &path, e));
+                }
+            }
+            let lock = Self {
+                file,
+                dir: dir.to_path_buf(),
+                path: path.clone(),
+            };
+            match lock.held_io() {
+                Ok(true) if dir.is_dir() => return Ok(Some(lock)),
+                Ok(true) => match dir.try_exists() {
+                    // The folder went while this waited. The lock was made
+                    // for nothing: do not leave it behind.
+                    Ok(false) if !create => {
+                        remove_sidecars(dir)?;
+                        return Ok(None);
+                    }
+                    Ok(_) => {}
+                    Err(e) => return Err(io_text("cannot check", dir, e)),
+                },
+                Ok(false) => {}
+                Err(e) if is_brief(&e) && start.elapsed() < limit => {
+                    last_problem = Some(io_text("cannot check lock", &path, e));
+                }
+                Err(e) => return Err(io_text("cannot check lock", &path, e)),
+            }
+        }
+    }
+
     /// Takes the lock, waiting up to `wait` while another holder (such as a
     /// scan) has it. With `create`, makes the folder (and syncs its parent).
     /// None: still held by someone else, or (without `create`) no folder.
+    #[cfg(not(windows))]
     fn take(dir: &Path, create: bool, wait: Duration) -> std::result::Result<Option<Self>, String> {
         let start = Instant::now();
         // Retries after a vanished folder or a lost lock stop after this.
@@ -689,90 +936,195 @@ impl FolderLock {
             let lock = Self {
                 file,
                 dir: dir.to_path_buf(),
+                path: path.clone(),
             };
             // The folder may have been renamed away (deleted) while we waited.
-            if lock.held() {
-                return Ok(Some(lock));
+            match lock.held() {
+                Ok(true) if dir.is_dir() => return Ok(Some(lock)),
+                Ok(_) => {}
+                Err(e) => return Err(e),
             }
         }
     }
 
     /// Makes `dir` with its lock held (see `take`). None: `dir` appeared
     /// meanwhile.
-    fn create_locked(dir: &Path) -> std::result::Result<Option<Self>, String> {
-        let parent = parent_of(dir);
-        fs::create_dir_all(parent).map_err(|e| io_text("cannot make", parent, e))?;
-        let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let name = dir
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let fresh = parent.join(format!(".{name}.new-{}-{n}", std::process::id()));
-        fs::create_dir(&fresh).map_err(|e| io_text("cannot make", &fresh, e))?;
-        let made = (|| {
-            let path = fresh.join(LOCK);
-            let file = OpenOptions::new()
+    fn create_locked(
+        dir: &Path,
+        #[cfg(windows)] last_problem: &mut Option<String>,
+    ) -> std::result::Result<Option<Self>, String> {
+        #[cfg(windows)]
+        {
+            let parent = parent_of(dir);
+            fs::create_dir_all(parent).map_err(|e| io_text("cannot make", parent, e))?;
+            let path = sibling_lock(dir);
+            let file = match OpenOptions::new()
                 .create(true)
                 .truncate(false)
                 .write(true)
                 .open(&path)
-                .map_err(|e| io_text("cannot open", &path, e))?;
-            file.try_lock()
-                .map_err(|e| io_text("cannot lock", &path, format!("{e:?}")))?;
-            Ok::<File, String>(file)
-        })();
-        let file = match made {
-            Ok(f) => f,
-            Err(e) => {
-                let _ = fs::remove_dir_all(&fresh);
-                return Err(e);
+            {
+                Ok(file) => file,
+                // A scan or a delete has this lock file at this moment.
+                Err(e) if is_brief(&e) => {
+                    *last_problem = Some(io_text("cannot open", &path, e));
+                    return Ok(None);
+                }
+                Err(e) => return Err(io_text("cannot open", &path, e)),
+            };
+            match file.try_lock() {
+                Ok(()) => {}
+                Err(std::fs::TryLockError::WouldBlock) => return Ok(None),
+                Err(std::fs::TryLockError::Error(e)) => {
+                    return Err(io_text("cannot lock", &path, e));
+                }
             }
-        };
-        // rename(2) of a folder onto an existing non-empty folder fails, so
-        // a folder someone else made in between is never replaced.
-        if dir.exists() || fs::rename(&fresh, dir).is_err() {
-            drop(file);
-            let _ = fs::remove_dir_all(&fresh);
-            if dir.is_dir() {
-                return Ok(None);
+            match fs::create_dir(dir) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(None),
+                Err(e) => return Err(io_text("cannot make", dir, e)),
             }
-            return Err(format!("cannot make {}", dir.display()));
+            sync_dir(parent).map_err(|e| io_text("cannot sync", parent, e))?;
+            let lock = Self {
+                file,
+                dir: dir.to_path_buf(),
+                path,
+            };
+            // Another process removed this lock file just before it was
+            // locked. The caller goes round again and locks the live one.
+            return match lock.held() {
+                Ok(true) => Ok(Some(lock)),
+                Ok(false) => Ok(None),
+                Err(e) => Err(e),
+            };
         }
-        sync_dir(parent).map_err(|e| io_text("cannot sync", parent, e))?;
-        Ok(Some(Self {
-            file,
-            dir: dir.to_path_buf(),
-        }))
+        #[cfg(not(windows))]
+        {
+            let parent = parent_of(dir);
+            fs::create_dir_all(parent).map_err(|e| io_text("cannot make", parent, e))?;
+            let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let name = dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let fresh = parent.join(format!(".{name}.new-{}-{n}", std::process::id()));
+            fs::create_dir(&fresh).map_err(|e| io_text("cannot make", &fresh, e))?;
+            let made = (|| {
+                let path = fresh.join(LOCK);
+                let file = OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .write(true)
+                    .open(&path)
+                    .map_err(|e| io_text("cannot open", &path, e))?;
+                file.try_lock()
+                    .map_err(|e| io_text("cannot lock", &path, format!("{e:?}")))?;
+                Ok::<File, String>(file)
+            })();
+            let file = match made {
+                Ok(f) => f,
+                Err(e) => {
+                    let _ = fs::remove_dir_all(&fresh);
+                    return Err(e);
+                }
+            };
+            // rename(2) of a folder onto an existing non-empty folder fails, so
+            // a folder someone else made in between is never replaced.
+            if dir.exists() || fs::rename(&fresh, dir).is_err() {
+                drop(file);
+                let _ = fs::remove_dir_all(&fresh);
+                if dir.is_dir() {
+                    return Ok(None);
+                }
+                return Err(format!("cannot make {}", dir.display()));
+            }
+            sync_dir(parent).map_err(|e| io_text("cannot sync", parent, e))?;
+            Ok(Some(Self {
+                file,
+                dir: dir.to_path_buf(),
+                path: dir.join(LOCK),
+            }))
+        }
     }
 
     /// The lock file at the folder's path is still the one we hold.
-    fn held(&self) -> bool {
+    fn held(&self) -> std::result::Result<bool, String> {
         #[cfg(test)]
         if tests::FORCE_LOST.load(Ordering::SeqCst) {
-            return false;
+            return Ok(false);
         }
-        same_file(&self.dir.join(LOCK), &self.file)
+        #[cfg(windows)]
+        {
+            self.held_io()
+                .map_err(|e| io_text("cannot check lock", &self.path, e))
+        }
+        #[cfg(not(windows))]
+        {
+            Ok(same_file(&self.path, &self.file))
+        }
+    }
+
+    /// A missing file is a lost lock. Any other error only means it could not
+    /// be checked this time.
+    #[cfg(windows)]
+    fn held_io(&self) -> std::io::Result<bool> {
+        #[cfg(test)]
+        if tests::FORCE_LOST.load(Ordering::SeqCst) {
+            return Ok(false);
+        }
+        match same_file_checked(&self.path, &self.file) {
+            Err(e) if file_is_gone(&e) => Ok(false),
+            other => other,
+        }
     }
 
     /// Deletes the folder while still holding its lock: renames it to a
     /// hidden tombstone (so the path is free at once), then deletes that.
+    /// Windows deletes it where it is, with the manifest first.
     fn delete_folder(self) -> std::result::Result<(), String> {
-        if !self.held() {
+        if !self.held()? {
+            #[cfg(windows)]
+            return Err(format!(
+                "the recovery lock for {} changed, so nothing was deleted",
+                self.dir.display()
+            ));
+            #[cfg(not(windows))]
             return Ok(());
         }
-        let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let name = self
-            .dir
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let parent = parent_of(&self.dir).to_path_buf();
-        let tomb = parent.join(format!(".{name}.deleted-{}-{n}", std::process::id()));
-        fs::rename(&self.dir, &tomb).map_err(|e| io_text("cannot delete", &self.dir, e))?;
-        let _ = sync_dir(&parent);
-        let result = fs::remove_dir_all(&tomb).map_err(|e| io_text("cannot delete", &tomb, e));
-        drop(self.file);
-        result
+        #[cfg(windows)]
+        {
+            // The lock stays held until the last file is gone.
+            let manifest = self.dir.join(MANIFEST);
+            match fs::remove_file(&manifest) {
+                Ok(()) => sync_dir(&self.dir).map_err(|e| io_text("cannot sync", &self.dir, e))?,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(io_text("cannot delete", &manifest, e)),
+            }
+            match fs::remove_dir_all(&self.dir) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(io_text("cannot delete", &self.dir, e)),
+            }
+            let result = remove_sidecars(&self.dir);
+            drop(self.file);
+            return result;
+        }
+        #[cfg(not(windows))]
+        {
+            let n = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let name = self
+                .dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let parent = parent_of(&self.dir).to_path_buf();
+            let tomb = parent.join(format!(".{name}.deleted-{}-{n}", std::process::id()));
+            fs::rename(&self.dir, &tomb).map_err(|e| io_text("cannot delete", &self.dir, e))?;
+            let _ = sync_dir(&parent);
+            let result = fs::remove_dir_all(&tomb).map_err(|e| io_text("cannot delete", &tomb, e));
+            drop(self.file);
+            result
+        }
     }
 }
 
@@ -791,13 +1143,70 @@ fn tombstone(dir: &Path) -> std::result::Result<PathBuf, String> {
     Ok(tomb)
 }
 
+#[cfg(windows)]
+fn scan_lock(dir: &Path) -> std::result::Result<Option<FolderLock>, String> {
+    FolderLock::take_within(dir, false, Duration::ZERO, Duration::from_millis(250))
+}
+#[cfg(not(windows))]
+fn scan_lock(dir: &Path) -> std::result::Result<Option<FolderLock>, String> {
+    FolderLock::take(dir, false, Duration::ZERO)
+}
+
+/// The first file in a record folder that another program is keeping us from
+/// opening, as text for the log.
+#[cfg(windows)]
+fn busy_file(dir: &Path) -> Option<String> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) => return is_brief(&e).then(|| io_text("cannot list", dir, e)),
+    };
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => return Some(io_text("cannot list", dir, e)),
+        };
+        if let Err(e) = File::open(entry.path())
+            && is_brief(&e)
+            && !entry.path().is_dir()
+        {
+            return Some(io_text("cannot open", &entry.path(), e));
+        }
+    }
+    None
+}
+
+/// Does this folder hold a record to offer? False: it was closed cleanly, or
+/// it has no manifest, so the folder may go. An error: it could not be checked.
+fn record_is_live(dir: &Path) -> std::result::Result<bool, String> {
+    #[cfg(windows)]
+    {
+        let marker = closed_marker(dir);
+        if marker
+            .try_exists()
+            .map_err(|e| io_text("cannot check", &marker, e))?
+        {
+            return Ok(false);
+        }
+    }
+    manifest_present(dir)
+}
+
 /// Lists the records under `root` that no live process owns: each one is a
 /// document that did not close cleanly. A folder with no manifest at all (a
 /// crash before the first record) and leftover tombstones are deleted.
 pub fn scan(root: &Path) -> Vec<RecordInfo> {
     let mut out = Vec::new();
-    let Ok(entries) = fs::read_dir(root) else {
-        return out;
+    #[cfg(windows)]
+    sweep_sidecars(root);
+    let entries = match fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(_e) => {
+            #[cfg(windows)]
+            if _e.kind() != std::io::ErrorKind::NotFound {
+                eprintln!("op-engine: {}", io_text("cannot list", root, _e));
+            }
+            return out;
+        }
     };
     let mut dirs: Vec<_> = entries
         .flatten()
@@ -811,17 +1220,39 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
         if uuid.starts_with('.') {
+            #[cfg(not(windows))]
             if uuid.contains(".deleted-")
                 && let Ok(Some(lock)) = FolderLock::take(&dir, false, Duration::ZERO)
             {
                 drop(lock);
                 let _ = fs::remove_dir_all(&dir);
             }
+            #[cfg(windows)]
+            if uuid.contains(".deleted-") {
+                match scan_lock(&dir) {
+                    Ok(Some(lock)) => {
+                        if let Err(e) = lock.delete_folder() {
+                            eprintln!("op-engine: {e}");
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => eprintln!("op-engine: {e}"),
+                }
+            }
             continue;
         }
-        let lock = match FolderLock::take(&dir, false, Duration::ZERO) {
+        let lock = match scan_lock(&dir) {
             Ok(Some(lock)) => lock,
             Ok(None) => continue,
+            // Windows: not being able to lock says nothing about the record.
+            // Listing it as damaged would offer only Discard, so it waits for
+            // the next scan.
+            #[cfg(windows)]
+            Err(problem) => {
+                eprintln!("op-engine: {problem}");
+                continue;
+            }
+            #[cfg(not(windows))]
             Err(problem) => {
                 out.push(RecordInfo {
                     uuid,
@@ -833,11 +1264,19 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
                 continue;
             }
         };
-        if !dir.join(MANIFEST).exists() {
-            if let Err(e) = lock.delete_folder() {
-                eprintln!("op-engine: {e}");
+        match record_is_live(&dir) {
+            Ok(true) => {}
+            Ok(false) => {
+                if let Err(e) = lock.delete_folder() {
+                    eprintln!("op-engine: {e}");
+                }
+                continue;
             }
-            continue;
+            // Could not tell: keep every file and look again next scan.
+            Err(e) => {
+                eprintln!("op-engine: {e}");
+                continue;
+            }
         }
         // The lock is held only for the check above: reading the record
         // (the snapshot's checksum can take long) happens without it, so an
@@ -847,19 +1286,62 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
             Ok(m) => Ok(m),
             // It changed meanwhile: a live owner took it (skip it), or read
             // it again under the lock.
-            Err(_) => match FolderLock::take(&dir, false, Duration::ZERO) {
+            Err(_) => match scan_lock(&dir) {
                 Ok(Some(lock)) => {
                     let again = read_record(&dir);
                     drop(lock);
                     again
                 }
-                _ => continue,
+                Ok(None) => continue,
+                Err(_problem) => {
+                    #[cfg(windows)]
+                    eprintln!("op-engine: {_problem}");
+                    continue;
+                }
             },
         };
+        // Another program holding a file is not damage. Listing it as damaged
+        // would offer only Discard, so it waits for the next scan.
+        #[cfg(windows)]
+        if read.is_err()
+            && let Some(busy) = busy_file(&dir)
+        {
+            eprintln!("op-engine: {busy}");
+            continue;
+        }
+        #[cfg(test)]
+        if let Some(hook) = *tests::AFTER_READ.lock().unwrap_or_else(|e| e.into_inner()) {
+            hook(&dir);
+        }
         // A live owner may have taken the folder while it was read: skip it.
-        match FolderLock::take(&dir, false, Duration::ZERO) {
-            Ok(Some(lock)) => drop(lock),
-            _ => continue,
+        match scan_lock(&dir) {
+            Ok(Some(lock)) => {
+                // Windows: that owner may also have closed while this read,
+                // and a held file can keep the folder. The old read must not
+                // become an offer.
+                #[cfg(windows)]
+                match record_is_live(&dir) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        if let Err(e) = lock.delete_folder() {
+                            eprintln!("op-engine: {e}");
+                        }
+                        continue;
+                    }
+                    Err(e) => {
+                        eprintln!("op-engine: {e}");
+                        continue;
+                    }
+                }
+                #[cfg(not(windows))]
+                drop(lock);
+            }
+            Ok(None) => continue,
+            Err(_problem) => {
+                #[cfg(windows)]
+                eprintln!("op-engine: {_problem}");
+                continue;
+            }
         }
         let (manifest, problem) = match read {
             Ok(m) => {
@@ -882,6 +1364,14 @@ pub fn scan(root: &Path) -> Vec<RecordInfo> {
 
 /// Deletes a record folder (Discard). Refuses one a live process owns.
 pub fn discard(dir: &Path) -> Result<()> {
+    #[cfg(windows)]
+    if !dir
+        .try_exists()
+        .map_err(|e| internal(io_text("cannot check", dir, e)))?
+    {
+        return Ok(());
+    }
+    #[cfg(not(windows))]
     if !dir.exists() {
         return Ok(());
     }
@@ -911,6 +1401,10 @@ pub(crate) struct Writer {
     saves: Arc<AtomicU64>,
     cancel: Arc<AtomicBool>,
     join: Option<JoinHandle<()>>,
+    /// Which lock file this writer holds. Close checks it, so a writer that
+    /// lost its lock never touches the next owner's record.
+    #[cfg(windows)]
+    lock_id: (u32, u32, u32),
 }
 
 #[derive(Default)]
@@ -982,8 +1476,9 @@ impl WriterState {
         if self.written == Some(record_key(&snap)) {
             return Ok(Some(snap.revision));
         }
-        match &self.lock {
-            Some(lock) if lock.held() => {}
+        match self.lock.as_ref().map(FolderLock::held) {
+            Some(Ok(true)) => {}
+            Some(Err(e)) => return Err(self.fail(e)),
             _ => {
                 // Never recreate a folder this writer no longer owns.
                 self.lock = None;
@@ -1158,9 +1653,23 @@ impl WriterState {
                 }
                 Ok(Ctl::Stop { delete, tomb }) => {
                     if let Some(tomb) = tomb {
+                        #[cfg(not(windows))]
                         drop(self.lock.take());
-                        if let Err(e) = fs::remove_dir_all(&tomb) {
-                            eprintln!("op-engine: cannot delete {}: {e}", tomb.display());
+                        match fs::remove_dir_all(&tomb) {
+                            Ok(()) => {}
+                            #[cfg(windows)]
+                            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                            Err(e) => {
+                                eprintln!("op-engine: cannot delete {}: {e}", tomb.display())
+                            }
+                        }
+                        // Windows: the lock goes last. This removes the marker
+                        // and the lock file.
+                        #[cfg(windows)]
+                        if let Some(lock) = self.lock.take()
+                            && let Err(e) = lock.delete_folder()
+                        {
+                            eprintln!("op-engine: {e}");
                         }
                     } else if delete
                         && let Some(lock) = self.lock.take()
@@ -1182,6 +1691,53 @@ impl WriterState {
     }
 }
 
+/// Windows clean close: hides the record before close returns. Returns the
+/// hidden folder when the path could be freed.
+#[cfg(windows)]
+fn close_hide(dir: &Path) -> Option<PathBuf> {
+    let dir = dir.to_path_buf();
+    // Hide the record, then free the path if nothing inside
+    // is open. The writer still holds the lock and deletes
+    // everything when it stops, so no other owner can get in
+    // while it might still touch these files. This call does
+    // not grow with leftover files.
+    let marker = closed_marker(&dir);
+    let marked = (|| -> std::io::Result<()> {
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&marker)?;
+        file.sync_all()?;
+        sync_dir(parent_of(&dir))
+    })();
+    if let Err(e) = &marked {
+        eprintln!("op-engine: {}", io_text("cannot mark closed", &marker, e));
+    }
+    let manifest = dir.join(MANIFEST);
+    match fs::remove_file(&manifest) {
+        Ok(()) => {
+            if let Err(e) = sync_dir(&dir) {
+                eprintln!("op-engine: {}", io_text("cannot sync", &dir, e));
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            eprintln!("op-engine: {}", io_text("cannot delete", &manifest, e))
+        }
+    }
+    // Windows refuses this while a file inside is open. The
+    // record is hidden already, and the writer deletes the
+    // folder from its own path instead.
+    match tombstone(&dir) {
+        Ok(t) => Some(t),
+        Err(e) => {
+            eprintln!("op-engine: {e}");
+            None
+        }
+    }
+}
+
 impl Registry {
     /// Tells the writer to stop and returns at once. The writer abandons a
     /// write in progress (the last good record stays, or the folder goes when
@@ -1194,11 +1750,43 @@ impl Registry {
         let writer = self.writers.lock().remove(&doc);
         if let Some(mut w) = writer {
             w.cancel.store(true, Ordering::SeqCst);
-            // A clean close moves the folder out of the way before it returns
-            // (one rename and a folder sync), so a Quit right after can never
-            // leave a record to offer; the writer deletes the moved folder.
+            // A clean close hides the record before it returns.
             let tomb = if delete {
                 let dir = w.status.lock().dir.clone();
+                #[cfg(windows)]
+                {
+                    let owned = (|| {
+                        Ok::<bool, std::io::Error>(
+                            file_identity(&File::open(sibling_lock(&dir))?)? == w.lock_id,
+                        )
+                    })();
+                    match owned {
+                        Ok(true) => close_hide(&dir),
+                        Ok(false) => {
+                            eprintln!(
+                                "op-engine: the recovery lock for {} changed, so close left the folder alone",
+                                dir.display()
+                            );
+                            None
+                        }
+                        Err(e) if file_is_gone(&e) => {
+                            eprintln!(
+                                "op-engine: the recovery lock for {} is gone, so close left the folder alone",
+                                dir.display()
+                            );
+                            None
+                        }
+                        // Not hidden yet. The writer tries again as it stops.
+                        Err(e) => {
+                            eprintln!(
+                                "op-engine: {}",
+                                io_text("cannot check lock", &sibling_lock(&dir), e)
+                            );
+                            None
+                        }
+                    }
+                }
+                #[cfg(not(windows))]
                 match tombstone(&dir) {
                     Ok(t) => Some(t),
                     Err(e) => {
@@ -1310,7 +1898,37 @@ impl Engine {
         let lock = FolderLock::take(dir, true, Duration::from_secs(2))
             .map_err(internal)?
             .ok_or_else(|| bad("another process owns this recovery folder"))?;
-        let on_disk = dir.join(MANIFEST).exists();
+        #[cfg(windows)]
+        let lock_id = file_identity(&lock.file)
+            .map_err(|e| internal(io_text("cannot check lock", &lock.path, e)))?;
+        // Windows: a marker means this record was closed cleanly. Recover must
+        // not bring it back. A new document takes the folder over, and the old
+        // record goes before the marker does, so a crash cannot offer it.
+        #[cfg(windows)]
+        {
+            let marker = closed_marker(dir);
+            if marker
+                .try_exists()
+                .map_err(|e| internal(io_text("cannot check", &marker, e)))?
+            {
+                if adopt {
+                    return Err(bad("this recovery record was closed cleanly"));
+                }
+                let manifest = dir.join(MANIFEST);
+                match fs::remove_file(&manifest) {
+                    Ok(()) => {
+                        sync_dir(dir).map_err(|e| internal(io_text("cannot sync", dir, e)))?
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(internal(io_text("cannot delete", &manifest, e))),
+                }
+                fs::remove_file(&marker)
+                    .map_err(|e| internal(io_text("cannot delete", &marker, e)))?;
+                sync_dir(parent_of(dir))
+                    .map_err(|e| internal(io_text("cannot sync", parent_of(dir), e)))?;
+            }
+        }
+        let on_disk = manifest_present(dir).map_err(internal)?;
         let current = d.published.load();
         let status = Arc::new(Mutex::new(RecoveryStatus {
             dir: dir.to_path_buf(),
@@ -1356,6 +1974,8 @@ impl Engine {
                 saves,
                 cancel,
                 join: Some(join),
+                #[cfg(windows)]
+                lock_id,
             },
         );
         Ok(())
@@ -1606,6 +2226,163 @@ mod tests {
         let held = File::open(&a).unwrap();
         assert!(same_file(&a, &held));
         assert!(!same_file(&b, &held));
+    }
+
+    /// Runs in `scan` after the record was read and before the last lock.
+    pub(super) static AFTER_READ: std::sync::Mutex<Option<fn(&Path)>> = std::sync::Mutex::new(None);
+
+    /// Another process attached and closed during the scan's read, and a held
+    /// file kept the folder. The old read must not become an offer.
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_close_during_the_scans_read_makes_no_offer() {
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("closes-during-read");
+        let e = Engine::new(None).unwrap();
+        let pixels = vec![9u8; 64 * 48 * 4];
+        let doc = e.import_pixels(64, 48, &pixels, None).unwrap();
+        e.recovery_attach(
+            doc,
+            &dir,
+            None,
+            RecoveryOptions {
+                settle: Duration::from_secs(600),
+                max_interval: Duration::from_secs(600),
+                hooks: RecordHooks::default(),
+            },
+        )
+        .unwrap();
+        e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+        e.recovery_flush(doc).unwrap();
+        e.recovery_detach(doc, false);
+        assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+        fn close_now(dir: &Path) {
+            fs::write(closed_marker(dir), b"").unwrap();
+        }
+        *AFTER_READ.lock().unwrap() = Some(close_now);
+        let found = scan(root.path());
+        *AFTER_READ.lock().unwrap() = None;
+        assert!(found.is_empty(), "{found:?}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_new_record_uses_a_sibling_lock() {
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("new-record");
+        let lock = FolderLock::take(&dir, true, Duration::ZERO)
+            .unwrap()
+            .unwrap();
+        assert!(dir.is_dir());
+        assert!(root.path().join(".new-record.owner.lock").is_file());
+        assert!(!dir.join(LOCK).exists());
+        assert!(
+            FolderLock::take(&dir, false, Duration::ZERO)
+                .unwrap()
+                .is_none()
+        );
+        lock.delete_folder().unwrap();
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_missing_lock_is_lost_and_a_brief_failure_is_not() {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_SHARE_WRITE: u32 = 2;
+        const FILE_SHARE_DELETE: u32 = 4;
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("lock-states");
+        let lock = FolderLock::take(&dir, true, Duration::ZERO)
+            .unwrap()
+            .unwrap();
+        // A handle that refuses readers makes the check fail. The lock is not
+        // lost: the check works again once that handle closes.
+        let blocker = OpenOptions::new()
+            .write(true)
+            .share_mode(FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .open(sibling_lock(&dir))
+            .unwrap();
+        assert!(lock.held().unwrap_err().contains("cannot check lock"));
+        drop(blocker);
+        assert!(lock.held().unwrap());
+        fs::remove_file(sibling_lock(&dir)).unwrap();
+        assert!(!lock.held().unwrap());
+    }
+
+    /// A missing path, such as a network share that dropped, says nothing about
+    /// the lock file. The writer must keep its lock and go on when it returns.
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_missing_path_is_not_a_lost_lock() {
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("path-gone");
+        let mut lock = FolderLock::take(&dir, true, Duration::ZERO)
+            .unwrap()
+            .unwrap();
+        let real = lock.path.clone();
+        lock.path = root.path().join("no-such-folder").join("x.lock");
+        let error = lock.held().unwrap_err();
+        assert!(error.contains("os error 3"), "{error}");
+        lock.path = real;
+        assert!(lock.held().unwrap());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_take_waits_out_a_brief_open_failure() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("brief");
+        fs::create_dir(&dir).unwrap();
+        let path = sibling_lock(&dir);
+        let blocker = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .share_mode(0)
+            .open(&path)
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            drop(blocker);
+        });
+        let lock = FolderLock::take(&dir, false, Duration::ZERO)
+            .unwrap()
+            .expect("the lock was free once the other handle closed");
+        release.join().unwrap();
+        assert!(lock.held().unwrap());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_sidecars_with_no_folder_are_removed_unless_held() {
+        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join(".gone.closed"), b"").unwrap();
+        fs::write(root.path().join(".gone.owner.lock"), b"").unwrap();
+        fs::write(root.path().join(".only-lock.owner.lock"), b"").unwrap();
+        fs::write(root.path().join(".only-marker.closed"), b"").unwrap();
+        let held = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(root.path().join(".making.owner.lock"))
+            .unwrap();
+        held.try_lock().unwrap();
+        assert!(scan(root.path()).is_empty());
+        let left: Vec<_> = fs::read_dir(root.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(left, [".making.owner.lock"]);
     }
 
     #[cfg(windows)]

@@ -107,6 +107,37 @@ tools/codegen/          Catalog to Swift generator
 - A failed operation leaves the current state and the history index unchanged.
 
 ### Recovery records (M57)
+
+**Windows W2 layout and close.** A Windows record owns a sibling lock file
+`.<doc-uuid>.owner.lock` in the recovery root. It is the only lock. The process
+locks it before it creates the record folder and holds it until its writer
+stops. No Windows release used a lock inside the folder, so no live process can
+hold one; an `owner.lock` found inside is a leftover file that is deleted with
+the folder. Only "this file does not exist" means the lock is lost. Any other
+failure to open or check it, including a missing path, only means it could not
+be checked, and is retried.
+On a clean close, Windows first checks that this writer still owns the lock file.
+If not, close leaves the folder alone. Otherwise it syncs a sibling `.<doc-uuid>.closed` marker, then
+removes and syncs the manifest. It then renames the folder to a hidden name if
+nothing inside is open, as Mac and Linux do; if something is open, the folder
+stays where it is. Close deletes nothing else.
+The writer deletes the folder and both sibling files when it stops, still
+holding the lock, so nothing else can own the path while the old writer might
+touch it. The marker stops a late writer commit, or a manifest another program
+holds open, from becoming a false offer.
+A scan locks a folder and checks the marker and the manifest. A marker, or no
+manifest, means the folder goes. A check that fails leaves every file alone and
+is printed. A file another program holds does not make a record damaged: the
+record waits for the next scan, with the reason printed. A lock file that stays
+denied hides its record the same way, so W10's recovery sheet must show this. The snapshot is read without the lock; afterwards the scan locks
+again and repeats the check. A scan also removes sibling files whose folder is
+gone, unless a live process holds the lock. Recover refuses a record with a
+marker. A crash before the marker leaves the last complete record. A crash after
+it leaves no recovery offer. Snapshot and manifest writes retain the order below
+on every system. Mac and Linux keep their existing folder lock and rename
+sequence. The bullets below describe that older sequence where they name a lock
+inside the folder or a folder rename.
+
 Autosave keeps a crash copy of every open document; it never replaces the user's own file.
 - **Where:** `~/Library/Application Support/OpenPainter/Recovery/<doc-uuid>/`, one folder per open document. The app picks the UUID when the document opens. Tests pass their own root. Making a folder also syncs its parent.
 - **Files:** `owner.lock` (held with `flock` while a live process owns the folder; the kernel lets go when the process dies, even on SIGKILL), `manifest.json`, and one `snapshot-<rev>-<pid>-<n>.opaint`.

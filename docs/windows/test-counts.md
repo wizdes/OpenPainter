@@ -4,6 +4,71 @@ Source counts are literal `#[test]` attributes. Windows counts are tests that fi
 
 The measured files contain **114** literal test-bearing Rust files and **687** literal test attributes. **623** Windows tests finished across the logged checks; **7** normal-run tests were ignored. The final non-GPU workspace run had **29** failed tests. The manual huge-document and GPU color checks add two failures, for **31** observed failed tests.
 
+## W2 run on Windows (2026-11-02)
+
+Root ran these as `agent` on the final code, from `engine/`, with `CARGO_INCREMENTAL=0` and `CARGO_PROFILE_DEV_DEBUG=0`. The counts at the top of this file are still the W1 baseline.
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p op-engine --lib --test recovery --test recovery_fixes --test recovery_fixes2 --test release_review --test fix_round2 --no-fail-fast -j 8 -- --test-threads=1` | 86 passed, 0 failed |
+| `cargo test -p op-cli --no-fail-fast -j 8 -- --test-threads=1` | 6 passed, 0 failed. Three are kill tests using `TerminateProcess`. |
+| `cargo test -p op-engine --test huge_document --no-fail-fast -j 8 -- --ignored --test-threads=1 --nocapture` | 1 passed |
+| A temporary stress test: 1500 attach and close cycles with a scan running at the same time | 0 files left, 10975 scans, 5.6 s. Not saved in the repo. |
+| A temporary timing test: one record write of a 256 by 256 image | 18 to 29 ms. Not saved in the repo. |
+| The `tests/recovery.rs` test program, 40 runs on a quieter machine, GPU on | 0 failed |
+| The same, 40 runs with `OP_FORCE_CPU=1` | 0 failed |
+| The same, 25 runs while two reviews were building code | **8 failed**, all `continuous_edits_still_write_within_the_max_interval` |
+
+**The one unreliable test.** `continuous_edits_still_write_within_the_max_interval` needs a record written within 900 ms. It fails when the machine is busy, with `writes: 0, failures: 0`, so the first write had not finished. Earlier runs on the Vulkan path failed more, 3 of 10 alone, but the GPU is not the whole cause: DX12 alone with the machine busy also fails. The likely cause is slow disk flushes under load; this is not measured. The test is unchanged. Changing its time limit needs the user's OK.
+
+The hang in W1's list also showed up here on Vulkan. See the W3 section.
+
+### Each W1 test waiting for W2
+
+These results come from the focused, op-cli, or manual commands above.
+
+| Test | W2 result |
+| --- | --- |
+| `the_latest_acknowledged_revision_recovers_whenever_the_process_is_killed` | Passed |
+| `dont_save_then_a_fast_quit_leaves_nothing_to_recover` | Passed |
+| `recovery::tests::a_new_folder_is_never_visible_without_its_lock_held` | Passed |
+| `a_recovery_record_keeps_the_original_content_type` | Passed |
+| `a_folder_without_a_manifest_is_cleaned_up_by_scan` | Passed |
+| `a_clean_save_and_undo_to_saved_delete_the_record_and_close_deletes_the_folder` | Passed |
+| `a_damaged_snapshot_is_listed_as_unusable` | Passed |
+| `a_crashed_documents_record_is_found_and_recovers_unsaved_at_its_revision` | Passed |
+| `a_record_is_written_after_edits_settle_and_names_the_revision` | Passed |
+| `a_record_write_never_blocks_commands_or_queries` | Passed |
+| `settle_delay_holds_back_a_write_while_edits_continue` | Passed |
+| `a_failed_record_write_keeps_the_previous_record_and_reports_the_error` | Passed |
+| `continuous_edits_still_write_within_the_max_interval` | Passed in focused runs; failed at 900 ms in broad run |
+| `discard_deletes_a_crashed_record` | Passed |
+| `item2a_a_clean_save_during_a_record_write_never_leaves_the_older_record` | Passed |
+| `item1_a_failed_folder_sync_after_the_manifest_rename_keeps_the_new_record` | Passed |
+| `item6_close_during_a_record_write_returns_at_once` | Passed |
+| `item6_a_stop_during_a_write_keeps_the_last_good_record` | Passed |
+| `item2b_a_record_older_than_its_file_is_not_offered` | Passed |
+| `item3_concurrent_attaches_and_scans_lose_no_folder` | Passed |
+| `item4_a_save_does_not_wait_for_a_record_write` | Passed |
+| `round3_the_acknowledged_revision_is_cleared_before_the_record_goes` | Passed |
+| `item1_close_removes_the_folder_before_it_returns` | Passed |
+| `item3_an_edit_and_save_after_the_state_load_is_not_committed_as_older` | Passed |
+| `item2_a_record_older_than_its_file_recovers_as_untitled` | Passed |
+| `the_recovery_record_holds_the_open_text` | Passed |
+| `kept_image_metadata_survives_opaint_and_recovery` | Passed |
+| `a_200_megapixel_document_paints_blurs_undoes_and_saves_under_the_memory_cap` | Passed |
+
+Mac run: **NOT RUN**. It is owed until a Mac session. The W14 Mandelbrot result is unchanged.
+
+### Limits accepted in W2
+
+- If the closed marker cannot be written and the process crashes within the same few milliseconds, a false offer is possible. The marker failure is printed.
+- A lock file that stays denied hides its record from every scan, with the reason only in the log. W10's recovery sheet has to show this.
+- A file held open by another program hides a record until the next scan. The reason is printed.
+- Attach waits up to 4 s on a lock that stays denied, and it holds the writers lock while it does.
+- Attaching to the same folder again before the old writer stops is refused. The app uses a new folder for each document.
+- Crashes during close are tested with hand-built folder states, not with real kills at those steps.
+
 ## Counts by source file
 
 | File under engine/ | Source `#[test]` | Windows ran | Why the counts differ |
@@ -243,4 +308,4 @@ Logs for the completed runs are under `engine/target/w3-*.log`. The runs set `CA
 
 The engine hang did not recur alone. Inspection found blocking GPU polls without deadlines in `op-gpu/src/lib.rs`, but no confirmed link to the reported 30-minute full-CPU spin. The `jobs.rs:461` crash did not recur in four focused RTX runs: 9.23, 8.07, 8.08, and 9.44 s. The WARP M54 crash did recur with default test threading, then disappeared with serial test threading; its cause is still unknown. No assertion, tolerance, or effect output changed.
 
-**NOT RUN:** the ignored release M54 matrix writer (it writes `docs/reports/parity-matrix.md`, outside this builder's owned paths); the real Win32 host, resize, switch, create-destroy, display ICC and DWM check, real device removal, direct lcms2 ??E00 check, and Mac view runtime and compile checks. The Win32 host is not built. W3's 0-failure done-test is not met.
+**NOT RUN:** the ignored release M54 matrix writer (it writes `docs/reports/parity-matrix.md`, outside this builder's owned paths); the real Win32 host, resize, switch, create-destroy, display ICC and DWM check, real device removal, direct lcms2 delta E 2000 check, and Mac view runtime and compile checks. The Win32 host is not built. W3's 0-failure done-test is not met.
