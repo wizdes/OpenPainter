@@ -1,0 +1,258 @@
+<title>OpenPainter for Windows</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a working plan. Decisions first, then a phase map that opens into milestone rows, then the testing rules. Colors come from the app's Orchard icon. */
+:root{
+  --bg:#fbf8fb; --panel:#ffffff; --ink:#2a1d2c; --muted:#6c5d6f; --line:#e6dde7;
+  --plum:#7c2a70; --magenta:#b5317f; --peach:#c9622f; --gold:#8f6a00;
+  --plum-soft:#f4e8f2; --peach-soft:#fbeee6; --gold-soft:#f8f1d8; --magenta-soft:#fae8f2;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1b141c; --panel:#251c27; --ink:#f2eaf2; --muted:#b5a7b8; --line:#3b2f3e;
+  --plum:#d893cd; --magenta:#ee87c0; --peach:#ee9f73; --gold:#e4c35a;
+  --plum-soft:#352439; --peach-soft:#3a281f; --gold-soft:#352e16; --magenta-soft:#3a2231; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b141c; --panel:#251c27; --ink:#f2eaf2; --muted:#b5a7b8; --line:#3b2f3e;
+  --plum:#d893cd; --magenta:#ee87c0; --peach:#ee9f73; --gold:#e4c35a;
+  --plum-soft:#352439; --peach-soft:#3a281f; --gold-soft:#352e16; --magenta-soft:#3a2231; color-scheme:dark}
+*{box-sizing:border-box}
+.wrap>*{min-width:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding-block:32px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:44px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700}
+h2{font-size:26px;font-weight:700;margin-bottom:12px}
+h3{font-size:17px;font-weight:700}
+p{margin:0;max-width:68ch}
+code{font:13px var(--mono);overflow-wrap:anywhere}
+.lede{display:grid;gap:12px}
+.lede p{font-size:18px}
+.stats{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px;color:var(--muted)}
+.stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+.ask{display:grid;gap:10px}
+.dec{display:grid;grid-template-columns:30px 1fr;gap:4px 10px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.dec .n{font:600 14px var(--mono);color:var(--plum);padding-top:1px}
+.dec .t{min-width:0}
+.dec b{display:block}
+.dec .rec{font-size:14px;color:var(--muted)}
+.tag{display:inline-block;font:600 11px var(--mono);letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:var(--magenta-soft);color:var(--magenta);margin-left:6px;white-space:nowrap}
+.note{font-size:14.5px;color:var(--muted)}
+.probe{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.bar{display:flex;height:26px;border-radius:5px;overflow:hidden;background:var(--line)}
+.bar span{display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12.5px;color:var(--muted);font-weight:700;background:var(--panel)}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap;overflow-wrap:normal}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.map{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:12px}
+.map svg{display:block;min-width:800px;width:100%;height:auto}
+.map text{font-family:var(--mono);font-size:12px;fill:var(--ink)}
+.map .lbl{font-family:var(--body);font-size:11px;fill:var(--muted)}
+.map .ph{font-family:var(--display);font-size:13px;font-weight:700;fill:var(--muted)}
+.node{cursor:pointer}
+.node rect{stroke-width:1.5;rx:6}
+.node:focus{outline:none}
+.node:focus rect,.node:hover rect{stroke-width:3}
+.pa rect{fill:var(--plum-soft);stroke:var(--plum)}
+.pb rect{fill:var(--peach-soft);stroke:var(--peach)}
+.pc rect{fill:var(--magenta-soft);stroke:var(--magenta)}
+.pd rect{fill:var(--gold-soft);stroke:var(--gold)}
+.edge{stroke:var(--muted);stroke-width:1.2;fill:none;opacity:.55}
+.phase{display:grid;gap:8px}
+.phasehead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-top:10px}
+.phasehead span{color:var(--muted);font-size:14px}
+details.ms{background:var(--panel);border:1px solid var(--line);border-radius:8px;scroll-margin-top:16px}
+details.ms[open]{border-color:var(--plum)}
+details.ms summary{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;padding:10px 14px;cursor:pointer;list-style:none;align-items:baseline}
+details.ms summary::-webkit-details-marker{display:none}
+summary:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid var(--magenta);outline-offset:2px}
+.id{font:600 14px var(--mono);color:var(--plum)}
+.nm{font-weight:700;min-width:0}
+.hr{font:13px var(--mono);color:var(--muted);white-space:nowrap}
+.body{padding:0 14px 14px 68px;display:grid;gap:8px;font-size:15px}
+.body dt{font-size:12.5px;font-weight:700;color:var(--muted);margin-top:2px}
+.body dd{margin:0;max-width:72ch}
+.body dl{margin:0;display:grid;gap:2px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:14.5px;padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--plum);border-color:var(--plum);color:var(--bg);font-weight:700}
+.layers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.layer{padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);display:grid;gap:4px;align-content:start;min-width:0}
+.layer b{font-family:var(--display);font-size:16px}
+.who{font-size:13px;color:var(--muted)}
+ul.plain{margin:0;padding-left:20px;display:grid;gap:4px;max-width:72ch}
+@media (max-width:640px){.layers{grid-template-columns:1fr}.body{padding-left:14px}details.ms summary{grid-template-columns:38px minmax(0,1fr) auto}}
+@media (prefers-reduced-motion:no-preference){details.ms[open] .body{animation:in .16s ease-out}@keyframes in{from{opacity:.4;transform:translateY(-3px)}to{opacity:1;transform:none}}}
+</style>
+
+<div class="wrap">
+
+<header class="lede">
+  <h1>OpenPainter for Windows</h1>
+  <p>The Rust engine moves over with modest changes, and Windows gets a new C# app. The paint.net 5.1.12 on this PC becomes the reference that the Mac build never had, and its fixes reach both apps.</p>
+  <div class="stats"><span><b>21</b> milestones</span><span><b>about 350</b> agent hours</span><span><b>Tier 3</b> new subsystem, storage, release</span><span>Revision 2, 2026-11-01</span></div>
+</header>
+
+<section class="ask" id="decisions">
+  <h2>What I need from you</h2>
+  <p>Say OK to the plan and answer these. Reply "all recommended" and I take every pick below. No build starts until you say OK.</p>
+  <div class="dec"><div class="n">1</div><div class="t"><b>SSH key for the <code>agent</code> account on this PC <span class="tag">needs your OK</span></b><span class="rec">Without it, Sol and Astra cannot run and root builds everything itself. Recommended: yes.</span></div></div>
+  <div class="dec"><div class="n">2</div><div class="t"><b>The same key on the Macs and the Linux box <span class="tag">needs your OK</span></b><span class="rec">Root can then run Mac and Linux checks from here. Without it, a Mac session runs them at each phase end. Recommended: yes.</span></div></div>
+  <div class="dec"><div class="n">3</div><div class="t"><b>The engine follows paint.net 5.1.12 when they differ</b><span class="rec">Mac results change too, and 41 effect targets move from paint.net 3.36 to 5.1. Recommended: yes.</span></div></div>
+  <div class="dec"><div class="n">4</div><div class="t"><b>A time window for real windows on your screen</b><span class="rec">The PC stays unlocked, and I run only what the two hidden layers cannot prove. Narrator speaks aloud. Recommended: yes, tell me the hours.</span></div></div>
+  <div class="dec"><div class="n">5</div><div class="t"><b>Ship through the Microsoft Store, plus a portable ZIP</b><span class="rec">Free, with no new spending. You log in to the Store account, and I make one extra Windows account for the install test. Azure signing costs about $9.99 a month, and SmartScreen still warns at first. Recommended: Store plus ZIP.</span></div></div>
+  <div class="dec"><div class="n">6</div><div class="t"><b>Captured paint.net images stay in a private repo</b><span class="rec">Others see those comparison tests report NOT RUN. This needs <code>gh auth login</code> on this PC. Recommended: yes.</span></div></div>
+  <div class="dec"><div class="n">7</div><div class="t"><b>The Windows design pick at W6</b><span class="rec">I publish the options, continue with my pick, and you can change it later. Recommended: yes. Say so if you want to choose first.</span></div></div>
+</section>
+
+<section class="probe">
+  <h2>What I measured on this PC</h2>
+  <p>I ran the engine's tests on Windows in a throwaway copy, with small patches to 2 source files. <b>568 passed, 42 failed, 6 ignored, in 344 s.</b> Four test files did not compile, so they did not run. This is a first look, and it passes no milestone.</p>
+  <div class="bar" role="img" aria-label="568 passed, 38 saving and recovery failures, 4 other failures, 6 ignored">
+    <span style="flex:568;background:var(--plum)"></span><span style="flex:38;background:var(--peach)"></span><span style="flex:4;background:var(--magenta)"></span><span style="flex:6;background:var(--muted)"></span>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--plum)"></i>568 passed</span>
+    <span><i style="background:var(--peach)"></i>38 saving and recovery. The ones I read say "Access is denied"</span>
+    <span><i style="background:var(--magenta)"></i>4 others: Mandelbrot (2), GPU color table, damaged ICC panic</span>
+    <span><i style="background:var(--muted)"></i>6 ignored</span>
+  </div>
+  <div class="tablebox"><table>
+    <tr><th>Finding</th><th>What it means for the plan</th></tr>
+    <tr><td>paint.net 5.1.12 is installed, and 5.2 test builds exist</td><td>Old milestone M02 becomes possible. A pinned copy keeps results stable, and tests never touch your running copy.</td></tr>
+    <tr><td>Windows refuses to rename a folder while a file inside is open (the reviewer ran this)</td><td>The recovery design breaks on Windows. W2 redesigns it.</td></tr>
+    <tr><td>The Mac draws selection outlines and handles over the canvas</td><td>Avalonia cannot draw over a native child window, and WinUI 3 can. W5 tests this before any app work.</td></tr>
+    <tr><td>.NET 9 support ends 2026-11-10</td><td>W0 installs .NET 10 for both accounts.</td></tr>
+    <tr><td>Oracle: 55 effect rows, 41 from 3.36, 14 our own, 0 from 5.1</td><td>W4 and W14 fill this gap. This is the largest piece of the work.</td></tr>
+    <tr><td>This PC has one screen and no pen</td><td>Real pen and mixed-screen checks will report NOT RUN.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>The milestones</h2>
+  <p class="note" style="margin-bottom:12px">Select a box to open that milestone below. W14 runs beside the app work and needs no UI.</p>
+  <div class="map"><svg id="graph" viewBox="0 0 930 335" role="group" aria-label="Milestone order"></svg></div>
+  <div id="phases"></div>
+</section>
+
+<section>
+  <h2>How testing works</h2>
+  <p style="margin-bottom:14px">I could not find a saved QuickEdit prompt on this PC, because the Mac session logs are not here. I used the questions and answers in QuickEdit's <code>docs/decisions.md</code>, its plan, its state file and its follow-up list. The most important lesson is to keep tests off your screen.</p>
+  <h3 style="margin-bottom:8px">Three layers. Each test runs at the lowest one that proves it.</h3>
+  <div class="layers" style="margin-bottom:18px">
+    <div class="layer"><b>1. Headless</b><span>No window at all. Most UI tests live here.</span><span class="who">Builders can run it, as <code>agent</code></span></div>
+    <div class="layer"><b>2. Hidden desktop</b><span>A real window on a second Windows desktop. W0 tests whether it works.</span><span class="who">Root only, on merged code</span></div>
+    <div class="layer"><b>3. Your desktop</b><span>Only what the others cannot prove, in your time window.</span><span class="who">Root only, with a front-window guard</span></div>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Testing details">
+    <button role="tab" id="t-levels" aria-selected="true" aria-controls="p-levels">Test levels</button>
+    <button role="tab" id="t-answers" aria-selected="false" aria-controls="p-answers">QuickEdit's answers</button>
+    <button role="tab" id="t-traps" aria-selected="false" aria-controls="p-traps">QuickEdit's traps</button>
+  </div>
+  <div id="p-levels" role="tabpanel" aria-labelledby="t-levels" class="tablebox"><table>
+    <tr><th>Level</th><th>When</th><th>Time</th><th>What</th></tr>
+    <tr><td><code>fast</code></td><td>Each change</td><td class="num">under 2 min</td><td>Changed crates, C# unit tests, headless UI for that area</td></tr>
+    <tr><td><code>milestone</code></td><td>Each milestone</td><td class="num">under 10 min</td><td>All headless UI on the AOT build (C# compiled to native), and 9 to 12 critical flows</td></tr>
+    <tr><td><code>window</code></td><td>Each milestone, when free</td><td class="num">under 15 min</td><td>Real windows: critical flows and one shot per changed screen</td></tr>
+    <tr><td><code>checkpoint</code></td><td>Phase end</td><td class="num">about 2 h</td><td>All real-window flows, GPU matrix on the RTX and on software, paint.net comparison, fuzz, Mac and Linux</td></tr>
+    <tr><td><code>speed</code></td><td>Release</td><td class="num">root only</td><td>Launch, size, open, blur and brush next to paint.net, 5 runs each</td></tr>
+  </table></div>
+  <div id="p-answers" role="tabpanel" aria-labelledby="t-answers" class="tablebox" hidden><table>
+    <tr><th>QuickEdit's answer</th><th>Here</th></tr>
+    <tr><td>U11: as few test runs as possible until the end</td><td>Builders run only tests for what they change.</td></tr>
+    <tr><td>U6: quick check under 10 minutes, full run only for a release</td><td>The milestone level, with a named list of critical flows.</td></tr>
+    <tr><td>U5: a listed flaky test may pass alone, if recorded</td><td>A retry counts only for a test on <code>flaky.md</code>. Any other retry is a failure.</td></tr>
+    <tr><td>U8: a flaky contrast audit became a unit test</td><td>A contrast test at 4.5:1 covers every window, light and dark.</td></tr>
+    <tr><td>U9, U12: do not wait; one review was skipped</td><td>Keep going. A skipped review is reported as skipped.</td></tr>
+    <tr><td>U13: the speed run was skipped, then stayed unrun for 5 releases</td><td>The release report prints the result or NOT RUN.</td></tr>
+    <tr><td>U1: no real printing, since a print prompt broke later tests</td><td>Print is not in this version, and no test opens a system dialog.</td></tr>
+    <tr><td>V1 to V4: Astra and Fable vote</td><td>Same, in <code>docs/windows/decisions.md</code>. Root breaks a tie.</td></tr>
+    <tr><td>Away log: UI tests marked as not run</td><td>A milestone closes on headless checks, marked. A phase stays open until window checks run or you waive them.</td></tr>
+  </table></div>
+  <div id="p-traps" role="tabpanel" aria-labelledby="t-traps" class="tablebox" hidden><table>
+    <tr><th>What went wrong</th><th>Rule here</th></tr>
+    <tr><td>A UI test typed into your Claude terminal</td><td>Tests act through UI Automation and the app's own window. A lint bans raw <code>SendInput</code>, except one guarded helper.</td></tr>
+    <tr><td>Full-screen shots showed your desktop</td><td>Window-only captures. Pixel checks read engine data or saved files.</td></tr>
+    <tr><td>Offscreen shots drew tab bars as black bars</td><td>A headless shot never counts as the visual check.</td></tr>
+    <tr><td>A locked screen hung UI tests</td><td><code>preflight.ps1</code> runs first and prints <code>UI TESTS: NOT RUN (reason)</code>.</td></tr>
+    <tr><td>A system prompt broke every later test</td><td>No network in tests, and the preflight looks for known dialogs.</td></tr>
+    <tr><td>Tests left 3,837 settings files behind</td><td>A temp <code>--data-root</code> for every test. The run fails if real settings changed.</td></tr>
+    <tr><td>Another job's memory use spoiled speed numbers</td><td>Speed runs record load and GPU use. Busy runs are reported and thrown out.</td></tr>
+    <tr><td>The suite outgrew its time limit</td><td>It prints what it did not reach, and fails.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>How paint.net is used</h2>
+  <ul class="plain">
+    <li>Root runs its own pinned copy. Your running copy and its settings stay untouched, and processes stop by PID only.</li>
+    <li>We compare outputs and behavior. Its license forbids derivative works, so we never decompile it or copy its icons, help text or resources.</li>
+    <li>Captures try the public plugin API first, then UI Automation, then the old OpenPDN oracle.</li>
+    <li>Effects must reach ±1/255. An effect that cannot goes on a list for you, because a builder may not loosen a tolerance.</li>
+    <li>The product page and Store listing never name paint.net. W19 scans for it.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Not in this version</h2>
+  <p>Linux UI, Windows on ARM, Windows 10, <code>.pdn</code> import, PSD, plugins, scripting, batch work, layer masks, adjustment layers, printing, shell thumbnails, custom shortcut editing, new Mac features, and paint.net 5.2's new effects.</p>
+</section>
+
+<section>
+  <h2>Review status</h2>
+  <p>A fresh Opus reviewer read revision 1 and raised 26 findings, and I accepted all of them. Revision 2 has had no review. Astra did not run, because root cannot reach the <code>agent</code> account until decision 1. The full plan is in <code>docs/windows/PLAN.md</code>, and the findings are in <code>docs/windows/reviews/plan-review.md</code>.</p>
+</section>
+
+</div>
+
+<script>
+const P={a:["Phase A: engine on Windows, and the reference","52 h"],b:["Phase B: the Windows app","122 h"],c:["Phase C: compare with paint.net, and improve","136 h"],d:["Phase D: finish and release","42 h"]};
+const M=[
+["W0","a","Machine and test setup",6,".NET 10 for both accounts, pinned paint.net, preflight, runner refresh, check levels. Probes for the hidden desktop, GPU over SSH, and a second paint.net copy.","The preflight passes. A headless Avalonia test passes as agent. A one-page result says what each probe found.","Decision 1",1,0],
+["W1","a","Engine files and tests",10,"File reads, folder sync, atomic replace with antivirus retries, paths, DLL build. Port Unix-only tests and the fuzz driver. Guard the ICC panic. Find the Mandelbrot cause.","Per-file test counts are compared with the Mac, and every file that does not run is named. All non-GPU tests pass.","W0",2,0],
+["W2","a","Recovery redesign",8,"Lock file outside the record folder, close before rename, a new same-file check, a Windows kill test. The architecture doc changes first.","Kill before, during and after a record write recovers on Windows and the Mac. Fresh review of this change.","W1",3,0],
+["W3","a","GPU and canvas on DX12",14,"One pinned backend, a software GPU selector, a backend assert. Win32 test host. Display profile. Device-lost hook. A guard against long GPU jobs.","The GPU matrix has 0 failures on the RTX and on software, and fails unless DX12 ran. Resize and switch scenarios pass. Color within ΔE 1 of lcms2.","W1",3,1],
+["W4","a","paint.net capture kit",14,"The old M02. Plugin or driver, the real 5.1.12 catalog, targets for 5.1, private oracle repo, parity list started.","One effect per family, twice, with the same hashes. The manifest pins build, parameters, inputs, GPU and driver. Fallback list committed.","W0",2,2],
+["W5","b","UI stack test",12,"The same small shell in Avalonia and WinUI 3: canvas, marching ants, floating panel, menu, dialog, pen log, IME field, on AOT builds.","A table of launch, size, resize, overlay frame rate, Narrator and headless reach. Astra and Fable vote. The decision is written down.","W3",4,1],
+["W6","b","Windows design and icons",8,"At least 3 mockups next to real paint.net shots, a critique and an adversarial review. A new icon set with open licenses.","A side-by-side page with a pick. All icons exist with license records.","W4, W5",5,1],
+["W7","b","App shell and canvas",14,"C# bridge from the catalog. Window, strip, status bar, 7-button command row, menu bar, Zoom, Pan, overlay path, test vectors from Swift, harness.","Open a 24 MP PNG, pan at 60 fps, color checked on the live window, menu order matches the catalog.","W5, W6",6,1],
+["W8","b","Panels",12,"Tools, History, Layers, Colors, Layer Properties, palettes, Windows shortcuts.","Every panel action is tested headless. Shortcuts match the catalog with 0 differences.","W7",7,1],
+["W9","b","Core tools",16,"Selection tools and Wand first, then Brush, Eraser, Pencil, Bucket, Picker, Move, Crop, options row, pen input, overlays.","Replayed pointer logs give the engine's goldens. Undo returns every byte. Real pen reports NOT RUN.","W8",8,1],
+["W10","b","Files",14,"Open, Save, Save a Copy, Revert, Save All, Recent, drag and drop, clipboard, metadata strip, recovery sheet, file association, second-file open, Windows codecs.","Save and reopen keep every byte. Kill mid-edit recovers. A codec table passes.","W9, W2",9,0],
+["W11","b","Effects and menus complete",10,"Schema dialogs, live preview, repeat-last, all Edit, Image, Layers, Adjustments and Effects items, Color Profile dialogs, Content-Aware Fill.","Every catalog item works or has a parity row. Preview equals the result. Cancel changes nothing.","W9, W4",9,1],
+["W12","b","The 7 tools the Mac never connected",20,"Gradient, Line/Curve, Shapes, Clone Stamp, Recolor, Healing Brush, Spot Heal, with new C interface paths and new design.","Each is usable from its button, with live preview and Finish, and passes goldens or reviewed shots.","W9",9,2],
+["W13","b","Text",16,"DirectWrite layout, IME, right-to-left text, emoji, live editing.","IME, bidi and emoji goldens reviewed. Caret overlay at full frame rate.","W9",9,3],
+["W14","c","Effect comparison and engine fixes",120,"Full parameter matrix from 5.1.12. A report per effect, then CPU and GPU fixes by family, side by side. The first 10 h make the report, and root resets the budget from it.","Every effect has a 5.1 row and a measured error at ±1/255, or sits on your list. Mac tests rerun.","W3, W4, decision 3",6,4],
+["W15","c","Behavior sweep",16,"The same scripted steps in both apps for menus, options, dialogs and non-pointer results. Fixes.","Every parity row is same, better, or left out on purpose.","W10 to W14",10,1],
+["W16","d","View, Settings, background removal",10,"Rulers, grid, zoom presets, light and dark, scaling, Settings. Remove Background with a model downloaded on request, MIT or Apache only.","Rulers correct at 3 scalings. IoU 0.9 on 10 photos, or you decide. Mixed screens report NOT RUN.","W9",10,0],
+["W17","d","Translation-ready text",2,"All strings in resource files.","A scan finds no hard-coded UI text.","W11",10,2],
+["W18","d","Keyboard and accessibility",6,"Full keyboard use, focus across panels, Narrator names.","A keyboard-only test passes. Accessibility Insights shows no errors. The Narrator walk runs in your time window.","W10, W11",10,3],
+["W19","d","Speed, sturdiness, release",18,"Launch work, fuzz, 200 MP, low disk, simulated sleep and GPU reset, icon, MSIX, ZIP, update check, page.","Launch under 3 s, app under 75 MB, DLL scan, no banned name, second-account install, page deployed from a Mac session.","W15, W18",11,1],
+["W20","d","Mac and Linux catch-up",6,"Mac test run and a Mac release with the engine fixes. Linux engine checks.","Mac and Linux suites pass. Release notes list the effect changes.","W19",12,1]
+];
+const E=[["W0","W1"],["W0","W4"],["W1","W2"],["W1","W3"],["W3","W5"],["W4","W6"],["W5","W6"],["W5","W7"],["W6","W7"],["W7","W8"],["W8","W9"],["W9","W10"],["W2","W10"],["W9","W11"],["W4","W11"],["W9","W12"],["W9","W13"],["W3","W14"],["W4","W14"],["W10","W15"],["W11","W15"],["W12","W15"],["W13","W15"],["W14","W15"],["W9","W16"],["W11","W17"],["W10","W18"],["W11","W18"],["W15","W19"],["W18","W19"],["W16","W19"],["W17","W19"],["W19","W20"]];
+const w=66,h=38,ox=10,oy=8,dx=76.5,dy=56;
+const pos={};M.forEach(m=>pos[m[0]]=[ox+m[7]*dx-dx,oy+m[8]*dy]);
+const svg=document.getElementById("graph");const NS="http://www.w3.org/2000/svg";
+function el(n,a,p){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+E.forEach(([a,b])=>{const A=pos[a],B=pos[b];const x1=A[0]+w,y1=A[1]+h/2,x2=B[0],y2=B[1]+h/2;const mx=(x1+x2)/2;el("path",{d:`M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`,class:"edge"})});
+function openMs(id){const d=document.getElementById("ms-"+id);if(!d)return;d.open=true;d.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"})}
+M.forEach(m=>{const[x,y]=pos[m[0]];const g=el("g",{class:"node p"+m[1],tabindex:0,role:"button","aria-label":m[0]+" "+m[2]});el("rect",{x,y,width:w,height:h,rx:6},g);const t=el("text",{x:x+w/2,y:y+h/2+4,"text-anchor":"middle"},g);t.textContent=m[0];const ti=el("title",{},g);ti.textContent=m[2];g.addEventListener("click",()=>openMs(m[0]));g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openMs(m[0])}})});
+[["pa","A: engine"],["pb","B: app"],["pc","C: compare"],["pd","D: release"]].forEach((l,i)=>{const g=el("g",{class:l[0]});el("rect",{x:ox+i*104,y:312,width:14,height:14,rx:3},g);const t=el("text",{x:ox+i*104+20,y:323,class:"lbl"},g);t.textContent=l[1]});
+const host=document.getElementById("phases");
+Object.keys(P).forEach(k=>{const s=document.createElement("div");s.className="phase";s.innerHTML=`<div class="phasehead"><h3>${P[k][0]}</h3><span>${P[k][1]}</span></div>`;
+M.filter(m=>m[1]===k).forEach(m=>{const d=document.createElement("details");d.className="ms";d.id="ms-"+m[0];d.innerHTML=`<summary><span class="id">${m[0]}</span><span class="nm">${m[2]}</span><span class="hr">${m[3]} h</span></summary><div class="body"><dl><dt>What it adds</dt><dd>${m[4]}</dd><dt>Done-test</dt><dd>${m[5]}</dd><dt>Needs</dt><dd>${m[6]}</dd></dl></div>`;s.appendChild(d)});host.appendChild(s)});
+const tabs=[...document.querySelectorAll('[role=tab]')];
+tabs.forEach((t,i)=>{t.addEventListener("click",()=>{tabs.forEach(o=>{const on=o===t;o.setAttribute("aria-selected",on);document.getElementById(o.getAttribute("aria-controls")).hidden=!on})});
+t.addEventListener("keydown",e=>{const n=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;if(n){const o=tabs[(i+n+tabs.length)%tabs.length];o.focus();o.click()}})});
+</script>
