@@ -1,6 +1,6 @@
 # OpenPainter for Windows: plan
 
-Status: revision 2, waiting for the user's OK. Written 2026-11-01 on the Windows PC. A fresh Opus reviewer read revision 1; `docs/windows/reviews/plan-review.md` records each finding. Astra did not review it, because root cannot reach the `agent` account yet (decision 1).
+Status: revision 2, approved by the user on 2026-11-01. W0 has started on branch `windows`. Written 2026-11-01 on the Windows PC. A fresh Opus reviewer read revision 1; `docs/windows/reviews/plan-review.md` records each finding. Astra reviews revision 2 now that root can reach the `agent` account.
 
 ## 1. The short version
 
@@ -219,6 +219,12 @@ W14 runs beside the app work and needs no UI. W16, W17 and W18 run after W9, W11
 | A pending Windows reboot, from the Build Tools install on 2026-10-30 | Not needed for this plan so far. Root asks before any reboot. |
 
 ## 9. Decisions for the user
+
+State on 2026-11-01, when the user said to move forward:
+
+- Decision 1 is done. The user approved the key in another session, and `ssh agent@127.0.0.1` works.
+- Decisions 3, 6 and 7 take the recommendation, under the user's rule to not wait on them. The user can change decision 3 any time before W14.
+- Decisions 2, 4 and 5 still need the user. Until they answer, a Mac session runs Mac checks at phase ends, real-window checks report NOT RUN, and W19 stops for the Store login.
 
 1. **SSH key for `agent` on this PC (needs your OK).** Root makes one key for `yjli` and adds it to `agent` here. Without it, Sol and Astra cannot run, and root builds everything itself. Recommended: yes.
 2. **The same key on the Macs and the Linux box (needs your OK).** This lets root run Mac and Linux checks from here. Without it, a Mac session runs them at phase ends. Recommended: yes.
