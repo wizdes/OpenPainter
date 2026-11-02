@@ -1770,20 +1770,13 @@ impl WriterState {
                         {
                             eprintln!("op-engine: {e}");
                         }
-                    } else if delete && let Some(lock) = self.lock.take() {
-                        // Close could not hide the record if it could not check
-                        // the lock. This is the last chance, and this thread
-                        // can wait: nobody is waiting on it.
+                    } else if delete {
                         #[cfg(windows)]
+                        finish_clean_close(self.lock.take(), &self.dir);
+                        #[cfg(not(windows))]
+                        if let Some(lock) = self.lock.take()
+                            && let Err(e) = lock.delete_folder()
                         {
-                            let start = Instant::now();
-                            while start.elapsed() < Duration::from_secs(5)
-                                && matches!(lock.held_io(), Err(ref e) if is_brief(e))
-                            {
-                                std::thread::sleep(Duration::from_millis(50));
-                            }
-                        }
-                        if let Err(e) = lock.delete_folder() {
                             eprintln!("op-engine: {e}");
                         }
                     }
@@ -1801,6 +1794,62 @@ impl WriterState {
     }
 }
 
+/// Windows: the writer's last step in a clean close. Close could not hide the
+/// record if it could not check the lock, and this is the last chance. Only an
+/// engine being dropped waits on this thread, for up to 5 s in this rare case.
+#[cfg(windows)]
+fn finish_clean_close(lock: Option<FolderLock>, dir: &Path) {
+    let lock = match lock {
+        Some(lock) => {
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_secs(5)
+                && matches!(lock.held_io(), Err(ref e) if is_brief(e))
+            {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            lock
+        }
+        // A failed write already gave the lock up. The user still closed this
+        // document, so take the lock again if nobody else has it.
+        None => {
+            match FolderLock::take_within(dir, false, Duration::ZERO, Duration::from_millis(250)) {
+                Ok(Some(lock)) => lock,
+                Ok(None) => return,
+                Err(e) => {
+                    eprintln!("op-engine: {e}");
+                    mark_closed(dir);
+                    return;
+                }
+            }
+        }
+    };
+    if let Err(e) = lock.delete_folder() {
+        eprintln!("op-engine: {e}");
+        // The record could not go. The marker stops the next scan offering it.
+        if manifest_present(dir).unwrap_or(true) && !e.starts_with("another owner") {
+            mark_closed(dir);
+        }
+    }
+}
+
+/// Windows: writes and syncs the marker that says this record closed cleanly.
+#[cfg(windows)]
+fn mark_closed(dir: &Path) {
+    let marker = closed_marker(dir);
+    let marked = (|| -> std::io::Result<()> {
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&marker)?;
+        file.sync_all()?;
+        sync_dir(parent_of(dir))
+    })();
+    if let Err(e) = marked {
+        eprintln!("op-engine: {}", io_text("cannot mark closed", &marker, e));
+    }
+}
+
 /// Windows clean close: hides the record before close returns. Returns the
 /// hidden folder when the path could be freed.
 #[cfg(windows)]
@@ -1811,19 +1860,7 @@ fn close_hide(dir: &Path) -> Option<PathBuf> {
     // everything when it stops, so no other owner can get in
     // while it might still touch these files. This call does
     // not grow with leftover files.
-    let marker = closed_marker(&dir);
-    let marked = (|| -> std::io::Result<()> {
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(&marker)?;
-        file.sync_all()?;
-        sync_dir(parent_of(&dir))
-    })();
-    if let Err(e) = &marked {
-        eprintln!("op-engine: {}", io_text("cannot mark closed", &marker, e));
-    }
+    mark_closed(&dir);
     let manifest = dir.join(MANIFEST);
     match fs::remove_file(&manifest) {
         Ok(()) => {

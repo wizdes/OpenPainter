@@ -945,6 +945,54 @@ fn windows_a_lost_lock_with_no_new_owner_makes_no_offer_after_close() {
     assert_eq!(names_in(root.path()), Vec::<String>::new());
 }
 
+/// A failed write gave the lock up before close. The user closed the document,
+/// so nothing may be offered.
+#[cfg(windows)]
+#[test]
+fn windows_close_after_a_failed_write_lost_the_lock_makes_no_offer() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("lost-then-closed");
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 38), None).unwrap();
+    e.recovery_attach(doc, &dir, None, manual()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    e.recovery_flush(doc).unwrap();
+    std::fs::remove_file(root.path().join(".lost-then-closed.owner.lock")).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    assert!(e.recovery_flush(doc).is_err());
+    e.close(doc).unwrap();
+    assert!(e.recovery_wait_stopped(Duration::from_secs(5)));
+    assert!(recovery::scan(root.path()).is_empty());
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
+/// A lock denied for longer than the writer waits. Nothing retries after that,
+/// so the marker must stop the false offer.
+#[cfg(windows)]
+#[test]
+fn windows_a_long_lock_denial_during_close_makes_no_offer() {
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_SHARE_WRITE: u32 = 2;
+    const FILE_SHARE_DELETE: u32 = 4;
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("long-denial");
+    let e = Engine::new(None).unwrap();
+    let doc = e.import_pixels(64, 48, &noise(64, 48, 39), None).unwrap();
+    e.recovery_attach(doc, &dir, None, manual()).unwrap();
+    e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
+    e.recovery_flush(doc).unwrap();
+    let held = std::fs::OpenOptions::new()
+        .write(true)
+        .share_mode(FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .open(root.path().join(".long-denial.owner.lock"))
+        .unwrap();
+    e.close(doc).unwrap();
+    assert!(e.recovery_wait_stopped(Duration::from_secs(10)));
+    drop(held);
+    assert!(recovery::scan(root.path()).is_empty());
+    assert_eq!(names_in(root.path()), Vec::<String>::new());
+}
+
 /// A byte-range lock lets a file open but not read. That is not damage.
 #[cfg(windows)]
 #[test]

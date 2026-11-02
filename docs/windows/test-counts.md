@@ -10,7 +10,7 @@ Root ran these as `agent` on the final code, from `engine/`, with `CARGO_INCREME
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p op-engine --lib --test recovery --test recovery_fixes --test recovery_fixes2 --test release_review --test fix_round2 --no-fail-fast -j 8 -- --test-threads=1` | 93 passed, 0 failed |
+| `cargo test -p op-engine --lib --test recovery --test recovery_fixes --test recovery_fixes2 --test release_review --test fix_round2 --no-fail-fast -j 8 -- --test-threads=1` | 95 passed, 0 failed |
 | `cargo test -p op-cli --no-fail-fast -j 8 -- --test-threads=1` | 6 passed, 0 failed. Three are kill tests using `TerminateProcess`. |
 | `cargo test -p op-engine --test huge_document --no-fail-fast -j 8 -- --ignored --test-threads=1 --nocapture` | 1 passed |
 | A temporary stress test: 1500 attach and close cycles with a scan running at the same time | 0 files left, 10975 scans, 5.6 s. Not saved in the repo. |
@@ -62,7 +62,9 @@ Mac: `cargo check -p op-engine -p op-cli --tests --target aarch64-apple-darwin` 
 
 ### Limits accepted in W2
 
-- Every write and delete checks the lock first, so a writer that lost its lock leaves the next owner alone. A very small gap remains between that check and the file operation.
+- Every write and delete checks the lock first, so a writer that lost its lock leaves the next owner alone. A gap remains between that check and the file operation. In a bulk clean-up it lasts as long as the loop: Astra deleted a new owner's snapshot with 16,000 leftover files. This needs a lock file deleted from outside as well.
+- Dropping the engine can wait up to 5 s if another program is denying the lock during a clean close.
+- A 200 MP run with `OP_FORCE_CPU=1` exceeded the memory cap in one review, 5,435 MB against 2,048 MB. It passes with the GPU on. The cause is not known, and it is filed as a follow-up.
 - A former owner that closes after the next owner has stopped cleanly can delete that owner's record. It needs a lock file deleted from outside first.
 - If the closed marker cannot be written and the process crashes within the same few milliseconds, a false offer is possible. The marker failure is printed.
 - A lock file that stays denied hides its record from every scan, with the reason only in the log. W10's recovery sheet has to show this.
