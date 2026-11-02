@@ -1,0 +1,1436 @@
+# Windows icon for every SF Symbol the Mac app shows. W6.
+# One row per Mac symbol. tools/ui-look/tests checks this file against the Mac source.
+# Fields: mac_symbol, used_in (a source file or a menu path), meaning, file, source,
+# source_name, license, and note for own-work rows.
+# Names such as doc.dirty and tool.text.begin are engine command names, not symbols,
+# so they have no row.
+
+[[icon]]
+mac_symbol = "1.magnifyingglass"
+used_in = "View > Actual Size"
+meaning = "actual size"
+file = "windows/assets/icons/view-actual-size.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "ratio_one_to_one_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "aqi.medium"
+used_in = "Menu effect effect.render.mandelbrot_fractal"
+meaning = "mandelbrot fractal"
+file = "windows/assets/icons/effect-mandelbrot.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "data_sunburst_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.clockwise"
+used_in = "Effects > Repeat Effect"
+meaning = "repeat effect"
+file = "windows/assets/icons/effect-repeat.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_clockwise_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.clockwise.square"
+used_in = "Layers > Rotate 180°"
+meaning = "rotate 180"
+file = "windows/assets/icons/image-rotate-180.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_sync_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.down"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Go to Layer Below"
+meaning = "down"
+file = "windows/assets/icons/arrow-down.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_down_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.down.left"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "down and left"
+file = "windows/assets/icons/arrow-down-left.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_down_left_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.down.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "down and right"
+file = "windows/assets/icons/arrow-down-right.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_down_right_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.down.square"
+used_in = "Layers > Merge Layer Down"
+meaning = "merge layer down in the menu"
+file = "windows/assets/icons/layer-merge-down-menu.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_square_down_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.down.to.line"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Go to Bottom Layer"
+meaning = "merge down and go to bottom"
+file = "windows/assets/icons/layer-merge-down.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_download_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.left"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "left"
+file = "windows/assets/icons/arrow-left.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_left_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.left.and.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift"
+meaning = "flip horizontal"
+file = "windows/assets/icons/image-flip-horizontal.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "flip_horizontal_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.left.and.right.righttriangle.left.righttriangle.right"
+used_in = "Image > Flip Horizontal"
+meaning = "flip horizontal"
+file = "windows/assets/icons/image-flip-horizontal.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "flip_horizontal_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.left.and.right.square"
+used_in = "Layers > Flip Horizontal"
+meaning = "flip horizontal"
+file = "windows/assets/icons/image-flip-horizontal.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "flip_horizontal_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.left.arrow.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/ColorsPanel.swift"
+meaning = "swap colors"
+file = "windows/assets/icons/colors-swap.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_swap_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "right"
+file = "windows/assets/icons/arrow-right.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_right_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.triangle.2.circlepath"
+used_in = "Image > Rotate 180°"
+meaning = "rotate 180"
+file = "windows/assets/icons/image-rotate-180.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_sync_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.triangle.2.circlepath.circle"
+used_in = "Menu effect effect.distort.polar_inversion"
+meaning = "polar inversion"
+file = "windows/assets/icons/effect-polar-inversion.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_sync_circle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Go to Layer Above"
+meaning = "up"
+file = "windows/assets/icons/arrow-up.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_up_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.and.down"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift"
+meaning = "flip vertical"
+file = "windows/assets/icons/image-flip-vertical.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "flip_vertical_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.and.down.and.arrow.left.and.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "move pixels"
+file = "windows/assets/icons/tool-move-pixels.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_move_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.and.down.righttriangle.up.righttriangle.down"
+used_in = "Image > Flip Vertical"
+meaning = "flip vertical"
+file = "windows/assets/icons/image-flip-vertical.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "flip_vertical_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.and.down.square"
+used_in = "Layers > Flip Vertical"
+meaning = "flip vertical"
+file = "windows/assets/icons/image-flip-vertical.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "flip_vertical_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.arrow.down"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift"
+meaning = "move layer"
+file = "windows/assets/icons/layer-move.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_sort_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.left"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "up and left"
+file = "windows/assets/icons/arrow-up-left.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_up_left_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.left.and.arrow.down.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Image > Resize…"
+meaning = "resize"
+file = "windows/assets/icons/image-resize.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "resize_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.left.and.arrow.down.right.circle"
+used_in = "Menu effect effect.blur.zoom"
+meaning = "zoom blur"
+file = "windows/assets/icons/effect-zoom-blur.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_maximize_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "move selection outline"
+file = "windows/assets/icons/tool-move-selection.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no four diagonal arrows; its arrow_move is used for Move Selected Pixels. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "arrow.up.left.and.down.right.magnifyingglass"
+used_in = "View > Zoom to Window"
+meaning = "zoom to window"
+file = "windows/assets/icons/view-zoom-fit.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "zoom_fit_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "up and right"
+file = "windows/assets/icons/arrow-up-right.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_up_right_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.up.to.line"
+used_in = "Layers > Go to Top Layer"
+meaning = "go to top layer"
+file = "windows/assets/icons/layer-go-top.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_upload_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.uturn.backward"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Edit > Undo"
+meaning = "undo"
+file = "windows/assets/icons/cmd-undo.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_undo_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "arrow.uturn.forward"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Edit > Redo"
+meaning = "redo"
+file = "windows/assets/icons/cmd-redo.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_redo_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "bold"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "bold"
+file = "windows/assets/icons/text-bold.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_bold_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "camera.aperture"
+used_in = "Menu effect effect.blur.unfocus"
+meaning = "unfocus"
+file = "windows/assets/icons/effect-unfocus.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "blur_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "camera.filters"
+used_in = "Image > Color Profile…"
+meaning = "color profile"
+file = "windows/assets/icons/image-color-profile.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "photo_filter_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "chart.bar"
+used_in = "Menu effect effect.adjust.levels"
+meaning = "levels"
+file = "windows/assets/icons/effect-levels.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "data_histogram_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "checkerboard.rectangle"
+used_in = "Menu effect effect.adjust.invert_alpha"
+meaning = "invert alpha"
+file = "windows/assets/icons/effect-invert-alpha.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no checkerboard. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "chevron.down"
+used_in = "Layers > Move Layer Down"
+meaning = "move layer down"
+file = "windows/assets/icons/layer-move-down.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "chevron_down_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "chevron.down.2"
+used_in = "Layers > Move Layer to Bottom"
+meaning = "move layer to bottom"
+file = "windows/assets/icons/layer-move-bottom.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "chevron_double_down_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "chevron.up"
+used_in = "Layers > Move Layer Up"
+meaning = "move layer up"
+file = "windows/assets/icons/layer-move-up.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "chevron_up_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "chevron.up.2"
+used_in = "Layers > Move Layer to Top"
+meaning = "move layer to top"
+file = "windows/assets/icons/layer-move-top.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "chevron_double_up_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "circle.bottomhalf.filled"
+used_in = "Menu effect effect.adjust.highlights_shadows"
+meaning = "highlights and shadows"
+file = "windows/assets/icons/effect-highlights-shadows.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "circle_half_fill_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "circle.circle"
+used_in = "Menu effect effect.blur.radial"
+meaning = "radial blur"
+file = "windows/assets/icons/effect-radial-blur.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "circle_multiple_concentric_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "circle.dashed"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.stylize.outline; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "ellipse selection"
+file = "windows/assets/icons/tool-ellipse-select.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no dashed circle. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "circle.dashed.inset.filled"
+used_in = "Menu effect effect.photo.vignette"
+meaning = "vignette"
+file = "windows/assets/icons/effect-vignette.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "circle_shadow_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "circle.fill"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/ImageSizeDialogs.swift"
+meaning = "plain dot"
+file = "windows/assets/icons/step-generic.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent regular has only a thin circle; this meaning needs a solid dot. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "circle.grid.cross"
+used_in = "Menu effect effect.distort.morphology"
+meaning = "morphology"
+file = "windows/assets/icons/effect-morphology.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "grid_dots_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "circle.hexagongrid"
+used_in = "Menu effect effect.blur.bokeh"
+meaning = "bokeh"
+file = "windows/assets/icons/effect-bokeh.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "hexagon_three_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "circle.lefthalf.filled"
+used_in = "mac/OpenPainterKit/Sources/Shell/ColorsPanel.swift; mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.adjust.black_and_white"
+meaning = "black and white, adjustment"
+file = "windows/assets/icons/colors-contrast.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no regular circle with its left half filled; its half circle fills the bottom and is used for highlights and shadows. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "circle.righthalf.filled"
+used_in = "Menu effect effect.adjust.invert_colors"
+meaning = "invert colors"
+file = "windows/assets/icons/effect-invert-colors.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no regular circle with its right half filled. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "clock.arrow.circlepath"
+used_in = "mac/OpenPainterKit/Sources/Shell/PanelLayout.swift"
+meaning = "history panel"
+file = "windows/assets/icons/panel-history.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "history_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "cloud"
+used_in = "Menu effect effect.render.clouds"
+meaning = "clouds"
+file = "windows/assets/icons/effect-clouds.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "cloud_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "crop"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Image > Crop to Selection"
+meaning = "crop"
+file = "windows/assets/icons/cmd-crop.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "crop_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "cube"
+used_in = "Menu effect effect.stylize.emboss"
+meaning = "emboss"
+file = "windows/assets/icons/effect-emboss.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "cube_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "diamond"
+used_in = "Menu effect effect.distort.crystalize"
+meaning = "crystalize"
+file = "windows/assets/icons/effect-crystalize.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "diamond_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "doc.badge.plus"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; File > New…"
+meaning = "new document"
+file = "windows/assets/icons/cmd-new.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "document_add_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "doc.on.clipboard"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; Edit > Paste"
+meaning = "paste"
+file = "windows/assets/icons/cmd-paste.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "clipboard_paste_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "doc.on.doc"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; Edit > Copy"
+meaning = "copy"
+file = "windows/assets/icons/cmd-copy.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "copy_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "dot.radiowaves.left.and.right"
+used_in = "Menu effect effect.render.turbulence"
+meaning = "turbulence"
+file = "windows/assets/icons/effect-turbulence.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "weather_fog_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "drop"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.blur.gaussian; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "paint bucket and liquid drop"
+file = "windows/assets/icons/tool-paint-bucket.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "drop_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "drop.fill"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Edit > Fill Selection"
+meaning = "fill selection"
+file = "windows/assets/icons/edit-fill.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "color_fill_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "ellipsis.circle"
+used_in = "mac/OpenPainterKit/Sources/Shell/ColorsPanel.swift; mac/OpenPainterKit/Sources/Shell/CommandBar.swift"
+meaning = "more commands"
+file = "windows/assets/icons/cmd-more.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "more_circle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "envelope"
+used_in = "Help > Send Feedback…"
+meaning = "send feedback"
+file = "windows/assets/icons/help-feedback.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "mail_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "eraser"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Edit > Erase Selection; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "eraser"
+file = "windows/assets/icons/tool-eraser.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "eraser_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "eye"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Toggle Layer Visibility"
+meaning = "visible"
+file = "windows/assets/icons/layer-visible.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "eye_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "eye.circle"
+used_in = "Menu effect effect.photo.red_eye_removal"
+meaning = "red eye removal"
+file = "windows/assets/icons/effect-red-eye.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "eye_circle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "eye.slash"
+used_in = "mac/OpenPainterKit/Sources/Shell/LayersPanel.swift"
+meaning = "hidden"
+file = "windows/assets/icons/layer-hidden.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "eye_off_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "eyedropper"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "color picker"
+file = "windows/assets/icons/tool-color-picker.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "eyedropper_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "folder"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; File > Open…"
+meaning = "open"
+file = "windows/assets/icons/cmd-open.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "folder_open_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "gearshape"
+used_in = "OpenPainter > Settings…"
+meaning = "settings"
+file = "windows/assets/icons/app-settings.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "settings_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "grid"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; View > Pixel Grid"
+meaning = "pixel grid"
+file = "windows/assets/icons/view-pixel-grid.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "grid_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "hand.raised"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "pan"
+file = "windows/assets/icons/tool-pan.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "hand_left_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "hurricane"
+used_in = "Menu effect effect.distort.dents"
+meaning = "dents"
+file = "windows/assets/icons/effect-dents.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "shape_organic_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "info.circle"
+used_in = "OpenPainter > About OpenPainter"
+meaning = "about"
+file = "windows/assets/icons/app-about.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "info_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "italic"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "italic"
+file = "windows/assets/icons/text-italic.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_italic_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "lasso"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "lasso selection"
+file = "windows/assets/icons/tool-lasso.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "lasso_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "level"
+used_in = "Effects > Photo > Straighten"
+meaning = "straighten"
+file = "windows/assets/icons/effect-straighten.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "line_horizontal_1_dot_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "lightbulb"
+used_in = "Menu effect effect.photo.glow"
+meaning = "glow"
+file = "windows/assets/icons/effect-glow.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "lightbulb_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "line.3.horizontal.decrease.circle"
+used_in = "Menu effect effect.blur.median"
+meaning = "median"
+file = "windows/assets/icons/effect-median.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "filter_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "line.diagonal"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "line"
+file = "windows/assets/icons/tool-line.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "line_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "magnifyingglass"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "zoom tool"
+file = "windows/assets/icons/tool-zoom.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "search_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "minus"
+used_in = "mac/OpenPainterKit/Sources/Shell/OptionsBarView.swift"
+meaning = "decrease"
+file = "windows/assets/icons/opt-minus.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "subtract_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "minus.magnifyingglass"
+used_in = "View > Zoom Out"
+meaning = "zoom out"
+file = "windows/assets/icons/view-zoom-out.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "zoom_out_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "minus.square"
+used_in = "Edit > Paste Selection > Exclude"
+meaning = "selection exclude"
+file = "windows/assets/icons/edit-paste-exclude.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "shape_subtract_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "mountain.2"
+used_in = "Menu effect effect.stylize.relief"
+meaning = "relief"
+file = "windows/assets/icons/effect-relief.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "mountain_location_top_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "paintbrush"
+used_in = "Menu effect effect.artistic.oil_painting; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "recolor"
+file = "windows/assets/icons/tool-recolor.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "paint_brush_sparkle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "paintbrush.pointed"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/PanelLayout.swift; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "paintbrush"
+file = "windows/assets/icons/tool-paintbrush.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "paint_brush_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "paintpalette"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.adjust.hue_saturation; mac/OpenPainterKit/Sources/Shell/PanelLayout.swift"
+meaning = "colors panel"
+file = "windows/assets/icons/panel-colors.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "color_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "pencil"
+used_in = "Menu effect effect.artistic.pencil_sketch; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "pencil"
+file = "windows/assets/icons/tool-pencil.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "edit_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "pencil.tip"
+used_in = "Menu effect effect.artistic.ink_sketch"
+meaning = "ink sketch"
+file = "windows/assets/icons/effect-ink-sketch.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "pen_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "person.crop.square"
+used_in = "Menu effect effect.photo.soften_portrait"
+meaning = "soften portrait"
+file = "windows/assets/icons/effect-soften-portrait.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "person_square_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "photo"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.adjust.sepia"
+meaning = "image, sepia"
+file = "windows/assets/icons/doc-image.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "image_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "photo.badge.plus"
+used_in = "Edit > Paste into New Image"
+meaning = "paste into new image"
+file = "windows/assets/icons/edit-paste-new-image.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "image_add_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "photo.on.rectangle"
+used_in = "Layers > Import From File…"
+meaning = "import from file"
+file = "windows/assets/icons/layer-import.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "image_multiple_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plus"
+used_in = "mac/OpenPainterKit/Sources/Shell/OptionsBarView.swift"
+meaning = "increase"
+file = "windows/assets/icons/opt-plus.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "add_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plus.magnifyingglass"
+used_in = "View > Zoom In"
+meaning = "zoom in"
+file = "windows/assets/icons/view-zoom-in.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "zoom_in_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plus.rectangle.on.rectangle"
+used_in = "Edit > Paste into New Layer"
+meaning = "paste into new layer"
+file = "windows/assets/icons/edit-paste-new-layer.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "layer_diagonal_add_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plus.square"
+used_in = "mac/OpenPainterKit/Sources/Shell/ColorsPanel.swift; mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift"
+meaning = "add"
+file = "windows/assets/icons/layer-add.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "add_square_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plus.square.dashed"
+used_in = "Edit > Paste Selection > Add (union)"
+meaning = "selection add"
+file = "windows/assets/icons/edit-paste-add.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "shape_union_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plus.square.on.square"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Add New Layer"
+meaning = "duplicate or add a layer"
+file = "windows/assets/icons/layer-duplicate.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "add_square_multiple_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "plusminus.circle"
+used_in = "Menu effect effect.adjust.exposure"
+meaning = "exposure"
+file = "windows/assets/icons/effect-exposure.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no plus-minus sign in a circle. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "point.topleft.down.to.point.bottomright.curvepath"
+used_in = "Menu effect effect.adjust.curves"
+meaning = "curves"
+file = "windows/assets/icons/effect-curves.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "data_line_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "power"
+used_in = "OpenPainter > Quit OpenPainter"
+meaning = "exit"
+file = "windows/assets/icons/app-exit.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "power_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "printer"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift"
+meaning = "print"
+file = "windows/assets/icons/cmd-print.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "print_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "questionmark.circle"
+used_in = "Help > OpenPainter Help"
+meaning = "help"
+file = "windows/assets/icons/help-contents.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "question_circle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "rectangle.dashed"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Edit > Paste Selection > Replace; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "rectangle selection"
+file = "windows/assets/icons/tool-rectangle-select.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "select_object_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "rectangle.dashed.and.paperclip"
+used_in = "Edit > Copy Selection"
+meaning = "copy selection outline"
+file = "windows/assets/icons/edit-copy-selection.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "select_object_skew_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "rectangle.dashed.badge.record"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; Edit > Deselect"
+meaning = "deselect"
+file = "windows/assets/icons/cmd-deselect.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "select_object_skew_dismiss_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "rotate.3d"
+used_in = "Layers > Rotate / Zoom…; Menu effect effect.layers.rotate_zoom"
+meaning = "rotate and zoom"
+file = "windows/assets/icons/layer-rotate-zoom.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "cube_rotate_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "rotate.left"
+used_in = "Image > Rotate 90° Counter-Clockwise"
+meaning = "rotate counter-clockwise"
+file = "windows/assets/icons/image-rotate-left.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_rotate_counterclockwise_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "rotate.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Image > Rotate 90° Clockwise"
+meaning = "rotate clockwise"
+file = "windows/assets/icons/image-rotate-right.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_rotate_clockwise_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "ruler"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; View > Rulers"
+meaning = "rulers"
+file = "windows/assets/icons/view-rulers.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "ruler_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "scissors"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; Edit > Cut"
+meaning = "cut"
+file = "windows/assets/icons/cmd-cut.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "cut_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "scribble"
+used_in = "Menu effect effect.blur.sketch"
+meaning = "sketch blur"
+file = "windows/assets/icons/effect-sketch-blur.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "line_style_sketch_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "selection.pin.in.out"
+used_in = "Edit > Select All"
+meaning = "select all"
+file = "windows/assets/icons/edit-select-all.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "select_all_on_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "shadow"
+used_in = "Menu effect effect.object.drop_shadow"
+meaning = "drop shadow"
+file = "windows/assets/icons/effect-drop-shadow.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "square_shadow_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "slider.horizontal.3"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Layer Properties…"
+meaning = "properties"
+file = "windows/assets/icons/layer-properties.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "options_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "smallcircle.filled.circle"
+used_in = "Menu effect effect.distort.bulge"
+meaning = "bulge"
+file = "windows/assets/icons/effect-bulge.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "target_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "snowflake"
+used_in = "Menu effect effect.distort.frosted_glass"
+meaning = "frosted glass"
+file = "windows/assets/icons/effect-frosted-glass.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "weather_snowflake_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "sparkles"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.render.julia_fractal"
+meaning = "effect"
+file = "windows/assets/icons/step-effect.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "sparkle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "speaker.slash"
+used_in = "Menu effect effect.noise.reduce"
+meaning = "reduce noise"
+file = "windows/assets/icons/effect-reduce-noise.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "speaker_mute_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "speaker.wave.2"
+used_in = "Menu effect effect.noise.add"
+meaning = "add noise"
+file = "windows/assets/icons/effect-add-noise.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "speaker_2_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.3.layers.3d"
+used_in = "Edit > Copy Merged; mac/OpenPainterKit/Sources/Shell/PanelLayout.swift"
+meaning = "layers panel"
+file = "windows/assets/icons/panel-layers.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "layer_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.3.layers.3d.down.right"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Image > Flatten"
+meaning = "flatten"
+file = "windows/assets/icons/image-flatten.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "layer_diagonal_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.and.arrow.down"
+used_in = "mac/OpenPainterKit/Sources/Shell/CommandBar.swift; File > Save"
+meaning = "save"
+file = "windows/assets/icons/cmd-save.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "save_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.and.arrow.down.on.square"
+used_in = "File > Save As…"
+meaning = "save as"
+file = "windows/assets/icons/cmd-save-as.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "save_copy_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.bottomhalf.filled"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "gradient"
+file = "windows/assets/icons/tool-gradient.svg"
+source = "own-work"
+source_name = "own-work"
+license = "MIT"
+note = "Fluent has no square with one half filled. Drawn for this project in the same 20 px style."
+
+[[icon]]
+mac_symbol = "square.dashed"
+used_in = "Menu effect effect.blur.square"
+meaning = "square blur"
+file = "windows/assets/icons/effect-square-blur.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "scan_dash_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.dashed.inset.filled"
+used_in = "Image > Canvas Size…"
+meaning = "canvas size"
+file = "windows/assets/icons/image-canvas-size.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "resize_image_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.grid.2x2"
+used_in = "Menu effect effect.blur.fragment"
+meaning = "fragment"
+file = "windows/assets/icons/effect-fragment.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "apps_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.grid.3x3"
+used_in = "Menu effect effect.color.quantize"
+meaning = "quantize"
+file = "windows/assets/icons/effect-quantize.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "data_treemap_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.grid.3x3.topleft.filled"
+used_in = "Menu effect effect.distort.tile_reflection"
+meaning = "tile reflection"
+file = "windows/assets/icons/effect-tile-reflection.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "slide_grid_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.on.circle"
+used_in = "mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "shapes"
+file = "windows/assets/icons/tool-shapes.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "shapes_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.on.square"
+used_in = "Layers > Duplicate Layer"
+meaning = "duplicate layer in the menu"
+file = "windows/assets/icons/layer-duplicate-menu.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "square_multiple_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.on.square.dashed"
+used_in = "Edit > Invert Selection; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "clone stamp and inverted selection"
+file = "windows/assets/icons/tool-clone-stamp.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "copy_select_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.on.square.intersection.dashed"
+used_in = "Edit > Paste Selection > Intersect"
+meaning = "selection intersect"
+file = "windows/assets/icons/edit-paste-intersect.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "shape_intersect_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.on.square.squareshape.controlhandles"
+used_in = "Edit > Paste Selection > Invert ('xor')"
+meaning = "selection invert"
+file = "windows/assets/icons/edit-paste-invert.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "shape_exclude_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "square.split.2x2"
+used_in = "Menu effect effect.adjust.posterize"
+meaning = "posterize"
+file = "windows/assets/icons/effect-posterize.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "table_simple_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "squareshape.dashed.squareshape"
+used_in = "Menu effect effect.stylize.edge_detect"
+meaning = "edge detect"
+file = "windows/assets/icons/effect-edge-detect.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "square_hint_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "squareshape.split.3x3"
+used_in = "Menu effect effect.distort.pixelate"
+meaning = "pixelate"
+file = "windows/assets/icons/effect-pixelate.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "sub_grid_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "strikethrough"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "strikethrough"
+file = "windows/assets/icons/text-strikethrough.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_strikethrough_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "sun.max"
+used_in = "Menu effect effect.adjust.brightness_contrast"
+meaning = "brightness and contrast"
+file = "windows/assets/icons/effect-brightness.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "weather_sunny_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "text.aligncenter"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "align center"
+file = "windows/assets/icons/text-align-center.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_align_center_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "text.alignleft"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "align left"
+file = "windows/assets/icons/text-align-left.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_align_left_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "text.alignright"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "align right"
+file = "windows/assets/icons/text-align-right.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_align_right_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "textformat"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "text"
+file = "windows/assets/icons/tool-text.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_font_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "thermometer.medium"
+used_in = "Menu effect effect.adjust.temperature_tint"
+meaning = "temperature and tint"
+file = "windows/assets/icons/effect-temperature.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "temperature_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "tornado"
+used_in = "Menu effect effect.distort.twist"
+meaning = "twist"
+file = "windows/assets/icons/effect-twist.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "arrow_clockwise_dashes_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "trash"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; mac/OpenPainterKit/Sources/Shell/LayersPanel.swift; Layers > Delete Layer"
+meaning = "delete"
+file = "windows/assets/icons/layer-delete.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "delete_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "tray.and.arrow.down"
+used_in = "File > Save All"
+meaning = "save all"
+file = "windows/assets/icons/cmd-save-all.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "save_multiple_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "triangle"
+used_in = "Menu effect effect.photo.sharpen"
+meaning = "sharpen"
+file = "windows/assets/icons/effect-sharpen.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "triangle_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "underline"
+used_in = "mac/OpenPainterKit/Sources/Shell/TextOptionsControls.swift"
+meaning = "underline"
+file = "windows/assets/icons/text-underline.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "text_underline_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "viewfinder"
+used_in = "View > Zoom to Selection"
+meaning = "zoom to selection"
+file = "windows/assets/icons/view-zoom-selection.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "full_screen_maximize_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "wand.and.stars"
+used_in = "mac/OpenPainterKit/Sources/Shell/HistoryPanel.swift; Menu effect effect.adjust.auto_level; mac/OpenPainterKit/Sources/Shell/ToolState.swift"
+meaning = "magic wand"
+file = "windows/assets/icons/tool-magic-wand.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "wand_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "water.waves"
+used_in = "Menu effect effect.blur.surface"
+meaning = "surface blur"
+file = "windows/assets/icons/effect-surface-blur.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "water_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "wind"
+used_in = "Menu effect effect.blur.motion"
+meaning = "motion blur"
+file = "windows/assets/icons/effect-motion-blur.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "weather_squalls_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "xmark"
+used_in = "mac/OpenPainterKit/Sources/Shell/ImageStripView.swift; File > Open Recent > Clear Menu"
+meaning = "close"
+file = "windows/assets/icons/window-close.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "dismiss_20_regular"
+license = "MIT"
+
+[[icon]]
+mac_symbol = "xmark.square"
+used_in = "File > Close"
+meaning = "close image"
+file = "windows/assets/icons/cmd-close-image.svg"
+source = "fluentui-svg-icons@1.1.345"
+source_name = "dismiss_square_20_regular"
+license = "MIT"
