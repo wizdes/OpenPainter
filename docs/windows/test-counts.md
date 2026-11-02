@@ -365,3 +365,24 @@ Recovery assumes one engine per process. Another engine's device can block recre
 - GPU timing: measure every kernel at two sizes on RTX and adjust the per-kernel time estimate before claiming the 0.2 s target.
 - Mac: install the Apple target, run the cross-target check, then run Mac view tests on a Mac.
 - W14: resolve the old Mandelbrot reference difference without changing the W3 tolerance.
+
+## Mac run of the Windows branch, 2026-11-02
+
+Root ran `e1f447b` on the MacBook Air (macOS 27.0.1, Xcode 27.1, Rust 1.97.1), in a throwaway clone, at low priority, over SSH. `main` at `3b41997` ran beside it for comparison.
+
+| Check | Windows branch | `main` |
+| --- | --- | --- |
+| `cargo test --workspace --no-fail-fast` | 679 passed, 0 failed, 8 ignored, 358 s | Not run |
+| Engine staticlib for the app | Builds, 16.9 MB | Builds |
+| App, Debug, no signing, no launch | `BUILD SUCCEEDED`, 24 s | Not run |
+| `mac/EngineBridge` `swift test` | 5 of 6 pass. `testOpenAddLayerInvertUndoReadsBackExpectedBytes` fails at line 56 | The same test fails at the same line |
+| `mac/PresenterSpike` `swift test` | Does not link: `op_ps_*` symbols are missing | The same |
+| App XCTests, `make -C mac test` | **NOT RUN**: they may open a window on the user's screen | Not run |
+
+So nothing here is caused by the Windows work. These faults come from `main`, and they are follow-ups:
+
+- `testOpenAddLayerInvertUndoReadsBackExpectedBytes` expects the ramp after undo or invert, and gets other bytes. Cause not known.
+- `mac/PresenterSpike` does not link against the staticlib.
+- `mac/Makefile`'s `-onlyUsePackageVersions` is rejected by `xcodebuild` in Xcode 27.1, so `make -C mac app`, `test` and `release` all stop there. The app build above left that flag out, and this copy needs a fix before the next Mac release.
+- `mac/scripts/build-engine.sh` names a `stable-aarch64-apple-darwin` toolchain folder. This Mac has only `1.97.1-aarch64-apple-darwin`, so the script cannot find `cargo`. The throwaway copy pointed it at the active toolchain.
+
