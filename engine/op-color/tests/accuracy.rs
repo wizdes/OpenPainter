@@ -315,7 +315,7 @@ fn malformed_icc_2000_mutations_and_truncations() {
 }
 
 #[test]
-fn damaged_icc_description_returns_an_error_instead_of_panicking() {
+fn damaged_icc_description_does_not_panic_through_the_caller() {
     let mut damaged = Profile::builtin("display-p3").unwrap().bytes().to_vec();
     let mut seed = 0x27182818u32;
     for _ in 0..=189 {
@@ -325,7 +325,12 @@ fn damaged_icc_description_returns_an_error_instead_of_panicking() {
     }
     assert_eq!(seed as usize % damaged.len(), 296);
     damaged[296] ^= (seed >> 8) as u8;
-    assert!(Profile::from_icc(&damaged).is_err());
+    // On Windows lcms2 panics here, and the name falls back. Elsewhere the
+    // same bytes may decode to some other name.
+    let profile = Profile::from_icc(&damaged).unwrap();
+    assert!(!profile.description().is_empty());
+    #[cfg(windows)]
+    assert_eq!(profile.description(), "Embedded ICC profile");
 }
 #[test]
 fn gray_to_rgb_accuracy() {

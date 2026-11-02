@@ -112,8 +112,12 @@ impl Write for HookedFile<'_> {
         if let Some(limit) = self.hooks.fail_after_bytes
             && self.written + buf.len() as u64 > limit
         {
-            // ENOSPC is 28 on macOS and Linux.
-            return Err(std::io::Error::from_raw_os_error(28));
+            // ENOSPC is 28 on macOS and Linux; ERROR_DISK_FULL is 112 on Windows.
+            return Err(std::io::Error::from_raw_os_error(if cfg!(windows) {
+                112
+            } else {
+                28
+            }));
         }
         let n = self.file.write(buf)?;
         self.written += n as u64;
@@ -248,6 +252,8 @@ fn save_impl(
         zip.write_all(&encode_png(&thumb).map_err(other)?)?;
         let file = zip.finish().map_err(zip_err)?;
         file.file.sync_all()?;
+        // ReplaceFileW refuses a temporary file this process still holds open.
+        drop(file);
         // The written entries are inside every reader size limit.
         check_written(&temp, doc)?;
         if let Some(permissions) = &target.permissions {
@@ -1190,17 +1196,15 @@ mod tests {
         )
         .unwrap_err();
         match &error {
-            Error::Io(e) => assert_eq!(e.raw_os_error(), Some(28)),
+            Error::Io(e) => {
+                assert_eq!(e.raw_os_error(), Some(if cfg!(windows) { 112 } else { 28 }))
+            }
             other => panic!("expected an I/O error, got {other}"),
         }
         #[cfg(unix)]
         assert!(error.to_string().contains("No space left on device"));
         #[cfg(windows)]
-        assert!(
-            error
-                .to_string()
-                .contains(&std::io::Error::from_raw_os_error(28).to_string())
-        );
+        assert!(error.to_string().contains("not enough space on the disk"));
         assert!(writes > 0);
         assert_eq!(fs::read(&path).unwrap(), old);
         let names: Vec<_> = fs::read_dir(dir.path())

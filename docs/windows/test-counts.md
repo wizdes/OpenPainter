@@ -125,7 +125,7 @@ The measured files contain **114** literal test-bearing Rust files and **687** l
 
 ## Tests still failing
 
-The line is where each test failed. W2 owns the recovery folder change: Windows refuses to rename a folder with its open `owner.lock` inside. W14 owns the unchanged Mandelbrot golden result. W3 owns the GPU color table.
+The line is where each test failed. W2 owns the recovery folder change: Windows refuses to rename a folder with its open `owner.lock` inside. Mandelbrot goes to the user's list, because its cause is not settled and a fix may change the Mac's output. W14 cannot close without that answer. W3 owns the GPU color table.
 
 | Failing line under engine/ | Test | Reason | Waits for |
 | --- | --- | --- | --- |
@@ -163,9 +163,9 @@ The line is where each test failed. W2 owns the recovery folder change: Windows 
 
 ## What changed
 
-- `op-core/src/tiles.rs`: Windows `seek_read` moved the shared cursor. Reads now open a separate handle, so an append cannot change a read's position. The saved cursor test failed with `left: 0, right: 3` before this change and passed after it.
-- `op-formats/src/lib.rs`, `op-formats/src/opaint.rs`, `op-engine/src/document_file.rs`, and `op-engine/src/recovery.rs`: opening a folder as a file caused error 5. Windows saves now sync the temporary file and call `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`. There are eight attempts, 25 ms apart, only for access-denied and sharing-violation errors. The last error reaches the caller. Unix save and folder-sync calls remain in their own unchanged `cfg(unix)` blocks. [Microsoft describes the write-through flag here.](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw)
-- `op-engine/src/recovery.rs`: Windows URL decoding now keeps drive letters, Unicode and UNC paths. A long local path passed. Manifests now reject Windows backslashes and colons in snapshot names. File identity uses the volume and file index from `GetFileInformationByHandle`.
+- `op-core/src/tiles.rs`: spill reads and writes use `seek_read` and `seek_write` with an explicit offset on one shared handle. These move the handle's cursor, but nothing depends on the cursor. The test reads from 8 threads.
+- `op-formats/src/lib.rs`, `op-formats/src/opaint.rs`, `op-engine/src/document_file.rs`, and `op-engine/src/recovery.rs`: saves use `ReplaceFileW` for an existing target, which keeps access rules, extra streams and creation time, and `MoveFileExW` for a new file, with `\\?\` paths. A read-only target is refused at once. A held target is retried for about 2 s, then the error names it. Folder flushes use a write handle with `FILE_FLAG_BACKUP_SEMANTICS`. A flush failure after a finished save is printed, not returned, since some drives refuse it.
+- `op-engine/src/recovery.rs`: Windows URL decoding now keeps drive letters, Unicode and UNC paths. A save past the old 260-character limit passes. A record whose original file cannot be checked is now offered as possibly older, while a file that is really gone stays safe. Manifests now reject Windows backslashes and colons in snapshot names. File identity uses the volume and file index from `GetFileInformationByHandle`.
 - `op-color/src/lib.rs`: lcms2 panicked while turning a damaged ICC description into Rust characters. That panic now becomes `InvalidProfile`. The saved regression uses Display P3 mutation 189 at byte 296. Valid profile tests still pass.
 - `xtask/src/fuzz.rs` and `op-formats/examples/common/capped_alloc.rs`: the Windows fuzz watchdog reads a process's working set and uses `TerminateProcess`. The worker reports that Windows has no `setrlimit`; its Rust allocation cap and the driver watchdog stay active.
 - `op-ffi/Cargo.toml`: the C interface now builds as `op_ffi.dll`. Python `ctypes.WinDLL` found `op_engine_new`, `op_engine_free`, `op_import_pixels`, `op_dispatch` and `op_query`.
@@ -209,6 +209,9 @@ Two earlier failures were intermittent. `op-engine/tests/jobs.rs:461` ended twic
 
 - W2: move the lock out of the record folder, close it before folder moves, then rerun every recovery and huge-document test.
 - W3: pin DX12 or WARP, finish the GPU suite, and retest the color table and GPU-enabled job crash.
-- W14: compare Mandelbrot outputs with the new reference before changing pixel math.
+- User's list: Mandelbrot differs by up to 23 of 255 levels. Decide once a Mac run shows whether the Mac still matches the reference.
+- W2: port `item5_a_failed_clean_up_is_reported_and_retried` in `recovery_fixes.rs`, which has no Windows version yet. `tests/recovery.rs:259`, `:261` and `:293` assert the Unix text "No space left" and need the Windows text once W2 lets them run.
+- W7: build the DLL with `cargo rustc -p op-ffi --lib --crate-type cdylib`, so the Mac's crate types stay as they were, and test its exports.
+- Fuzz: `rss_kib` keeps returning a value while the child's handle is open, so the Windows watchdog polls until the handle closes.
 - W19: stress the C-interface job queue under load.
 - Tool setup: install the missing Apple target outside this builder's owned paths, then rerun the cross-target check and Mac runtime tests.

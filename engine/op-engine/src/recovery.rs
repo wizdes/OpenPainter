@@ -213,15 +213,7 @@ fn sync_dir(dir: &Path) -> std::io::Result<()> {
     }
     #[cfg(windows)]
     {
-        // A folder opens only with FILE_FLAG_BACKUP_SEMANTICS, and flushing
-        // it needs a write handle: a read handle gives error 5 on sync_all.
-        use std::os::windows::fs::OpenOptionsExt;
-        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
-        OpenOptions::new()
-            .write(true)
-            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
-            .open(dir)?
-            .sync_all()
+        op_formats::sync_folder(dir)
     }
 }
 
@@ -239,7 +231,11 @@ fn parent_of(dir: &Path) -> &Path {
 /// The local path of a `file://` URL (percent escapes decoded).
 fn url_path(url: &str) -> Option<PathBuf> {
     let rest = url.strip_prefix("file://")?;
-    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+    // Only the whole name counts: file://localhost-backup/ is another server.
+    let rest = match rest.strip_prefix("localhost") {
+        Some(after) if after.is_empty() || after.starts_with('/') => after,
+        _ => rest,
+    };
     let bytes = rest.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -267,6 +263,13 @@ fn url_path(url: &str) -> Option<PathBuf> {
             Some(PathBuf::from(&decoded[1..]))
         } else if rest.starts_with('/') {
             Some(PathBuf::from(decoded))
+        } else if decoded
+            .split('/')
+            .next()
+            .is_some_and(|host| host.contains(':'))
+        {
+            // file://C:\x is not a valid URL: a drive letter is not a server.
+            None
         } else {
             Some(PathBuf::from(format!("//{decoded}")))
         }
@@ -290,16 +293,35 @@ pub fn stamp_of(url: Option<&str>) -> Option<FileStamp> {
 
 /// Why `m` must not be recovered over its file, if it must not: the file was
 /// saved (here before a crash, or by another app) after the record's base.
+///
+/// A file that is really gone is no problem. A file that cannot be checked
+/// is: a share that is offline or a denied read may hide a newer file, so
+/// recovering over it is not safe.
 pub fn older_than_file(m: &Manifest) -> Option<String> {
+    const CANNOT_CHECK: &str =
+        "The file this copy came from cannot be checked, so this copy may be older than the file.";
     let url = m.original_url.as_deref()?;
-    let now = stamp_of(Some(url))?;
-    if m.base_file == Some(now) {
-        None
-    } else {
-        Some(
-            "The file was saved after this copy was made, so this copy is older than the file."
-                .into(),
-        )
+    let Some(path) = url_path(url) else {
+        return Some(CANNOT_CHECK.into());
+    };
+    match fs::metadata(&path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // A missing drive or share reports "not found" as well, and says
+            // nothing about the file on it.
+            let root_exists = path.ancestors().last().is_some_and(Path::exists);
+            root_exists
+                .then(|| ())
+                .map_or(Some(CANNOT_CHECK.into()), |()| None)
+        }
+        Err(_) => Some(CANNOT_CHECK.into()),
+        Ok(_) => match stamp_of(Some(url)) {
+            None => Some(CANNOT_CHECK.into()),
+            Some(now) if m.base_file == Some(now) => None,
+            Some(_) => Some(
+                "The file was saved after this copy was made, so this copy is older than the file."
+                    .into(),
+            ),
+        },
     }
 }
 
@@ -1452,6 +1474,69 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn manifest_for(url: &str) -> Manifest {
+        Manifest {
+            format: FORMAT,
+            revision: 1,
+            original_url: Some(url.into()),
+            original_type: None,
+            time_unix: 0.0,
+            snapshot: "snapshot-1.opaint".into(),
+            snapshot_bytes: 0,
+            snapshot_crc32: 0,
+            width: 1,
+            height: 1,
+            layers: 1,
+            pid: 0,
+            base_file: None,
+        }
+    }
+
+    #[test]
+    fn a_url_that_cannot_be_read_is_not_safe_to_recover_over() {
+        let problem = older_than_file(&manifest_for("https://example.com/a.opaint")).unwrap();
+        assert!(problem.contains("cannot be checked"), "{problem}");
+    }
+
+    #[test]
+    fn a_file_that_is_really_gone_is_safe_to_recover() {
+        let dir = tempfile::tempdir().unwrap();
+        let gone = dir.path().join("gone.opaint");
+        let text = gone.to_string_lossy().replace('\\', "/");
+        let url = if cfg!(windows) {
+            format!("file:///{text}")
+        } else {
+            format!("file://{text}")
+        };
+        assert_eq!(older_than_file(&manifest_for(&url)), None);
+    }
+
+    #[test]
+    fn localhost_counts_only_as_a_whole_name() {
+        assert_eq!(
+            url_path("file://localhost/share/a.opaint").map(|p| p.ends_with("share/a.opaint")),
+            Some(true)
+        );
+        let other = url_path("file://localhost-backup/share/a.opaint").unwrap();
+        assert!(
+            other.to_string_lossy().contains("localhost-backup"),
+            "{other:?}"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_file_that_cannot_be_checked_is_not_safe_to_recover_over() {
+        for url in ["file://C:\\x\\a.opaint", "file:///C:/x%FF.opaint"] {
+            let problem = older_than_file(&manifest_for(url)).expect(url);
+            assert!(problem.contains("cannot be checked"), "{url}: {problem}");
+        }
+        if !Path::new("Z:/").exists() {
+            let problem = older_than_file(&manifest_for("file:///Z:/gone/a.opaint")).unwrap();
+            assert!(problem.contains("cannot be checked"), "{problem}");
+        }
+    }
 
     #[cfg(windows)]
     #[test]

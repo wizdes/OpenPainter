@@ -130,13 +130,8 @@ fn item2_a_record_older_than_its_file_recovers_as_untitled() {
     e.save_document(doc, &file, SaveFormat::Opaint, true)
         .unwrap();
     let dir = rec.join("stale");
-    e.recovery_attach(
-        doc,
-        &dir,
-        Some(format!("file://{}", file.display())),
-        manual(),
-    )
-    .unwrap();
+    e.recovery_attach(doc, &dir, Some(file_url(&file)), manual())
+        .unwrap();
     e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
     e.recovery_flush(doc).unwrap();
     let expected = e.snapshot(doc).unwrap().pixels(false).unwrap();
@@ -178,13 +173,8 @@ fn item3_an_edit_and_save_after_the_state_load_is_not_committed_as_older() {
         },
         ..manual()
     };
-    e.recovery_attach(
-        doc,
-        &dir,
-        Some(format!("file://{}", file.display())),
-        options,
-    )
-    .unwrap();
+    e.recovery_attach(doc, &dir, Some(file_url(&file)), options)
+        .unwrap();
     e.dispatch(doc, "image.invert_colors", json!({})).unwrap();
     gate.arm();
     let e = Arc::new(e);
@@ -296,4 +286,13 @@ fn round3_the_acknowledged_revision_is_cleared_before_the_record_goes() {
         status.acknowledged, None,
         "the status named a revision whose record was gone"
     );
+}
+
+/// A real file URL for this system: Windows paths need `file:///C:/...`.
+fn file_url(path: &std::path::Path) -> String {
+    if cfg!(windows) {
+        format!("file:///{}", path.display().to_string().replace('\\', "/"))
+    } else {
+        format!("file://{}", path.display())
+    }
 }

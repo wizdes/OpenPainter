@@ -9,7 +9,7 @@ build = "build.rs"
 workspace = true
 
 [lib]
-crate-type = ["staticlib", "rlib", "cdylib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 op-engine = { path = "../op-engine" }

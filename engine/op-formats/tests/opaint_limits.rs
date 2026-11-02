@@ -26,6 +26,164 @@ fn windows_saves_replace_an_existing_opaint_file() {
     assert_eq!(load_opaint(&path).unwrap().layers[0].name, "Second save");
 }
 
+/// A named stream on `path`. A replace that makes a new file would lose it.
+#[cfg(windows)]
+fn stream_of(path: &std::path::Path) -> std::path::PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(":note");
+    name.into()
+}
+
+#[cfg(windows)]
+fn acl_of(path: &std::path::Path) -> String {
+    let out = std::process::Command::new("icacls")
+        .arg(path)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+#[cfg(windows)]
+fn no_temp_left(dir: &std::path::Path) {
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+        assert!(
+            !name.ends_with(".tmp") && !name.ends_with(".old"),
+            "left behind: {name}"
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_save_keeps_access_rules_streams_and_creation_time() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("private.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let user = std::env::var("USERNAME").unwrap();
+    let status = std::process::Command::new("icacls")
+        .arg(&path)
+        .args(["/inheritance:r", "/grant:r", &format!("{user}:F")])
+        .output()
+        .unwrap();
+    assert!(status.status.success());
+    std::fs::write(stream_of(&path), b"kept").unwrap();
+    let acl = acl_of(&path);
+    let created = std::fs::metadata(&path).unwrap().created().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    let second = first.set_layer_name(0, "Second").unwrap();
+    save_opaint(&second, &path).unwrap();
+    assert_eq!(load_opaint(&path).unwrap().layers[0].name, "Second");
+    assert_eq!(acl_of(&path), acl);
+    assert_eq!(std::fs::read(stream_of(&path)).unwrap(), b"kept");
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().created().unwrap(),
+        created
+    );
+    no_temp_left(dir.path());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_read_only_target_is_refused_and_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("locked.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let old = std::fs::read(&path).unwrap();
+    let mut p = std::fs::metadata(&path).unwrap().permissions();
+    p.set_readonly(true);
+    std::fs::set_permissions(&path, p.clone()).unwrap();
+    let error = save_opaint(&first.set_layer_name(0, "No").unwrap(), &path).unwrap_err();
+    let text = error.to_string();
+    assert!(
+        text.contains("read-only") && text.contains("locked.opaint"),
+        "{text}"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), old);
+    no_temp_left(dir.path());
+    #[allow(clippy::permissions_set_readonly_false)]
+    p.set_readonly(false);
+    std::fs::set_permissions(&path, p).unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_plain_reader_does_not_block_a_save() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("read.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let reader = std::fs::File::open(&path).unwrap();
+    save_opaint(&first.set_layer_name(0, "Saved").unwrap(), &path).unwrap();
+    drop(reader);
+    assert_eq!(load_opaint(&path).unwrap().layers[0].name, "Saved");
+}
+
+#[cfg(windows)]
+fn hold_with_no_sharing(path: &std::path::Path) -> std::fs::File {
+    use std::os::windows::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(path)
+        .unwrap()
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_save_waits_for_a_program_that_lets_go() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("held.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let held = hold_with_no_sharing(&path);
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        drop(held);
+    });
+    save_opaint(&first.set_layer_name(0, "After").unwrap(), &path).unwrap();
+    release.join().unwrap();
+    assert_eq!(load_opaint(&path).unwrap().layers[0].name, "After");
+    no_temp_left(dir.path());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_held_target_fails_with_its_name_and_stays_whole() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("stuck.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let old = std::fs::read(&path).unwrap();
+    let held = hold_with_no_sharing(&path);
+    let error = save_opaint(&first.set_layer_name(0, "No").unwrap(), &path).unwrap_err();
+    drop(held);
+    let text = error.to_string();
+    assert!(
+        text.contains("stuck.opaint") && text.contains("another program"),
+        "{text}"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), old);
+    no_temp_left(dir.path());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_a_save_works_past_the_old_path_limit() {
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("a".repeat(120)).join("b".repeat(120));
+    std::fs::create_dir_all(&folder).unwrap();
+    let path = folder.join("long.opaint");
+    assert!(path.as_os_str().len() > 260);
+    let first = doc(&root, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    save_opaint(&first.set_layer_name(0, "Again").unwrap(), &path).unwrap();
+    assert_eq!(load_opaint(&path).unwrap().layers[0].name, "Again");
+}
+
 fn doc(dir: &tempfile::TempDir, w: u32, h: u32) -> DocState {
     let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
     DocState::new(store, w, h, 72.0).unwrap()
@@ -300,15 +458,11 @@ fn a_save_through_a_symlink_replaces_the_target_and_keeps_its_permissions() {
     #[cfg(unix)]
     std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o600)).unwrap();
     #[cfg(windows)]
-    {
-        let mut p = std::fs::metadata(&real).unwrap().permissions();
-        p.set_readonly(false);
-        std::fs::set_permissions(&real, p).unwrap();
-    }
+    std::fs::write(stream_of(&real), b"kept").unwrap();
     #[cfg(unix)]
     std::os::unix::fs::symlink("real.opaint", &link).unwrap();
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file(&real, &link).unwrap();
+    std::os::windows::fs::symlink_file("real.opaint", &link).unwrap();
     let renamed = d.set_layer_name(0, "Through the link").unwrap();
     save_opaint(&renamed, &link).unwrap();
     assert!(
@@ -328,9 +482,10 @@ fn a_save_through_a_symlink_replaces_the_target_and_keeps_its_permissions() {
         assert_eq!(mode, 0o600, "the target keeps its permissions");
     }
     #[cfg(windows)]
-    assert!(
-        !std::fs::metadata(&real).unwrap().permissions().readonly(),
-        "the target keeps its permissions"
+    assert_eq!(
+        std::fs::read(stream_of(&real)).unwrap(),
+        b"kept",
+        "the target keeps its extra stream"
     );
 }
 

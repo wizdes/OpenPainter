@@ -2,52 +2,161 @@
 pub mod opaint;
 pub mod png;
 
-/// Replace a fully synced temporary file on Windows and flush the rename.
+/// How long a save waits for another program to let go of the target.
+#[cfg(windows)]
+const REPLACE_ATTEMPTS: usize = 40;
+#[cfg(windows)]
+const REPLACE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// The path with the `\\?\` prefix, so `MoveFileExW` and `ReplaceFileW` accept
+/// it past `MAX_PATH` whatever the calling app's long-path setting is.
+#[cfg(windows)]
+fn extended_wide(path: &std::path::Path) -> std::io::Result<Vec<u16>> {
+    use std::os::windows::ffi::OsStrExt;
+    let absolute = std::path::absolute(path)?;
+    let text = absolute.as_os_str().to_string_lossy();
+    let prefixed = if text.starts_with(r"\\?\") {
+        text.into_owned()
+    } else if let Some(share) = text.strip_prefix(r"\\") {
+        format!(r"\\?\UNC\{share}")
+    } else {
+        format!(r"\\?\{text}")
+    };
+    Ok(std::ffi::OsStr::new(&prefixed)
+        .encode_wide()
+        .chain(Some(0))
+        .collect())
+}
+
+/// Flushes a folder's entries. A folder opens only with
+/// FILE_FLAG_BACKUP_SEMANTICS, and flushing needs a write handle: a read
+/// handle gives error 5 on `sync_all`.
+#[cfg(windows)]
+pub fn sync_folder(dir: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(dir)?
+        .sync_all()
+}
+
+/// Puts a fully synced temporary file in the target's place on Windows.
+///
+/// An existing target goes through `ReplaceFileW`, which keeps its access
+/// rules, extra streams and creation time. With a backup name, a failed call
+/// always leaves both files under their own names, so a caller that deletes
+/// the temporary file after an error never loses the old file. A read-only
+/// target is refused at once. A target another program holds is retried for
+/// about 2 s, and then the error names the file.
 #[cfg(windows)]
 pub fn replace_synced_file(
     temp: &std::path::Path,
     target: &std::path::Path,
 ) -> std::io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use std::time::Duration;
+    use std::ptr::{null, null_mut};
     use windows_sys::Win32::Storage::FileSystem::{
-        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW, ReplaceFileW,
     };
-    const REPLACE_ATTEMPTS: usize = 8;
-    const REPLACE_RETRY_DELAY: Duration = Duration::from_millis(25);
+    const ERROR_FILE_NOT_FOUND: i32 = 2;
     const ERROR_ACCESS_DENIED: i32 = 5;
     const ERROR_SHARING_VIOLATION: i32 = 32;
-    let wide = |p: &std::path::Path| {
-        p.as_os_str()
-            .encode_wide()
-            .chain(Some(0))
-            .collect::<Vec<u16>>()
+    const ERROR_UNABLE_TO_REMOVE_REPLACED: i32 = 1175;
+    const ERROR_UNABLE_TO_MOVE_REPLACEMENT: i32 = 1176;
+    const ERROR_UNABLE_TO_MOVE_REPLACEMENT_2: i32 = 1177;
+    let named = |error: std::io::Error, why: &str| {
+        std::io::Error::new(
+            error.kind(),
+            format!("cannot replace {}: {error}{why}", target.display()),
+        )
     };
-    let from = wide(temp);
-    let to = wide(target);
+    let exists = match std::fs::metadata(target) {
+        Ok(meta) if meta.permissions().readonly() => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!("cannot replace {}: the file is read-only", target.display()),
+            ));
+        }
+        Ok(_) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => return Err(named(e, "")),
+    };
+    let from = extended_wide(temp)?;
+    let to = extended_wide(target)?;
+    let mut backup_name = temp.as_os_str().to_owned();
+    backup_name.push(".old");
+    let backup_path = std::path::PathBuf::from(backup_name);
+    let backup = extended_wide(&backup_path)?;
+    let mut replace = exists;
     for attempt in 0..REPLACE_ATTEMPTS {
         let ok = unsafe {
-            MoveFileExW(
-                from.as_ptr(),
-                to.as_ptr(),
-                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-            )
+            if replace {
+                ReplaceFileW(
+                    to.as_ptr(),
+                    from.as_ptr(),
+                    backup.as_ptr(),
+                    0,
+                    null_mut(),
+                    null(),
+                )
+            } else {
+                MoveFileExW(
+                    from.as_ptr(),
+                    to.as_ptr(),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+                )
+            }
         };
         if ok != 0 {
+            if replace && let Err(e) = std::fs::remove_file(&backup_path) {
+                eprintln!(
+                    "saved {}, but could not remove {}: {e}",
+                    target.display(),
+                    backup_path.display()
+                );
+            }
+            // The save is complete here. Some drives refuse a folder flush,
+            // and that must not report a saved file as failed.
+            if let Some(parent) = target.parent()
+                && let Err(e) = sync_folder(parent)
+            {
+                eprintln!(
+                    "saved {}, but could not flush {}: {e}",
+                    target.display(),
+                    parent.display()
+                );
+            }
             return Ok(());
         }
         let error = std::io::Error::last_os_error();
-        if attempt + 1 == REPLACE_ATTEMPTS
-            || !matches!(
-                error.raw_os_error(),
-                Some(ERROR_ACCESS_DENIED | ERROR_SHARING_VIOLATION)
+        let code = error.raw_os_error();
+        if replace && code == Some(ERROR_FILE_NOT_FOUND) && !target.exists() {
+            replace = false;
+            continue;
+        }
+        let held = matches!(
+            code,
+            Some(
+                ERROR_ACCESS_DENIED
+                    | ERROR_SHARING_VIOLATION
+                    | ERROR_UNABLE_TO_REMOVE_REPLACED
+                    | ERROR_UNABLE_TO_MOVE_REPLACEMENT
+                    | ERROR_UNABLE_TO_MOVE_REPLACEMENT_2
             )
-        {
-            return Err(error);
+        );
+        if !held {
+            return Err(named(error, ""));
+        }
+        if attempt + 1 == REPLACE_ATTEMPTS {
+            return Err(named(error, "; another program may have it open"));
         }
         std::thread::sleep(REPLACE_RETRY_DELAY);
     }
-    unreachable!("the final attempt returns its error")
+    Err(named(
+        std::io::Error::other("no attempt finished"),
+        "; another program may have it open",
+    ))
 }
 
 mod bmp;

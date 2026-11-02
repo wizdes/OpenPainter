@@ -315,7 +315,7 @@ fn a_recovery_record_keeps_the_original_content_type() {
     let dir = root.path().join("rec");
     let original = root.path().join("photo.png");
     std::fs::write(&original, b"really a camera raw file").unwrap();
-    let url = format!("file://{}", original.display());
+    let url = file_url(&original);
     let e = Engine::new(None).unwrap();
     let id = blue(&e);
     let options = RecoveryOptions {
@@ -481,4 +481,13 @@ fn canvas_size_and_resize_stop_at_the_16_gib_pixel_total() {
     assert!(op_core::doc::check_pixel_budget(43, 10000, 10000).is_err());
     assert!(op_core::doc::check_pixel_budget(15, 16384, 16384).is_ok());
     assert!(op_core::doc::check_pixel_budget(16, 16384, 16384).is_err());
+}
+
+/// A real file URL for this system: Windows paths need `file:///C:/...`.
+fn file_url(path: &std::path::Path) -> String {
+    if cfg!(windows) {
+        format!("file:///{}", path.display().to_string().replace('\\', "/"))
+    } else {
+        format!("file://{}", path.display())
+    }
 }

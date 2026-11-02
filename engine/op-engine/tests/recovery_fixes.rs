@@ -178,7 +178,7 @@ fn item2b_a_record_older_than_its_file_is_not_offered() {
     let doc = e.import_pixels(64, 48, &noise(64, 48, 3), None).unwrap();
     e.save_document(doc, &file, SaveFormat::Opaint, true)
         .unwrap();
-    let url = format!("file://{}", file.display());
+    let url = file_url(&file);
     let dir = rec.join("stale");
     e.recovery_attach(doc, &dir, Some(url.clone()), manual())
         .unwrap();
@@ -389,4 +389,13 @@ fn item6_a_stop_during_a_write_keeps_the_last_good_record() {
         .collect();
     assert!(temps.is_empty(), "{temps:?}");
     drop(flusher);
+}
+
+/// A real file URL for this system: Windows paths need `file:///C:/...`.
+fn file_url(path: &std::path::Path) -> String {
+    if cfg!(windows) {
+        format!("file:///{}", path.display().to_string().replace('\\', "/"))
+    } else {
+        format!("file://{}", path.display())
+    }
 }

@@ -285,11 +285,13 @@ fn a_png_save_through_a_symlink_keeps_the_link_and_permissions() {
     #[cfg(unix)]
     std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o640)).unwrap();
     #[cfg(windows)]
-    {
-        let mut p = std::fs::metadata(&real).unwrap().permissions();
-        p.set_readonly(false);
-        std::fs::set_permissions(&real, p).unwrap();
-    }
+    let stream = {
+        let mut name = real.as_os_str().to_owned();
+        name.push(":note");
+        std::path::PathBuf::from(name)
+    };
+    #[cfg(windows)]
+    std::fs::write(&stream, b"kept").unwrap();
     #[cfg(unix)]
     std::os::unix::fs::symlink(&real, &link).unwrap();
     #[cfg(windows)]
@@ -314,7 +316,7 @@ fn a_png_save_through_a_symlink_keeps_the_link_and_permissions() {
         assert_eq!(mode, 0o640);
     }
     #[cfg(windows)]
-    assert!(!std::fs::metadata(&real).unwrap().permissions().readonly());
+    assert_eq!(std::fs::read(&stream).unwrap(), b"kept");
 }
 
 fn kept_metadata(e: &Engine, id: u64) -> Value {
