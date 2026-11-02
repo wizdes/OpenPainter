@@ -1,12 +1,12 @@
 # OpenPainter for Windows: plan
 
-Status: revision 3. The user approved revision 2 on 2026-11-01, and this revision adds the fixes from its review. W0 is closed and W1 is building on branch `windows`. Fresh Opus reviewers read revisions 1 and 2; `docs/windows/reviews/` records each finding. Astra has not reviewed any revision: its slot stayed full for 45 minutes on 2026-11-01. Root retries at the end of Phase A.
+Status: revision 4. The user approved revision 2 on 2026-11-01. Revision 3 added the fixes from its review, and revision 4 adds the user's answers to decisions 2, 4 and 8, and their rule that the Mac app is the reference for UI. W0 is closed and W1 is building on branch `windows`. Fresh Opus reviewers read revisions 1 and 2; `docs/windows/reviews/` records each finding. Astra has not reviewed any revision: its slot stayed full for 45 minutes on 2026-11-01. Root retries at the end of Phase A.
 
 ## 1. The short version
 
 The Rust engine moves to Windows with modest changes. The Mac app (Swift) does not move, so Windows gets a new C# app. This PC has paint.net 5.1.12, so effects and behavior can be compared with the real thing. That comparison was blocked for the whole Mac build (old milestone M02). Fixes go into the shared engine, so the Mac app gets them too.
 
-The work is 21 milestones, W0 to W20, about 420 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
+The work is 21 milestones, W0 to W20, about 415 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
 
 ```
 Engine (Rust, shared) --> C interface --> Mac app (Swift, exists)
@@ -57,7 +57,7 @@ Avalonia 12 with C# and NativeAOT (C# compiled to one native program) is my work
 
 The Mac draws those overlays in Swift (`mac/OpenPainterKit/Sources/Shell/SelectionOverlay.swift`), so WinUI has a real advantage here. Avalonia stays first because headless testing removes most of the need to touch the user's screen, and that was QuickEdit's largest source of trouble. WPF lost because its Native AOT is not ready. All-Rust Win32 lost because every control and screen-reader path would be hand-built.
 
-W5 chooses WinUI 3 if Avalonia fails any of: overlays at full frame rate on a visible screen, pointer and IME input on the canvas itself, Narrator, a launch under 3 s, or tests against the AOT build. Real pen pressure cannot be measured here (no pen), so W5 checks that the pressure API delivers replayed values and marks a real pen NOT RUN.
+W5 chooses WinUI 3 if Avalonia fails any of: overlays at full frame rate on a visible screen, pointer and text input on the canvas itself, Narrator, a launch under 3 s, or tests against the AOT build. Real pen pressure cannot be measured here (no pen), so W5 checks that the pressure API delivers replayed values and marks a real pen NOT RUN.
 
 **W5 stops for decision 4.** Its real-window checks cannot close NOT RUN, because 122 hours of work depend on the choice. **If WinUI wins, root re-plans W7 to W18 before they start**, with new test layers and budgets, because WinUI tests need a real window and builders have none.
 
@@ -70,7 +70,16 @@ W5 chooses WinUI 3 if Avalonia fails any of: overlays at full frame rate on a vi
 - **Tools keep our own goldens.** `docs/ARCHITECTURE.md:205` says "Never capture pixels" for tools. Tools get reviewed shots and behavior checks against paint.net.
 - **The product page and Store listing never name paint.net** (user decision, 2026-10-25). W19 scans for it.
 
-### 3.3 What "improve the code" means
+### 3.3 Which reference for what (user decision, 2026-11-01)
+
+| Question | Reference |
+| --- | --- |
+| How the app looks and how its UI works: layout, panels, menus, dialogs, tool options, shortcuts | **The Mac app.** Windows changes only what Windows needs: window buttons, a menu bar in the window, Ctrl for Cmd. |
+| What pixels come out: effects, adjustments, file results | paint.net 5.1.12 |
+
+paint.net screenshots are not a design input. W4's catalog from paint.net is used only to list its effects and their parameters.
+
+### 3.4 What "improve the code" means
 
 `docs/windows/parity.md` starts in W4 and grows at every milestone, as QuickEdit's did. Each row ends as "same", "better (why)", or "left out on purpose (why)". For effects, the bar is the user's ±1/255. An effect that cannot reach it goes on a list for the user. A builder cannot pass it with a written reason, because loosening a tolerance needs the user's OK. Old `legacy-3.36` goldens stay in the repo for the record.
 
@@ -146,26 +155,26 @@ Each milestone ends with a working build, a short hands-on script, and a row of 
 | W3 | GPU and canvas on DX12 | One pinned backend for both device paths, WARP selector, backend assert. Small Win32 test host. Window handle in `op_view_attach`. Display profile from Windows, and how DWM color management treats our output. Device-lost callback in the view host. Shader compiler choice. A guard against long GPU jobs that trigger a Windows GPU reset. | M54 matrix 0 failures on RTX and WARP, and the test fails unless DX12 or WARP ran. Ported resize, switch and create-destroy scenarios pass. Color within ΔE00 1 of direct lcms2 transforms. A real device removal, if `RemoveDevice` touches only our device, recovers the canvas; `simulate_device_loss` alone does not count. Mac view tests: NOT RUN until the phase-end Mac session. | 16 h | W1 |
 | W4 | paint.net capture kit (old M02) | Clean unpack of the pin, and write access removed for `agent`. Plugin or driver. The real 5.1.12 catalog. `targets.toml` gains `pdn-5.1`, and `m54_parity.rs` reads those rows. Private oracle repo. `parity.md` started. Fallback list. | One effect per family, twice, with the same hashes. The manifest pins build, parameters, ICC, inputs, GPU and driver. Catalog and fallback list committed. A `pdn-5.1` row with no capture fails or prints NOT RUN, and never passes. | 20 h | W0, D4 |
 
-### Phase B: the Windows app (164 h)
+### Phase B: the Windows app (160 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |
-| W5 | UI stack test | The same small shell in both stacks: canvas, marching ants, floating panel, menu, dialog, pointer log, and IME, focus and pointer input on the canvas itself. On AOT builds. UI Automation retried on the hidden desktop. | A table of launch, size, resize, overlay frame rate, IME, pointer, focus, Narrator, and what headless tests see, with no NOT RUN except a real pen. Astra and Fable vote. Written in `decisions.md` and `ARCHITECTURE.md`. | 14 h | W3, D4 |
-| W6 | Windows design and icons | At least 3 rendered mockups next to real paint.net shots, from `docs/design/SPEC.md`. Critique plus adversarial review. New icon set: open license only, no SF Symbols, no paint.net icons. | A side-by-side page with a pick. All icons exist with license records. | 8 h | W4, W5 |
-| W7 | App shell and canvas | `windows/` project. A new `opcli dump-catalog` command and a generator for the C# bridge (neither exists yet). Window, strip, status bar, command row of 7 buttons, empty panels, menu bar, Zoom, Pan. Overlay path. Test vectors exported from the Swift tests. Harness. | A 24 MP PNG, loaded through a test hook because Open comes in W10, pans over a 30 s trace at 59 fps or more on average with no stall over 50 ms on the RTX. Color check on the live window. Menu order matches the W4 catalog. | 18 h | W5, W6 |
-| W8 | Panels | Tools, History, Layers, Colors, Layer Properties, palettes, Windows shortcuts. Color math passes the Swift vectors. | Every panel action is tested headless. Shortcuts match the catalog with 0 differences. Focus rules follow `Shell/FocusRouter.swift`. | 20 h | W7 |
+| W5 | UI stack test | The same small shell in both stacks: canvas, marching ants, floating panel, menu, dialog, pointer log, and focus, text and pointer input on the canvas itself. On AOT builds. UI Automation retried on the hidden desktop. | A table of launch, size, resize, overlay frame rate, text input, pointer, focus, Narrator, and what headless tests see, with no NOT RUN except a real pen. Astra and Fable vote. Written in `decisions.md` and `ARCHITECTURE.md`. | 14 h | W3, D4 |
+| W6 | Windows look and icons | One rendered Windows version of the Mac UI, next to real Mac app shots, with a list of each Windows change and why. Critique of the render. New icon set matching the Mac's meanings: open license only, no SF Symbols, no paint.net icons. | A side-by-side page. All icons exist with license records. | 6 h | W5 |
+| W7 | App shell and canvas | `windows/` project. A new `opcli dump-catalog` command and a generator for the C# bridge (neither exists yet). Window, strip, status bar, command row of 7 buttons, empty panels, menu bar, Zoom, Pan. Overlay path. Test vectors exported from the Swift tests. Harness. | A 24 MP PNG, loaded through a test hook because Open comes in W10, pans over a 30 s trace at 59 fps or more on average with no stall over 50 ms on the RTX. Color check on the live window. Menu order matches the Mac app. | 18 h | W5, W6 |
+| W8 | Panels | Tools, History, Layers, Colors, Layer Properties, palettes, Windows shortcuts. Color math passes the Swift vectors. | Every panel action is tested headless. Shortcuts match the Mac app's, with Ctrl for Cmd, with 0 unexplained differences. Focus rules follow `Shell/FocusRouter.swift`. | 20 h | W7 |
 | W9 | Core tools | Selection tools and Wand first, then Brush, Eraser, Pencil, Bucket, Picker, Move, Crop, options row. Windows pointer input for pen. Overlays. | Replayed pointer logs give the engine's goldens. Undo returns every byte. Real pen is NOT RUN (no pen here). | 28 h | W8 |
 | W10 | Files | New, Open, Save, Save As, Save a Copy, Revert, Save All, Recent, drag and drop, clipboard, close prompts, save options, GPS and metadata strip, recovery sheet, file association, opening a second file in the running app. Windows Imaging codecs, with a clear message when one is missing. Local app data for recovery. | Save and reopen keep every byte. Kill mid-edit recovers. Clipboard copy and paste work. The codec table records what is installed and what shows the missing message. File association and second-file open work in an unpackaged build. Long paths are tested with the system setting's value recorded. Fresh review of this change. | 22 h | W9, W2 |
 | W11 | Effects and menus complete | Dialogs from the schema, live preview, repeat-last, all Edit, Image, Layers, Adjustments and Effects items except Remove Background (W16), Color Profile dialogs, Content-Aware Fill. | Every catalog item works, or is left out with the user's OK. Preview equals the result. Cancel changes nothing. | 18 h | W9, W10, W4 |
-| W12 | The 7 tools the Mac never connected | Gradient, Line/Curve, Shapes, Clone Stamp, Recolor, Healing Brush, Spot Heal. New C interface paths and new design. | Each is usable from its panel button, with live preview and Finish, and passes engine goldens or reviewed shots. | 20 h | W9 |
-| W13 | Text | DirectWrite layout, IME, right-to-left text, emoji, the text tool's live editing. | Same gates as Mac M46: IME, bidi and emoji reviewed goldens. Caret overlay at full frame rate. Input methods for Japanese and Chinese need decision 8; without it those gates are NOT RUN. | 16 h | W9, D8 |
+| W12 | The 7 tools the Mac never connected | Gradient, Line/Curve, Shapes, Clone Stamp, Recolor, Healing Brush, Spot Heal. New C interface paths. Their UI follows the Mac app's other tools and `docs/design/SPEC.md`, since the Mac has none to copy. | Each is usable from its panel button, with live preview and Finish, and passes engine goldens or reviewed shots. | 20 h | W9 |
+| W13 | Text | DirectWrite layout, right-to-left text, emoji, the text tool's live editing. | Bidi and emoji reviewed goldens from Mac M46. Caret overlay at full frame rate. Japanese and Chinese input are out (decision 8). | 14 h | W9 |
 
 ### Phase C: compare with paint.net, and improve (136 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |
 | W14 | Effect comparison and engine fixes | Full parameter matrix from 5.1.12. Report per effect, then the fixes, CPU and GPU, by family, side by side. Root captures, and builders get the images in their clone. | Every effect has a `pdn-5.1` row and a measured error at ±1/255, or sits on the user's list. If over 10% of effects land on that list, root stops and reports. Mac tests: NOT RUN until the phase-end Mac session. The budget is an estimate; the first 10 h produce the report, and root resets the budget from it. | 120 h | W3, W4, D3 |
-| W15 | Behavior sweep | The same scripted steps in both apps for menus, options, dialogs and non-pointer results. Fixes. | Every row in `parity.md` has one of the 3 endings. A "left out" row outside effects needs the user's OK. | 16 h | W10 to W14 |
+| W15 | Behavior sweep | The same scripted steps against the Mac app for menus, options and dialogs, and against paint.net for non-pointer results. Fixes. | Every row in `parity.md` has one of the 3 endings. A "left out" row outside effects needs the user's OK. Mac side uses saved shots and logs if no Mac session is reachable, and says so. | 16 h | W10 to W14 |
 
 ### Phase D: finish and release (56 h)
 
@@ -205,6 +214,7 @@ W14 runs beside the app work and needs no UI, except W4's captures. W16, W17 and
 - Linux UI, Windows on ARM, Windows 10 (no machine to test it).
 - `.pdn` import, PSD, plugins, scripting, batch work, layer masks, adjustment layers.
 - Printing, shell thumbnails, custom shortcut editing.
+- Japanese and Chinese input methods, as a built or tested feature (user decision, 2026-11-01). Other languages' typed text still goes through normal text input.
 - New Mac features. The Mac gets engine fixes only.
 - paint.net 5.2's new effects.
 
@@ -228,7 +238,11 @@ State on 2026-11-01, when the user said to move forward:
 
 - Decision 1 is done. The user approved the key in another session, and `ssh agent@127.0.0.1` works.
 - Decisions 3, 6 and 7 take the recommendation, under the user's rule to not wait on them. The user can change decision 3 any time before W14.
-- Decisions 2, 4, 5 and 8 still need the user. Until they answer, a Mac session runs Mac checks at phase ends, W4 and W5 stop, other real-window checks report NOT RUN, and W19 stops for the Store login.
+- Decision 2: yes. Root has a key on the Linux box. The Macs still need the user to add this PC's key, because neither this PC nor the Linux box can log in to them. Until then, Mac checks are listed as owed.
+- Decision 4: yes, from 2026-11-01, with no end given. The user's paint.net was closed when they answered. The preflight stops captures if a copy outside the pin opens.
+- Decision 5 waits for W19.
+- Decision 7 is gone: W6 no longer has a design pick, because the Mac app is the reference.
+- Decision 8: no Japanese or Chinese input.
 
 1. **SSH key for `agent` on this PC (needs your OK).** Root makes one key for `yjli` and adds it to `agent` here. Without it, Sol and Astra cannot run, and root builds everything itself. Recommended: yes.
 2. **The same key on the Macs and the Linux box (needs your OK).** This lets root run Mac and Linux checks from here. Without it, a Mac session runs them at phase ends. Recommended: yes.
