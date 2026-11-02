@@ -140,7 +140,12 @@ fn windows_a_reader_sharing_read_only_delays_a_save_until_it_lets_go() {
         std::thread::sleep(std::time::Duration::from_millis(500));
         drop(held);
     });
+    let started = std::time::Instant::now();
     save_opaint(&first.set_layer_name(0, "After").unwrap(), &path).unwrap();
+    assert!(
+        started.elapsed() >= std::time::Duration::from_millis(300),
+        "the reader had to delay the save"
+    );
     release.join().unwrap();
     assert_eq!(load_opaint(&path).unwrap().layers[0].name, "After");
     no_temp_left(dir.path());

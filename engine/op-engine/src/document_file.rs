@@ -91,9 +91,11 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
         }
     };
     let result = (|| {
+        #[cfg(windows)]
+        op_formats::make_temp_private(&temp, path)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        // ReplaceFileW refuses a temporary file this process still holds open.
+        // The temporary file closes before its details change and it is renamed.
         drop(file);
         if let Some(permissions) = &target.permissions {
             fs::set_permissions(&temp, permissions.clone())?;

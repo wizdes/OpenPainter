@@ -175,6 +175,8 @@ fn save_impl(
     let cancel = hooks.cancel;
     let stop = || cancelled(cancel);
     let result = (|| {
+        #[cfg(windows)]
+        crate::make_temp_private(&temp, path)?;
         let mut zip = ZipWriter::new(HookedFile {
             file,
             written: 0,
@@ -252,7 +254,7 @@ fn save_impl(
         zip.write_all(&encode_png(&thumb).map_err(other)?)?;
         let file = zip.finish().map_err(zip_err)?;
         file.file.sync_all()?;
-        // ReplaceFileW refuses a temporary file this process still holds open.
+        // The temporary file closes before its details change and it is renamed.
         drop(file);
         // The written entries are inside every reader size limit.
         check_written(&temp, doc)?;

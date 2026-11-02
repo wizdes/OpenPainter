@@ -25,7 +25,7 @@ The measured files contain **114** literal test-bearing Rust files and **687** l
 | `op-engine/src/color_sample.rs` | 2 | 2 |  |
 | `op-engine/src/gpu_effects.rs` | 5 | 5 |  |
 | `op-engine/src/image_commands.rs` | 1 | 1 |  |
-| `op-engine/src/recovery.rs` | 8 | 8 |  |
+| `op-engine/src/recovery.rs` | 12 | 12 |  |
 | `op-engine/src/text_commands.rs` | 1 | 1 |  |
 | `op-engine/tests/brush.rs` | 1 | 1 |  |
 | `op-engine/tests/clipboard.rs` | 12 | 12 |  |
@@ -81,7 +81,8 @@ The measured files contain **114** literal test-bearing Rust files and **687** l
 | `op-formats/tests/corpus.rs` | 7 | 7 |  |
 | `op-formats/tests/io.rs` | 17 | 17 |  |
 | `op-formats/tests/opaint.rs` | 9 | 9 |  |
-| `op-formats/tests/opaint_limits.rs` | 12 | 12 |  |
+| `op-formats/src/lib.rs` | 9 | 9 | New Windows save tests. |
+| `op-formats/tests/opaint_limits.rs` | 19 | 19 |  |
 | `op-formats/tests/png.rs` | 6 | 6 |  |
 | `op-formats/tests/png16.rs` | 2 | 2 |  |
 | `op-formats/tests/robustness.rs` | 3 | 3 |  |
@@ -164,8 +165,8 @@ The line is where each test failed. W2 owns the recovery folder change: Windows 
 ## What changed
 
 - `op-core/src/tiles.rs`: spill reads and writes use `seek_read` and `seek_write` with an explicit offset on one shared handle. These move the handle's cursor, but nothing depends on the cursor. The test reads from 8 threads.
-- `op-formats/src/lib.rs`, `op-formats/src/opaint.rs`, `op-engine/src/document_file.rs`, and `op-engine/src/recovery.rs`: a save copies the old file's access rules, extra streams, creation time and hidden and system attributes onto the temporary file, then swaps them in one atomic rename. `ReplaceFileW` was tried and dropped: a review proved a gap where no file has the name, and a killed process then lost a recovery record. Recovery manifests use the plain rename. A read-only target or a folder is refused at once. A held target is retried for about 2 s, and then the error names it. A failed flush after the rename is returned, as on Unix, except on a drive with no folder flush.
-- `op-engine/src/recovery.rs`: Windows URL decoding now keeps drive letters, Unicode and UNC paths. A save past the old 260-character limit passes. A record whose original file cannot be checked is now offered as possibly older, while a file that is really gone stays safe. Manifests now reject Windows backslashes and colons in snapshot names. File identity uses the volume and file index from `GetFileInformationByHandle`.
+- `op-formats/src/lib.rs`, `op-formats/src/opaint.rs`, `op-engine/src/document_file.rs`, and `op-engine/src/recovery.rs`: when a file already exists, its temporary file is made private to the saver before any bytes go in. Streams, creation time and hidden and system attributes are copied onto it. The old access rules are read, the two swap in one atomic rename, and the rules are then applied exactly. A crash in between leaves the file too private, never too open. A stream that cannot be copied stops the save. `ReplaceFileW` was tried and dropped: a review proved a gap where no file has the name, and a killed process then lost a recovery record. Recovery manifests use the plain rename and do their own folder flush. A read-only or write-denied target, or a folder, is refused at once. A held target is retried for about 2 s. Not kept: owner, mandatory label, compression, encryption. After the rename, a failed flush or failed rule copy is printed, not returned, because the save is complete.
+- `op-engine/src/recovery.rs`: Windows URL decoding now keeps drive letters, Unicode and UNC paths. A save past the old 260-character limit passes. On Windows, a record whose original file cannot be checked is now offered as possibly older, while a file that is really gone stays safe. The Mac and Linux keep the old rule until a Mac session tests the new one. Manifests now reject Windows backslashes and colons in snapshot names. File identity uses the volume and file index from `GetFileInformationByHandle`.
 - `op-color/src/lib.rs`: lcms2 panics on a wide character it cannot convert. On Windows that includes a valid surrogate pair, because `wchar_t` is 16 bits there. Only the name falls back to "Embedded ICC profile", and the rest of the profile is still used.
 - `xtask/src/fuzz.rs` and `op-formats/examples/common/capped_alloc.rs`: the Windows fuzz watchdog reads a process's working set and uses `TerminateProcess`. The worker reports that Windows has no `setrlimit`; its Rust allocation cap and the driver watchdog stay active.
 - `op-ffi`: `cargo rustc -p op-ffi --lib --crate-type cdylib` builds `op_ffi.dll`, so the Mac's crate types stay as they were. Python `ctypes` found `op_engine_new`, `op_engine_free` and `op_import_pixels` in it. W7 adds a test.
@@ -209,6 +210,9 @@ Two earlier failures were intermittent. `op-engine/tests/jobs.rs:461` ended twic
 
 - W2: move the lock out of the record folder, close it before folder moves, then rerun every recovery and huge-document test.
 - W3: pin DX12 or WARP, finish the GPU suite, and retest the color table and GPU-enabled job crash.
+- Mac session: a missing external drive still counts as "really gone"; `mac/OpenPainterKit/Sources/Shell/RecoverySheet.swift:58` says "The file changed" for every stale record; decide whether the stricter Windows rule should apply there too.
+- W10: a killed save leaves a private temporary file in the user's folder, and nothing clears it, as on the Mac.
+- W10: on a network path a plain reader blocks the rename, and the save fails after about 2 s with a clear message (`\\localhost\C$`, measured).
 - User's list: Mandelbrot differs by up to 23 of 255 levels. Decide once a Mac run shows whether the Mac still matches the reference.
 - W2: port `item5_a_failed_clean_up_is_reported_and_retried` in `recovery_fixes.rs`, which has no Windows version yet. `tests/recovery.rs:259`, `:261` and `:293` assert the Unix text "No space left" and need the Windows text once W2 lets them run.
 - W7: build the DLL with `cargo rustc -p op-ffi --lib --crate-type cdylib`, so the Mac's crate types stay as they were, and test its exports.

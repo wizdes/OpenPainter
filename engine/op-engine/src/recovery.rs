@@ -298,6 +298,27 @@ pub fn stamp_of(url: Option<&str>) -> Option<FileStamp> {
 /// is: a share that is offline or a denied read may hide a newer file, so
 /// recovering over it is not safe.
 pub fn older_than_file(m: &Manifest) -> Option<String> {
+    // The Mac and Linux keep their tested behavior: only a file that exists
+    // and differs is older. The stricter rule waits for a Mac session.
+    #[cfg(unix)]
+    {
+        let url = m.original_url.as_deref()?;
+        let now = stamp_of(Some(url))?;
+        if m.base_file == Some(now) {
+            None
+        } else {
+            Some(
+                "The file was saved after this copy was made, so this copy is older than the file."
+                    .into(),
+            )
+        }
+    }
+    #[cfg(windows)]
+    older_than_file_windows(m)
+}
+
+#[cfg(windows)]
+fn older_than_file_windows(m: &Manifest) -> Option<String> {
     const CANNOT_CHECK: &str =
         "The file this copy came from cannot be checked, so this copy may be older than the file.";
     let url = m.original_url.as_deref()?;
@@ -309,9 +330,11 @@ pub fn older_than_file(m: &Manifest) -> Option<String> {
             // A missing drive or share reports "not found" as well, and says
             // nothing about the file on it.
             let root_exists = path.ancestors().last().is_some_and(Path::exists);
-            root_exists
-                .then(|| ())
-                .map_or(Some(CANNOT_CHECK.into()), |()| None)
+            if root_exists {
+                None
+            } else {
+                Some(CANNOT_CHECK.into())
+            }
         }
         Err(_) => Some(CANNOT_CHECK.into()),
         Ok(_) => match stamp_of(Some(url)) {
@@ -1493,6 +1516,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn a_url_that_cannot_be_read_is_not_safe_to_recover_over() {
         let problem = older_than_file(&manifest_for("https://example.com/a.opaint")).unwrap();
