@@ -33,6 +33,7 @@ public sealed class CanvasHost : NativeControlHost {
     static CanvasHost? current;
     public event Action<string>? NativeInput;
     public event Action? TabOut;
+    public event Action<int>? PanTo;
     public nint Hwnd { get; private set; }
     public void TakeFocus() { if (Hwnd != 0) SetFocus(Hwnd); }
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent) {
@@ -62,7 +63,7 @@ public sealed class CanvasHost : NativeControlHost {
         var input = current?.NativeInput;
         switch (message) {
             case 0x0201: SetFocus(hwnd); input?.Invoke($"pointer:down:{(short)(l.ToInt64() & 65535)},{(short)((l.ToInt64() >> 16) & 65535)}:1.00:Mouse"); return 0;
-            case 0x0200: input?.Invoke("pointer:move:1.00:Mouse"); return 0;
+            case 0x0200: input?.Invoke("pointer:move:1.00:Mouse"); current?.PanTo?.Invoke((short)(l.ToInt64() & 65535)); return 0;
             case 0x0202: input?.Invoke("pointer:up:1.00:Mouse"); return 0;
             case 0x020A: input?.Invoke($"wheel:{(short)((long)w >> 16)}"); return 0;
             case 0x0246: LogPen("down", w); break;
@@ -124,6 +125,11 @@ public sealed class Shell : Window {
         if (!headless) {
             native = new CanvasHost();
             native.NativeInput += events.Add;
+            if (Pan) native.PanTo += x => {
+                if (view == 0) return;
+                var moved = new ViewState { Width = Math.Max(1, native.Bounds.Width), Height = Math.Max(1, native.Bounds.Height), Scale = RenderScaling, Zoom = 1, X = x % 64, Y = 0 };
+                Engine.Check(Engine.op_view_set(engine, view, ref moved), "VIEW_SET");
+            };
             native.TabOut += () => { events.Add("tab:out"); Dispatcher.UIThread.Post(() => MenuButton.Focus(NavigationMethod.Tab)); };
             canvasLayer.Children.Add(native);
             CanvasInput.GotFocus += (_, e) => { if (e.NavigationMethod == NavigationMethod.Tab) native.TakeFocus(); };
@@ -172,7 +178,7 @@ public sealed class Shell : Window {
         Engine.Check(Engine.op_doc_new(engine, 1600, 1000, 96, 0xffffffff, out doc), "DOC_NEW");
         Engine.Check(Engine.op_view_attach(engine, doc, native.Hwnd, out view), "VIEW_ATTACH");
         UpdateView(); ticking = true; NextFrame();
-        if (OverlayThread) StartOverlayThread();
+        if (OverlayThread && !Pan && !CallbackOnly) StartOverlayThread();
     }
     void UpdateView() {
         if (view == 0 || native is null) return;
@@ -180,6 +186,9 @@ public sealed class Shell : Window {
         Engine.Check(Engine.op_view_set(engine, view, ref s), "VIEW_SET");
     }
     static readonly bool MoveCanvas = Environment.GetEnvironmentVariable("SPIKE_CANVAS_MOVE") == "1";
+    static readonly bool Pan = Environment.GetEnvironmentVariable("SPIKE_PAN") == "1";
+    // SPIKE_CALLBACK_ONLY: the UI frame callback does almost nothing, to see its own rate.
+    static readonly bool CallbackOnly = Environment.GetEnvironmentVariable("SPIKE_CALLBACK_ONLY") == "1";
     // The ants clock runs off the UI thread: op_view_set_overlay only stores the newest state and wakes the render thread.
     static readonly bool OverlayThread = Environment.GetEnvironmentVariable("SPIKE_OVERLAY_THREAD") != "0";
     void StartOverlayThread() {
@@ -203,7 +212,8 @@ public sealed class Shell : Window {
             Engine.Check(Engine.op_view_set(engine, view, ref moved), "VIEW_SET");
         }
         ticks++;
-        if (!OverlayThread) {
+        if (CallbackOnly && ticks % 30 != 0) return;
+        if (!OverlayThread && !Pan && !CallbackOnly) {
             var o = new Overlay { Ants = new Rect(80, 80, 400, 300), Crop = new Rect(40, 40, 650, 450), Caret = new Rect(120, 130, 2, 22), DashOffset = ticks % 32 };
             Engine.Check(Engine.op_view_set_overlay(engine, view, ref o), "VIEW_OVERLAY");
         }

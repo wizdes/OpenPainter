@@ -45,7 +45,13 @@ public sealed class Shell : Window {
         AutomationProperties.SetName(input, "Canvas"); surface.Children.Add(input);
         // Handled, or XAML moves focus away again when the pointer goes up.
         input.PointerPressed += (_, e) => { input.Focus(FocusState.Pointer); LogPointer("down", e); e.Handled = true; };
-        input.PointerMoved += (_, e) => LogPointer("move", e);
+        input.PointerMoved += (_, e) => {
+            LogPointer("move", e);
+            if (Pan && view != 0) {
+                var moved = new ViewState { Width = Math.Max(1, panel.ActualWidth), Height = Math.Max(1, panel.ActualHeight), Scale = panel.XamlRoot?.RasterizationScale ?? 1, Zoom = 1, X = (int)e.GetCurrentPoint(panel).Position.X % 64, Y = 0 };
+                Engine.Check(Engine.op_view_set(engine, view, ref moved), "VIEW_SET");
+            }
+        };
         input.PointerReleased += (_, e) => { LogPointer("up", e); e.Handled = true; };
         input.PointerWheelChanged += (_, e) => events.Add($"wheel:{e.GetCurrentPoint(input).Properties.MouseWheelDelta}");
         input.KeyDown += (_, e) => events.Add($"key:{e.Key}");
@@ -92,6 +98,7 @@ public sealed class Shell : Window {
         Engine.Check(Engine.op_view_set(engine, view, ref s), "VIEW_SET");
     }
     static readonly bool MoveCanvas = Environment.GetEnvironmentVariable("SPIKE_CANVAS_MOVE") == "1";
+    static readonly bool Pan = Environment.GetEnvironmentVariable("SPIKE_PAN") == "1";
     void Tick() {
         ants.StrokeDashOffset = ticks++ % 8;
         if (MoveCanvas) {

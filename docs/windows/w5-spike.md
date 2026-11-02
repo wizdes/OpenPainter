@@ -6,23 +6,25 @@ Root ran both shells as native (AOT) builds on real windows, as the signed-in us
 | --- | --- | --- |
 | Start to first engine frame, visible desktop | 429 to 765 ms | 405 to 750 ms |
 | Same, hidden desktop | 435 to 630 ms | 433 to 497 ms |
-| Program size without PDB files | 46 MB, 5 files | 136 MB, 292 files |
+| Program size without PDB files | 46 MB, 5 files | 136 MB, 292 files, as a self-contained build. A Store package could be smaller |
 | Memory at first frame | 199 to 244 MB | 222 to 232 MB |
 | Resize, engine frames in the 3 s script | 182 | 181 |
-| Ants overlay rate | 60.0 fps, gap p99 18.8 ms, drawn by the engine with the clock off the UI thread | About 58 per second, XAML over the panel |
-| Same ants clock on the UI thread | 37 to 42 fps: UI frame callback fires about 33 to 43 times a second, cause not known | Not applicable |
+| Ants overlay rate | 60.0 fps, gap p99 18.8 ms, drawn by the engine with the clock off the UI thread | About 58 callbacks per second, XAML over the panel. This counts callbacks, not frames on screen |
+| Same ants clock on the UI thread | 37 to 42 fps: the UI frame callback holds it back | Not applicable |
+| UI frame callback alone, doing almost nothing | 41 to 44 per second on all 5 drawing routes tried | About 58 per second |
+| Engine frames with the pointer moving the canvas, blank document, 3 runs | 57.3 to 58.0 fps, gap median 16.7 ms | 58.0 to 58.4 fps, gap median 16.7 ms |
 | Engine drawing a canvas moved every UI frame | 38 fps: held back by the same UI callback | 60.0 fps, gap p99 18.7 ms |
 | Crop dim and caret over the canvas | Seen in screenshots | Seen in screenshots |
-| Pop-up menu and floating panel over the canvas | Seen in a screenshot. Each is its own window | Seen in screenshots. Both are XAML in the same window |
+| Pop-up menu and floating panel over the canvas | Seen in a screenshot. Each is its own window. The automated walk used a button, not this menu | Seen in screenshots. Both are XAML in the same window |
 | Pointer and wheel on the canvas | Pass | Pass |
 | Typed text | Pass, including `é` sent as a Unicode key | Pass, including `é` sent as a Unicode key |
 | A real dead key on a dead-key layout | NOT RUN: it would change the user's keyboard layout | NOT RUN: same reason |
 | Pen pressure, replayed through Windows' synthetic pen | 0.50 and 0.68, as sent | 0.50 and 0.68, as sent |
 | A real pen | NOT RUN: no pen here | NOT RUN: no pen here |
-| Tab order, names read by UI Automation | Test menu, Floating panel button, Canvas, and around again | Test menu, Canvas, and around again |
+| Tab order, names read by UI Automation | Test menu, Floating panel button, Canvas, and around again | Test menu, Canvas, and around again. Its panel has no focusable button, so the shells differ here |
 | UI Automation, visible desktop | Pass: menu, dialog, number box, panel, canvas | Names pass. Invoke on the menu item leaves the menu open, and the dialog opens only with the Enter key |
 | UI Automation, hidden desktop | Pass | Names pass. Dialog step fails: Invoke does not open it, and a key cannot reach a hidden desktop |
-| Tests with no window, as `agent` | 1 test passes: controls and input, not the engine's pixels | None possible: exits with `0xC000027B` with no desktop |
+| Tests with no window, as `agent` | 1 test passes: controls only. It removes the native canvas, so it proves neither canvas input nor pixels. It runs as a normal .NET build, not the native one | None possible: exits with `0xC000027B` with no desktop |
 | Narrator | NOT RUN: a tool cannot hear it. Focus names above are what it would be given | NOT RUN: same reason |
 
 ## What each stack needs that a plain app does not
@@ -44,6 +46,7 @@ WinUI:
 
 ## Not known
 
-- Why Avalonia's UI frame callback runs at about 33 to 43 per second on a 60 Hz screen. It holds back anything driven from that callback. Pointer-driven pan and zoom were not measured.
+- Why Avalonia's UI frame callback runs at 41 to 44 per second on a 60 Hz screen. It is not the drawing route. Avalonia's own animations were not measured on screen.
+- Pan on a real 24 MP image. W7 owns this.
 - How either stack behaves at other scales or refresh rates, or with a real document's tiles.
 - Whether Narrator reads the names as UI Automation reports them.
