@@ -377,9 +377,14 @@ Root ran `e1f447b` on the MacBook Air (macOS 27.0.1, Xcode 27.1, Rust 1.97.1), i
 | App, Debug, no signing, no launch | `BUILD SUCCEEDED`, 24 s | Not run |
 | `mac/EngineBridge` `swift test` | 5 of 6 pass. `testOpenAddLayerInvertUndoReadsBackExpectedBytes` fails at line 56 | The same test fails at the same line |
 | `mac/PresenterSpike` `swift test` | Does not link: `op_ps_*` symbols are missing | The same |
-| App XCTests, `make -C mac test` | **NOT RUN**: they may open a window on the user's screen | Not run |
+| App XCTests, `make -C mac test` | 395 run, 8 skipped, 1 failed, 2052 s. The failure is below. | Not run |
+| Mac reference images, `ProjectPageShotsTests` | 2 tests, 0 failures, 82 s, with a 4096 by 3072 picture. 26 images. | Not run |
+
+The user approved opening the app on the Air's screen for the last 2 rows. `git diff origin/main...windows -- mac` is empty, so the Windows branch has not changed the Mac app code. The first reference run used a 512 by 384 picture and had 4 failed checks, because the test's selection drag falls outside so small a picture. That was the wrong test picture, not an app fault.
 
 So nothing here is caused by the Windows work. These faults come from `main`, and they are follow-ups:
+
+- `KeyboardAccessibilityTests.testEveryShownStringIsInTheStringCatalog` fails at line 788 on `This display: Color LCD`. The catalog holds `This display: DELL U2414H`, so this test fails on any Mac with another display.
 
 - `testOpenAddLayerInvertUndoReadsBackExpectedBytes` expects the ramp after undo or invert, and gets other bytes. Cause not known.
 - `mac/PresenterSpike` does not link against the staticlib.
