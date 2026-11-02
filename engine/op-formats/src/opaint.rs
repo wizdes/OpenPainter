@@ -1209,7 +1209,7 @@ mod tests {
                 .output()
                 .unwrap();
             let text = String::from_utf8_lossy(&acl.stdout).into_owned();
-            assert!(!text.contains("BUILTIN\Users"), "{text}");
+            assert!(!text.contains(r"BUILTIN\Users"), "{text}");
             let mut bytes = Vec::new();
             match fs::File::open(&temp).and_then(|mut f| f.read_to_end(&mut bytes)) {
                 Err(e) => assert_eq!(e.raw_os_error(), Some(32), "{e}"),
