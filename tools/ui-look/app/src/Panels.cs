@@ -12,7 +12,11 @@ namespace UiLook;
 
 public static class Panels
 {
-    /// A panel frame: shadow, title row with the close button on the right, and a body.
+    /// The icon box and the selected dot of a Tools panel cell, relative to the cell.
+    public static Rect ToolIconBox => new(2, 2, Tokens.IconSize, Tokens.IconSize);
+    public static Rect ToolDotBox => new(22, 0, 4, 4);
+
+    /// A panel frame: shadow, outline, title row with the close button on the right, and a body.
     public static Control Frame(Palette p, string title, Control body, double width, double height)
     {
         var grid = new Grid { Width = width, Height = height, RowDefinitions = new RowDefinitions($"{Tokens.PanelTitleHeight},*") };
@@ -32,6 +36,7 @@ public static class Panels
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 7, 0),
         });
+        titleRow.Children.Add(new Border { Height = 1, Background = B(p.PanelEdge), VerticalAlignment = VerticalAlignment.Bottom });
         grid.Children.Add(titleRow);
         Grid.SetRow(body, 1);
         grid.Children.Add(body);
@@ -50,6 +55,13 @@ public static class Panels
                     BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 3, Blur = 12, Color = Tokens.Shadow }),
                 },
                 grid,
+                new Border
+                {
+                    BorderBrush = B(p.PanelEdge),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(Tokens.PanelCorner),
+                    IsHitTestVisible = false,
+                },
             },
         };
     }
@@ -61,7 +73,7 @@ public static class Panels
         var x0 = Math.Round((Tokens.ToolsWidth - (2 * cell + gap)) / 2);
         for (var i = 0; i < Scenes.Tools.Length; i++)
         {
-            var (icon, _) = Scenes.Tools[i];
+            var (_, icon, _) = Scenes.Tools[i];
             var x = x0 + i % 2 * (cell + gap);
             var y = inset + i / 2 * (cell + gap);
             var on = icon == s.ToolIcon;
@@ -69,7 +81,8 @@ public static class Panels
             {
                 At(body, Box(p.Wash, 3), x, y, cell, cell);
                 At(body, Box(p.Accent), x, y, 2, cell);
-                At(body, new Border { Background = B(p.Accent), CornerRadius = new CornerRadius(2) }, x + cell - 6, y + 2, 4, 4);
+                // The dot sits outside the icon box.
+                At(body, new Border { Background = B(p.Accent), CornerRadius = new CornerRadius(2) }, x + ToolDotBox.X, y + ToolDotBox.Y, ToolDotBox.Width, ToolDotBox.Height);
             }
             At(body, new IconView(icon, p.Ink), x + 2, y + 2);
         }
@@ -105,7 +118,7 @@ public static class Panels
             var current = i == s.HistoryCurrent;
             var row = new Canvas();
             At(row, new IconView(e.Icon, p.Ink), 7, 3.5);
-            var label = Label(e.Title, p.Ink, weight: current ? FontWeight.SemiBold : FontWeight.Normal);
+            var label = Label(e.Title, p.Ink, weight: current ? Tokens.StrongWeight : FontWeight.Normal);
             At(row, label, 36, 5, Tokens.ListPanelWidth - 60, 16);
             list.Children.Add(ListRow(p, Tokens.HistoryRowHeight, current, row));
         }
@@ -116,12 +129,12 @@ public static class Panels
         var enabled = s.HistoryCurrent > 0;
         var actions = new Grid { Margin = new Thickness(8, 0), ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
         var undo = Row(4);
-        undo.Children.Add(new IconView("cmd-undo", enabled ? p.Ink : p.Disabled, Tokens.SmallIconSize));
-        undo.Children.Add(Label("Undo", enabled ? p.Ink : p.Disabled));
+        undo.Children.Add(new IconView("cmd-undo", enabled ? p.Ink : p.DisabledText, Tokens.SmallIconSize));
+        undo.Children.Add(Label("Undo", enabled ? p.Ink : p.DisabledText));
         actions.Children.Add(undo);
         var redo = Row(4);
-        redo.Children.Add(Label("Redo", p.Disabled));
-        redo.Children.Add(new IconView("cmd-redo", p.Disabled, Tokens.SmallIconSize));
+        redo.Children.Add(Label("Redo", p.DisabledText));
+        redo.Children.Add(new IconView("cmd-redo", p.DisabledText, Tokens.SmallIconSize));
         Grid.SetColumn(redo, 2);
         actions.Children.Add(redo);
         Grid.SetRow(actions, 2);
@@ -148,7 +161,7 @@ public static class Panels
                 At(row, thumb, 8, 9, tw, th);
             }
             At(row, new Border { BorderBrush = B(p.Line), BorderThickness = new Thickness(1) }, 8, 9, tw, th);
-            At(row, Label(l.Name, p.Ink, weight: current ? FontWeight.SemiBold : FontWeight.Normal), 58, 16, Tokens.ListPanelWidth - 114, 16);
+            At(row, Label(l.Name, p.Ink, weight: current ? Tokens.StrongWeight : FontWeight.Normal), 58, 16, Tokens.ListPanelWidth - 114, 16);
             At(row, new IconView("layer-visible", s.Dialog == DialogKind.None ? p.Ink : p.Muted), Tokens.ListPanelWidth - 50, 14.5);
             list.Children.Add(ListRow(p, Tokens.LayerRowHeight, current, row));
         }
@@ -161,12 +174,9 @@ public static class Panels
         var canRaise = s.Dialog != DialogKind.None;
         var actions = Row(4);
         actions.Margin = new Thickness(8, 0);
-        foreach (var (icon, on) in new[]
-        {
-            ("layer-add", true), ("layer-delete", many), ("layer-duplicate", true), ("layer-merge-down", many),
-            ("arrow-up", canRaise), ("arrow-down", many), ("layer-properties", true),
-        })
-            actions.Children.Add(IconButton(p, icon, on ? p.Ink : p.Disabled, Tokens.PanelTarget));
+        var enabledActions = new[] { true, many, true, many, canRaise, many, true };
+        for (var i = 0; i < Scenes.LayerActions.Length; i++)
+            actions.Children.Add(IconButton(p, Scenes.LayerActions[i].Icon, enabledActions[i] ? p.Ink : p.Disabled, Tokens.PanelTarget));
         Grid.SetRow(actions, 2);
         body.Children.Add(actions);
         return Frame(p, "Layers", body, Tokens.ListPanelWidth, Tokens.ListPanelHeight);
@@ -205,7 +215,7 @@ public static class Panels
             new PolylineGeometry(new[] { new Point(0, 0), new Point(9, 0), new Point(0, 9) }, true))), pad, pad, 9, 9);
 
         At(body, IconButton(p, "colors-swap", p.Ink, Tokens.PanelTarget), 68, pad);
-        At(body, IconButton(p, "colors-contrast", p.Ink, Tokens.PanelTarget), 68, pad + 30);
+        At(body, IconButton(p, "colors-reset", p.Ink, Tokens.PanelTarget), 68, pad + 30);
         At(body, Label("Hex", p.Muted), 100, pad + 1, 72, 15);
         At(body, Field(p, primaryHex, 72, Tokens.FieldHeight, TextAlignment.Left), 100, pad + 18);
 
@@ -224,7 +234,7 @@ public static class Panels
 
         // More or Less, add color, palette menu.
         At(body, Push(p, expanded ? "« Less" : "More »", 84), pad - 2, rowY);
-        At(body, IconButton(p, "layer-add", p.Ink, Tokens.PanelTarget), width - pad - 52, rowY);
+        At(body, IconButton(p, "colors-add", p.Ink, Tokens.PanelTarget), width - pad - 52, rowY);
         At(body, IconButton(p, "cmd-more", p.Ink, Tokens.PanelTarget), width - pad - 24, rowY);
 
         var y = moreY;

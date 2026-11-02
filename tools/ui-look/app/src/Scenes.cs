@@ -1,11 +1,11 @@
 // What each scene shows. The content copies the Mac shots: same rows, labels and numbers.
 namespace UiLook;
 
-public enum Options { Brush, Text, Selection }
+public enum Options { Brush, Text, Selection, Flood }
 public enum DialogKind { None, Curves, HueSaturation }
 public enum CanvasFx { None, Text, Selection, CurvesPreview, HueSaturationPreview }
 
-public sealed record HistoryEntry(string Icon, string Title);
+public sealed record HistoryEntry(string Use, string Icon, string Title);
 public sealed record LayerEntry(string Name, bool HasImage);
 
 public sealed record Scene(
@@ -34,29 +34,57 @@ public static class Scenes
     /// The Mac shots' seven steps, in order.
     public static readonly HistoryEntry[] History =
     [
-        new("doc-image", "Open"),
-        new("colors-contrast", "Curves"),
-        new("colors-contrast", "Hue / Saturation"),
-        new("tool-ellipse-select", "Ellipse Select"),
-        new("tool-rectangle-select", "Deselect"),
-        new("layer-add", "Add New Layer"),
-        new("tool-text", "Text"),
+        new("history:document.open", "doc-image", "Open"),
+        new("history:effect.adjust.*", "step-adjustment", "Curves"),
+        new("history:effect.adjust.*", "step-adjustment", "Hue / Saturation"),
+        new("history:selection.ellipse", "tool-ellipse-select", "Ellipse Select"),
+        new("history:selection.deselect", "cmd-deselect", "Deselect"),
+        new("history:layer.add", "layer-add", "Add New Layer"),
+        new("history:tool.text.finish", "tool-text", "Text"),
     ];
 
-    /// The Tools panel in the Mac's order: two columns, read across.
-    public static readonly (string Icon, string Label)[] Tools =
+    /// The Tools panel in the Mac's order: two columns, read across. Case is the Mac's
+    /// PaintTool case, so a test can tie each button to its row in icons.toml.
+    public static readonly (string Case, string Icon, string Label)[] Tools =
     [
-        ("tool-rectangle-select", "Rectangle Select"), ("tool-move-pixels", "Move Selected Pixels"),
-        ("tool-lasso", "Lasso Select"), ("tool-move-selection", "Move Selection"),
-        ("tool-ellipse-select", "Ellipse Select"), ("tool-zoom", "Zoom"),
-        ("tool-magic-wand", "Magic Wand"), ("tool-pan", "Pan"),
-        ("tool-paint-bucket", "Paint Bucket"), ("tool-gradient", "Gradient"),
-        ("tool-paintbrush", "Paintbrush"), ("tool-eraser", "Eraser"),
-        ("tool-pencil", "Pencil"), ("tool-color-picker", "Color Picker"),
-        ("tool-clone-stamp", "Clone Stamp"), ("tool-recolor", "Recolor"),
-        ("tool-text", "Text"), ("tool-line", "Line / Curve"),
-        ("tool-shapes", "Shapes"),
+        ("rectangleSelect", "tool-rectangle-select", "Rectangle Select"), ("moveSelectedPixels", "tool-move-pixels", "Move Selected Pixels"),
+        ("lassoSelect", "tool-lasso", "Lasso Select"), ("moveSelection", "tool-move-selection", "Move Selection"),
+        ("ellipseSelect", "tool-ellipse-select", "Ellipse Select"), ("zoom", "tool-zoom", "Zoom"),
+        ("magicWand", "tool-magic-wand", "Magic Wand"), ("pan", "tool-pan", "Pan"),
+        ("paintBucket", "tool-paint-bucket", "Paint Bucket"), ("gradient", "tool-gradient", "Gradient"),
+        ("paintbrush", "tool-paintbrush", "Paintbrush"), ("eraser", "tool-eraser", "Eraser"),
+        ("pencil", "tool-pencil", "Pencil"), ("colorPicker", "tool-color-picker", "Color Picker"),
+        ("cloneStamp", "tool-clone-stamp", "Clone Stamp"), ("recolor", "tool-recolor", "Recolor"),
+        ("text", "tool-text", "Text"), ("lineCurve", "tool-line", "Line / Curve"),
+        ("shapes", "tool-shapes", "Shapes"),
     ];
+
+    /// The Layers panel's action row, with the row in icons.toml for each.
+    public static readonly (string Use, string Icon)[] LayerActions =
+    [
+        ("site:LayersPanel.swift:Add New Layer", "layer-add"),
+        ("site:LayersPanel.swift:Delete Layer", "layer-delete"),
+        ("site:LayersPanel.swift:Duplicate Layer", "layer-duplicate"),
+        ("site:LayersPanel.swift:Merge Layer Down", "layer-merge-down"),
+        ("site:LayersPanel.swift:Move Layer Up", "arrow-up"),
+        ("site:LayersPanel.swift:Move Layer Down", "arrow-down"),
+        ("site:LayersPanel.swift:Layer Properties", "layer-properties"),
+    ];
+
+    /// The command buttons at the start of the options row, with their rows in icons.toml.
+    public static readonly (string Use, string Icon)[] BarCommands =
+    [
+        ("bar:new", "cmd-new"), ("bar:open", "cmd-open"), ("bar:save", "cmd-save"),
+        ("bar:undo", "cmd-undo"), ("bar:redo", "cmd-redo"),
+        ("bar:crop", "cmd-crop"), ("bar:wand", "tool-magic-wand"),
+        ("site:CommandBar.swift:More commands", "cmd-more"),
+    ];
+
+    /// Not one of the 12. It proves the selected-tool dot and the pressed wand button draw.
+    public static readonly Scene MagicWandCheck = new(
+        "magic-wand-check", "tool-magic-wand", Options.Flood, "Magic Wand: click to select a region of similar color", "None",
+        HistoryCount: 4, HistoryCurrent: 3, TwoLayers: false, "#CF684D", "#E9E7DC", ChosenSwatch: -1,
+        CanvasFx.None, DialogKind.None, Dirty: true, CropEnabled: false, UndoEnabled: true);
 
     public static readonly Scene Main = new(
         "main", "tool-paintbrush", Options.Brush, "Paintbrush: drag to paint", "None",

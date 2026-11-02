@@ -47,6 +47,22 @@ public static class Renderer
         return written;
     }
 
+    /// Draws one scene in memory, for tests. `omitPanel` leaves out a panel by title.
+    public static RenderTargetBitmap DrawScene(Palette p, Scene s, string? omitPanel = null)
+    {
+        using var image = new Bitmap(FixturePath);
+        return Draw(Shell.Build(p, s, image, CanvasBitmap(image, s.Canvas), omitPanel), p, (int)Tokens.ShotWidth, (int)Tokens.ShotHeight);
+    }
+
+    public static RenderTargetBitmap DrawColorsExpanded(Palette p) => Draw(Shell.ColorsExpanded(p), p, 308, 534);
+
+    /// Writes the Magic Wand check scene: the selected dot and the pressed wand button.
+    public static void RenderMagicWandCheck(string file)
+    {
+        using var bitmap = DrawScene(Tokens.Light, Scenes.MagicWandCheck);
+        bitmap.Save(file, PngBitmapEncoderOptions.Default);
+    }
+
     /// Every icon with its file name on one sheet, for looking them over.
     public static void RenderIconSheet(string file)
     {
@@ -69,6 +85,12 @@ public static class Renderer
 
     static void Save(Control root, Palette p, int width, int height, string file)
     {
+        using var bitmap = Draw(root, p, width, height);
+        bitmap.Save(file, PngBitmapEncoderOptions.Default);
+    }
+
+    static RenderTargetBitmap Draw(Control root, Palette p, int width, int height)
+    {
         var window = new Window
         {
             Width = width,
@@ -84,11 +106,11 @@ public static class Renderer
         root.Arrange(new Rect(0, 0, width, height));
         window.UpdateLayout();
         Dispatcher.UIThread.RunJobs();
-        using var bitmap = new RenderTargetBitmap(new PixelSize(width * Scale, height * Scale), new Vector(96 * Scale, 96 * Scale));
+        var bitmap = new RenderTargetBitmap(new PixelSize(width * Scale, height * Scale), new Vector(96 * Scale, 96 * Scale));
         bitmap.Render(root);
-        bitmap.Save(file, PngBitmapEncoderOptions.Default);
         window.Close();
         Dispatcher.UIThread.RunJobs();
+        return bitmap;
     }
 
     /// The image the stage shows. The dialog scenes tint it to stand in for the engine's

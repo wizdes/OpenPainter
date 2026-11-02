@@ -12,8 +12,13 @@ public static class Dialogs
 {
     const double DialogX = 420, DialogWidth = 440, LabelRight = 133, ControlX = 144;
 
-    static Canvas Frame(Canvas win, Palette p, double y, double height)
+    /// A dialog with a window title row, as the Mac's panel.title sets one (EffectDialog.swift).
+    /// `y` and `height` describe the part below the title row, measured from the Mac shot.
+    static Canvas Frame(Canvas win, Palette p, string title, double y, double height)
     {
+        var titleHeight = Tokens.DialogTitleHeight;
+        y -= titleHeight / 2;
+        var total = height + titleHeight;
         var body = new Canvas { Width = DialogWidth, Height = height };
         // The shadow is a sibling of the content; see Panels.Frame.
         At(win, new Border
@@ -21,14 +26,24 @@ public static class Dialogs
             Background = B(p.Panel),
             CornerRadius = new CornerRadius(Tokens.DialogCorner),
             BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 8, Blur = 28, Color = Tokens.Shadow }),
-        }, DialogX, y, DialogWidth, height);
-        At(win, body, DialogX, y);
+        }, DialogX, y, DialogWidth, total);
+        var row = new Grid { Background = Brushes.Transparent };
+        row.Children.Add(new Border { Background = B(p.TitleBar), CornerRadius = new CornerRadius(Tokens.DialogCorner, Tokens.DialogCorner, 0, 0) });
+        row.Children.Add(new Border { Height = 1, Background = B(p.PanelEdge), VerticalAlignment = VerticalAlignment.Bottom });
+        var name = Label(title, p.Ink);
+        name.Margin = new Thickness(12, 0, 0, 0);
+        name.HorizontalAlignment = HorizontalAlignment.Left;
+        row.Children.Add(name);
+        row.Children.Add(new IconView("window-close", p.Ink, 16) { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 15, 0) });
+        At(win, row, DialogX, y, DialogWidth, titleHeight);
+        At(win, body, DialogX, y + titleHeight);
+        At(win, new Border { BorderBrush = B(p.PanelEdge), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(Tokens.DialogCorner), IsHitTestVisible = false }, DialogX, y, DialogWidth, total);
         return body;
     }
 
     static void Buttons(Canvas body, Palette p, double y)
     {
-        At(body, Push(p, "OK", 80, Tokens.DialogButtonHeight), DialogWidth - 16 - 164, y);
+        At(body, Push(p, "OK", 80, Tokens.DialogButtonHeight, accent: true), DialogWidth - 16 - 164, y);
         At(body, Push(p, "Cancel", 80, Tokens.DialogButtonHeight), DialogWidth - 16 - 80, y);
     }
 
@@ -41,7 +56,7 @@ public static class Dialogs
 
     public static void Curves(Canvas win, Palette p)
     {
-        var body = Frame(win, p, 221, 390);
+        var body = Frame(win, p, "Curves", 221, 390);
         RightLabel(body, p, "Transfer map:", 34);
         At(body, Choice(p, "Luminosity", 130, 24), ControlX, 22);
         RightLabel(body, p, "Curve:", 69);
@@ -94,7 +109,7 @@ public static class Dialogs
 
     public static void HueSaturation(Canvas win, Palette p)
     {
-        var body = Frame(win, p, 326, 180);
+        var body = Frame(win, p, "Hue / Saturation", 326, 180);
         void Row(string label, double centerY, double min, double max, double value, string text)
         {
             RightLabel(body, p, label, centerY);

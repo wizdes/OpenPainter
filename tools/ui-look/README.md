@@ -16,6 +16,12 @@ To see every icon on one sheet:
 dotnet run --project tools/ui-look/app -- --icon-sheet <file.png>
 ```
 
+To see the Magic Wand selected, with its dot and pressed button:
+
+```
+dotnet run --project tools/ui-look/app -- --magic-wand-check <file.png>
+```
+
 ## Run the checks
 
 ```
@@ -35,7 +41,9 @@ Both commands need .NET 10. Set `DOTNET_ROOT` and `PATH` to it first.
 | `app/src/Renderer.cs` | Draws each scene to a PNG. |
 | `tests/src/MacSymbols.cs` | Finds the SF Symbol names in the Mac source. |
 | `../../windows/assets/icons/` | The icon files and their licenses. |
-| `../../docs/windows/icons.toml` | One row per Mac symbol. |
+| `tests/non-symbols.txt` | The exact dotted names in the Mac source that are not icons. |
+| `../../windows/assets/icons/fluent-used.txt` | Each Fluent icon in use, with the SHA-256 of the unchanged package file. |
+| `../../docs/windows/icons.toml` | One row per use in the Mac app, with one meaning and a SHA-256. |
 | `../../docs/windows/w6-look.md` | Each Windows change and why, and where the picture still differs from the Mac. |
 
 ## One trap

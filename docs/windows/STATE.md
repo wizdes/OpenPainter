@@ -19,7 +19,8 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
   - Real device removal recovers on WARP, and is deliberately not run on the RTX. Mac run owed. The Mac code type-checks only.
 - [x] W4: capture kit. Number settings work. A wrong capture now fails by name, after two review rounds. Checked on real paint.net: 13 named jobs and all 54 effects at default settings. Add Noise and Clouds are not repeatable; W14 owns that, the other control types and the rows. See `parity.md`.
 - [x] W5: UI stack test. Avalonia chosen, see `decisions.md`. The engine draws the Mac's overlay set at 60 fps. NOT RUN: Narrator heard by a person, a real dead key, a real pen.
-- [ ] W6 to W20: see `PLAN.md`
+- [ ] W6: Windows look and icons. 12 renders, 240 icon rows, 42 tests pass. Built by a native Opus builder, because Sol reached its usage limit. Fresh Opus critique done and fixed. OPEN: the Astra critique, NOT RUN until the limit ends on 2026-11-04 21:32. NOT RUN: a real window, 100% scale. See `w6-look.md`.
+- [ ] W7 to W20: see `PLAN.md`
 
 ## Open items
 

@@ -23,13 +23,21 @@ public static class Program
         if (sheet >= 0 && sheet + 1 < args.Length)
         {
             BuildAvaloniaApp().SetupWithoutStarting();
+            if (sheet + 2 < args.Length) Icons.Folder = args[sheet + 2];   // Optional: another folder of icons.
             Renderer.RenderIconSheet(args[sheet + 1]);
+            return 0;
+        }
+        var wand = Array.IndexOf(args, "--magic-wand-check");
+        if (wand >= 0 && wand + 1 < args.Length)
+        {
+            BuildAvaloniaApp().SetupWithoutStarting();
+            Renderer.RenderMagicWandCheck(args[wand + 1]);
             return 0;
         }
         var at = Array.IndexOf(args, "--out");
         if (at < 0 || at + 1 >= args.Length)
         {
-            Console.Error.WriteLine("usage: UiLook --out <folder> | --icon-sheet <file.png>");
+            Console.Error.WriteLine("usage: UiLook --out <folder> | --icon-sheet <file.png> [icon folder] | --magic-wand-check <file.png>");
             return 2;
         }
         BuildAvaloniaApp().SetupWithoutStarting();

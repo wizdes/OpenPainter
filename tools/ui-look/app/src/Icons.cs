@@ -16,7 +16,7 @@ public static class Icons
 {
     static readonly Dictionary<string, IconArt> Cache = new();
 
-    public static string Folder => Path.Combine(AppContext.BaseDirectory, "assets", "icons");
+    public static string Folder { get; set; } = Path.Combine(AppContext.BaseDirectory, "assets", "icons");
 
     public static IconArt Load(string name)
     {

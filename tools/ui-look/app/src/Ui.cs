@@ -33,7 +33,26 @@ public static class Ui
         TextTrimming = TextTrimming.CharacterEllipsis,
     };
 
-    public static TextBox Field(Palette p, string text, double width, double height = Tokens.FieldHeight, TextAlignment align = TextAlignment.Center) => new()
+    /// A text field: Fluent's TextBox with Windows 11's stronger bottom line on top.
+    public static Control Field(Palette p, string text, double width, double height = Tokens.FieldHeight, TextAlignment align = TextAlignment.Center) => new Grid
+    {
+        Width = width,
+        Height = height,
+        VerticalAlignment = VerticalAlignment.Center,
+        Children =
+        {
+            FieldBox(p, text, width, height, align),
+            new Border
+            {
+                BorderBrush = B(p.FieldBottom),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                CornerRadius = new CornerRadius(Tokens.ControlCorner),
+                IsHitTestVisible = false,
+            },
+        },
+    };
+
+    static TextBox FieldBox(Palette p, string text, double width, double height, TextAlignment align) => new()
     {
         Text = text,
         Width = width,
@@ -63,7 +82,8 @@ public static class Ui
             FontSize = Tokens.FontBody,
             Foreground = B(p.Ink),
             Background = B(p.Control),
-            BorderThickness = new Thickness(0),
+            BorderBrush = B(p.ControlEdge),
+            BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(Tokens.ControlCorner),
             Padding = new Thickness(padLeft, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
@@ -72,19 +92,27 @@ public static class Ui
         };
         box.Items.Add(content);
         box.SelectedIndex = 0;
+        // Fluent's arrow is drawn for 14 pixel text. This look uses 12.
+        box.TemplateApplied += (_, e) =>
+        {
+            var glyph = e.NameScope.Find<Control>("DropDownGlyph") ?? throw new InvalidOperationException("Fluent's ComboBox template has no DropDownGlyph");
+            glyph.Width = Tokens.ChoiceArrow;
+            glyph.Height = Tokens.ChoiceArrow;
+        };
         return box;
     }
 
-    public static Button Push(Palette p, string text, double width, double height = Tokens.ButtonHeight) => new()
+    public static Button Push(Palette p, string text, double width, double height = Tokens.ButtonHeight, bool accent = false) => new()
     {
         Content = text,
         Width = width,
         Height = height,
         MinHeight = 0,
         FontSize = Tokens.FontBody,
-        Foreground = B(p.Ink),
-        Background = B(p.Control),
-        BorderThickness = new Thickness(0),
+        Foreground = B(accent ? p.OnAccent : p.Ink),
+        Background = B(accent ? p.Accent : p.Control),
+        BorderBrush = B(accent ? p.Accent : p.ControlEdge),
+        BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(Tokens.ControlCorner),
         Padding = new Thickness(0),
         HorizontalContentAlignment = HorizontalAlignment.Center,
@@ -123,14 +151,29 @@ public static class Ui
             Width = width,
             MinHeight = 0,
             VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 4, 0, 0),   // Fluent's template sits high once the margins above are gone.
         };
         slider.Resources["SliderTrackFill"] = B(p.Line);
-        slider.Resources["SliderTrackValueFill"] = B(p.PanelLine);
-        slider.Resources["SliderThumbBackground"] = B(p.Knob);
+        slider.Resources["SliderTrackValueFill"] = B(p.SliderValue);
         slider.Resources["SliderContainerBackground"] = Brushes.Transparent;
         slider.Resources["SliderPreContentMargin"] = new GridLength(0);
         slider.Resources["SliderPostContentMargin"] = new GridLength(0);
         slider.Resources["SliderHorizontalHeight"] = 20.0;
+        // Fluent's knob has one color and no ring, so this draws its own: white with a darker ring.
+        slider.TemplateApplied += (_, e) =>
+        {
+            var track = e.NameScope.Find<Avalonia.Controls.Primitives.Track>("PART_Track") ?? throw new InvalidOperationException("Fluent's Slider template has no PART_Track");
+            var thumb = track.Thumb ?? throw new InvalidOperationException("Fluent's Slider track has no thumb");
+            thumb.Width = Tokens.KnobSize;
+            thumb.Height = Tokens.KnobSize;
+            thumb.Template = new Avalonia.Controls.Templates.FuncControlTemplate<Avalonia.Controls.Primitives.Thumb>((_, _) => new Border
+            {
+                Background = B(p.Knob),
+                BorderBrush = B(p.KnobRing),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(Tokens.KnobSize / 2),
+            });
+        };
         return slider;
     }
 

@@ -1,7 +1,13 @@
-// Finds every SF Symbol name the Mac app shows, by reading its Swift source.
-// Symbols reach the screen through a known set of code shapes, listed in Extract below.
-// A wider check, Unclassified, catches a dotted name that appears anywhere else, so a new
-// way of naming a symbol fails a test by name instead of going unseen.
+// Finds where the Mac app names an SF Symbol, by reading its Swift source. Each find is a
+// use (a place in the app) and a symbol name.
+//
+// What this does catch: every literal name at the code shapes in Extract, including
+// systemSymbolName:, systemName: and symbol:, and any other dotted string literal, which
+// must be either a found symbol or an exact entry in tests/non-symbols.txt.
+//
+// What this does not catch: a one-word name such as "hare" passed through a call shape that
+// Extract does not list, or a name built at run time. No list of SF Symbols exists here to
+// check such a string against.
 using System.Text.RegularExpressions;
 
 namespace UiLookTests;
@@ -21,41 +27,77 @@ public static partial class MacSymbols
         SourceFolders.Select(f => Path.Combine(repo, f)).Where(Directory.Exists)
             .SelectMany(f => Directory.EnumerateFiles(f, "*.swift", SearchOption.AllDirectories));
 
-    /// The symbol names in one source file.
-    public static HashSet<string> Extract(string fileName, string text)
+    /// The uses in one source file. A value that starts with = points at another use.
+    public static Dictionary<string, string> Extract(string fileName, string text)
     {
-        var found = new HashSet<string>();
+        var found = new Dictionary<string, string>();
         if (fileName == "MenuIcons.swift")
         {
             // Dictionary rows: "File > Open…": "folder", and "effect.blur.gaussian": "drop".
-            foreach (Match m in DictionaryRow().Matches(text)) found.Add(m.Groups["value"].Value);
+            foreach (Match m in DictionaryRow().Matches(text))
+            {
+                var key = m.Groups["key"].Value.Replace("\\\"", "'");
+                found[(key.StartsWith("effect.", StringComparison.Ordinal) ? "effect:" : "menu:") + key] = m.Groups["value"].Value;
+            }
             return found;
         }
         foreach (var line in text.Split('\n'))
         {
-            // NSImage(systemSymbolName: "x"), ShellButton(symbol: "x"), and a choice such
-            // as symbol: layer.visible ? "eye" : "eye.slash".
+            var bar = BarLiteral().Match(line);
+            if (bar.Success) { found["bar:" + bar.Groups[1].Value] = bar.Groups[2].Value; continue; }
+            var barTool = BarTool().Match(line);
+            if (barTool.Success) { found["bar:" + barTool.Groups[1].Value] = "=tool:" + barTool.Groups[2].Value; continue; }
+
+            // NSImage(systemSymbolName: "x"), Image(systemName: "x"), ShellButton(symbol: "x"),
+            // and a choice such as symbol: layer.visible ? "eye" : "eye.slash".
+            var label = LabelArgument().Match(line);
             foreach (Match m in LabeledSymbol().Matches(line))
                 foreach (Match s in Literal().Matches(m.Groups["rest"].Value))
-                    found.Add(s.Groups[1].Value);
+                    found[$"site:{fileName}:{(label.Success ? label.Groups[1].Value : s.Groups[1].Value)}"] = s.Groups[1].Value;
+
             if (fileName == "ColorsPanel.swift")
-                foreach (Match m in ButtonCall().Matches(line)) found.Add(m.Groups[1].Value);
+                foreach (Match m in ButtonCall().Matches(line)) found[$"site:{fileName}:{m.Groups[2].Value}"] = m.Groups[1].Value;
             if (fileName == "TextOptionsControls.swift")
             {
-                foreach (Match m in ToggleCall().Matches(line)) found.Add(m.Groups[1].Value);
-                foreach (Match m in AlignTuple().Matches(line)) found.Add(m.Groups[1].Value);
+                foreach (Match m in ToggleCall().Matches(line)) found[$"site:{fileName}:{m.Groups[2].Value}"] = m.Groups[1].Value;
+                foreach (Match m in AlignTuple().Matches(line)) found[$"site:{fileName}:{m.Groups[1].Value}"] = m.Groups[1].Value;
             }
             if (fileName == "LayersPanel.swift")
-                foreach (Match m in LayerTuple().Matches(line)) found.Add(m.Groups[1].Value);
+            {
+                var m = LayerTuple().Match(line);
+                if (m.Success) found[$"site:{fileName}:{m.Groups[2].Value}"] = m.Groups[1].Value;
+            }
         }
-        // var symbol: String { switch ... case .x: "name" } and HistoryStep's
-        // func symbol(_:) with its return "name" lines. The case patterns of that function
-        // are engine command ids, so only the value after the colon or return counts.
-        foreach (Match m in SymbolBlockStart().Matches(text))
+
+        // var symbol: String { switch self { case .x: "name" } }
+        var prefix = fileName switch
         {
-            var end = BlockEnd(text, m.Index + m.Length);
-            foreach (Match s in BlockValue().Matches(text[(m.Index + m.Length)..end])) found.Add(s.Groups[1].Value);
-        }
+            "PanelLayout.swift" => "panel:",
+            "ToolState.swift" => "tool:",
+            "ImageSizeDialogs.swift" => "anchor:",
+            _ => $"site:{fileName}:",
+        };
+        foreach (Match m in SymbolProperty().Matches(text))
+            foreach (Match c in SwitchCase().Matches(text[(m.Index + m.Length)..BlockEnd(text, m.Index + m.Length)]))
+                foreach (var one in c.Groups[1].Value.Split(','))
+                    found[prefix + one.Trim().TrimStart('.')] = c.Groups[2].Value;
+
+        // HistoryStep's func symbol(_:). Its case patterns are engine command ids, each a use.
+        var step = SymbolFunction().Match(text);
+        if (step.Success)
+            foreach (var line in text[(step.Index + step.Length)..BlockEnd(text, step.Index + step.Length)].Split('\n'))
+            {
+                var c = HistoryCase().Match(line);
+                if (c.Success)
+                {
+                    foreach (Match k in Literal().Matches(c.Groups[1].Value)) found["history:" + k.Groups[1].Value] = c.Groups[2].Value;
+                    continue;
+                }
+                var p = HistoryPrefix().Match(line);
+                if (p.Success) { found["history:" + p.Groups[1].Value + "*"] = p.Groups[2].Value; continue; }
+                var r = HistoryReturn().Match(line);
+                if (r.Success) found["history:default"] = r.Groups[1].Value;
+            }
         return found;
     }
 
@@ -71,50 +113,58 @@ public static partial class MacSymbols
         return i;
     }
 
-    public static HashSet<string> All(string repo)
+    public static Dictionary<string, string> AllUses(string repo)
     {
-        var all = new HashSet<string>();
-        foreach (var file in SwiftFiles(repo)) all.UnionWith(Extract(Path.GetFileName(file), File.ReadAllText(file)));
+        var all = new Dictionary<string, string>();
+        foreach (var file in SwiftFiles(repo))
+            foreach (var (use, symbol) in Extract(Path.GetFileName(file), File.ReadAllText(file)))
+                all[use] = symbol;
+        foreach (var (use, symbol) in all.ToList())
+            if (symbol.StartsWith('=')) all[use] = all[symbol[1..]];
         return all;
     }
 
-    /// Not a symbol, because the name has this start. These are engine command ids
-    /// (tool.text.begin), engine query ids (doc.dirty), effect ids and file type ids.
-    /// They are dotted like symbols but no icon draws them, so they must not get a row.
-    static readonly string[] NonSymbolStarts =
-    [
-        "artistic.", "blur.", "clipboard.", "color.", "com.", "commands.", "dev.", "distort.", "doc.", "document.", "edit.", "effect.", "effects.",
-        "history.", "image.", "layer.", "move.", "noise.", "object.", "org.", "photo.", "preview.", "public.",
-        "render.", "selection.", "stylize.", "tool.",
-    ];
-
-    /// True for a dotted name that names something other than an icon.
-    public static bool IsKnownNonSymbol(string name) =>
-        name.Contains('_') || name.EndsWith(".txt", StringComparison.Ordinal)
-        || NonSymbolStarts.Any(s => name.StartsWith(s, StringComparison.Ordinal));
-
-    /// Dotted names in the source that are neither found symbols nor known non-symbols.
-    public static List<string> Unclassified(string repo, HashSet<string> symbols)
+    /// Uses with no row, or whose row names another symbol. The message names each one.
+    public static List<string> MissingRows(IDictionary<string, string> uses, IEnumerable<Dictionary<string, string>> rows)
     {
-        var left = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var file in SwiftFiles(repo))
-            foreach (Match m in DottedLiteral().Matches(File.ReadAllText(file)))
-            {
-                var name = m.Groups[1].Value;
-                if (!symbols.Contains(name) && !IsKnownNonSymbol(name)) left.Add(name);
-            }
-        return left.ToList();
+        var byUse = rows.Where(r => r.ContainsKey("use")).ToDictionary(r => r["use"]);
+        var problems = new List<string>();
+        foreach (var (use, symbol) in uses.OrderBy(u => u.Key, StringComparer.Ordinal))
+        {
+            var key = use.Replace('"', '\'');
+            if (!byUse.TryGetValue(key, out var row)) problems.Add($"{symbol} at {use}");
+            else if (row["mac_symbol"] != symbol) problems.Add($"{use}: the source says {symbol}, the row says {row["mac_symbol"]}");
+        }
+        return problems;
     }
 
-    [GeneratedRegex("""^\s*"[^\n]*":\s*"(?<value>[^"\n]+)",\s*$""", RegexOptions.Multiline)] private static partial Regex DictionaryRow();
-    [GeneratedRegex("""\b(?:systemSymbolName|symbol):\s*(?<rest>[^,]*)""")] private static partial Regex LabeledSymbol();
+    public static string NonSymbolsPath(string repo) => Path.Combine(repo, "tools", "ui-look", "tests", "non-symbols.txt");
+
+    public static HashSet<string> ReadNonSymbols(string repo) =>
+        File.ReadAllLines(NonSymbolsPath(repo)).Where(l => l.Length > 0 && !l.StartsWith('#')).ToHashSet();
+
+    /// Dotted names in `text` that are neither known symbols nor exact non-symbols.
+    public static List<string> Unclassified(string text, ISet<string> symbols, ISet<string> nonSymbols) =>
+        DottedNames(text).Where(n => !symbols.Contains(n) && !nonSymbols.Contains(n)).Distinct().Order(StringComparer.Ordinal).ToList();
+
+    public static IEnumerable<string> DottedNames(string text) => DottedLiteral().Matches(text).Select(m => m.Groups[1].Value);
+
+    [GeneratedRegex("""^\s*"(?<key>.+)":\s*"(?<value>[^"\n]+)",\s*$""", RegexOptions.Multiline)] private static partial Regex DictionaryRow();
+    [GeneratedRegex("BarCommand\\(key: \"(\\w+)\", symbol: \"([^\"]+)\"")] private static partial Regex BarLiteral();
+    [GeneratedRegex("BarCommand\\(key: \"(\\w+)\", symbol: PaintTool\\.(\\w+)\\.symbol")] private static partial Regex BarTool();
+    [GeneratedRegex("\\blabel: \"([^\"]+)\"")] private static partial Regex LabelArgument();
+    [GeneratedRegex("""\b(?:systemSymbolName|systemName|symbol):\s*(?<rest>[^,]*)""")] private static partial Regex LabeledSymbol();
     [GeneratedRegex("\"([^\"]+)\"")] private static partial Regex Literal();
-    [GeneratedRegex("\\bbutton\\(\"([^\"]+)\"")] private static partial Regex ButtonCall();
-    [GeneratedRegex("\\btoggle\\(\"([^\"]+)\"")] private static partial Regex ToggleCall();
+    [GeneratedRegex("\\bbutton\\(\"([^\"]+)\", \"([^\"]+)\"")] private static partial Regex ButtonCall();
+    [GeneratedRegex("\\btoggle\\(\"([^\"]+)\", \"([^\"]+)\"")] private static partial Regex ToggleCall();
     [GeneratedRegex("\"(text\\.align[a-z]+)\"")] private static partial Regex AlignTuple();
-    [GeneratedRegex("""^\s*\("[^"]+", "([^"]+)", "[^"]+"\),""")] private static partial Regex LayerTuple();
-    [GeneratedRegex("""(?:var symbol: String|static func symbol\(_ command: String\) -> String)\s*\{""")] private static partial Regex SymbolBlockStart();
-    [GeneratedRegex("(?:case \\.[^:\\n]+:|return)\\s*\"([^\"]+)\"")] private static partial Regex BlockValue();
+    [GeneratedRegex("""^\s*\("[^"]+", "([^"]+)", "([^"]+)"\),""")] private static partial Regex LayerTuple();
+    [GeneratedRegex("""var symbol: String\s*\{""")] private static partial Regex SymbolProperty();
+    [GeneratedRegex("case \\.([^:\\n]+):\\s*\"([^\"]+)\"")] private static partial Regex SwitchCase();
+    [GeneratedRegex("""static func symbol\(_ command: String\) -> String\s*\{""")] private static partial Regex SymbolFunction();
+    [GeneratedRegex("case (.+): return \"([^\"]+)\"")] private static partial Regex HistoryCase();
+    [GeneratedRegex("hasPrefix\\(\"([^\"]+)\"\\).*return \"([^\"]+)\"")] private static partial Regex HistoryPrefix();
+    [GeneratedRegex("^\\s*return \"([^\"]+)\"")] private static partial Regex HistoryReturn();
     [GeneratedRegex("\"([a-zA-Z0-9_]+(?:\\.[a-zA-Z0-9_]+)+)\"")] private static partial Regex DottedLiteral();
 }
 
