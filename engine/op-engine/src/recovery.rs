@@ -20,12 +20,15 @@
 use super::{Engine, Error, Event, EventKind, Published, Result, bad, internal};
 use arc_swap::ArcSwap;
 use crossbeam_channel::{RecvTimeoutError, Sender, bounded, unbounded};
+#[cfg(windows)]
+use op_formats::replace_synced_file as replace_file;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -204,7 +207,27 @@ fn io_text(what: &str, path: &Path, e: impl std::fmt::Display) -> String {
 }
 
 fn sync_dir(dir: &Path) -> std::io::Result<()> {
-    File::open(dir)?.sync_all()
+    #[cfg(unix)]
+    {
+        File::open(dir)?.sync_all()
+    }
+    #[cfg(windows)]
+    {
+        // A folder opens only with FILE_FLAG_BACKUP_SEMANTICS, and flushing
+        // it needs a write handle: a read handle gives error 5 on sync_all.
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+        OpenOptions::new()
+            .write(true)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(dir)?
+            .sync_all()
+    }
+}
+
+#[cfg(unix)]
+fn replace_file(temp: &Path, target: &Path) -> std::io::Result<()> {
+    fs::rename(temp, target)
 }
 
 fn parent_of(dir: &Path) -> &Path {
@@ -232,8 +255,22 @@ fn url_path(url: &str) -> Option<PathBuf> {
             i += 1;
         }
     }
-    use std::os::unix::ffi::OsStrExt;
-    Some(PathBuf::from(std::ffi::OsStr::from_bytes(&out)))
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        Some(PathBuf::from(std::ffi::OsStr::from_bytes(&out)))
+    }
+    #[cfg(windows)]
+    {
+        let decoded = String::from_utf8(out).ok()?;
+        if decoded.starts_with('/') && decoded.as_bytes().get(2) == Some(&b':') {
+            Some(PathBuf::from(&decoded[1..]))
+        } else if rest.starts_with('/') {
+            Some(PathBuf::from(decoded))
+        } else {
+            Some(PathBuf::from(format!("//{decoded}")))
+        }
+    }
 }
 
 /// The size and modification time of the file at `url` now (None: no file).
@@ -385,7 +422,7 @@ fn write_record(
     let temp = write_temp(dir, MANIFEST, &text)
         .map_err(|e| drop_snapshot(fail(io_text("cannot write", &target, e))))?;
     stage(RecordStage::ManifestTemp);
-    if let Err(e) = fs::rename(&temp, &target) {
+    if let Err(e) = replace_file(&temp, &target) {
         let _ = fs::remove_file(&temp);
         return Err(drop_snapshot(fail(io_text("cannot write", &target, e))));
     }
@@ -478,7 +515,11 @@ pub fn parse_manifest(text: &[u8]) -> std::result::Result<Manifest, String> {
         return Err(format!("unknown record format {}", manifest.format));
     }
     let name = &manifest.snapshot;
-    if name.contains('/') || name.contains('\0') || !name.starts_with("snapshot-") {
+    if name.contains('/')
+        || name.contains('\0')
+        || !name.starts_with("snapshot-")
+        || (cfg!(windows) && (name.contains('\\') || name.contains(':')))
+    {
         return Err("bad snapshot name in the manifest".into());
     }
     Ok(manifest)
@@ -504,8 +545,37 @@ pub fn read_record(dir: &Path) -> std::result::Result<Manifest, String> {
     Ok(manifest)
 }
 
-fn same_file(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
-    a.dev() == b.dev() && a.ino() == b.ino()
+fn same_file(a: &Path, b: &File) -> bool {
+    #[cfg(unix)]
+    {
+        match (fs::metadata(a), b.metadata()) {
+            (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Storage::FileSystem::{
+            BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
+        };
+        let Ok(a) = File::open(a) else {
+            return false;
+        };
+        let info = |file: &File| {
+            let mut info = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::zeroed();
+            let ok = unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) };
+            (ok != 0).then(|| unsafe { info.assume_init() })
+        };
+        match (info(&a), info(b)) {
+            (Some(a), Some(b)) => {
+                a.dwVolumeSerialNumber == b.dwVolumeSerialNumber
+                    && a.nFileIndexHigh == b.nFileIndexHigh
+                    && a.nFileIndexLow == b.nFileIndexLow
+            }
+            _ => false,
+        }
+    }
 }
 
 /// A record folder's lock (`owner.lock`, flock). While it is held no other
@@ -636,10 +706,7 @@ impl FolderLock {
         if tests::FORCE_LOST.load(Ordering::SeqCst) {
             return false;
         }
-        match (fs::metadata(self.dir.join(LOCK)), self.file.metadata()) {
-            (Ok(a), Ok(b)) => same_file(&a, &b),
-            _ => false,
-        }
+        same_file(&self.dir.join(LOCK), &self.file)
     }
 
     /// Deletes the folder while still holding its lock: renames it to a
@@ -1385,6 +1452,86 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_directory_sync_accepts_a_real_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("record"), b"saved").unwrap();
+        sync_dir(dir.path()).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_file_urls_keep_drive_unc_and_unicode_paths() {
+        assert_eq!(
+            url_path("file:///C:/paint/a%20b.opaint"),
+            Some(PathBuf::from("C:/paint/a b.opaint"))
+        );
+        assert_eq!(
+            url_path("file://server/share/%E2%98%83.opaint"),
+            Some(PathBuf::from("//server/share/☃.opaint"))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_file_stamp_accepts_a_long_path() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("a".repeat(120)).join("b".repeat(120));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("image.opaint");
+        fs::write(&path, b"data").unwrap();
+        let url = format!("file:///{}", path.to_string_lossy().replace('\\', "/"));
+        assert_eq!(stamp_of(Some(&url)).unwrap().size, 4);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_same_file_compares_file_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a");
+        let b = dir.path().join("b");
+        fs::write(&a, b"one").unwrap();
+        fs::write(&b, b"two").unwrap();
+        let held = File::open(&a).unwrap();
+        assert!(same_file(&a, &held));
+        assert!(!same_file(&b, &held));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_atomic_replace_replaces_an_existing_manifest() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join(MANIFEST);
+        fs::write(&target, b"old").unwrap();
+        let temp = write_temp(dir.path(), MANIFEST, b"new").unwrap();
+        replace_file(&temp, &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"new");
+        assert!(!temp.exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_manifest_rejects_backslash_path_escape() {
+        let manifest = Manifest {
+            format: FORMAT,
+            revision: 1,
+            original_url: None,
+            original_type: None,
+            time_unix: 0.0,
+            snapshot: "snapshot-..\\outside.opaint".into(),
+            snapshot_bytes: 0,
+            snapshot_crc32: 0,
+            width: 1,
+            height: 1,
+            layers: 1,
+            pid: 0,
+            base_file: None,
+        };
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        assert!(parse_manifest(&bytes).is_err());
+    }
 
     /// Makes every lock look lost (taken over by another holder).
     pub(super) static FORCE_LOST: AtomicBool = AtomicBool::new(false);

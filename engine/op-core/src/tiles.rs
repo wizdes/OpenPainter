@@ -10,7 +10,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::ops::Deref;
+#[cfg(unix)]
 use std::os::unix::fs::FileExt;
+#[cfg(windows)]
+use std::os::windows::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -192,7 +195,10 @@ impl SpillIo for FileIo {
     fn append(&self, bytes: &[u8]) -> io::Result<u64> {
         let mut end = self.end.lock();
         let offset = *end;
+        #[cfg(unix)]
         self.file.write_all_at(bytes, offset)?;
+        #[cfg(windows)]
+        write_all_at(&self.file, bytes, offset)?;
         *end = offset
             .checked_add(bytes.len() as u64)
             .ok_or_else(|| io::Error::other("spill file offset overflow"))?;
@@ -200,8 +206,49 @@ impl SpillIo for FileIo {
     }
 
     fn read_exact_at(&self, offset: u64, bytes: &mut [u8]) -> io::Result<()> {
-        self.file.read_exact_at(bytes, offset)
+        #[cfg(unix)]
+        {
+            self.file.read_exact_at(bytes, offset)
+        }
+        #[cfg(windows)]
+        {
+            // seek_read moves the handle's cursor, but every read and write
+            // here names its own offset, so nothing depends on the cursor.
+            read_exact_at(&self.file, bytes, offset)
+        }
     }
+}
+
+#[cfg(windows)]
+fn write_all_at(file: &File, mut bytes: &[u8], mut offset: u64) -> io::Result<()> {
+    while !bytes.is_empty() {
+        let count = file.seek_write(bytes, offset)?;
+        if count == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "spill write returned zero bytes",
+            ));
+        }
+        offset += count as u64;
+        bytes = &bytes[count..];
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn read_exact_at(file: &File, mut bytes: &mut [u8], mut offset: u64) -> io::Result<()> {
+    while !bytes.is_empty() {
+        let count = file.seek_read(bytes, offset)?;
+        if count == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "spill read reached end",
+            ));
+        }
+        offset += count as u64;
+        bytes = &mut bytes[count..];
+    }
+    Ok(())
 }
 
 impl Drop for FileIo {
@@ -213,6 +260,44 @@ impl Drop for FileIo {
                 self.path.display()
             );
         }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_file_tests {
+    use super::*;
+
+    #[test]
+    fn positioned_spill_reads_work_at_any_offset_across_threads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("spill");
+        let file = OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        let io = FileIo {
+            file,
+            path,
+            end: Mutex::new(0),
+        };
+        let first = io.append(b"first").unwrap();
+        let second = io.append(b"second").unwrap();
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                scope.spawn(|| {
+                    for _ in 0..500 {
+                        let mut bytes = [0; 6];
+                        io.read_exact_at(second, &mut bytes).unwrap();
+                        assert_eq!(&bytes, b"second");
+                        let mut head = [0; 5];
+                        io.read_exact_at(first, &mut head).unwrap();
+                        assert_eq!(&head, b"first");
+                    }
+                });
+            }
+        });
     }
 }
 

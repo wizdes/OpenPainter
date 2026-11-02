@@ -274,6 +274,7 @@ fn an_amend_right_after_a_save_marks_the_image_edited() {
 /// target, keeps the link, and keeps the target's permissions.
 #[test]
 fn a_png_save_through_a_symlink_keeps_the_link_and_permissions() {
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     let real = dir.path().join("real.png");
@@ -281,8 +282,18 @@ fn a_png_save_through_a_symlink_keeps_the_link_and_permissions() {
     let e = Engine::new(None).unwrap();
     let id = blue(&e);
     e.save_document(id, &real, SaveFormat::Png, false).unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o640)).unwrap();
+    #[cfg(windows)]
+    {
+        let mut p = std::fs::metadata(&real).unwrap().permissions();
+        p.set_readonly(false);
+        std::fs::set_permissions(&real, p).unwrap();
+    }
+    #[cfg(unix)]
     std::os::unix::fs::symlink(&real, &link).unwrap();
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(&real, &link).unwrap();
     run(&e, id, "image.invert_colors", json!({})).unwrap();
     e.save_document(id, &link, SaveFormat::Png, true).unwrap();
     assert!(
@@ -297,8 +308,13 @@ fn a_png_save_through_a_symlink_keeps_the_link_and_permissions() {
         e2.query(back, "doc.pixels", json!({})).unwrap()[..4],
         [255, 255, 0, 255]
     );
-    let mode = std::fs::metadata(&real).unwrap().permissions().mode() & 0o777;
-    assert_eq!(mode, 0o640);
+    #[cfg(unix)]
+    {
+        let mode = std::fs::metadata(&real).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o640);
+    }
+    #[cfg(windows)]
+    assert!(!std::fs::metadata(&real).unwrap().permissions().readonly());
 }
 
 fn kept_metadata(e: &Engine, id: u64) -> Value {

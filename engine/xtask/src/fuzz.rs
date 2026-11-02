@@ -202,7 +202,7 @@ pub fn rss_kib(pid: u32) -> Option<u64> {
         }
         Some(info[9] / 1024)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     {
         let out = Command::new("ps")
             .args(["-o", "rss=", "-p", &pid.to_string()])
@@ -210,6 +210,44 @@ pub fn rss_kib(pid: u32) -> Option<u64> {
             .ok()?;
         String::from_utf8_lossy(&out.stdout).trim().parse().ok()
     }
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::ProcessStatus::{
+            K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+        };
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+        };
+        let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid) };
+        if handle.is_null() {
+            return None;
+        }
+        let mut info = std::mem::MaybeUninit::<PROCESS_MEMORY_COUNTERS>::zeroed();
+        let ok = unsafe {
+            K32GetProcessMemoryInfo(
+                handle,
+                info.as_mut_ptr(),
+                std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+            )
+        };
+        unsafe { CloseHandle(handle) };
+        (ok != 0).then(|| unsafe { info.assume_init().WorkingSetSize as u64 / 1024 })
+    }
+}
+
+#[cfg(windows)]
+fn kill_process(pid: u32) -> std::io::Result<()> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
+    let handle = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
+    if handle.is_null() {
+        return Err(std::io::Error::last_os_error());
+    }
+    let ok = unsafe { TerminateProcess(handle, 1) };
+    let error = std::io::Error::last_os_error();
+    unsafe { CloseHandle(handle) };
+    if ok == 0 { Err(error) } else { Ok(()) }
 }
 
 /// Kills `pid` (SIGKILL) once its resident size passes `limit_kib`.
@@ -218,7 +256,14 @@ fn watch_memory(pid: u32, limit_kib: u64, flag: Arc<AtomicBool>) {
         while let Some(kib) = rss_kib(pid) {
             if kib > limit_kib {
                 flag.store(true, Ordering::SeqCst);
-                let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+                #[cfg(unix)]
+                if let Err(e) = Command::new("kill").args(["-9", &pid.to_string()]).status() {
+                    eprintln!("fuzz: cannot kill worker {pid}: {e}");
+                }
+                #[cfg(windows)]
+                if let Err(e) = kill_process(pid) {
+                    eprintln!("fuzz: cannot kill worker {pid}: {e}");
+                }
                 return;
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -500,6 +545,27 @@ pub fn main(engine: &Path, args: &[String]) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn the_memory_watchdog_reads_the_current_process() {
+        let kib = rss_kib(std::process::id()).expect("Windows process memory is visible");
+        assert!(kib > 0 && kib < RSS_LIMIT_KIB);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_memory_watchdog_kills_a_worker_over_its_limit() {
+        let mut child = Command::new("powershell")
+            .args(["-NoProfile", "-Command", "Start-Sleep -Seconds 5"])
+            .spawn()
+            .unwrap();
+        let flag = Arc::new(AtomicBool::new(false));
+        watch_memory(child.id(), 1, flag.clone());
+        let status = child.wait().unwrap();
+        assert!(!status.success());
+        assert!(flag.load(Ordering::SeqCst));
+    }
 
     #[test]
     fn arguments_default_to_ten_minutes_for_every_target() {

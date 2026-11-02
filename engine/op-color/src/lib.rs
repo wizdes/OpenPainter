@@ -77,8 +77,13 @@ impl Profile {
         }
         let p = lcms2::Profile::new_icc(bytes).map_err(|e| Error::InvalidProfile(e.to_string()))?;
         let hash = hash::sha256(bytes);
-        let description = p
-            .info(InfoType::Description, Locale::none())
+        // lcms2 6.2.0 unwraps an invalid Unicode scalar in a damaged
+        // description. Keep the bad profile from unwinding through callers.
+        let info = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            p.info(InfoType::Description, Locale::none())
+        }))
+        .map_err(|_| Error::InvalidProfile("ICC description contains invalid Unicode".into()))?;
+        let description = info
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "Embedded ICC profile".into());
         Ok(Self {

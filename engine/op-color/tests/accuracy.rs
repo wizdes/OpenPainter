@@ -313,6 +313,20 @@ fn malformed_icc_2000_mutations_and_truncations() {
         }
     }
 }
+
+#[test]
+fn damaged_icc_description_returns_an_error_instead_of_panicking() {
+    let mut damaged = Profile::builtin("display-p3").unwrap().bytes().to_vec();
+    let mut seed = 0x27182818u32;
+    for _ in 0..=189 {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+    }
+    assert_eq!(seed as usize % damaged.len(), 296);
+    damaged[296] ^= (seed >> 8) as u8;
+    assert!(Profile::from_icc(&damaged).is_err());
+}
 #[test]
 fn gray_to_rgb_accuracy() {
     let src = Profile::builtin("gray-2.2").unwrap();

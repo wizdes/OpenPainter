@@ -10,7 +10,9 @@ use op_core::doc::DocState;
 use op_core::history::History;
 use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use serde_json::json;
-use std::fs::{self, File, OpenOptions};
+#[cfg(unix)]
+use std::fs::File;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -94,8 +96,15 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
         if let Some(permissions) = &target.permissions {
             fs::set_permissions(&temp, permissions.clone())?;
         }
-        fs::rename(&temp, path)?;
-        File::open(parent)?.sync_all()
+        #[cfg(unix)]
+        {
+            fs::rename(&temp, path)?;
+            File::open(parent)?.sync_all()
+        }
+        #[cfg(windows)]
+        {
+            op_formats::replace_synced_file(&temp, path)
+        }
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temp);

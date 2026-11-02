@@ -2,6 +2,54 @@
 pub mod opaint;
 pub mod png;
 
+/// Replace a fully synced temporary file on Windows and flush the rename.
+#[cfg(windows)]
+pub fn replace_synced_file(
+    temp: &std::path::Path,
+    target: &std::path::Path,
+) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use std::time::Duration;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+    };
+    const REPLACE_ATTEMPTS: usize = 8;
+    const REPLACE_RETRY_DELAY: Duration = Duration::from_millis(25);
+    const ERROR_ACCESS_DENIED: i32 = 5;
+    const ERROR_SHARING_VIOLATION: i32 = 32;
+    let wide = |p: &std::path::Path| {
+        p.as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<u16>>()
+    };
+    let from = wide(temp);
+    let to = wide(target);
+    for attempt in 0..REPLACE_ATTEMPTS {
+        let ok = unsafe {
+            MoveFileExW(
+                from.as_ptr(),
+                to.as_ptr(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        };
+        if ok != 0 {
+            return Ok(());
+        }
+        let error = std::io::Error::last_os_error();
+        if attempt + 1 == REPLACE_ATTEMPTS
+            || !matches!(
+                error.raw_os_error(),
+                Some(ERROR_ACCESS_DENIED | ERROR_SHARING_VIOLATION)
+            )
+        {
+            return Err(error);
+        }
+        std::thread::sleep(REPLACE_RETRY_DELAY);
+    }
+    unreachable!("the final attempt returns its error")
+}
+
 mod bmp;
 mod exif_ifd;
 mod io;

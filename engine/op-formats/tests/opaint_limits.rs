@@ -8,10 +8,23 @@ use op_formats::opaint::{
     MAX_LAYER_NAME_CHARS, MAX_LAYERS, MAX_STACK_XML, load_opaint, save_opaint,
 };
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};
+
+#[cfg(windows)]
+#[test]
+fn windows_saves_replace_an_existing_opaint_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("repeat.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let second = first.set_layer_name(0, "Second save").unwrap();
+    save_opaint(&second, &path).unwrap();
+    assert_eq!(load_opaint(&path).unwrap().layers[0].name, "Second save");
+}
 
 fn doc(dir: &tempfile::TempDir, w: u32, h: u32) -> DocState {
     let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
@@ -284,8 +297,18 @@ fn a_save_through_a_symlink_replaces_the_target_and_keeps_its_permissions() {
     let link = dir.path().join("link.opaint");
     let d = doc(&dir, 2, 2);
     save_opaint(&d, &real).unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o600)).unwrap();
+    #[cfg(windows)]
+    {
+        let mut p = std::fs::metadata(&real).unwrap().permissions();
+        p.set_readonly(false);
+        std::fs::set_permissions(&real, p).unwrap();
+    }
+    #[cfg(unix)]
     std::os::unix::fs::symlink("real.opaint", &link).unwrap();
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(&real, &link).unwrap();
     let renamed = d.set_layer_name(0, "Through the link").unwrap();
     save_opaint(&renamed, &link).unwrap();
     assert!(
@@ -299,8 +322,16 @@ fn a_save_through_a_symlink_replaces_the_target_and_keeps_its_permissions() {
         load_opaint(&real).unwrap().layers[0].name,
         "Through the link"
     );
-    let mode = std::fs::metadata(&real).unwrap().permissions().mode() & 0o777;
-    assert_eq!(mode, 0o600, "the target keeps its permissions");
+    #[cfg(unix)]
+    {
+        let mode = std::fs::metadata(&real).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "the target keeps its permissions");
+    }
+    #[cfg(windows)]
+    assert!(
+        !std::fs::metadata(&real).unwrap().permissions().readonly(),
+        "the target keeps its permissions"
+    );
 }
 
 /// Item 5: the kept image metadata is its own ZIP entry, not stack.xml text.

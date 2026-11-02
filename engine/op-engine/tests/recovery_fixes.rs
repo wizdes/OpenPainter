@@ -3,7 +3,9 @@
 //! over a newer clean save, folders lost between a scan and an attach, clean-up
 //! errors that were hidden, and a close that waited for a write.
 use op_engine::recovery::{self, RecordHooks, RecordStage, RecoveryOptions};
-use op_engine::{Engine, Event, EventKind, SaveFormat};
+use op_engine::{Engine, SaveFormat};
+#[cfg(unix)]
+use op_engine::{Event, EventKind};
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -253,6 +255,7 @@ fn item3_concurrent_attaches_and_scans_lose_no_folder() {
 }
 
 #[test]
+#[cfg(unix)] // Unix mode bits provide the permission failure injected by this test.
 fn item5_a_failed_clean_up_is_reported_and_retried() {
     use std::os::unix::fs::PermissionsExt;
     let root = tempfile::tempdir().unwrap();

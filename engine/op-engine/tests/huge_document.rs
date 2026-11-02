@@ -20,16 +20,19 @@ const MEMORY_CAP: u64 = 2 << 30;
 
 #[repr(C)]
 #[derive(Default)]
+#[cfg(unix)]
 struct RUsage {
     times: [i64; 4],
     maxrss: i64,
     rest: [i64; 13],
 }
+#[cfg(unix)]
 unsafe extern "C" {
     fn getrusage(who: i32, usage: *mut RUsage) -> i32;
 }
 
 /// The process's peak resident memory in bytes (macOS reports bytes, Linux KiB).
+#[cfg(unix)]
 fn peak_rss() -> u64 {
     let mut u = RUsage::default();
     assert_eq!(unsafe { getrusage(0, &mut u) }, 0);
@@ -38,6 +41,29 @@ fn peak_rss() -> u64 {
     } else {
         u.maxrss as u64 * 1024
     }
+}
+
+#[cfg(windows)]
+fn peak_rss() -> u64 {
+    use windows_sys::Win32::System::ProcessStatus::{
+        K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+    let mut info = std::mem::MaybeUninit::<PROCESS_MEMORY_COUNTERS>::zeroed();
+    let ok = unsafe {
+        K32GetProcessMemoryInfo(
+            GetCurrentProcess(),
+            info.as_mut_ptr(),
+            std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        )
+    };
+    assert_ne!(
+        ok,
+        0,
+        "GetProcessMemoryInfo: {}",
+        std::io::Error::last_os_error()
+    );
+    unsafe { info.assume_init().PeakWorkingSetSize as u64 }
 }
 
 fn mb(bytes: u64) -> f64 {

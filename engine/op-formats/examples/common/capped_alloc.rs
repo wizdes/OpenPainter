@@ -62,10 +62,12 @@ unsafe impl GlobalAlloc for Capped {
 static GLOBAL: Capped = Capped;
 
 #[repr(C)]
+#[cfg(unix)]
 struct RLimit {
     cur: u64,
     max: u64,
 }
+#[cfg(unix)]
 unsafe extern "C" {
     fn setrlimit(resource: i32, rlp: *const RLimit) -> i32;
 }
@@ -73,6 +75,7 @@ unsafe extern "C" {
 /// Also asks the kernel for 2 GiB limits: RLIMIT_DATA, then RLIMIT_AS.
 /// macOS refuses RLIMIT_AS and does not apply RLIMIT_DATA to mmap, so the
 /// capped allocator above is the limit that holds; the result is logged.
+#[cfg(unix)]
 pub fn set_rlimit() -> String {
     #[cfg(target_os = "macos")]
     const LIMITS: [(&str, i32); 2] = [("RLIMIT_DATA", 2), ("RLIMIT_AS", 5)];
@@ -90,4 +93,11 @@ pub fn set_rlimit() -> String {
         })
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+/// Windows has no `setrlimit`; the Rust allocator cap and process watchdog
+/// remain active, and the worker reports this limit to its caller.
+#[cfg(windows)]
+pub fn set_rlimit() -> String {
+    "Windows has no setrlimit; Rust allocation cap and resident-size watchdog active".into()
 }

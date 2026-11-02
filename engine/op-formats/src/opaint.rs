@@ -255,8 +255,15 @@ fn save_impl(
         }
         checkpoint(usize::MAX)?;
         if !keep_temp {
-            fs::rename(&temp, path)?;
-            File::open(parent)?.sync_all()?;
+            #[cfg(unix)]
+            {
+                fs::rename(&temp, path)?;
+                File::open(parent)?.sync_all()?;
+            }
+            #[cfg(windows)]
+            {
+                crate::replace_synced_file(&temp, path)?;
+            }
         }
         Ok(())
     })();
@@ -1186,7 +1193,14 @@ mod tests {
             Error::Io(e) => assert_eq!(e.raw_os_error(), Some(28)),
             other => panic!("expected an I/O error, got {other}"),
         }
+        #[cfg(unix)]
         assert!(error.to_string().contains("No space left on device"));
+        #[cfg(windows)]
+        assert!(
+            error
+                .to_string()
+                .contains(&std::io::Error::from_raw_os_error(28).to_string())
+        );
         assert!(writes > 0);
         assert_eq!(fs::read(&path).unwrap(), old);
         let names: Vec<_> = fs::read_dir(dir.path())
