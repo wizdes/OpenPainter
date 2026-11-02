@@ -514,6 +514,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn the_memory_watchdog_reads_a_live_process_and_none_after_it_ends() {
         let mut child = Command::new("sleep").arg("5").spawn().unwrap();
         let kib = rss_kib(child.id()).unwrap();

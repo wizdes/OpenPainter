@@ -1,0 +1,10 @@
+[package]
+name = "gpu-probe"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+wgpu = "=27.0.1"
+pollster = "0.4"

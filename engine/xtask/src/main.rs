@@ -12,6 +12,7 @@ enum Status {
     Pass,
     Fail,
     Skip,
+    NotRun,
 }
 
 impl Status {
@@ -20,6 +21,7 @@ impl Status {
             Self::Pass => "PASS",
             Self::Fail => "FAIL",
             Self::Skip => "SKIP",
+            Self::NotRun => "NOT RUN",
         }
     }
 }
@@ -207,13 +209,32 @@ fn main() -> ExitCode {
         return fuzz::main(&engine, &args[1..]);
     }
     if args.len() != 3 || args[0] != "check" || args[1] != "--tier" {
-        eprintln!("Usage: cargo xtask check --tier fast|milestone|checkpoint");
+        eprintln!("Usage: cargo xtask check --tier fast|milestone|window|checkpoint|speed");
         return ExitCode::from(2);
     }
     let tier = args[2].as_str();
-    if !matches!(tier, "fast" | "milestone" | "checkpoint") {
+    if !matches!(
+        tier,
+        "fast" | "milestone" | "window" | "checkpoint" | "speed"
+    ) {
         eprintln!("Unknown tier: {tier}");
         return ExitCode::from(2);
+    }
+    if matches!(tier, "window" | "speed") {
+        let mut steps = Vec::new();
+        for part in pending_parts(tier) {
+            not_run(&mut steps, part, "not implemented");
+        }
+        println!("\nSummary");
+        for step in &steps {
+            println!(
+                "{} {:.2}s {}",
+                step.status.label(),
+                step.duration.as_secs_f64(),
+                step.name
+            );
+        }
+        return ExitCode::FAILURE;
     }
     let engine = engine_dir(
         std::env::var_os("CARGO_MANIFEST_DIR"),
@@ -326,11 +347,37 @@ fn main() -> ExitCode {
             step.name
         );
     }
-    if steps.iter().any(|step| matches!(step.status, Status::Fail)) {
+    if tier_failed(&steps) {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
     }
+}
+
+fn tier_failed(steps: &[Step]) -> bool {
+    steps
+        .iter()
+        .any(|step| matches!(step.status, Status::Fail | Status::NotRun))
+}
+
+fn pending_parts(tier: &str) -> &'static [&'static str] {
+    match tier {
+        "window" => &[
+            "critical flows in real windows",
+            "one shot per changed screen",
+        ],
+        "speed" => &["launch", "app size", "file open", "blur", "brush"],
+        _ => &[],
+    }
+}
+
+fn not_run(steps: &mut Vec<Step>, name: &str, reason: &str) {
+    println!("NOT RUN 0.00s {name}: {reason}");
+    steps.push(Step {
+        name: name.into(),
+        duration: Duration::ZERO,
+        status: Status::NotRun,
+    });
 }
 
 fn run(steps: &mut Vec<Step>, name: &str, dir: &Path, program: &str, args: &[&str]) {
@@ -445,7 +492,31 @@ fn run_script(steps: &mut Vec<Step>, name: &str, repo: &Path, app: Option<&Path>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn window_and_speed_parts_are_pending_and_fail_the_tier() {
+        assert_eq!(
+            pending_parts("window"),
+            [
+                "critical flows in real windows",
+                "one shot per changed screen"
+            ]
+        );
+        assert_eq!(
+            pending_parts("speed"),
+            ["launch", "app size", "file open", "blur", "brush"]
+        );
+        for tier in ["window", "speed"] {
+            let mut steps = Vec::new();
+            for part in pending_parts(tier) {
+                not_run(&mut steps, part, "not implemented");
+            }
+            assert!(steps.iter().all(|s| matches!(s.status, Status::NotRun)));
+            assert!(tier_failed(&steps));
+        }
+    }
 
     #[test]
     fn fast_tier_runs_only_the_base_checks() {
@@ -575,8 +646,15 @@ mod tests {
             &mut steps,
             "env",
             &dir,
-            "sh",
-            &["-c", "test \"$OP_PROPTEST_CASES\" = 1024"],
+            if cfg!(windows) { "cmd" } else { "sh" },
+            if cfg!(windows) {
+                &[
+                    "/C",
+                    "if %OP_PROPTEST_CASES%==1024 (exit /b 0) else (exit /b 1)",
+                ]
+            } else {
+                &["-c", "test \"$OP_PROPTEST_CASES\" = 1024"]
+            },
             &[("OP_PROPTEST_CASES", "1024")],
             false,
         );
@@ -602,6 +680,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn size_report_rejects_even_a_rounded_overrun() {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -721,6 +800,7 @@ mod tests {
 
     /// Runs scripts/perf-compare.sh on a run and a baseline that differ from
     /// the defaults by `run` and `base` (key, value) pairs.
+    #[cfg(unix)]
     fn perf_compare(tag: &str, run: &[(&str, &str)], base: &[(&str, &str)]) -> (bool, String) {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -765,6 +845,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn perf_compare_passes_within_ten_percent() {
         let (ok, text) = perf_compare("ok", &[("launch_p95_ms", "2199")], &[]);
         assert!(ok, "{text}");
@@ -779,6 +860,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn perf_compare_fails_on_a_launch_p95_regression() {
         let (ok, text) = perf_compare("p95", &[("launch_p95_ms", "2201")], &[]);
         assert!(
@@ -788,6 +870,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn perf_compare_fails_on_a_first_effect_regression() {
         let (ok, text) = perf_compare("effect", &[("first_effect_median_ms", "1300")], &[]);
         assert!(
@@ -797,6 +880,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn perf_compare_refuses_a_purged_run_against_an_unpurged_baseline() {
         let (ok, text) = perf_compare("purge", &[("cache_purged", "1")], &[]);
         assert!(!ok && text.contains("do not compare"), "{text}");
@@ -805,6 +889,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn perf_compare_refuses_another_machine() {
         let (ok, text) = perf_compare("machine", &[], &[("machine", "\"Other Mac\"")]);
         assert!(!ok && text.contains("the baseline is from"), "{text}");
