@@ -168,7 +168,7 @@ The line is where each test failed. W2 owns the recovery folder change: Windows 
 - `op-engine/src/recovery.rs`: Windows URL decoding now keeps drive letters, Unicode and UNC paths. A save past the old 260-character limit passes. A record whose original file cannot be checked is now offered as possibly older, while a file that is really gone stays safe. Manifests now reject Windows backslashes and colons in snapshot names. File identity uses the volume and file index from `GetFileInformationByHandle`.
 - `op-color/src/lib.rs`: lcms2 panics on a wide character it cannot convert. On Windows that includes a valid surrogate pair, because `wchar_t` is 16 bits there. Only the name falls back to "Embedded ICC profile", and the rest of the profile is still used.
 - `xtask/src/fuzz.rs` and `op-formats/examples/common/capped_alloc.rs`: the Windows fuzz watchdog reads a process's working set and uses `TerminateProcess`. The worker reports that Windows has no `setrlimit`; its Rust allocation cap and the driver watchdog stay active.
-- `op-ffi/Cargo.toml`: the C interface now builds as `op_ffi.dll`. Python `ctypes.WinDLL` found `op_engine_new`, `op_engine_free`, `op_import_pixels`, `op_dispatch` and `op_query`.
+- `op-ffi`: `cargo rustc -p op-ffi --lib --crate-type cdylib` builds `op_ffi.dll`, so the Mac's crate types stay as they were. Python `ctypes` found `op_engine_new`, `op_engine_free` and `op_import_pixels` in it. W7 adds a test.
 - `op-formats/tests/opaint_limits.rs`, `op-engine/tests/release_review.rs`, `op-engine/tests/huge_document.rs`, `op-engine/tests/recovery_fixes.rs`, `op-color/tests/accuracy.rs`, plus the inline tests above: Windows symlinks, working-set memory and saved regressions. The Unix mode-bit permission test remains Unix only because Windows readonly flags do not deny file deletion the same way.
 - `engine/Cargo.lock`, `op-engine/Cargo.toml`, `op-formats/Cargo.toml`, and `xtask/Cargo.toml`: Windows API dependency records and features.
 
@@ -193,7 +193,7 @@ The first failing reference pixel is `(16, 6)` in `Mandelbrot_Fractal_default_im
 | `cargo test -p xtask --no-fail-fast` | Passed 15/15. |
 | `cargo build -p op-formats --example fuzz_worker` and `cargo build -p op-engine --example fuzz_engine_worker` | Both passed. |
 | `cargo run -p xtask -- fuzz --seconds 1 icc` | 67,545 cases; zero crashes, hangs, aborts or out-of-memory cases. Log: `target/w1-fuzz.log`. |
-| `cargo build -p op-ffi` | Passed; `target/debug/op_ffi.dll` is 13,742,592 bytes. The five named C exports loaded through `ctypes.WinDLL`. |
+| `cargo rustc -p op-ffi --lib --crate-type cdylib` | Passed; the DLL loads through `ctypes`, and 3 named exports were found. |
 | `cargo test --workspace --no-fail-fast` | Stopped during `op-gpu/tests/effects.rs` after 14 tests remained active for several minutes. Log: `target/w1-final.log`. **Full GPU suite NOT COMPLETED.** |
 | `cargo test --workspace --exclude op-gpu --no-fail-fast` | Final log `target/w1-nongpu-final.log`: 29 failed tests in nine test targets, all listed above; other test targets finished. |
 | `cargo test -p op-engine --test huge_document --no-fail-fast -- --ignored --nocapture` | Failed at `huge_document.rs:136` during W2 recovery attach. The later memory-cap assertion was **NOT RUN**. Log: `target/w1-huge.log`. |
