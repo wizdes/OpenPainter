@@ -557,6 +557,22 @@ fn engine_run(
         .map_err(|err| err.to_string())?;
     let ms = start.elapsed().as_secs_f64() * 1000.0;
     let gi = info(e, doc);
+    #[cfg(windows)]
+    if gi["gpu_effects"]["gpu_runs"].as_u64().unwrap() > before {
+        assert_eq!(gi["gpu_device"]["backend"], "Dx12", "{id}: {gi}");
+        let name = gi["gpu_device"]["adapter"].as_str().unwrap_or("");
+        if std::env::var("OP_GPU_ADAPTER").as_deref() == Ok("warp") {
+            assert!(
+                name.to_ascii_lowercase().contains("basic render"),
+                "{id}: {gi}"
+            );
+        } else {
+            assert!(
+                !name.to_ascii_lowercase().contains("basic render"),
+                "{id}: {gi}"
+            );
+        }
+    }
     let fell_back = (gi["gpu_effects"]["gpu_runs"].as_u64().unwrap() == before).then(|| {
         gi["gpu_effects"]["last_cpu_reason"]
             .as_str()

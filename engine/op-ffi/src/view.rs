@@ -214,14 +214,21 @@ struct Gpu {
 
 impl Gpu {
     fn new() -> Result<Self, String> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::METAL,
-            flags: wgpu::InstanceFlags::from_build_config().with_env(),
-            ..Default::default()
-        });
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-                .map_err(|e| format!("adapter: {e}"))?;
+        #[cfg(windows)]
+        let (instance, adapter) = op_gpu::windows_adapter().map_err(|e| e.to_string())?;
+        #[cfg(not(windows))]
+        let (instance, adapter) = {
+            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+                backends: wgpu::Backends::METAL,
+                flags: wgpu::InstanceFlags::from_build_config().with_env(),
+                ..Default::default()
+            });
+            let adapter = pollster::block_on(
+                instance.request_adapter(&wgpu::RequestAdapterOptions::default()),
+            )
+            .map_err(|e| format!("adapter: {e}"))?;
+            (instance, adapter)
+        };
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("OpenPainter canvas"),
             required_limits: adapter.limits(),

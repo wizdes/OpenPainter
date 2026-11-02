@@ -25,6 +25,47 @@ pub enum GpuError {
 }
 pub type Result<T> = std::result::Result<T, GpuError>;
 
+/// Selects one DX12 adapter for effects and canvas views on Windows.
+#[cfg(windows)]
+pub fn windows_adapter() -> Result<(wgpu::Instance, wgpu::Adapter)> {
+    let choice = std::env::var("OP_GPU_ADAPTER").unwrap_or_else(|_| "hardware".into());
+    if choice != "hardware" && choice != "warp" {
+        return Err(GpuError::NoAdapter(format!(
+            "unknown OP_GPU_ADAPTER={choice}; use hardware or warp"
+        )));
+    }
+    // FXC ships with Windows. DXC would require shipping dxcompiler.dll.
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::DX12,
+        ..Default::default()
+    });
+    let adapter = if choice == "warp" {
+        instance
+            .enumerate_adapters(wgpu::Backends::DX12)
+            .into_iter()
+            .find(|a| {
+                let info = a.get_info();
+                info.backend == wgpu::Backend::Dx12
+                    && info.device_type == wgpu::DeviceType::Cpu
+                    && info.name.to_ascii_lowercase().contains("basic render")
+            })
+            .ok_or_else(|| GpuError::NoAdapter("DX12 WARP adapter was not found".into()))?
+    } else {
+        let adapter =
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+                .map_err(|e| GpuError::NoAdapter(format!("DX12 hardware: {e}")))?;
+        let info = adapter.get_info();
+        if info.backend != wgpu::Backend::Dx12 || info.device_type == wgpu::DeviceType::Cpu {
+            return Err(GpuError::NoAdapter(format!(
+                "DX12 hardware requested but {} ({:?}, {:?}) was selected",
+                info.name, info.backend, info.device_type
+            )));
+        }
+        adapter
+    };
+    Ok((instance, adapter))
+}
+
 #[derive(Debug, Clone)]
 pub struct GpuInfo {
     pub name: String,
@@ -704,10 +745,17 @@ impl GpuContext {
         self.readback(&output, width, height)
     }
     pub fn new() -> Result<Self> {
-        let instance = wgpu::Instance::default();
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-                .map_err(|e| GpuError::NoAdapter(e.to_string()))?;
+        #[cfg(windows)]
+        let (_instance, adapter) = windows_adapter()?;
+        #[cfg(not(windows))]
+        let (_instance, adapter) = {
+            let instance = wgpu::Instance::default();
+            let adapter = pollster::block_on(
+                instance.request_adapter(&wgpu::RequestAdapterOptions::default()),
+            )
+            .map_err(|e| GpuError::NoAdapter(e.to_string()))?;
+            (instance, adapter)
+        };
         let info = adapter.get_info();
         let limits = adapter.limits();
         let features = adapter.features();

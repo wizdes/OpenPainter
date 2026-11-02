@@ -222,3 +222,25 @@ Two earlier failures were intermittent. `op-engine/tests/jobs.rs:461` ended twic
 - Fuzz: `rss_kib` keeps returning a value while the child's handle is open, so the Windows watchdog polls until the handle closes.
 - W19: stress the C-interface job queue under load.
 - Tool setup: install the missing Apple target outside this builder's owned paths, then rerun the cross-target check and Mac runtime tests.
+
+## W3 Windows GPU check (2026-11-02)
+
+The effects path now asks for DX12 on Windows. `OP_GPU_ADAPTER=hardware` selects the RTX 3060 Ti; `OP_GPU_ADAPTER=warp` selects Microsoft Basic Render Driver. An unknown selector fails with its name. The view device uses the same selector, but `op_view_attach` still returns `OP_ERR_UNSUPPORTED` on Windows, so no window frame was tested. macOS still asks for Metal in the view path and keeps its default effects adapter choice.
+
+The saved `op-gpu/tests/windows_backend.rs` test failed before the selection change: it got `Vulkan` instead of `Dx12`. It passed afterward on RTX and WARP, 1/1 for each. `OP_GPU_ADAPTER=bogus` failed by name as intended. The normal M54 tests also check the reported DX12 backend and adapter on each GPU effect run.
+
+| Check | RTX 3060 Ti | WARP |
+| --- | --- | --- |
+| `cargo test -p op-engine --test m54_parity --no-fail-fast -j 8 -- --nocapture` | 8 passed, 2 failed, 2 ignored; 38.16 s. Failures: known Mandelbrot legacy row (worst 23/255) and new DX12 Twist CPU/GPU difference (worst 232/255). | Process exited `STATUS_ACCESS_VIOLATION` after one completed test with default test threading. |
+| Same M54 command with `--test-threads=1` | NOT RUN | 8 passed, 2 failed, 2 ignored; 100.57 s. The same Mandelbrot and Twist failures. |
+| `cargo test -p op-gpu --test presenter lut_on_gpu_matches_cpu_trilinear_within_one_level --no-fail-fast -j 8 -- --exact --nocapture` | Failed; worst 0.55805206 levels against the current 0.511-level bound. Adapter reported DX12. | NOT RUN |
+| `cargo test -p op-engine --test engine --no-fail-fast -j 8 -- --test-threads=1 --nocapture` | 11 passed, 0 failed; 4.09 s. | NOT RUN |
+| `cargo test -p op-engine --test jobs random_operations_keep_published_snapshot_equal_to_actor_state --no-fail-fast -j 8 -- --exact --nocapture` | 1 passed, 0 failed; 9.23 s. | 1 passed, 0 failed; 6.71 s. |
+| `cargo test -p op-gpu --no-fail-fast -j 8 -- --test-threads=1` | 52 passed, 2 failed, 1 ignored. `effects.rs` fails on Twist (`49` vs `50`); `presenter.rs` fails on the color table. Other test targets finished. | 52 passed, 2 failed, 1 ignored. `effects.rs` fails on Twist (`49` vs `50`) and a configurable adjustment endpoint (`[91, 92, 91, 0]` vs `[92, 92, 92, 0]`). The color table passed. |
+| `cargo test -p op-ffi --no-fail-fast -j 8` | 17 passed, 0 failed. Mac-only view tests compiled as zero tests on Windows. | NOT RUN |
+
+Logs for the completed runs are under `engine/target/w3-*.log`. The runs set `CARGO_INCREMENTAL=0` and `CARGO_PROFILE_DEV_DEBUG=0` after an initial `wgpu-core` compile failed with disk error 112. `cargo clean` removed 1.1 GiB of generated files, including that failed attempt's log, then the focused backend regression built and ran. `cargo check -p op-ffi --all-targets -j 8` passed with the same build settings. The first color attempt before the backend change stopped at the disk error, so the Vulkan color number above is from W1. The full `op-gpu` runs finished all test targets on both adapters; the RTX color table failed and the WARP color table passed.
+
+The engine hang did not recur alone. Inspection found blocking GPU polls without deadlines in `op-gpu/src/lib.rs`, but no confirmed link to the reported 30-minute full-CPU spin. The `jobs.rs:461` crash did not recur in four focused RTX runs: 9.23, 8.07, 8.08, and 9.44 s. The WARP M54 crash did recur with default test threading, then disappeared with serial test threading; its cause is still unknown. No assertion, tolerance, or effect output changed.
+
+**NOT RUN:** the ignored release M54 matrix writer (it writes `docs/reports/parity-matrix.md`, outside this builder's owned paths); the real Win32 host, resize, switch, create-destroy, display ICC and DWM check, real device removal, direct lcms2 ??E00 check, and Mac view runtime and compile checks. The Win32 host is not built. W3's 0-failure done-test is not met.
