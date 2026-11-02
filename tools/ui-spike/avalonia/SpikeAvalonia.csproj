@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationManifest>src/app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../engine/target/release/op_ffi.dll" Link="op_ffi.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../../engine/target/release/op_ffi.dll')" />
+  </ItemGroup>
+</Project>

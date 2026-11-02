@@ -10,7 +10,7 @@ use crate::{GpuError, Result};
 fn presenter_shader_source(format: wgpu::TextureFormat) -> wgpu::ShaderSource<'static> {
     #[cfg(windows)]
     {
-        let source = if format == wgpu::TextureFormat::Bgra8Unorm {
+        let mut source = if format == wgpu::TextureFormat::Bgra8Unorm {
             assert!(
                 include_str!("presenter.wgsl").contains("return vec4<f32>(rgb, 1.0);"),
                 "Windows presenter shader patch marker is missing"
@@ -22,6 +22,26 @@ fn presenter_shader_source(format: wgpu::TextureFormat) -> wgpu::ShaderSource<'s
         } else {
             include_str!("presenter.wgsl").to_owned()
         };
+        source = source.replace("    _pad: u32,", "    _pad: u32,\n    ants: vec4<f32>,\n    crop: vec4<f32>,\n    caret: vec4<f32>,\n    dash: vec4<f32>,");
+        source = source.replace("    return vec4<f32>(rgb, 1.0);", "    return apply_overlay(vec4<f32>(rgb, 1.0), d);\n");
+        source.push_str(r#"
+fn in_rect(r: vec4<f32>, d: vec2<f32>) -> bool {
+    return r.z > 0.0 && r.w > 0.0 && d.x >= r.x && d.y >= r.y && d.x < r.x + r.z && d.y < r.y + r.w;
+}
+fn apply_overlay(base: vec4<f32>, d: vec2<f32>) -> vec4<f32> {
+    if (in_rect(p.caret, d)) { return vec4<f32>(0.1, 0.4, 1.0, 1.0); }
+    let a = p.ants;
+    if (in_rect(a, d) && (d.x-a.x < 1.0 || a.x+a.z-d.x <= 1.0 || d.y-a.y < 1.0 || a.y+a.w-d.y <= 1.0)) {
+        let phase = i32(floor((d.x+d.y+p.dash.x)/4.0));
+        if ((phase & 1) == 0) { return vec4<f32>(1.0); }
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    if (p.crop.z > 0.0 && p.crop.w > 0.0 && !in_rect(p.crop, d)) {
+        return vec4<f32>(base.rgb * 0.45, 1.0);
+    }
+    return base;
+}
+"#);
         wgpu::ShaderSource::Wgsl(source.into())
     }
     #[cfg(not(windows))]
@@ -119,6 +139,14 @@ struct ParamsRaw {
     checker_px: u32,
     grid: u32,
     _pad: u32,
+    #[cfg(windows)]
+    ants: [f32; 4],
+    #[cfg(windows)]
+    crop: [f32; 4],
+    #[cfg(windows)]
+    caret: [f32; 4],
+    #[cfg(windows)]
+    dash: [f32; 4],
 }
 
 /// Canvas options on top of [`ViewParams`] (M12).
@@ -132,6 +160,17 @@ pub struct CanvasParams {
     /// Below 100%, read a premultiplied 2x2 box mip pyramid (built on first use)
     /// instead of a capped box filter on the full-size document.
     pub use_mips: bool,
+    #[cfg(windows)]
+    pub overlay: Option<OverlayParams>,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OverlayParams {
+    pub ants: [f32; 4],
+    pub crop: [f32; 4],
+    pub caret: [f32; 4],
+    pub dash_offset: f32,
 }
 
 impl CanvasParams {
@@ -641,6 +680,8 @@ impl ViewRenderer {
             checker_px: 8,
             pixel_grid: false,
             use_mips: false,
+            #[cfg(windows)]
+            overlay: None,
         };
         self.encode_canvas(device, queue, encoder, target, &canvas)
     }
@@ -678,6 +719,14 @@ impl ViewRenderer {
             checker_px: canvas.checker_px,
             grid: canvas.pixel_grid as u32,
             _pad: 0,
+            #[cfg(windows)]
+            ants: canvas.overlay.map_or([0.0; 4], |o| o.ants),
+            #[cfg(windows)]
+            crop: canvas.overlay.map_or([0.0; 4], |o| o.crop),
+            #[cfg(windows)]
+            caret: canvas.overlay.map_or([0.0; 4], |o| o.caret),
+            #[cfg(windows)]
+            dash: [canvas.overlay.map_or(0.0, |o| o.dash_offset), 0.0, 0.0, 0.0],
         };
         queue.write_buffer(&self.params, 0, bytemuck::bytes_of(&raw));
         if self.bind_group.is_none() {

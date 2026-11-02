@@ -176,6 +176,23 @@ typedef struct OpViewState {
 } OpViewState;
 
 /**
+ * A rectangle in document points. Zero width or height disables that shape.
+ */
+typedef struct OpOverlayRect {
+  double x;
+  double y;
+  double width;
+  double height;
+} OpOverlayRect;
+
+typedef struct OpViewOverlay {
+  struct OpOverlayRect ants;
+  struct OpOverlayRect crop;
+  struct OpOverlayRect caret;
+  double dash_offset;
+} OpViewOverlay;
+
+/**
  * What a view holds now (for tests and diagnostics).
  */
 typedef struct OpViewInfo {
@@ -623,12 +640,29 @@ enum OpStatus op_stroke_cancel(struct OpEngine *p, uint64_t doc);
 enum OpStatus op_view_attach(struct OpEngine *p, uint64_t doc, void *layer, uint64_t *out_view);
 
 /**
+ * Attaches a Windows WinUI SwapChainPanel. The caller keeps the panel alive
+ * until detach and sends its current size through `op_view_set`.
+ */
+enum OpStatus op_view_attach_panel(struct OpEngine *p,
+                                   uint64_t doc,
+                                   void *panel,
+                                   uint64_t *out_view);
+
+/**
  * Stores the view's newest state and asks for a frame. Returns at once; the
  * render thread draws the newest state it finds. A bad field returns
  * OP_ERR_BAD_ARGUMENT and changes nothing. A stale view id returns
  * OP_ERR_NO_SUCH_DOC.
  */
 enum OpStatus op_view_set(struct OpEngine *p, uint64_t view, const struct OpViewState *state);
+
+/**
+ * Sets the Windows canvas overlay. A null pointer clears it. This stores the
+ * newest shape and wakes the render thread, just like `op_view_set`.
+ */
+enum OpStatus op_view_set_overlay(struct OpEngine *p,
+                                  uint64_t view,
+                                  const struct OpViewOverlay *overlay);
 
 /**
  * Sets the color drawn around the document (the canvas surround, M56: the

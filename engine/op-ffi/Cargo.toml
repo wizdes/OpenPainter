@@ -12,7 +12,7 @@ test-hooks = ["op-gpu/test-hooks"]
 workspace = true
 
 [lib]
-crate-type = ["staticlib", "rlib"]
+crate-type = ["staticlib", "rlib", "cdylib"]
 
 [dependencies]
 op-engine = { path = "../op-engine" }

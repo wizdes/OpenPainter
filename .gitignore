@@ -23,3 +23,5 @@ mac/**/.build/
 .swiftpm/
 tools/pdn-oracle/Generated/
 mac/build/
+tools/ui-spike/*/bin/
+tools/ui-spike/*/obj/

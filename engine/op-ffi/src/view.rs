@@ -39,6 +39,55 @@ pub const OP_VIEW_PIXEL_GRID: u32 = 1;
 /// drawable surface and refuses frames until a state without this flag arrives.
 pub const OP_VIEW_SUSPENDED: u32 = 2;
 
+/// A rectangle in document points. Zero width or height disables that shape.
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OpOverlayRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OpViewOverlay {
+    pub ants: OpOverlayRect,
+    pub crop: OpOverlayRect,
+    pub caret: OpOverlayRect,
+    pub dash_offset: f64,
+}
+
+#[cfg(windows)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum OverlayHit { None, CropDim, AntWhite, AntBlack, Caret }
+
+#[cfg(windows)]
+fn inside(r: OpOverlayRect, x: f64, y: f64) -> bool {
+    r.width > 0.0 && r.height > 0.0 && x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height
+}
+
+/// Matches the Windows shader shapes; useful without a window surface.
+#[cfg(windows)]
+pub fn overlay_sample(o: &OpViewOverlay, x: f64, y: f64) -> OverlayHit {
+    if inside(o.caret, x, y) { return OverlayHit::Caret; }
+    let a = o.ants;
+    if inside(a, x, y) && (x - a.x < 1.0 || a.x + a.width - x <= 1.0 || y - a.y < 1.0 || a.y + a.height - y <= 1.0) {
+        let step = ((x + y + o.dash_offset) / 4.0).floor() as i64;
+        return if step.rem_euclid(2) == 0 { OverlayHit::AntWhite } else { OverlayHit::AntBlack };
+    }
+    if o.crop.width > 0.0 && o.crop.height > 0.0 && !inside(o.crop, x, y) { return OverlayHit::CropDim; }
+    OverlayHit::None
+}
+
+#[cfg(windows)]
+fn valid_overlay(o: &OpViewOverlay) -> bool {
+    let rect = |r: OpOverlayRect| [r.x, r.y, r.width, r.height].iter().all(|v| v.is_finite()) && r.width >= 0.0 && r.height >= 0.0;
+    rect(o.ants) && rect(o.crop) && rect(o.caret) && o.dash_offset.is_finite()
+}
+
 /// Where and how a view shows its document. Sizes and positions are in points;
 /// the drawable is `width_pt * scale` by `height_pt * scale` pixels.
 #[repr(C)]
@@ -165,6 +214,8 @@ struct Request {
     set: bool,
     /// Fill outside the document (`op_view_set_background`, M56).
     background: [f32; 4],
+    #[cfg(windows)]
+    overlay: Option<OpViewOverlay>,
 }
 
 #[cfg(windows)]
@@ -194,6 +245,7 @@ mod recovery_profile_tests {
             display_gen: 1,
             set: true,
             background: BACKGROUND,
+            overlay: None,
         };
         assert_eq!(&*recovery_profile(&request, &[4, 5]), &[1, 2, 3]);
         let mut automatic = request;
@@ -393,7 +445,7 @@ struct Host {
     #[cfg(windows)]
     recreate_after: Mutex<Option<Instant>>,
     #[cfg(windows)]
-    pending_recovery: Mutex<Vec<(Arc<View>, isize, op_gpu::win32::WindowStats, u64)>>,
+    pending_recovery: Mutex<Vec<(Arc<View>, isize, bool, op_gpu::win32::WindowStats, u64)>>,
     #[cfg(target_os = "macos")]
     counters: Arc<op_gpu::layer::LayerCounters>,
     #[cfg(windows)]
@@ -464,7 +516,7 @@ impl Host {
                         let stats = render.target.stats.clone();
                         let errors = render.frame_errors;
                         render.target.suspend();
-                        old.push((view.clone(), hwnd, stats, errors));
+                        old.push((view.clone(), hwnd, render.target.is_panel(), stats, errors));
                     }
                 }
                 *self.pending_recovery.lock() = old;
@@ -486,7 +538,7 @@ impl Host {
                     Err(e) => {
                         eprintln!("op-ffi view: recreate DX12 device failed: {e}; retry in 2 s");
                         *self.recreate_after.lock() = Some(Instant::now() + Duration::from_secs(2));
-                        for (view, _, _, _) in self.pending_recovery.lock().iter() {
+                        for (view, _, _, _, _) in self.pending_recovery.lock().iter() {
                             view.recovery_errors.fetch_add(1, Ordering::SeqCst);
                         }
                         return Err(OpStatus::OP_ERR_INTERNAL);
@@ -528,7 +580,7 @@ impl Host {
             #[cfg(windows)]
             {
                 *self.recreate_after.lock() = Some(Instant::now() + Duration::from_secs(2));
-                for (view, _, _, _) in self.pending_recovery.lock().iter() {
+                for (view, _, _, _, _) in self.pending_recovery.lock().iter() {
                     view.recovery_errors.fetch_add(1, Ordering::SeqCst);
                 }
             }
@@ -547,7 +599,7 @@ impl Host {
     fn restore_views(&self, gpu: &Arc<Gpu>) {
         let pending = std::mem::take(&mut *self.pending_recovery.lock());
         let mut retry = Vec::new();
-        for (view, hwnd, stats, errors) in pending {
+        for (view, hwnd, panel, stats, errors) in pending {
             if !self
                 .state
                 .lock()
@@ -558,22 +610,19 @@ impl Host {
                 continue;
             }
             match unsafe {
-                op_gpu::win32::Win32Target::new(
-                    &gpu.instance,
-                    hwnd as *mut c_void,
-                    self.counters.clone(),
-                )
+                if panel { op_gpu::win32::Win32Target::new_panel(&gpu.instance, hwnd as *mut c_void, self.counters.clone()) }
+                else { op_gpu::win32::Win32Target::new(&gpu.instance, hwnd as *mut c_void, self.counters.clone()) }
             } {
                 Ok(mut target) => {
                     let profile = recovery_profile(&view.request.lock(), target.display_icc());
-                    let problem = self
+                    let problem = (!profile.is_empty()).then(|| self
                         .engine()
                         .core()
                         .snapshot(view.doc)
                         .ok()
                         .and_then(|snap| {
                             display_table(snap.state.profile.as_deref(), &profile).err()
-                        });
+                        })).flatten();
                     if let Some(e) = &problem {
                         eprintln!(
                             "op-ffi view: recovery display table unavailable: {e}; drawing without display conversion"
@@ -582,7 +631,7 @@ impl Host {
                     {
                         let mut request = view.request.lock();
                         if !request.display_sent {
-                            request.display_icc = problem.is_none().then_some(profile);
+                            request.display_icc = (problem.is_none() && !profile.is_empty()).then_some(profile);
                             request.display_gen += 1;
                         }
                     }
@@ -620,7 +669,7 @@ impl Host {
                 Err(e) => {
                     eprintln!("op-ffi view: recreate HWND surface failed: {e}");
                     view.recovery_errors.fetch_add(1, Ordering::SeqCst);
-                    retry.push((view, hwnd, stats, errors));
+                    retry.push((view, hwnd, panel, stats, errors));
                 }
             }
         }
@@ -824,6 +873,7 @@ mod retry_tests {
                 display_gen: 0,
                 set: true,
                 background: BACKGROUND,
+                overlay: None,
             }),
             dirty: true.into(),
             render: Mutex::new(None),
@@ -874,6 +924,7 @@ mod retry_tests {
                 display_gen: 0,
                 set: false,
                 background: BACKGROUND,
+                overlay: None,
             }),
             dirty: false.into(),
             render: Mutex::new(None),
@@ -1080,6 +1131,14 @@ fn render_one(host: &Host, v: &View) {
         checker_px: ((CHECKER_PT * req.scale).round() as u32).max(1),
         pixel_grid: req.flags & OP_VIEW_PIXEL_GRID != 0 && req.zoom >= GRID_MIN_ZOOM - 1e-9,
         use_mips: true,
+        #[cfg(windows)]
+        overlay: req.overlay.map(|o| {
+            let rect = |r: OpOverlayRect| [r.x as f32, r.y as f32, r.width as f32, r.height as f32];
+            op_gpu::presenter::OverlayParams {
+                ants: rect(o.ants), crop: rect(o.crop), caret: rect(o.caret),
+                dash_offset: o.dash_offset as f32,
+            }
+        }),
     };
     let renderer = &mut r.renderer;
     let result = r
@@ -1248,12 +1307,25 @@ pub extern "C" fn op_view_attach(
         if e.core().snapshot(doc).is_err() {
             return OpStatus::OP_ERR_NO_SUCH_DOC;
         }
-        pooled(|| attach(p, doc, layer, out_view))
+        pooled(|| attach(p, doc, layer, out_view, false))
+    })
+}
+
+/// Attaches a Windows WinUI SwapChainPanel. The caller keeps the panel alive
+/// until detach and sends its current size through `op_view_set`.
+#[cfg(windows)]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_view_attach_panel(p: *mut OpEngine, doc: u64, panel: *mut c_void, out_view: *mut u64) -> OpStatus {
+    guard(|| {
+        if out_view.is_null() || panel.is_null() { return OpStatus::OP_ERR_BAD_ARGUMENT; }
+        let e = match engine(p) { Ok(e) => e, Err(s) => return s };
+        if e.core().snapshot(doc).is_err() { return OpStatus::OP_ERR_NO_SUCH_DOC; }
+        pooled(|| attach(p, doc, panel, out_view, true))
     })
 }
 
 #[cfg(any(target_os = "macos", windows))]
-fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) -> OpStatus {
+fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, panel: bool) -> OpStatus {
     let host = host_for(p);
     let gpu = match host.gpu() {
         Ok(g) => g,
@@ -1264,7 +1336,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
     #[cfg(windows)]
     if !current.as_ref().is_some_and(|now| Arc::ptr_eq(now, &gpu)) {
         drop(current);
-        return attach(p, doc, layer, out_view);
+        return attach(p, doc, layer, out_view, panel);
     }
     // SAFETY: the caller passes a live Objective-C object; its class is checked.
     #[cfg(target_os = "macos")]
@@ -1280,10 +1352,11 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
     };
     #[cfg(windows)]
     let target = match unsafe {
-        op_gpu::win32::Win32Target::new(&gpu.instance, layer, host.counters.clone())
+        if panel { op_gpu::win32::Win32Target::new_panel(&gpu.instance, layer, host.counters.clone()) }
+        else { op_gpu::win32::Win32Target::new(&gpu.instance, layer, host.counters.clone()) }
     } {
         Ok(t) => t,
-        Err(e) if e == "invalid HWND" => return OpStatus::OP_ERR_BAD_ARGUMENT,
+        Err(e) if e == "invalid HWND" || e == "invalid SwapChainPanel" => return OpStatus::OP_ERR_BAD_ARGUMENT,
         Err(e) => {
             eprintln!("op-ffi view: attach failed: {e}");
             return OpStatus::OP_ERR_INTERNAL;
@@ -1292,12 +1365,12 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
     #[cfg(windows)]
     let display_icc: Arc<[u8]> = Arc::from(target.display_icc());
     #[cfg(windows)]
-    let display_problem = host
+    let display_problem = (!display_icc.is_empty()).then(|| host
         .engine()
         .core()
         .snapshot(doc)
         .ok()
-        .and_then(|snap| display_table(snap.state.profile.as_deref(), &display_icc).err());
+        .and_then(|snap| display_table(snap.state.profile.as_deref(), &display_icc).err())).flatten();
     #[cfg(windows)]
     if let Some(e) = &display_problem {
         eprintln!(
@@ -1324,7 +1397,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             #[cfg(target_os = "macos")]
             display_icc: None,
             #[cfg(windows)]
-            display_icc: display_problem.is_none().then_some(display_icc),
+            display_icc: (display_problem.is_none() && !display_icc.is_empty()).then_some(display_icc),
             #[cfg(windows)]
             display_sent: false,
             #[cfg(target_os = "macos")]
@@ -1333,6 +1406,8 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             display_gen: u64::from(display_problem.is_none()),
             set: false,
             background: BACKGROUND,
+            #[cfg(windows)]
+            overlay: None,
         }),
         dirty: false.into(),
         render: Mutex::new(Some(Render {
@@ -1395,7 +1470,7 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-fn attach(_p: *mut OpEngine, _doc: u64, _layer: *mut c_void, _out: *mut u64) -> OpStatus {
+fn attach(_p: *mut OpEngine, _doc: u64, _layer: *mut c_void, _out: *mut u64, _panel: bool) -> OpStatus {
     OpStatus::OP_ERR_UNSUPPORTED
 }
 
@@ -1477,6 +1552,27 @@ pub extern "C" fn op_view_set(p: *mut OpEngine, view: u64, state: *const OpViewS
                 r.display_sent = true;
             }
         }
+        v.dirty.store(true, Ordering::Release);
+        host.wake.notify_all();
+        OpStatus::OP_OK
+    })
+}
+
+/// Sets the Windows canvas overlay. A null pointer clears it. This stores the
+/// newest shape and wakes the render thread, just like `op_view_set`.
+#[cfg(windows)]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_view_set_overlay(p: *mut OpEngine, view: u64, overlay: *const OpViewOverlay) -> OpStatus {
+    guard(|| {
+        if let Err(s) = engine(p) { return s; }
+        let next = if overlay.is_null() { None } else {
+            let value = unsafe { *overlay };
+            if !valid_overlay(&value) { return OpStatus::OP_ERR_BAD_ARGUMENT; }
+            Some(value)
+        };
+        let Some(host) = find_host(p) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
+        let Some(v) = host.view(view) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
+        v.request.lock().overlay = next;
         v.dirty.store(true, Ordering::Release);
         host.wake.notify_all();
         OpStatus::OP_OK
