@@ -21,7 +21,7 @@ use super::{Engine, Error, Event, EventKind, Published, Result, bad, internal};
 use arc_swap::ArcSwap;
 use crossbeam_channel::{RecvTimeoutError, Sender, bounded, unbounded};
 #[cfg(windows)]
-use op_formats::replace_synced_file as replace_file;
+use op_formats::rename_synced_file as replace_file;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

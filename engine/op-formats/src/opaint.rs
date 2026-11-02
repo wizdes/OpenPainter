@@ -1204,7 +1204,11 @@ mod tests {
         #[cfg(unix)]
         assert!(error.to_string().contains("No space left on device"));
         #[cfg(windows)]
-        assert!(error.to_string().contains("not enough space on the disk"));
+        assert!(
+            error
+                .to_string()
+                .contains(&std::io::Error::from_raw_os_error(112).to_string())
+        );
         assert!(writes > 0);
         assert_eq!(fs::read(&path).unwrap(), old);
         let names: Vec<_> = fs::read_dir(dir.path())

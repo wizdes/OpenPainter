@@ -123,6 +123,30 @@ fn windows_a_plain_reader_does_not_block_a_save() {
 }
 
 #[cfg(windows)]
+#[test]
+fn windows_a_reader_sharing_read_only_delays_a_save_until_it_lets_go() {
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_SHARE_READ: u32 = 1;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("shared.opaint");
+    let first = doc(&dir, 2, 2);
+    save_opaint(&first, &path).unwrap();
+    let held = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .open(&path)
+        .unwrap();
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        drop(held);
+    });
+    save_opaint(&first.set_layer_name(0, "After").unwrap(), &path).unwrap();
+    release.join().unwrap();
+    assert_eq!(load_opaint(&path).unwrap().layers[0].name, "After");
+    no_temp_left(dir.path());
+}
+
+#[cfg(windows)]
 fn hold_with_no_sharing(path: &std::path::Path) -> std::fs::File {
     use std::os::windows::fs::OpenOptionsExt;
     std::fs::OpenOptions::new()
