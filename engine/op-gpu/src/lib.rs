@@ -14,20 +14,27 @@ use std::sync::{
 use thiserror::Error;
 use wgpu::util::DeviceExt;
 
+#[cfg(windows)]
+fn replace_shader_marker(source: &str, marker: &str, replacement: &str) -> String {
+    assert_eq!(
+        source.matches(marker).count(),
+        1,
+        "Windows shader patch marker must occur exactly once: {marker}"
+    );
+    source.replace(marker, replacement)
+}
+
 fn kernel_shader_source() -> wgpu::ShaderSource<'static> {
     #[cfg(windows)]
     {
         let original = include_str!("kernels.wgsl");
-        assert!(
-            original.contains("if value == 0u || value == 255u { return value; }")
-                && original
-                    .contains("fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {"),
-            "Windows kernel shader patch marker is missing"
-        );
-        let source = original.replace(
+        let source = replace_shader_marker(
+            original,
             "if value == 0u || value == 255u { return value; }",
             "if value == 0u || value == 255u || gamma == 1.0 { return value; }",
-        ).replace(
+        );
+        let source = replace_shader_marker(
+            &source,
             "fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {",
             "fn effect_twist(@builtin(global_invocation_id) id: vec3<u32>) {\n  let out_y = id.y + p.mode;\n  if id.x >= p.width || out_y >= p.height { return; }\n  let base = (id.y * p.width + id.x) * 4u;\n  var exact_samples: array<vec4<u32>, 4>;\n  for (var sample = 0u; sample < 4u; sample++) {\n    let xy = acc[base + sample].xy;\n    exact_samples[sample] = bilinear_clamp(xy.x, xy.y);\n  }\n  textureStore(output_tex, vec2<i32>(i32(id.x), i32(out_y)), blend4(exact_samples[0], exact_samples[1], exact_samples[2], exact_samples[3]));\n  return;",
         );
@@ -36,6 +43,17 @@ fn kernel_shader_source() -> wgpu::ShaderSource<'static> {
     #[cfg(not(windows))]
     {
         wgpu::ShaderSource::Wgsl(include_str!("kernels.wgsl").into())
+    }
+}
+
+#[cfg(all(test, windows))]
+mod patch_tests {
+    #[test]
+    fn duplicate_shader_marker_is_rejected() {
+        assert!(
+            std::panic::catch_unwind(|| super::replace_shader_marker("x x", "x", "y")).is_err()
+        );
+        assert_eq!(super::replace_shader_marker("x", "x", "y"), "y");
     }
 }
 
@@ -57,6 +75,8 @@ pub enum GpuError {
 pub type Result<T> = std::result::Result<T, GpuError>;
 
 pub fn poll_gpu(device: &wgpu::Device, operation: &'static str) -> Result<()> {
+    // Windows has a deadline so DX12 cannot block a worker forever. Metal
+    // keeps its original indefinite wait and the same error mapping.
     #[cfg(windows)]
     let poll = wgpu::PollType::Wait {
         submission_index: None,
@@ -75,12 +95,89 @@ pub fn poll_gpu(device: &wgpu::Device, operation: &'static str) -> Result<()> {
 pub fn windows_warp_guard() -> Result<Option<std::sync::MutexGuard<'static, ()>>> {
     static WARP_CREATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
     if std::env::var("OP_GPU_ADAPTER").as_deref() == Ok("warp") {
-        Ok(Some(WARP_CREATE.lock().map_err(|e| {
-            GpuError::NoAdapter(format!("WARP device creation lock: {e}"))
-        })?))
+        // A failed GPU worker must not permanently stop WARP work in this process.
+        Ok(Some(
+            WARP_CREATE
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner()),
+        ))
     } else {
         Ok(None)
     }
+}
+
+/// Upper bound on neighbor loop iterations per output pixel. Median scans the
+/// neighborhood eight times, once for each bit of its rank search.
+#[cfg(windows)]
+pub fn windows_kernel_samples(kernel: op_ops::effect::GpuKernel, values: [i32; 3]) -> Option<u64> {
+    use op_ops::effect::GpuKernel as K;
+    let square = |radius: i32| (2 * radius as u64 + 1).pow(2);
+    match kernel {
+        K::Morphology => Some(values[0] as u64 * values[1] as u64),
+        K::OilPainting
+        | K::Outline
+        | K::Bokeh
+        | K::Square
+        | K::Unfocus
+        | K::Surface
+        | K::Sharpen
+        | K::ReduceNoise => Some(square(values[0])),
+        K::Sketch => Some(2 * square(values[0])),
+        K::Median => Some(8 * square(values[0])),
+        K::Gaussian | K::PencilSketch => Some(square(values[0])),
+        K::InkSketch => Some(square(6) + 25),
+        K::Motion => Some(16),
+        K::Radial => Some(272),
+        K::Zoom => Some(64),
+        K::Pixelate => Some(4),
+        K::EdgeDetect | K::Emboss | K::Relief => Some(9),
+        _ => None,
+    }
+}
+
+#[cfg(windows)]
+pub fn windows_job_too_long(
+    kernel: op_ops::effect::GpuKernel,
+    width: u32,
+    height: u32,
+    values: [i32; 3],
+) -> Option<&'static str> {
+    use op_ops::effect::GpuKernel as K;
+    let name = match kernel {
+        K::Morphology => "Morphology",
+        K::OilPainting => "Oil Painting",
+        K::Outline => "Outline",
+        K::Bokeh => "Bokeh",
+        K::Square => "Square",
+        K::Unfocus => "Unfocus",
+        K::Surface => "Surface",
+        K::Sharpen => "Sharpen",
+        K::ReduceNoise => "Reduce Noise",
+        K::Sketch => "Sketch",
+        K::Median => "Median",
+        K::InkSketch => "Ink Sketch",
+        K::Gaussian => "Gaussian",
+        K::PencilSketch => "Pencil Sketch",
+        K::Motion => "Motion Blur",
+        K::Radial => "Radial Blur",
+        K::Zoom => "Zoom Blur",
+        K::Pixelate => "Pixelate",
+        K::EdgeDetect => "Edge Detect",
+        K::Emboss => "Emboss",
+        K::Relief => "Relief",
+        _ => return None,
+    };
+    let samples = if kernel == K::Median {
+        8 * u64::from(width.min((2 * values[0] + 1) as u32))
+            * u64::from(height.min((2 * values[0] + 1) as u32))
+    } else {
+        windows_kernel_samples(kernel, values)?
+    };
+    (u64::from(width)
+        .saturating_mul(u64::from(height))
+        .saturating_mul(samples)
+        > 250_000_000)
+        .then_some(name)
 }
 
 #[cfg(windows)]
@@ -574,8 +671,12 @@ impl GpuContext {
         let radius = width.min(height) as f64 * 0.5;
         for start in (0..height).step_by(rows_per_chunk as usize) {
             let rows = rows_per_chunk.min(height - start);
-            let mut coordinates =
-                Vec::<[f32; 4]>::with_capacity(width as usize * rows as usize * 4);
+            let mut coordinates = Vec::<[f32; 4]>::new();
+            coordinates
+                .try_reserve_exact(width as usize * rows as usize * 4)
+                .map_err(|e| {
+                    GpuError::Map(format!("Windows Twist coordinate allocation failed: {e}"))
+                })?;
             for y in start..start + rows {
                 for x in 0..width {
                     for sample in 0..4 {
@@ -599,16 +700,30 @@ impl GpuContext {
                     }
                 }
             }
-            let table = self
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Windows Twist sample coordinates"),
-                    contents: bytemuck::cast_slice(&coordinates),
-                    usage: wgpu::BufferUsages::STORAGE,
-                });
+            self.device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+            let table = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Windows Twist sample coordinates"),
+                        contents: bytemuck::cast_slice(&coordinates),
+                        usage: wgpu::BufferUsages::STORAGE,
+                    })
+            }));
+            let _ = self.device.poll(wgpu::PollType::Poll);
+            let allocation_error = pollster::block_on(self.device.pop_error_scope());
+            if table.is_err() || allocation_error.is_some() {
+                return Err(GpuError::Map(format!(
+                    "Windows Twist GPU buffer allocation failed: {}",
+                    allocation_error.map_or_else(|| "wgpu panicked".into(), |e| e.to_string())
+                )));
+            }
+            let table = table.unwrap();
             let params = self.params(width, height, start, 0, false);
             let bind = self.bind(&pipeline, &input, &table, &params, &output, None);
             self.dispatch(&pipeline, &bind, width, rows)?;
+            // Each chunk owns a coordinate buffer. Finish its work before the
+            // next chunk allocates another buffer, including on hardware.
+            poll_gpu(&self.device, "Windows Twist chunk")?;
         }
         self.readback(&output, width, height)
     }
@@ -703,19 +818,8 @@ impl GpuContext {
         }
         #[cfg(windows)]
         {
-            let taps = match kernel {
-                op_ops::effect::GpuKernel::Morphology => (values[0] as u64) * (values[1] as u64),
-                op_ops::effect::GpuKernel::OilPainting => (2 * values[0] as u64 + 1).pow(2),
-                op_ops::effect::GpuKernel::Outline => (2 * values[0] as u64 + 1).pow(2),
-                _ => 0,
-            };
-            if taps > 0 && u64::from(width) * u64::from(height) * taps > 200_000_000 {
-                return Err(GpuError::JobTooLong(match kernel {
-                    op_ops::effect::GpuKernel::Morphology => "Morphology",
-                    op_ops::effect::GpuKernel::OilPainting => "Oil Painting",
-                    op_ops::effect::GpuKernel::Outline => "Outline",
-                    _ => unreachable!(),
-                }));
+            if let Some(name) = windows_job_too_long(kernel, width, height, values) {
+                return Err(GpuError::JobTooLong(name));
             }
         }
         #[cfg(windows)]

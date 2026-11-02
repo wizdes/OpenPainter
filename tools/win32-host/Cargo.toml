@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-op-ffi = { path = "../../engine/op-ffi" }
+op-ffi = { path = "../../engine/op-ffi", features = ["test-hooks"] }
 op-color = { path = "../../engine/op-color" }

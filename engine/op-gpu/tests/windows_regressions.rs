@@ -101,6 +101,29 @@ fn four_warp_devices_create_and_run_together() {
 }
 
 #[test]
+fn warp_lock_survives_a_panicking_worker() {
+    if std::env::var("OP_GPU_ADAPTER").as_deref() != Ok("warp") {
+        return;
+    }
+    assert!(
+        std::thread::spawn(|| {
+            let _guard = op_gpu::windows_warp_guard().unwrap();
+            panic!("deliberate WARP worker panic");
+        })
+        .join()
+        .is_err()
+    );
+    let result = std::thread::spawn(|| {
+        let mut gpu = GpuContext::new().unwrap();
+        gpu.effect_kernel_with_params(GpuKernel::Sepia, 1, 1, &[30, 100, 220, 0], [0, 0, 0])
+            .unwrap()
+    })
+    .join()
+    .unwrap();
+    assert_eq!(result, [92, 92, 92, 0]);
+}
+
+#[test]
 fn gpu_wait_timeout_names_the_operation() {
     let error = op_gpu::GpuError::WaitTimeout("readback mapping");
     assert_eq!(
@@ -123,9 +146,92 @@ fn expensive_morphology_is_refused_before_gpu_dispatch() {
     assert_eq!(gpu.dispatch_count(), before);
 }
 
-/// The hang found on 2026-11-02 was two threads spinning inside NVIDIA's OpenGL
-/// and Vulkan driver at thread exit. Pinning DX12 must keep that driver out of
-/// the process.
+#[test]
+fn large_median_is_refused_before_gpu_dispatch() {
+    assert_eq!(
+        op_gpu::windows_kernel_samples(GpuKernel::Median, [200, 50, 0]),
+        Some(8 * 401 * 401)
+    );
+    assert!(op_gpu::windows_job_too_long(GpuKernel::Median, 128, 128, [200, 50, 0]).is_some());
+    assert!(op_gpu::windows_job_too_long(GpuKernel::Median, 40, 30, [200, 50, 0]).is_none());
+}
+
+#[test]
+fn ordinary_outline_is_allowed_on_a_four_megapixel_chunk() {
+    assert_eq!(
+        op_gpu::windows_kernel_samples(GpuKernel::Outline, [3, 50, 0]),
+        Some(49)
+    );
+    assert!(op_gpu::windows_job_too_long(GpuKernel::Outline, 2048, 2048, [3, 50, 0]).is_none());
+}
+
+#[test]
+fn every_neighborhood_kernel_has_a_sample_estimate() {
+    for kernel in [
+        GpuKernel::Gaussian,
+        GpuKernel::Median,
+        GpuKernel::Motion,
+        GpuKernel::Radial,
+        GpuKernel::Zoom,
+        GpuKernel::Bokeh,
+        GpuKernel::Sketch,
+        GpuKernel::Square,
+        GpuKernel::Surface,
+        GpuKernel::Unfocus,
+        GpuKernel::EdgeDetect,
+        GpuKernel::Emboss,
+        GpuKernel::Relief,
+        GpuKernel::OilPainting,
+        GpuKernel::Outline,
+        GpuKernel::InkSketch,
+        GpuKernel::PencilSketch,
+        GpuKernel::Pixelate,
+        GpuKernel::Morphology,
+        GpuKernel::Sharpen,
+        GpuKernel::ReduceNoise,
+    ] {
+        assert!(
+            op_gpu::windows_kernel_samples(kernel, [3, 3, 0]).is_some(),
+            "{kernel:?}"
+        );
+    }
+}
+
+#[test]
+fn measure_short_neighborhood_jobs() {
+    let mut gpu = GpuContext::new().unwrap();
+    for (kernel, values, name) in [
+        (GpuKernel::Outline, [3, 50, 0], "Outline"),
+        (GpuKernel::Median, [5, 50, 0], "Median"),
+        (GpuKernel::Unfocus, [5, 0, 0], "Unfocus"),
+    ] {
+        let (width, height) = if name == "Outline" {
+            (512u32, 512u32)
+        } else {
+            (128u32, 128u32)
+        };
+        let pixels = vec![127u8; (width * height * 4) as usize];
+        gpu.effect_kernel_with_params(kernel, width, height, &pixels, values)
+            .unwrap();
+        let start = std::time::Instant::now();
+        gpu.effect_kernel_with_params(kernel, width, height, &pixels, values)
+            .unwrap();
+        let samples = op_gpu::windows_kernel_samples(kernel, values).unwrap()
+            * u64::from(width)
+            * u64::from(height);
+        eprintln!(
+            "throughput {name}: {samples} estimated loop iterations in {:.3} ms",
+            start.elapsed().as_secs_f64() * 1000.0
+        );
+    }
+}
+
+/// One Vulkan-path process spun for nine minutes on 2026-11-02. One stack
+/// sample put a thread in nvoglv64.dll DllMain during LdrShutdownThread,
+/// looping over SwitchToThread and GetExitCodeThread. Another thread was in
+/// LdrInitializeThunk with OPENGL32.dll on its stack. This fits the W1 hang,
+/// but that hang was never sampled. DX12 must keep nvoglv64.dll and
+/// vulkan-1.dll unloaded.
 #[test]
 fn the_opengl_and_vulkan_drivers_are_not_loaded() {
     #[link(name = "kernel32")]
@@ -161,4 +267,23 @@ fn twist_matches_cpu_across_more_than_one_chunk() {
     let expected =
         op_ops::effect::reference_rgba8("effect.distort.twist", width, height, &source).unwrap();
     assert!(actual == expected, "Twist differs across a chunk boundary");
+}
+
+#[test]
+fn warp_default_twist_completes_at_3000_by_2700() {
+    if std::env::var("OP_GPU_ADAPTER").as_deref() != Ok("warp") {
+        return;
+    }
+    let mut gpu = GpuContext::new().unwrap();
+    let (width, height) = (3000u32, 2700u32);
+    let source = vec![128u8; (width * height * 4) as usize];
+    let start = std::time::Instant::now();
+    let result = gpu
+        .effect_kernel(GpuKernel::Twist, width, height, &source)
+        .unwrap();
+    assert_eq!(result.len(), source.len());
+    eprintln!(
+        "WARP Twist 3000x2700: {:.3} s",
+        start.elapsed().as_secs_f64()
+    );
 }

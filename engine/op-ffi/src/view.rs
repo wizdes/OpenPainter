@@ -182,6 +182,8 @@ struct Render {
     doc_uploads: u64,
     frame_errors: u64,
     last_error: OpStatus,
+    #[cfg(windows)]
+    last_message: Option<String>,
     /// The snapshot whose pixels are on the GPU, for tile diffs.
     shown: Option<Arc<op_engine::Published>>,
     region_uploads: u64,
@@ -206,6 +208,10 @@ struct View {
     render: Mutex<Option<Render>>,
     log: Mutex<FrameLog>,
     frame_cv: Condvar,
+    #[cfg(windows)]
+    recovery_errors: AtomicU64,
+    #[cfg(windows)]
+    retry_at: Mutex<Option<Instant>>,
 }
 
 struct Gpu {
@@ -218,6 +224,18 @@ struct Gpu {
 }
 
 impl Gpu {
+    #[cfg(windows)]
+    fn removed(&self) -> bool {
+        use windows::Win32::Graphics::Direct3D12::ID3D12Device;
+        let raw: ID3D12Device = unsafe {
+            self.device
+                .as_hal::<wgpu::hal::api::Dx12>()
+                .unwrap()
+                .raw_device()
+                .clone()
+        };
+        unsafe { raw.GetDeviceRemovedReason().is_err() }
+    }
     fn new() -> Result<Self, String> {
         #[cfg(windows)]
         let _warp_create_guard = op_gpu::windows_warp_guard().map_err(|e| e.to_string())?;
@@ -282,6 +300,10 @@ struct Host {
     wake: Condvar,
     thread: Mutex<Option<JoinHandle<()>>>,
     gpu: Mutex<Option<Arc<Gpu>>>,
+    #[cfg(windows)]
+    recreate_after: Mutex<Option<Instant>>,
+    #[cfg(windows)]
+    pending_recovery: Mutex<Vec<(Arc<View>, isize, op_gpu::win32::WindowStats, u64)>>,
     #[cfg(target_os = "macos")]
     counters: Arc<op_gpu::layer::LayerCounters>,
     #[cfg(windows)]
@@ -312,6 +334,10 @@ fn host_for(p: *mut OpEngine) -> Arc<Host> {
         wake: Condvar::new(),
         thread: Mutex::new(None),
         gpu: Mutex::new(None),
+        #[cfg(windows)]
+        recreate_after: Mutex::new(None),
+        #[cfg(windows)]
+        pending_recovery: Mutex::new(Vec::new()),
         #[cfg(target_os = "macos")]
         counters: Arc::default(),
         #[cfg(windows)]
@@ -337,38 +363,153 @@ impl Host {
             #[cfg(windows)]
             if g.lost.load(Ordering::SeqCst) {
                 eprintln!("op-ffi view: recreating lost DX12 canvas device");
-                let replacement = Arc::new(Gpu::new().map_err(|e| {
-                    eprintln!("op-ffi view: recreate DX12 device failed: {e}");
-                    OpStatus::OP_ERR_INTERNAL
-                })?);
-                for view in self.state.lock().views.values() {
-                    if let Some(render) = view.render.lock().as_mut() {
+                let views: Vec<_> = self.state.lock().views.values().cloned().collect();
+                let mut old = Vec::new();
+                for view in &views {
+                    if let Some(mut render) = view.render.lock().take() {
+                        let hwnd = render.target.hwnd();
+                        let stats = render.target.stats.clone();
+                        let errors = render.frame_errors;
                         render.target.suspend();
-                        render.target.resume(&replacement.instance).map_err(|e| {
-                            eprintln!("op-ffi view: recreate HWND surface failed: {e}");
-                            OpStatus::OP_ERR_INTERNAL
-                        })?;
-                        render.renderer = op_gpu::presenter::ViewRenderer::new(
-                            &replacement.device,
-                            op_gpu::win32::FORMAT,
-                        );
-                        render.doc_revision = None;
-                        render.shown = None;
-                        render.display_gen = 0;
-                        view.dirty.store(true, Ordering::Release);
+                        old.push((view.clone(), hwnd, stats, errors));
                     }
                 }
+                *self.pending_recovery.lock() = old;
+                self.engine()
+                    .core()
+                    .release_effect_gpu_for_canvas_recovery();
+                *slot = None;
+                // No view renderer, surface, effect context or host slot may
+                // retain the removed device when DX12 selects WARP again.
+                if self
+                    .recreate_after
+                    .lock()
+                    .is_some_and(|at| Instant::now() < at)
+                {
+                    return Err(OpStatus::OP_ERR_INTERNAL);
+                }
+                let replacement = match Gpu::new() {
+                    Ok(g) => Arc::new(g),
+                    Err(e) => {
+                        eprintln!("op-ffi view: recreate DX12 device failed: {e}; retry in 2 s");
+                        *self.recreate_after.lock() = Some(Instant::now() + Duration::from_secs(2));
+                        for (view, _, _, _) in self.pending_recovery.lock().iter() {
+                            view.recovery_errors.fetch_add(1, Ordering::SeqCst);
+                        }
+                        return Err(OpStatus::OP_ERR_INTERNAL);
+                    }
+                };
+                *self.recreate_after.lock() = None;
+                self.restore_views(&replacement);
                 *slot = Some(replacement.clone());
                 return Ok(replacement);
             }
             return Ok(g.clone());
         }
+        #[cfg(windows)]
+        if self
+            .recreate_after
+            .lock()
+            .is_some_and(|at| Instant::now() < at)
+        {
+            return Err(OpStatus::OP_ERR_INTERNAL);
+        }
         let g = Arc::new(Gpu::new().map_err(|e| {
             eprintln!("op-ffi view: no GPU for the canvas: {e}");
+            #[cfg(windows)]
+            {
+                *self.recreate_after.lock() = Some(Instant::now() + Duration::from_secs(2));
+                for (view, _, _, _) in self.pending_recovery.lock().iter() {
+                    view.recovery_errors.fetch_add(1, Ordering::SeqCst);
+                }
+            }
             OpStatus::OP_ERR_INTERNAL
         })?);
+        #[cfg(windows)]
+        {
+            *self.recreate_after.lock() = None;
+            self.restore_views(&g);
+        }
         *slot = Some(g.clone());
         Ok(g)
+    }
+
+    #[cfg(windows)]
+    fn restore_views(&self, gpu: &Arc<Gpu>) {
+        let pending = std::mem::take(&mut *self.pending_recovery.lock());
+        for (view, hwnd, stats, errors) in pending {
+            if !self
+                .state
+                .lock()
+                .views
+                .values()
+                .any(|registered| Arc::ptr_eq(registered, &view))
+            {
+                continue;
+            }
+            match unsafe {
+                op_gpu::win32::Win32Target::new(
+                    &gpu.instance,
+                    hwnd as *mut c_void,
+                    self.counters.clone(),
+                )
+            } {
+                Ok(mut target) => {
+                    let profile: Arc<[u8]> = Arc::from(target.display_icc());
+                    let problem = self
+                        .engine()
+                        .core()
+                        .snapshot(view.doc)
+                        .ok()
+                        .and_then(|snap| {
+                            display_table(snap.state.profile.as_deref(), &profile).err()
+                        });
+                    if let Some(e) = &problem {
+                        eprintln!(
+                            "op-ffi view: recovery display table unavailable: {e}; drawing without display conversion"
+                        );
+                    }
+                    {
+                        let mut request = view.request.lock();
+                        request.display_icc = problem.is_none().then_some(profile);
+                        request.display_gen += 1;
+                    }
+                    target.stats = stats;
+                    let render = Render {
+                        target,
+                        renderer: op_gpu::presenter::ViewRenderer::new(
+                            &gpu.device,
+                            op_gpu::win32::FORMAT,
+                        ),
+                        doc_revision: None,
+                        doc_preview: 0,
+                        doc_profile: None,
+                        display_gen: 0,
+                        has_table: false,
+                        table_builds: 0,
+                        doc_uploads: 0,
+                        frame_errors: errors
+                            + view.recovery_errors.swap(0, Ordering::SeqCst)
+                            + u64::from(problem.is_some()),
+                        last_error: if problem.is_some() {
+                            OpStatus::OP_ERR_INTERNAL
+                        } else {
+                            OpStatus::OP_OK
+                        },
+                        last_message: problem.clone(),
+                        shown: None,
+                        region_uploads: 0,
+                        region_tiles: 0,
+                    };
+                    *view.render.lock() = Some(render);
+                    view.dirty.store(true, Ordering::Release);
+                }
+                Err(e) => {
+                    eprintln!("op-ffi view: recreate HWND surface failed: {e}");
+                    view.recovery_errors.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+        }
     }
 
     fn view(&self, id: u64) -> Option<Arc<View>> {
@@ -431,13 +572,26 @@ fn raise_thread_priority() {}
 fn render_loop(host: Arc<Host>) {
     // Frames are on the user's critical path, like the main thread.
     raise_thread_priority();
+    #[cfg(windows)]
+    let mut last_idle_check = Instant::now() - Duration::from_secs(1);
     loop {
         let views: Vec<Arc<View>> = {
             let mut st = host.state.lock();
             if st.stop {
                 return;
             }
-            let any_dirty = st.views.values().any(|v| v.dirty.load(Ordering::Acquire));
+            let any_dirty = st.views.values().any(|v| {
+                v.dirty.load(Ordering::Acquire) && {
+                    #[cfg(windows)]
+                    {
+                        v.retry_at.lock().is_none_or(|at| Instant::now() >= at)
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        true
+                    }
+                }
+            });
             if !any_dirty {
                 host.wake.wait_for(&mut st, Duration::from_millis(50));
             }
@@ -452,13 +606,32 @@ fn render_loop(host: Arc<Host>) {
             // else polls this device. Without this the canvas never recovers.
             let gpu = host.gpu.lock().clone();
             gpu.is_some_and(|gpu| {
-                if let Err(e) = gpu.device.poll(wgpu::PollType::Poll) {
-                    eprintln!("op-ffi view: canvas device poll failed: {e}");
+                let result = catch_unwind(AssertUnwindSafe(|| {
+                    if let Err(e) = gpu.device.poll(wgpu::PollType::Poll) {
+                        eprintln!("op-ffi view: canvas device poll failed: {e}");
+                    }
+                    if last_idle_check.elapsed() >= Duration::from_secs(1) {
+                        last_idle_check = Instant::now();
+                        if gpu.removed() {
+                            gpu.lost.store(true, Ordering::SeqCst);
+                        }
+                    }
+                }));
+                if result.is_err() {
+                    eprintln!("op-ffi view: canvas device poll panicked; treating as device loss");
+                    gpu.lost.store(true, Ordering::SeqCst);
+                    for view in &views {
+                        view.recovery_errors.fetch_add(1, Ordering::SeqCst);
+                    }
                 }
                 gpu.lost.load(Ordering::SeqCst)
             })
         };
         for v in views {
+            #[cfg(windows)]
+            if v.retry_at.lock().is_some_and(|at| Instant::now() < at) {
+                continue;
+            }
             if !v.dirty.load(Ordering::Acquire) && !doc_changed(&host, &v) && {
                 #[cfg(windows)]
                 {
@@ -472,9 +645,27 @@ fn render_loop(host: Arc<Host>) {
                 continue;
             }
             v.dirty.store(false, Ordering::Release);
+            #[cfg(windows)]
+            let errors_before = v.render.lock().as_ref().map_or(0, |r| r.frame_errors)
+                + v.recovery_errors.load(Ordering::SeqCst);
             let ok = catch_unwind(AssertUnwindSafe(|| pooled(|| render_one(&host, &v))));
             if ok.is_err() {
+                #[cfg(windows)]
+                if let Some(gpu) = host.gpu.lock().as_ref() {
+                    gpu.lost.store(true, Ordering::SeqCst);
+                }
                 record_error(&v, OpStatus::OP_ERR_PANIC);
+            }
+            #[cfg(windows)]
+            {
+                let errors_after = v.render.lock().as_ref().map_or(0, |r| r.frame_errors)
+                    + v.recovery_errors.load(Ordering::SeqCst);
+                if errors_after > errors_before {
+                    *v.retry_at.lock() = Some(Instant::now() + Duration::from_millis(100));
+                    v.dirty.store(true, Ordering::Release);
+                } else {
+                    *v.retry_at.lock() = None;
+                }
             }
         }
     }
@@ -510,7 +701,13 @@ fn doc_changed(_host: &Host, _v: &View) -> bool {
 #[cfg(any(target_os = "macos", windows))]
 fn render_one(host: &Host, v: &View) {
     use op_gpu::presenter::{CanvasParams, Lut3d, ViewParams};
-    let Ok(gpu) = host.gpu() else { return };
+    let Ok(gpu) = host.gpu() else {
+        #[cfg(windows)]
+        {
+            v.recovery_errors.fetch_add(1, Ordering::SeqCst);
+        }
+        return;
+    };
     let req = v.request.lock().clone();
     if !req.set {
         return;
@@ -518,6 +715,14 @@ fn render_one(host: &Host, v: &View) {
     let mut guard = v.render.lock();
     let Some(r) = guard.as_mut() else { return };
     let fail = |r: &mut Render, status: OpStatus, msg: String| {
+        #[cfg(windows)]
+        {
+            if r.last_message.as_deref() != Some(msg.as_str()) {
+                eprintln!("op-ffi view: frame failed: {msg}");
+            }
+            r.last_message = Some(msg);
+        }
+        #[cfg(not(windows))]
         eprintln!("op-ffi view: frame failed: {msg}");
         r.frame_errors += 1;
         r.last_error = status;
@@ -525,6 +730,10 @@ fn render_one(host: &Host, v: &View) {
     if req.flags & OP_VIEW_SUSPENDED != 0 {
         r.target.suspend();
         return;
+    }
+    #[cfg(windows)]
+    if let Err(e) = r.target.enter_window_desktop() {
+        return fail(r, OpStatus::OP_ERR_INTERNAL, e);
     }
     if let Err(e) = r.target.resume(&gpu.instance) {
         return fail(r, OpStatus::OP_ERR_INTERNAL, e.to_string());
@@ -578,8 +787,11 @@ fn render_one(host: &Host, v: &View) {
             r.doc_uploads += 1;
         }
         r.shown = Some(snap.clone());
-        r.doc_revision = Some(snap.revision);
-        r.doc_preview = snap.preview_serial;
+        #[cfg(not(windows))]
+        {
+            r.doc_revision = Some(snap.revision);
+            r.doc_preview = snap.preview_serial;
+        }
         if r.doc_profile != snap.state.profile {
             r.doc_profile = snap.state.profile.clone();
             need_table = true;
@@ -606,7 +818,11 @@ fn render_one(host: &Host, v: &View) {
                 // Shown unconverted; the failure is counted and printed.
                 r.renderer.set_lut(&gpu.device, &gpu.queue, None);
                 r.has_table = false;
-                return fail(r, OpStatus::OP_ERR_INTERNAL, format!("display table: {e}"));
+                fail(
+                    r,
+                    OpStatus::OP_ERR_INTERNAL,
+                    format!("display table: {e}; drawing without display conversion"),
+                );
             }
         }
     }
@@ -637,6 +853,15 @@ fn render_one(host: &Host, v: &View) {
     #[cfg(windows)]
     if let Err(e) = op_gpu::poll_gpu(&gpu.device, "view frame") {
         return fail(r, OpStatus::OP_ERR_INTERNAL, e.to_string());
+    }
+    #[cfg(windows)]
+    {
+        r.doc_revision = Some(snap.revision);
+        r.doc_preview = snap.preview_serial;
+    }
+    #[cfg(windows)]
+    {
+        r.last_message = None;
     }
     #[cfg(not(windows))]
     let _ = gpu.device.poll(wgpu::PollType::wait_indefinitely());
@@ -674,6 +899,18 @@ fn display_table(doc: Option<&[u8]>, display: &[u8]) -> Result<Vec<[f32; 4]>, St
     let dst = op_color::Profile::from_icc(display).map_err(|e| format!("display profile: {e}"))?;
     let table = op_color::display_table(&src, &dst, LUT_N).map_err(|e| e.to_string())?;
     Ok(table.into_iter().map(|c| [c[0], c[1], c[2], 1.0]).collect())
+}
+
+#[cfg(all(test, windows))]
+#[test]
+fn rswop_profile_parses_but_cannot_build_a_display_table() {
+    let root = std::env::var_os("WINDIR").expect("Windows directory");
+    let profile = std::fs::read(
+        std::path::PathBuf::from(root).join("System32/spool/drivers/color/RSWOP.icm"),
+    )
+    .unwrap();
+    op_color::Profile::from_icc(&profile).unwrap();
+    assert!(display_table(None, &profile).is_err());
 }
 
 /// Called first thing in `op_engine_free`: stops the render thread and releases
@@ -780,6 +1017,13 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
         Ok(g) => g,
         Err(s) => return s,
     };
+    #[cfg(windows)]
+    let current = host.gpu.lock();
+    #[cfg(windows)]
+    if !current.as_ref().is_some_and(|now| Arc::ptr_eq(now, &gpu)) {
+        drop(current);
+        return attach(p, doc, layer, out_view);
+    }
     // SAFETY: the caller passes a live Objective-C object; its class is checked.
     #[cfg(target_os = "macos")]
     let target = match unsafe {
@@ -806,9 +1050,17 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
     #[cfg(windows)]
     let display_icc: Arc<[u8]> = Arc::from(target.display_icc());
     #[cfg(windows)]
-    if let Err(e) = op_color::Profile::from_icc(&display_icc) {
-        eprintln!("op-ffi view: Windows display ICC is invalid: {e}");
-        return OpStatus::OP_ERR_INTERNAL;
+    let display_problem = host
+        .engine()
+        .core()
+        .snapshot(doc)
+        .ok()
+        .and_then(|snap| display_table(snap.state.profile.as_deref(), &display_icc).err());
+    #[cfg(windows)]
+    if let Some(e) = &display_problem {
+        eprintln!(
+            "op-ffi view: display table unavailable: {e}; drawing without display conversion"
+        );
     }
     #[cfg(target_os = "macos")]
     let format = op_gpu::layer::FORMAT;
@@ -830,11 +1082,11 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             #[cfg(target_os = "macos")]
             display_icc: None,
             #[cfg(windows)]
-            display_icc: Some(display_icc),
+            display_icc: display_problem.is_none().then_some(display_icc),
             #[cfg(target_os = "macos")]
             display_gen: 0,
             #[cfg(windows)]
-            display_gen: 1,
+            display_gen: u64::from(display_problem.is_none()),
             set: false,
             background: BACKGROUND,
         }),
@@ -849,8 +1101,32 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             has_table: false,
             table_builds: 0,
             doc_uploads: 0,
-            frame_errors: 0,
-            last_error: OpStatus::OP_OK,
+            frame_errors: {
+                #[cfg(windows)]
+                {
+                    u64::from(display_problem.is_some())
+                }
+                #[cfg(not(windows))]
+                {
+                    0
+                }
+            },
+            last_error: {
+                #[cfg(windows)]
+                {
+                    if display_problem.is_some() {
+                        OpStatus::OP_ERR_INTERNAL
+                    } else {
+                        OpStatus::OP_OK
+                    }
+                }
+                #[cfg(not(windows))]
+                {
+                    OpStatus::OP_OK
+                }
+            },
+            #[cfg(windows)]
+            last_message: display_problem,
             shown: None,
             region_uploads: 0,
             region_tiles: 0,
@@ -861,6 +1137,10 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64) ->
             stamps: VecDeque::new(),
         }),
         frame_cv: Condvar::new(),
+        #[cfg(windows)]
+        recovery_errors: AtomicU64::new(0),
+        #[cfg(windows)]
+        retry_at: Mutex::new(None),
     });
     host.state.lock().views.insert(id, view);
     // SAFETY: checked non-null by the caller.
@@ -1076,13 +1356,21 @@ fn fill_render_info(v: &View, info: &mut OpViewInfo) {
         info.region_uploads = r.region_uploads;
         info.region_tiles = r.region_tiles;
     }
+    #[cfg(windows)]
+    {
+        let recovery_errors = v.recovery_errors.load(Ordering::SeqCst);
+        info.frame_errors += recovery_errors;
+        if recovery_errors > 0 {
+            info.last_error = OpStatus::OP_ERR_INTERNAL as u32;
+        }
+    }
 }
 #[cfg(not(any(target_os = "macos", windows)))]
 fn fill_render_info(_v: &View, _info: &mut OpViewInfo) {}
 
 /// Test only: destroys the canvas device, so the test host can prove the canvas
 /// recovers. This is not `extern "C"`, so it is not in the C header.
-#[cfg(windows)]
+#[cfg(all(windows, feature = "test-hooks"))]
 #[doc(hidden)]
 pub fn view_test_lose_device(p: *mut OpEngine) {
     if let Some(host) = find_host(p)
@@ -1090,6 +1378,38 @@ pub fn view_test_lose_device(p: *mut OpEngine) {
     {
         gpu.device.destroy();
     }
+}
+
+/// Removes the DX12 device only in the WARP test host. DX12 signals monitored
+/// fences across devices, so this hook refuses the hardware adapter.
+#[cfg(all(windows, feature = "test-hooks"))]
+#[doc(hidden)]
+pub fn view_test_remove_device(p: *mut OpEngine) -> Result<(), String> {
+    use windows::Win32::Graphics::Direct3D12::{ID3D12Device, ID3D12Device5};
+    use windows::core::Interface;
+    if std::env::var("OP_GPU_ADAPTER").as_deref() != Ok("warp") {
+        return Err("RemoveDevice is allowed only with OP_GPU_ADAPTER=warp".into());
+    }
+    let host = find_host(p).ok_or("no view host")?;
+    let gpu = host.gpu.lock().clone().ok_or("no canvas device")?;
+    let raw: ID3D12Device = unsafe {
+        gpu.device
+            .as_hal::<wgpu::hal::api::Dx12>()
+            .unwrap()
+            .raw_device()
+            .clone()
+    };
+    let d5: ID3D12Device5 = raw.cast().map_err(|e| e.to_string())?;
+    unsafe {
+        d5.RemoveDevice();
+    }
+    Ok(())
+}
+
+#[cfg(all(windows, feature = "test-hooks"))]
+#[doc(hidden)]
+pub fn view_test_fail_next_configure() {
+    op_gpu::win32::test_fail_next_configure();
 }
 
 /// Reads the engine-wide view counters (live views, retained layers, surfaces,

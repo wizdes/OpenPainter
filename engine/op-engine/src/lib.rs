@@ -2434,6 +2434,10 @@ pub struct Engine {
     recovery: recovery::Registry,
 }
 impl Engine {
+    #[cfg(windows)]
+    pub fn release_effect_gpu_for_canvas_recovery(&self) {
+        self.gpu.release_for_canvas_recovery();
+    }
     /// An engine with options from the environment (`OP_FORCE_CPU=1` turns the GPU off).
     pub fn new(callback: Option<Arc<dyn Fn(Event) + Send + Sync>>) -> Result<Self> {
         Self::with_options(callback, EngineOptions::from_env())

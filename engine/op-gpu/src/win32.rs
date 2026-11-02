@@ -9,11 +9,27 @@ use wgpu::rwh::{RawDisplayHandle, RawWindowHandle, Win32WindowHandle, WindowsDis
 
 pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
+#[cfg(feature = "test-hooks")]
+static FAIL_NEXT_CONFIGURE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+#[cfg(feature = "test-hooks")]
+#[doc(hidden)]
+pub fn test_fail_next_configure() {
+    FAIL_NEXT_CONFIGURE.store(true, Ordering::SeqCst);
+}
+
 #[link(name = "user32")]
 unsafe extern "system" {
     fn IsWindow(hwnd: isize) -> i32;
     fn GetDC(hwnd: isize) -> isize;
     fn ReleaseDC(hwnd: isize, dc: isize) -> i32;
+    fn GetWindowThreadProcessId(hwnd: isize, process_id: *mut u32) -> u32;
+    fn GetThreadDesktop(thread_id: u32) -> isize;
+    fn SetThreadDesktop(desktop: isize) -> i32;
+}
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetCurrentThreadId() -> u32;
 }
 #[link(name = "gdi32")]
 unsafe extern "system" {
@@ -48,6 +64,24 @@ pub struct Win32Target {
 unsafe impl Send for Win32Target {}
 
 impl Win32Target {
+    pub fn enter_window_desktop(&self) -> Result<(), String> {
+        let owner = unsafe { GetWindowThreadProcessId(self.hwnd, std::ptr::null_mut()) };
+        if owner == 0 {
+            return Err("HWND owner thread was not found".into());
+        }
+        let target_desktop = unsafe { GetThreadDesktop(owner) };
+        if target_desktop == 0 {
+            return Err("HWND desktop was not found".into());
+        }
+        let current = unsafe { GetThreadDesktop(GetCurrentThreadId()) };
+        if current != target_desktop && unsafe { SetThreadDesktop(target_desktop) } == 0 {
+            return Err(format!(
+                "SetThreadDesktop for HWND failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(())
+    }
     /// The caller must keep `hwnd` alive through detach.
     pub unsafe fn new(
         instance: &wgpu::Instance,
@@ -58,7 +92,10 @@ impl Win32Target {
         if value == 0 || unsafe { IsWindow(value) } == 0 {
             return Err("invalid HWND".into());
         }
-        let display_icc = display_profile(hwnd)?;
+        let display_icc = display_profile(hwnd).unwrap_or_else(|e| {
+            eprintln!("op-gpu: Windows display profile unavailable: {e}; drawing without display conversion");
+            Vec::new()
+        });
         let mut target = Self {
             hwnd: value,
             surface: None,
@@ -75,6 +112,9 @@ impl Win32Target {
     pub fn display_icc(&self) -> &[u8] {
         &self.display_icc
     }
+    pub fn hwnd(&self) -> isize {
+        self.hwnd
+    }
     pub fn tag_is_display(&self) -> bool {
         false
     }
@@ -90,6 +130,9 @@ impl Win32Target {
     pub fn resume(&mut self, instance: &wgpu::Instance) -> Result<(), String> {
         if self.surface.is_some() {
             return Ok(());
+        }
+        if unsafe { IsWindow(self.hwnd) } == 0 {
+            return Err("HWND was destroyed".into());
         }
         let hwnd = NonZeroIsize::new(self.hwnd).ok_or("invalid HWND")?;
         let surface = unsafe {
@@ -116,26 +159,56 @@ impl Win32Target {
         draw: impl FnOnce(&mut wgpu::CommandEncoder, &wgpu::TextureView) -> Result<(), String>,
     ) -> Result<(), String> {
         let _warp_guard = crate::windows_warp_guard().map_err(|e| e.to_string())?;
+        if unsafe { IsWindow(self.hwnd) } == 0 {
+            self.configured = None;
+            self.stats.surface_errors += 1;
+            return Err("HWND was destroyed before its frame".into());
+        }
         let surface = self.surface.as_ref().ok_or("HWND surface is suspended")?;
         if self.configured != Some((width, height)) {
-            surface.configure(
-                device,
-                &wgpu::SurfaceConfiguration {
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    format: FORMAT,
-                    width,
-                    height,
-                    present_mode: wgpu::PresentMode::Fifo,
-                    desired_maximum_frame_latency: 2,
-                    alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-                    view_formats: vec![],
-                },
-            );
+            #[cfg(feature = "test-hooks")]
+            if FAIL_NEXT_CONFIGURE.swap(false, Ordering::SeqCst) {
+                self.configured = None;
+                self.stats.surface_errors += 1;
+                return Err("configure HWND surface failed: test hook".into());
+            }
+            device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let configured = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                surface.configure(
+                    device,
+                    &wgpu::SurfaceConfiguration {
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                        format: FORMAT,
+                        width,
+                        height,
+                        present_mode: wgpu::PresentMode::Fifo,
+                        desired_maximum_frame_latency: 2,
+                        alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+                        view_formats: vec![],
+                    },
+                )
+            }));
+            let _ = device.poll(wgpu::PollType::Poll);
+            let scope_error = pollster::block_on(device.pop_error_scope());
+            if configured.is_err() || scope_error.is_some() {
+                self.configured = None;
+                self.stats.surface_errors += 1;
+                return Err(format!(
+                    "configure HWND surface failed: {}",
+                    scope_error.map_or_else(
+                        || "surface configure panicked".to_owned(),
+                        |e| e.to_string()
+                    )
+                ));
+            }
             self.configured = Some((width, height));
             self.stats.configures += 1;
             self.stats.drawable = (width, height);
         }
         let frame = surface.get_current_texture().map_err(|e| {
+            if matches!(e, wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) {
+                self.configured = None;
+            }
             self.stats.surface_errors += 1;
             format!("acquire HWND frame: {e}")
         })?;

@@ -11,8 +11,12 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
   - Owed to a Mac session: every engine test on the Mac, and the items in `test-counts.md`.
   - An `engine.rs` test run spun at full CPU for over 30 minutes while root ran GPU captures. Alone it passes in 1.62 s. W3 must look at this: suspect GPU contention or a device reset.
   - Tests failed once with `STATUS_ACCESS_VIOLATION` in `op-engine/tests/jobs.rs:461` with GPU creation on. W3 also.
-- [ ] W2: recovery redesign
-- [ ] W3: GPU and canvas on DX12
+- [x] W2: recovery redesign, code committed 2026-11-02. The final batch (`d2afa3c`) is reviewed at the end of Phase A. Results and accepted limits: `test-counts.md`.
+  - Six reviews found real bugs, each with a test. On Windows the lock sits beside the folder, close only hides the record, and the writer deletes.
+  - One test depends on machine load: `continuous_edits_still_write_within_the_max_interval`. Its time limit needs the user's OK to change.
+  - Mac run owed. The Mac code type-checks only.
+- [x] W3: GPU and canvas on DX12, code committed 2026-11-02. Reviewed at the end of Phase A. Results: `test-counts.md`, `w3-host.md`.
+  - Real device removal recovers on WARP, and is deliberately not run on the RTX. Mac run owed. The Mac code type-checks only.
 - [ ] W4: capture kit, committed at 244f671. Add Noise and Clouds are not repeatable, and parameters cannot be set yet. See `parity.md`. Its review comes at the end of Phase A.
 - [ ] W5 to W20: see `PLAN.md`
 

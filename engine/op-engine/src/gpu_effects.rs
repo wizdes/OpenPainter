@@ -45,6 +45,9 @@ pub struct EngineOptions {
     /// running GPU job without racing the last tiles on a fast or busy machine.
     #[doc(hidden)]
     pub hold_gpu_job_for_cancel: bool,
+    /// Test hook: one dispatch returns a named GPU error before it submits work.
+    #[doc(hidden)]
+    pub simulate_gpu_dispatch_error: Option<&'static str>,
 }
 impl EngineOptions {
     /// Options from the environment: `OP_FORCE_CPU=1` turns the GPU off.
@@ -123,6 +126,13 @@ pub(crate) struct GpuShared {
     stats: Mutex<Stats>,
 }
 impl GpuShared {
+    #[cfg(windows)]
+    pub(crate) fn release_for_canvas_recovery(&self) {
+        let mut slot = self.slot.lock();
+        if matches!(*slot, Slot::Ready(_)) {
+            *slot = Slot::Untried;
+        }
+    }
     pub(crate) fn new(options: EngineOptions) -> Arc<Self> {
         let slot = if options.force_cpu {
             Slot::Off("forced off by OP_FORCE_CPU=1 or the force_cpu engine option".into())
@@ -788,6 +798,11 @@ fn render(
         let (iw, ih) = (chunk.input.width, chunk.input.height);
         let before = device.ctx.dispatch_count();
         let result = catch_unwind(AssertUnwindSafe(|| {
+            match shared.options.simulate_gpu_dispatch_error {
+                Some("wait_timeout") => return Err(GpuError::WaitTimeout("simulated dispatch")),
+                Some("job_too_long") => return Err(GpuError::JobTooLong("simulated dispatch")),
+                _ => {}
+            }
             run_call(&mut device.ctx, plan.call, iw, ih, &input, &prepared)
         }));
         ms[1] += elapsed(start);
@@ -798,6 +813,20 @@ fn render(
             Ok(Err(GpuError::DeviceLost)) => {
                 shared.disable(&mut slot, "the GPU device was lost".into());
                 return Ok(Outcome::Cpu("the GPU device was lost".into()));
+            }
+            Ok(Err(e @ GpuError::WaitTimeout(_))) => {
+                let reason = format!("GPU wait timed out ({e})");
+                // wgpu may still own an active DX12 submission. Dropping its
+                // device here can panic, so retain it for this process's life.
+                if let Slot::Ready(device) =
+                    std::mem::replace(&mut *slot, Slot::Off(reason.clone()))
+                {
+                    eprintln!(
+                        "op-engine: retaining timed-out GPU device until process exit: {reason}"
+                    );
+                    std::mem::forget(device);
+                }
+                return Ok(Outcome::Cpu(reason));
             }
             Ok(Err(GpuError::InvalidImage)) => {
                 return Ok(Outcome::Cpu(

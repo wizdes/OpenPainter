@@ -432,6 +432,49 @@ fn gpu_creation_failure_falls_back_with_reason_in_doc_info() {
 }
 
 #[test]
+fn timeout_turns_gpu_off_and_named_errors_reach_cpu() {
+    let source = image(32, 32);
+    for (error, expected) in [
+        ("wait_timeout", "GPU wait timed out"),
+        ("job_too_long", "GPU job is too large"),
+    ] {
+        let test = Engine::with_options(
+            None,
+            EngineOptions {
+                simulate_gpu_dispatch_error: Some(error),
+                ..options(false)
+            },
+        )
+        .unwrap();
+        let cpu = Engine::with_options(None, options(true)).unwrap();
+        let t = test.import_pixels(32, 32, &source, None).unwrap();
+        let c = cpu.import_pixels(32, 32, &source, None).unwrap();
+        test.dispatch(t, "effect.adjust.sepia", json!({})).unwrap();
+        cpu.dispatch(c, "effect.adjust.sepia", json!({})).unwrap();
+        let after = info(&test, t);
+        assert!(
+            after["gpu_effects"]["last_cpu_reason"]
+                .as_str()
+                .unwrap()
+                .contains(expected),
+            "{after}"
+        );
+        assert_eq!(pixels(&test, t), pixels(&cpu, c));
+        if error == "wait_timeout" {
+            assert_eq!(after["gpu"], false);
+            assert!(
+                after["gpu_reason"]
+                    .as_str()
+                    .unwrap()
+                    .contains("GPU wait timed out")
+            );
+            test.dispatch(t, "effect.adjust.sepia", json!({})).unwrap();
+            assert_eq!(info(&test, t)["gpu_effects"]["cpu_runs"], 2);
+        }
+    }
+}
+
+#[test]
 fn forced_cpu_reports_gpu_off_and_env_switch_parses() {
     let cpu = Engine::with_options(None, options(true)).unwrap();
     let c = cpu.import_pixels(4, 4, &[9; 64], None).unwrap();
