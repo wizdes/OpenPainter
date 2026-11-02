@@ -391,3 +391,9 @@ So nothing here is caused by the Windows work. These faults come from `main`, an
 - `mac/Makefile`'s `-onlyUsePackageVersions` is rejected by `xcodebuild` in Xcode 27.1, so `make -C mac app`, `test` and `release` all stop there. The app build above left that flag out, and this copy needs a fix before the next Mac release.
 - `mac/scripts/build-engine.sh` names a `stable-aarch64-apple-darwin` toolchain folder. This Mac has only `1.97.1-aarch64-apple-darwin`, so the script cannot find `cargo`. The throwaway copy pointed it at the active toolchain.
 
+## Phase A end, 2026-11-02
+
+Root ran `cargo test --manifest-path engine/Cargo.toml --workspace --no-fail-fast` on `a0544c5` on the RTX PC, in 457 s: 752 passed, 2 failed, 7 ignored. Both failures are the Mandelbrot row, `legacy_render_oracle_every_fixture_and_variant` and `m54_legacy_rows_hold_on_small_fixtures_through_the_tiled_path`, worst 23 of 255. W14 owns them. They pass on the Mac. The WARP suites and the hidden-desktop checks were not rerun in this pass.
+
+`main` moved to `10367e6`: W4 at `22db5b4` plus the change diagram `docs/diagrams/phase-a-windows.html`. W5 and W6 stay on `windows` until the Phase B review, because W5's engine overlay code has not had its fresh review.
+
