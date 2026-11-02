@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('fast','milestone','window','checkpoint','speed')][string]$Level = 'fast',
+    [ValidateSet('fast','milestone','window','checkpoint','speed','capture')][string]$Level = 'fast',
     [hashtable]$Facts
 )
 $ErrorActionPreference = 'Stop'
@@ -56,6 +56,16 @@ public static class PreflightDesktop {
         if (Test-Path -LiteralPath $pin -PathType Leaf) { $f.PaintVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($pin).FileVersion }
         else { $f.PaintVersion = '' }
     } catch { $f.PaintVersion = $null }
+    try {
+        $pinRoot = [IO.Path]::GetFullPath('C:\agent-work\pdn-5.1.12') + [IO.Path]::DirectorySeparatorChar
+        $paintProcesses = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'paintdotnet%'" -ErrorAction Stop)
+        $f.OutsidePinPaint = $false
+        foreach ($process in $paintProcesses) {
+            if ([string]::IsNullOrWhiteSpace($process.ExecutablePath)) { $f.OutsidePinPaint = $null; break }
+            $path = [IO.Path]::GetFullPath($process.ExecutablePath)
+            if (-not $path.StartsWith($pinRoot, [StringComparison]::OrdinalIgnoreCase)) { $f.OutsidePinPaint = $true; break }
+        }
+    } catch { $f.OutsidePinPaint = $null }
     # Sunshine stays running when nobody streams. A stream holds an NVENC session.
     try { $f.SunshineRunning = @((Get-Process -Name sunshine -ErrorAction SilentlyContinue)).Count -gt 0 } catch { $f.SunshineRunning = $null }
     $f.EncoderSessions = $null
@@ -103,13 +113,16 @@ if ($Level -in @('window','checkpoint','speed')) {
     if ($uiReason) { Write-Output "UI TESTS: NOT RUN ($uiReason)"; $reasons.Add("UI tests: $uiReason") }
     else { Write-Output 'UI TESTS: PASS' }
 }
-if ($Level -in @('checkpoint','speed')) {
+if ($Level -in @('checkpoint','speed','capture')) {
     if ($null -eq $Facts.PaintVersion) { Write-Output 'paint.net pin: FAIL (cannot determine)'; $reasons.Add('paint.net pin cannot determine') }
     elseif ($Facts.PaintVersion -eq '5.112.9563.32325') { Write-Output 'paint.net pin: PASS' }
     else { Write-Output 'paint.net pin: FAIL'; $reasons.Add('paint.net pin wrong or absent') }
+}
+if ($Level -in @('checkpoint','speed')) {
     Check-Boolean 'Sunshine idle' (Resolve-Idle $Facts.SunshineRunning $Facts.EncoderSessions)
     Check-Boolean 'LM Studio idle' (Resolve-Idle $Facts.LMStudioRunning $Facts.LoadedModels)
 }
+if ($Level -in @('checkpoint','speed','capture')) { Check-Boolean 'paint.net outside pin' $(if ($null -eq $Facts.OutsidePinPaint) { $null } else { -not $Facts.OutsidePinPaint }) }
 if ($reasons.Count -eq 0) { Write-Output 'PREFLIGHT: PASS'; exit 0 }
 Write-Output ('PREFLIGHT: FAIL (' + ($reasons -join '; ') + ')')
 exit 1

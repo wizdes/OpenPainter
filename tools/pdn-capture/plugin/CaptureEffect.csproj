@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="PaintDotNet.Effects.Core"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Effects.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.PropertySystem"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.PropertySystem.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Core"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Data"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Data.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Base"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Base.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Primitives"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Primitives.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Fundamentals"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Fundamentals.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.ComponentModel"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.ComponentModel.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Windows"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Windows.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="PaintDotNet.Effects.Gpu"><HintPath>C:\agent-work\pdn-5.1.12\PaintDotNet.Effects.Gpu.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

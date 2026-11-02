@@ -7,7 +7,14 @@ function Check($name, $level, $facts, $wantPass, $wantText) {
     if (($output -join "`n") -notmatch [regex]::Escape($wantText)) { throw "$name missing $wantText; output: $output" }
     Write-Output "PASS $name"
 }
-$base = @{ DotNet10=$true; Cargo=$true; DiskGB=41; UserSession=$true; Unlocked=$true; PaintVersion='5.112.9563.32325'; SunshineRunning=$true; EncoderSessions=0; LMStudioRunning=$false; LoadedModels=$null }
+$base = @{ DotNet10=$true; Cargo=$true; DiskGB=41; UserSession=$true; Unlocked=$true; PaintVersion='5.112.9563.32325'; SunshineRunning=$true; EncoderSessions=0; LMStudioRunning=$false; LoadedModels=$null; OutsidePinPaint=$false }
+Check 'capture pass' capture $base $true 'PREFLIGHT: PASS'
+$outside = $base.Clone(); $outside.OutsidePinPaint = $true
+foreach ($level in @('checkpoint','speed','capture')) {
+    Check "outside pin fails $level" $level $outside $false 'paint.net outside pin: FAIL'
+}
+$unknownPaint = $base.Clone(); $unknownPaint.OutsidePinPaint = $null
+Check 'unknown paint path fails capture' capture $unknownPaint $false 'paint.net outside pin: FAIL (cannot determine)'
 Check 'fast pass' fast $base $true 'PREFLIGHT: PASS'
 $low = $base.Clone(); $low.DiskGB = 39
 Check 'disk low fails' fast $low $false '40 GB'

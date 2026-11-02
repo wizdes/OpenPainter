@@ -699,6 +699,13 @@ fn m54_legacy_rows_hold_on_small_fixtures_through_the_tiled_path() {
     let mut checked = 0;
     for spec in effect::registered() {
         let target = &targets[spec.id];
+        // A pdn-5.1 row is a comparison this test cannot make yet. W14 adds the
+        // captures, and until then such a row must not pass by being skipped.
+        assert_ne!(
+            target.target, "pdn-5.1",
+            "NOT RUN: {} has a pdn-5.1 row, and this test has no capture to compare it with",
+            spec.id
+        );
         if target.target != "legacy-3.36" {
             continue;
         }

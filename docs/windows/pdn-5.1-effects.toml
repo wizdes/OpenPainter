@@ -1,0 +1,326 @@
+# paint.net 5.1.12 built-in effects, as IEffectsService2 lists them to a plugin.
+# Used only to list what W14 compares. No parameters: no public way gives them (tools/pdn-capture/README.md).
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//auto-level"
+name = "Auto-Level"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//black and white"
+name = "Black and White"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//brightness / contrast"
+name = "Brightness / Contrast"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//curves"
+name = "Curves"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//exposure"
+name = "Exposure"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//highlights / shadows"
+name = "Highlights / Shadows"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//hue / saturation"
+name = "Hue / Saturation"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//invert alpha"
+name = "Invert Alpha"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//invert colors"
+name = "Invert Colors"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//levels"
+name = "Levels"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//posterize"
+name = "Posterize"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//sepia"
+name = "Sepia"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/adjustment//temperature / tint"
+name = "Temperature / Tint"
+category = "Adjustment"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/donotdisplay//rotate / zoom"
+name = "Rotate / Zoom"
+category = "DoNotDisplay"
+submenu = ""
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/artistic/ink sketch"
+name = "Ink Sketch"
+category = "Effect"
+submenu = "Artistic"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/artistic/oil painting"
+name = "Oil Painting"
+category = "Effect"
+submenu = "Artistic"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/artistic/pencil sketch"
+name = "Pencil Sketch"
+category = "Effect"
+submenu = "Artistic"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/bokeh blur"
+name = "Bokeh Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/fragment blur"
+name = "Fragment Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/gaussian blur"
+name = "Gaussian Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/median blur"
+name = "Median Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/motion blur"
+name = "Motion Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/radial blur"
+name = "Radial Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/sketch blur"
+name = "Sketch Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/square blur"
+name = "Square Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/surface blur"
+name = "Surface Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/blurs/zoom blur"
+name = "Zoom Blur"
+category = "Effect"
+submenu = "Blurs"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/bulge"
+name = "Bulge"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/crystalize"
+name = "Crystalize"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/dents"
+name = "Dents"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/frosted glass"
+name = "Frosted Glass"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/morphology"
+name = "Morphology"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/pixelate"
+name = "Pixelate"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/polar inversion"
+name = "Polar Inversion"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/tile reflection"
+name = "Tile Reflection"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/distort/twist"
+name = "Twist"
+category = "Effect"
+submenu = "Distort"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/noise/add noise"
+name = "Add Noise"
+category = "Effect"
+submenu = "Noise"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/noise/reduce noise"
+name = "Reduce Noise"
+category = "Effect"
+submenu = "Noise"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/object/drop shadow"
+name = "Drop Shadow"
+category = "Effect"
+submenu = "Object"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/photo/glow"
+name = "Glow"
+category = "Effect"
+submenu = "Photo"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/photo/sharpen"
+name = "Sharpen"
+category = "Effect"
+submenu = "Photo"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/photo/soften portrait"
+name = "Soften Portrait"
+category = "Effect"
+submenu = "Photo"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/photo/straighten"
+name = "Straighten"
+category = "Effect"
+submenu = "Photo"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/photo/vignette"
+name = "Vignette"
+category = "Effect"
+submenu = "Photo"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/render/clouds"
+name = "Clouds"
+category = "Effect"
+submenu = "Render"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/render/julia fractal"
+name = "Julia Fractal"
+category = "Effect"
+submenu = "Render"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/render/mandelbrot fractal"
+name = "Mandelbrot Fractal"
+category = "Effect"
+submenu = "Render"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/render/turbulence"
+name = "Turbulence"
+category = "Effect"
+submenu = "Render"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/stylize/edge detect"
+name = "Edge Detect"
+category = "Effect"
+submenu = "Stylize"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/stylize/emboss"
+name = "Emboss"
+category = "Effect"
+submenu = "Stylize"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/stylize/outline"
+name = "Outline"
+category = "Effect"
+submenu = "Stylize"
+
+[[effect]]
+id = "paintdotnet.effects.gpu/effect/stylize/relief"
+name = "Relief"
+category = "Effect"
+submenu = "Stylize"
+
+[[effect]]
+id = "paintdotnet.effects/effect/color/quantize"
+name = "Quantize"
+category = "Effect"
+submenu = "Color"
+
+[[effect]]
+id = "paintdotnet.effects/effect/photo/red eye removal"
+name = "Red Eye Removal"
+category = "Effect"
+submenu = "Photo"
