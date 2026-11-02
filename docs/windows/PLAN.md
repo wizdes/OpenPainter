@@ -6,7 +6,7 @@ Status: revision 3. The user approved revision 2 on 2026-11-01, and this revisio
 
 The Rust engine moves to Windows with modest changes. The Mac app (Swift) does not move, so Windows gets a new C# app. This PC has paint.net 5.1.12, so effects and behavior can be compared with the real thing. That comparison was blocked for the whole Mac build (old milestone M02). Fixes go into the shared engine, so the Mac app gets them too.
 
-The work is 21 milestones, W0 to W20, about 410 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
+The work is 21 milestones, W0 to W20, about 420 agent hours. It is Tier 3: a new subsystem, file storage, signing and a release. It uses its own worktree, a full test run and fresh review at each phase end, and a change diagram.
 
 ```
 Engine (Rust, shared) --> C interface --> Mac app (Swift, exists)
@@ -146,7 +146,7 @@ Each milestone ends with a working build, a short hands-on script, and a row of 
 | W3 | GPU and canvas on DX12 | One pinned backend for both device paths, WARP selector, backend assert. Small Win32 test host. Window handle in `op_view_attach`. Display profile from Windows, and how DWM color management treats our output. Device-lost callback in the view host. Shader compiler choice. A guard against long GPU jobs that trigger a Windows GPU reset. | M54 matrix 0 failures on RTX and WARP, and the test fails unless DX12 or WARP ran. Ported resize, switch and create-destroy scenarios pass. Color within ΔE00 1 of direct lcms2 transforms. A real device removal, if `RemoveDevice` touches only our device, recovers the canvas; `simulate_device_loss` alone does not count. Mac view tests: NOT RUN until the phase-end Mac session. | 16 h | W1 |
 | W4 | paint.net capture kit (old M02) | Clean unpack of the pin, and write access removed for `agent`. Plugin or driver. The real 5.1.12 catalog. `targets.toml` gains `pdn-5.1`, and `m54_parity.rs` reads those rows. Private oracle repo. `parity.md` started. Fallback list. | One effect per family, twice, with the same hashes. The manifest pins build, parameters, ICC, inputs, GPU and driver. Catalog and fallback list committed. A `pdn-5.1` row with no capture fails or prints NOT RUN, and never passes. | 20 h | W0, D4 |
 
-### Phase B: the Windows app (160 h)
+### Phase B: the Windows app (164 h)
 
 | # | Milestone | What it adds | Done-test | Budget | Needs |
 | --- | --- | --- | --- | --- | --- |

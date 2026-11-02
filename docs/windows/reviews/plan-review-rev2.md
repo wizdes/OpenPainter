@@ -22,7 +22,7 @@ Root checked findings 5, 7, 9, 10, 11, 13, 16, 20 and the manifest finding again
 | 14 | Three done-tests pass by giving up | W11, W14, W15 limits. |
 | 15 | Late dependencies wrong; W7 opens a PNG before Open exists; "60 fps" undefined | Tables fixed. Test hook. M12's definition. |
 | 16 | `opcli dump-catalog` does not exist | W7 builds it and the generator. |
-| 17 | Phase B budgets well below the Mac's planned hours | Raised. Total about 410 h. Still below the Mac, because the engine exists. |
+| 17 | Phase B budgets well below the Mac's planned hours | Raised. Total about 420 h. Still below the Mac, because the engine exists. |
 | 18 | Reviews further apart than the workspace rule | W1, W2, W10 get reviews. Listed as a choice to check. |
 | 19 | Release items did not fit together | W10 and W19 rows. |
 | 20 | `low_disk` cannot run as `agent` | Reports NOT RUN. W19 covers low disk. |
