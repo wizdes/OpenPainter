@@ -10,7 +10,7 @@ Root ran these as `agent` on the final code, from `engine/`, with `CARGO_INCREME
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p op-engine --lib --test recovery --test recovery_fixes --test recovery_fixes2 --test release_review --test fix_round2 --no-fail-fast -j 8 -- --test-threads=1` | 86 passed, 0 failed |
+| `cargo test -p op-engine --lib --test recovery --test recovery_fixes --test recovery_fixes2 --test release_review --test fix_round2 --no-fail-fast -j 8 -- --test-threads=1` | 93 passed, 0 failed |
 | `cargo test -p op-cli --no-fail-fast -j 8 -- --test-threads=1` | 6 passed, 0 failed. Three are kill tests using `TerminateProcess`. |
 | `cargo test -p op-engine --test huge_document --no-fail-fast -j 8 -- --ignored --test-threads=1 --nocapture` | 1 passed |
 | A temporary stress test: 1500 attach and close cycles with a scan running at the same time | 0 files left, 10975 scans, 5.6 s. Not saved in the repo. |
@@ -58,13 +58,15 @@ These results come from the focused, op-cli, or manual commands above.
 | `kept_image_metadata_survives_opaint_and_recovery` | Passed |
 | `a_200_megapixel_document_paints_blurs_undoes_and_saves_under_the_memory_cap` | Passed |
 
-Mac run: **NOT RUN**. It is owed until a Mac session. The W14 Mandelbrot result is unchanged.
+Mac: `cargo check -p op-engine -p op-cli --tests --target aarch64-apple-darwin` passes with a stub C compiler. This checks types only, and links and runs nothing. The Mac run is **NOT RUN**, and owed until a Mac session. The W14 Mandelbrot result is unchanged.
 
 ### Limits accepted in W2
 
+- Every write and delete checks the lock first, so a writer that lost its lock leaves the next owner alone. A very small gap remains between that check and the file operation.
+- A former owner that closes after the next owner has stopped cleanly can delete that owner's record. It needs a lock file deleted from outside first.
 - If the closed marker cannot be written and the process crashes within the same few milliseconds, a false offer is possible. The marker failure is printed.
 - A lock file that stays denied hides its record from every scan, with the reason only in the log. W10's recovery sheet has to show this.
-- A file held open by another program hides a record until the next scan. The reason is printed.
+- A file that cannot be read, because another program holds it or a disk failed, hides a record until the next scan. The reason is printed. Only a bad format, a bad checksum or a truly missing file lists a record as damaged.
 - Attach waits up to 4 s on a lock that stays denied, and it holds the writers lock while it does.
 - Attaching to the same folder again before the old writer stops is refused. The app uses a new folder for each document.
 - Crashes during close are tested with hand-built folder states, not with real kills at those steps.

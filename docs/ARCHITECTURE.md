@@ -127,8 +127,10 @@ touch it. The marker stops a late writer commit, or a manifest another program
 holds open, from becoming a false offer.
 A scan locks a folder and checks the marker and the manifest. A marker, or no
 manifest, means the folder goes. A check that fails leaves every file alone and
-is printed. A file another program holds does not make a record damaged: the
-record waits for the next scan, with the reason printed. A lock file that stays
+is printed. A file that cannot be read does not make a record damaged: the record waits
+for the next scan, with the reason printed. Only a bad format, a bad checksum or
+a truly missing file lists it as damaged. Every write and delete checks that this
+writer still owns the lock file. A lock file that stays
 denied hides its record the same way, so W10's recovery sheet must show this. The snapshot is read without the lock; afterwards the scan locks
 again and repeats the check. A scan also removes sibling files whose folder is
 gone, unless a live process holds the lock. Recover refuses a record with a
