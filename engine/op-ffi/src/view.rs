@@ -39,53 +39,64 @@ pub const OP_VIEW_PIXEL_GRID: u32 = 1;
 /// drawable surface and refuses frames until a state without this flag arrives.
 pub const OP_VIEW_SUSPENDED: u32 = 2;
 
-/// A rectangle in document points. Zero width or height disables that shape.
+/// An overlay point in document points. Borrowed only during the set call.
 #[cfg(windows)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-pub struct OpOverlayRect {
+pub struct OpOverlayPoint { pub x: f64, pub y: f64 }
+
+/// Windows overlay item kinds: path=1, rectangle=2, ellipse=3, handle=4,
+/// pivot=5, crop=6, caret=7, edit frame=8, underline=9, flood handle=10,
+/// static zoom rectangle=11.
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OpOverlayItem {
+    pub kind: u32,
+    /// For a path only: 1 closes it; all other bits are invalid.
+    pub flags: u32,
+    pub points: *const OpOverlayPoint,
+    pub point_count: usize,
     pub x: f64,
     pub y: f64,
     pub width: f64,
     pub height: f64,
 }
-
 #[cfg(windows)]
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct OpViewOverlay {
-    pub ants: OpOverlayRect,
-    pub crop: OpOverlayRect,
-    pub caret: OpOverlayRect,
-    pub dash_offset: f64,
+impl Default for OpOverlayItem {
+    fn default() -> Self { Self { kind:0, flags:0, points:std::ptr::null(), point_count:0, x:0.0, y:0.0, width:0.0, height:0.0 } }
 }
 
 #[cfg(windows)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum OverlayHit { None, CropDim, AntWhite, AntBlack, Caret }
-
-#[cfg(windows)]
-fn inside(r: OpOverlayRect, x: f64, y: f64) -> bool {
-    r.width > 0.0 && r.height > 0.0 && x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height
-}
-
-/// Matches the Windows shader shapes; useful without a window surface.
-#[cfg(windows)]
-pub fn overlay_sample(o: &OpViewOverlay, x: f64, y: f64) -> OverlayHit {
-    if inside(o.caret, x, y) { return OverlayHit::Caret; }
-    let a = o.ants;
-    if inside(a, x, y) && (x - a.x < 1.0 || a.x + a.width - x <= 1.0 || y - a.y < 1.0 || a.y + a.height - y <= 1.0) {
-        let step = ((x + y + o.dash_offset) / 4.0).floor() as i64;
-        return if step.rem_euclid(2) == 0 { OverlayHit::AntWhite } else { OverlayHit::AntBlack };
+fn parse_overlay_items(items: *const OpOverlayItem, count: usize) -> Result<Arc<op_gpu::overlay::Overlay>, OpStatus> {
+    use op_gpu::overlay::{Item, Point};
+    if count > 10_000 || (count > 0 && items.is_null()) { return Err(OpStatus::OP_ERR_BAD_ARGUMENT); }
+    let source = if count == 0 { &[][..] } else { unsafe { std::slice::from_raw_parts(items, count) } };
+    let mut parsed=Vec::with_capacity(count);
+    let pt=|x:f64,y:f64| Point::new(x as f32,y as f32);
+    for i in source {
+        if i.flags & !1 != 0 || ![i.x,i.y,i.width,i.height].iter().all(|n|n.is_finite()) { return Err(OpStatus::OP_ERR_BAD_ARGUMENT); }
+        let points = if i.point_count == 0 { Vec::new() } else {
+            if i.point_count > 1_000_000 || i.points.is_null() { return Err(OpStatus::OP_ERR_BAD_ARGUMENT); }
+            unsafe { std::slice::from_raw_parts(i.points,i.point_count) }.iter().map(|p|pt(p.x,p.y)).collect::<Vec<_>>()
+        };
+        let item=match i.kind {
+            1 if i.point_count >= 2 => Item::path(points,i.flags == 1),
+            2 if i.point_count == 0 && i.flags == 0 => Item::Rectangle {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
+            3 if i.point_count == 0 && i.flags == 0 => Item::Ellipse {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
+            4 if i.point_count == 0 && i.flags == 0 => Item::handle(pt(i.x,i.y)),
+            5 if i.point_count == 0 && i.flags == 0 => Item::Pivot(pt(i.x,i.y)),
+            6 if i.point_count == 4 && i.flags == 0 => Item::crop([points[0],points[1],points[2],points[3]]),
+            7 if i.point_count == 0 && i.flags == 0 => Item::Caret {x:i.x as f32,y:i.y as f32,height:i.height as f32},
+            8 if i.point_count == 0 && i.flags == 0 => Item::EditFrame {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
+            9 if i.point_count == 2 && i.flags == 0 => Item::Underline {from:points[0],to:points[1]},
+            10 if i.point_count == 0 && i.flags == 0 => Item::FloodHandle(pt(i.x,i.y)),
+            11 if i.point_count == 0 && i.flags == 0 => Item::ZoomRectangle {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
+            _ => return Err(OpStatus::OP_ERR_BAD_ARGUMENT),
+        };
+        parsed.push(item);
     }
-    if o.crop.width > 0.0 && o.crop.height > 0.0 && !inside(o.crop, x, y) { return OverlayHit::CropDim; }
-    OverlayHit::None
-}
-
-#[cfg(windows)]
-fn valid_overlay(o: &OpViewOverlay) -> bool {
-    let rect = |r: OpOverlayRect| [r.x, r.y, r.width, r.height].iter().all(|v| v.is_finite()) && r.width >= 0.0 && r.height >= 0.0;
-    rect(o.ants) && rect(o.crop) && rect(o.caret) && o.dash_offset.is_finite()
+    op_gpu::overlay::Overlay::new(parsed).map(Arc::new).map_err(|_|OpStatus::OP_ERR_BAD_ARGUMENT)
 }
 
 /// Where and how a view shows its document. Sizes and positions are in points;
@@ -215,7 +226,9 @@ struct Request {
     /// Fill outside the document (`op_view_set_background`, M56).
     background: [f32; 4],
     #[cfg(windows)]
-    overlay: Option<OpViewOverlay>,
+    overlay: Option<Arc<op_gpu::overlay::Overlay>>,
+    #[cfg(windows)]
+    overlay_dash: f64,
 }
 
 #[cfg(windows)]
@@ -246,6 +259,7 @@ mod recovery_profile_tests {
             set: true,
             background: BACKGROUND,
             overlay: None,
+            overlay_dash: 0.0,
         };
         assert_eq!(&*recovery_profile(&request, &[4, 5]), &[1, 2, 3]);
         let mut automatic = request;
@@ -874,6 +888,7 @@ mod retry_tests {
                 set: true,
                 background: BACKGROUND,
                 overlay: None,
+                overlay_dash: 0.0,
             }),
             dirty: true.into(),
             render: Mutex::new(None),
@@ -925,6 +940,7 @@ mod retry_tests {
                 set: false,
                 background: BACKGROUND,
                 overlay: None,
+                overlay_dash: 0.0,
             }),
             dirty: false.into(),
             render: Mutex::new(None),
@@ -1131,16 +1147,10 @@ fn render_one(host: &Host, v: &View) {
         checker_px: ((CHECKER_PT * req.scale).round() as u32).max(1),
         pixel_grid: req.flags & OP_VIEW_PIXEL_GRID != 0 && req.zoom >= GRID_MIN_ZOOM - 1e-9,
         use_mips: true,
-        #[cfg(windows)]
-        overlay: req.overlay.map(|o| {
-            let rect = |r: OpOverlayRect| [r.x as f32, r.y as f32, r.width as f32, r.height as f32];
-            op_gpu::presenter::OverlayParams {
-                ants: rect(o.ants), crop: rect(o.crop), caret: rect(o.caret),
-                dash_offset: o.dash_offset as f32,
-            }
-        }),
     };
     let renderer = &mut r.renderer;
+    #[cfg(windows)]
+    renderer.set_overlay(&gpu.device, req.overlay.clone(), req.overlay_dash as f32, req.scale as f32, width, height);
     let result = r
         .target
         .present(&gpu.device, &gpu.queue, width, height, |enc, target| {
@@ -1408,6 +1418,8 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, pa
             background: BACKGROUND,
             #[cfg(windows)]
             overlay: None,
+            #[cfg(windows)]
+            overlay_dash: 0.0,
         }),
         dirty: false.into(),
         render: Mutex::new(Some(Render {
@@ -1558,21 +1570,32 @@ pub extern "C" fn op_view_set(p: *mut OpEngine, view: u64, state: *const OpViewS
     })
 }
 
-/// Sets the Windows canvas overlay. A null pointer clears it. This stores the
-/// newest shape and wakes the render thread, just like `op_view_set`.
+/// Copies a list of Windows overlay items once. A zero count clears it.
 #[cfg(windows)]
 #[unsafe(no_mangle)]
-pub extern "C" fn op_view_set_overlay(p: *mut OpEngine, view: u64, overlay: *const OpViewOverlay) -> OpStatus {
+pub extern "C" fn op_view_set_overlay(p: *mut OpEngine, view: u64, items: *const OpOverlayItem, count: usize) -> OpStatus {
     guard(|| {
         if let Err(s) = engine(p) { return s; }
-        let next = if overlay.is_null() { None } else {
-            let value = unsafe { *overlay };
-            if !valid_overlay(&value) { return OpStatus::OP_ERR_BAD_ARGUMENT; }
-            Some(value)
-        };
+        let next = match parse_overlay_items(items,count) { Ok(value)=>value, Err(status)=>return status };
         let Some(host) = find_host(p) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
         let Some(v) = host.view(view) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
-        v.request.lock().overlay = next;
+        v.request.lock().overlay = Some(next);
+        v.dirty.store(true, Ordering::Release);
+        host.wake.notify_all();
+        OpStatus::OP_OK
+    })
+}
+
+/// Changes only the phase of retained marching ants; no points are copied.
+#[cfg(windows)]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_view_set_overlay_dash(p: *mut OpEngine, view: u64, dash_offset: f64) -> OpStatus {
+    guard(|| {
+        if let Err(s) = engine(p) { return s; }
+        if !dash_offset.is_finite() || !(dash_offset as f32).is_finite() { return OpStatus::OP_ERR_BAD_ARGUMENT; }
+        let Some(host) = find_host(p) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
+        let Some(v) = host.view(view) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
+        v.request.lock().overlay_dash = dash_offset;
         v.dirty.store(true, Ordering::Release);
         host.wake.notify_all();
         OpStatus::OP_OK

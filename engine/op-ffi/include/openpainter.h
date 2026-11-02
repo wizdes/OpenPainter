@@ -176,21 +176,31 @@ typedef struct OpViewState {
 } OpViewState;
 
 /**
- * A rectangle in document points. Zero width or height disables that shape.
+ * An overlay point in document points. Borrowed only during the set call.
  */
-typedef struct OpOverlayRect {
+typedef struct OpOverlayPoint {
+  double x;
+  double y;
+} OpOverlayPoint;
+
+/**
+ * Windows overlay item kinds: path=1, rectangle=2, ellipse=3, handle=4,
+ * pivot=5, crop=6, caret=7, edit frame=8, underline=9, flood handle=10,
+ * static zoom rectangle=11.
+ */
+typedef struct OpOverlayItem {
+  uint32_t kind;
+  /**
+   * For a path only: 1 closes it; all other bits are invalid.
+   */
+  uint32_t flags;
+  const struct OpOverlayPoint *points;
+  uintptr_t point_count;
   double x;
   double y;
   double width;
   double height;
-} OpOverlayRect;
-
-typedef struct OpViewOverlay {
-  struct OpOverlayRect ants;
-  struct OpOverlayRect crop;
-  struct OpOverlayRect caret;
-  double dash_offset;
-} OpViewOverlay;
+} OpOverlayItem;
 
 /**
  * What a view holds now (for tests and diagnostics).
@@ -657,12 +667,17 @@ enum OpStatus op_view_attach_panel(struct OpEngine *p,
 enum OpStatus op_view_set(struct OpEngine *p, uint64_t view, const struct OpViewState *state);
 
 /**
- * Sets the Windows canvas overlay. A null pointer clears it. This stores the
- * newest shape and wakes the render thread, just like `op_view_set`.
+ * Copies a list of Windows overlay items once. A zero count clears it.
  */
 enum OpStatus op_view_set_overlay(struct OpEngine *p,
                                   uint64_t view,
-                                  const struct OpViewOverlay *overlay);
+                                  const struct OpOverlayItem *items,
+                                  uintptr_t count);
+
+/**
+ * Changes only the phase of retained marching ants; no points are copied.
+ */
+enum OpStatus op_view_set_overlay_dash(struct OpEngine *p, uint64_t view, double dash_offset);
 
 /**
  * Sets the color drawn around the document (the canvas surround, M56: the

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using SpikeAvalonia;
 using Xunit;
 
@@ -15,6 +16,18 @@ public sealed class TestApp {
 }
 
 public sealed class ShellTests {
+    [AvaloniaFact]
+    public void FileMenuItemOpensDialog() {
+        var shell = new Shell(headless: true); shell.Show();
+        var flyout = Assert.IsType<MenuFlyout>(shell.FileMenuButton.Flyout);
+        var item = Assert.IsType<MenuItem>(flyout.Items[0]);
+        Assert.Equal("Open dialog", item.Header);
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert.Contains("dialog:open", shell.EventLog);
+        foreach (var window in shell.OwnedWindows.ToArray()) window.Close();
+        shell.Close();
+    }
+
     [AvaloniaFact]
     public void MenuDialogNumberAndCanvasInput() {
         var shell = new Shell(headless: true); shell.Show();

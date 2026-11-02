@@ -32,7 +32,7 @@ public sealed class Shell : Window {
         Title = "OpenPainter WinUI W5";
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
         var menu = new MenuBar(); AutomationProperties.SetName(menu, "Menu bar");
-        var item = new MenuBarItem { Title = "Test menu" }; AutomationProperties.SetName(item, "Test menu");
+        var item = new MenuBarItem { Title = "File" }; AutomationProperties.SetName(item, "File menu");
         var open = new MenuFlyoutItem { Text = "Open dialog" }; open.Click += async (_, _) => await OpenDialog(); item.Items.Add(open); menu.Items.Add(item);
         root.Children.Add(menu);
         var surface = new Grid(); Grid.SetRow(surface, 1); root.Children.Add(surface);
@@ -58,7 +58,9 @@ public sealed class Shell : Window {
         input.CharacterReceived += (_, e) => events.Add($"text:{(char)e.Character}");
         input.GotFocus += (_, _) => { events.Add("focus:canvas"); input.BorderThickness = new Thickness(2); };
         input.LostFocus += (_, _) => { events.Add("blur:canvas"); input.BorderThickness = new Thickness(0); };
-        var floating = new Border { Width = 220, Height = 90, Background = new SolidColorBrush(Microsoft.UI.Colors.LightGray), Child = new TextBlock { Text = "Floating panel", Margin = new Thickness(12) }, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(12) };
+        var panelButton = new Button { Content = "Floating panel button", IsTabStop = true };
+        AutomationProperties.SetName(panelButton, "Floating panel button");
+        var floating = new Border { Width = 220, Height = 90, Background = new SolidColorBrush(Microsoft.UI.Colors.LightGray), Child = new StackPanel { Children = { new TextBlock { Text = "Floating panel", Margin = new Thickness(8) }, panelButton } }, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(12) };
         AutomationProperties.SetName(floating, "Floating panel"); surface.Children.Add(floating);
         floating.PointerPressed += (_, e) => { events.Add("panel:drag"); floating.Translation += new System.Numerics.Vector3(10, 10, 0); };
         surface.SizeChanged += (_, _) => UpdateView();

@@ -18,8 +18,8 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
 - [x] W3: GPU and canvas on DX12, code committed 2026-11-02. Reviewed at the end of Phase A. Results: `test-counts.md`, `w3-host.md`. One crash is unresolved: WARP, a forced removal, and a window attaching and detaching, 5 of 5 runs. W18 owns it.
   - Real device removal recovers on WARP, and is deliberately not run on the RTX. Mac run owed. The Mac code type-checks only.
 - [x] W4: capture kit. Number settings work. A wrong capture now fails by name, after two review rounds. Checked on real paint.net: 13 named jobs and all 54 effects at default settings. Add Noise and Clouds are not repeatable; W14 owns that, the other control types and the rows. See `parity.md`.
-- [ ] W5: UI stack test. Both shells ran on real windows. Astra and Fable voted for Avalonia, and the choice is in `decisions.md`. W5b, the engine overlay test, is the named stop.
-- [ ] W5 to W20: see `PLAN.md`
+- [x] W5: UI stack test. Avalonia chosen, see `decisions.md`. The engine draws the Mac's overlay set at 60 fps. NOT RUN: Narrator heard by a person, a real dead key, a real pen.
+- [ ] W6 to W20: see `PLAN.md`
 
 ## Open items
 

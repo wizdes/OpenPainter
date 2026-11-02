@@ -60,15 +60,19 @@ try:
     if win is None:
         raise SystemExit('NO_WINDOW')
     hwnd, left, top, right, bottom = win
+    # Windows lets a background program take the front only just after a key press, so tap Alt first.
+    user.keybd_event(0x12, 0, 0, 0)
+    user.keybd_event(0x12, 0, 2, 0)
     if not user.SetForegroundWindow(hwnd):
-        user.keybd_event(0x12, 0, 0, 0)
-        user.keybd_event(0x12, 0, 2, 0)
-        user.SetForegroundWindow(hwnd)
+        raise SystemExit('SET_FOREGROUND_FAILED')
     time.sleep(0.3)
     if user.GetForegroundWindow() != hwnd:
         raise SystemExit('NOT_IN_FRONT')
     x0, y = left + 200, (top + bottom) // 2
-    user.SetCursorPos(x0, y)
+    if user.GetForegroundWindow() != hwnd:
+        raise SystemExit('NOT_IN_FRONT')
+    if not user.SetCursorPos(x0, y):
+        raise SystemExit(f'SET_CURSOR_FAILED: {C.get_last_error()}')
     step = 4
     while time.time() - start < 9.2:
         if user.GetForegroundWindow() != hwnd:
@@ -90,7 +94,11 @@ finally:
     if before_fg:
         user.SetForegroundWindow(before_fg)
 d = json.load(open(out, encoding='utf-8-sig'))
+if process.returncode != 0:
+    raise SystemExit(f'PAN_MEASURE_EXIT_{process.returncode}')
 t = [x for x in d['FrameTimesMs'] if 3500 <= x <= 9000]
+if len(t) < 2:
+    raise SystemExit('PAN_MEASURE_FRAMES_MISSING')
 g = sorted(b - a for a, b in zip(t, t[1:]))
 print(json.dumps({'stack': d['Stack'], 'pointer_moves': moves, 'engine_fps': round(len(t) / 5.5, 1),
                   'gap_median_ms': round(g[len(g) // 2], 1) if g else None, 'gap_p99_ms': round(g[int(len(g) * .99)], 1) if g else None,

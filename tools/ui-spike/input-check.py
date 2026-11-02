@@ -14,6 +14,32 @@ import subprocess
 import sys
 import time
 
+def missing_events(events):
+    expected = {
+        'pointer down': lambda e: e.startswith('pointer:down:'),
+        'pointer up': lambda e: e.startswith('pointer:up:'),
+        'wheel': lambda e: e.startswith('wheel:'),
+        'typed a': lambda e: e == 'text:a',
+        'typed é': lambda e: e == 'text:é',
+        'Tab': lambda e: e in ('key:9', 'key:Tab'),
+        # Avalonia's canvas logs pen:down:0.50. WinUI logs pointer:down:x,y:0.50:Pen.
+        'pen pressure 0.50': lambda e: (e.startswith('pen:') or e.endswith(':Pen')) and ':0.50' in e,
+        'pen pressure 0.68': lambda e: (e.startswith('pen:') or e.endswith(':Pen')) and ':0.68' in e,
+    }
+    return [name for name, matches in expected.items() if not any(matches(event) for event in events)]
+
+
+if sys.argv[1:] == ['--self-test']:
+    full = ['pointer:down:1,1:1.00:Mouse', 'pointer:up:1.00:Mouse', 'wheel:120',
+            'text:a', 'text:é', 'key:9', 'pen:down:0.50', 'pen:move:0.68']
+    assert missing_events(full) == []
+    assert missing_events(full[:-2]) == ['pen pressure 0.50', 'pen pressure 0.68']
+    assert missing_events(full[:-2] + ['pointer:down:1.0,2.0:0.50:Pen', 'pointer:move:1.0,2.0:0.68:Pen']) == []
+    assert missing_events(full[:-2] + ['pointer:down:1.0,2.0:0.50:Mouse', 'pointer:move:1.0,2.0:0.68:Mouse']) == ['pen pressure 0.50', 'pen pressure 0.68']
+    assert len(missing_events([])) == 8
+    print('INPUT_EVENT_SELF_TEST_PASS 3 cases')
+    sys.exit(0)
+
 exe, out_dir, name = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
 out_dir.mkdir(parents=True, exist_ok=True)
 user = C.WinDLL('user32', use_last_error=True)
@@ -40,6 +66,7 @@ class INPUT(C.Structure):
 
 
 def send(*items):
+    require_front()
     array = (INPUT * len(items))(*items)
     if user.SendInput(len(items), array, C.sizeof(INPUT)) != len(items):
         raise OSError(f'SendInput failed: {C.get_last_error()}')
@@ -78,6 +105,20 @@ def windows_of(pid):
     return found
 
 
+target_hwnd = None
+
+
+def require_front():
+    if target_hwnd is None or user.GetForegroundWindow() != target_hwnd:
+        raise RuntimeError('NOT_IN_FRONT')
+
+
+def move_cursor(x, y):
+    require_front()
+    if not user.SetCursorPos(x, y):
+        raise OSError(f'SetCursorPos failed: {C.get_last_error()}')
+
+
 def shot(rect, path):
     left, top, right, bottom = rect
     subprocess.run(['powershell', '-NoProfile', '-Command', f'''
@@ -103,7 +144,7 @@ def inject_pen(x, y):
 
     device = user.CreateSyntheticPointerDevice(3, 1, 1)
     if not device:
-        return f'CreateSyntheticPointerDevice failed: {C.get_last_error()}'
+        raise OSError(f'CreateSyntheticPointerDevice failed: {C.get_last_error()}')
     INRANGE, INCONTACT, DOWN, UPDATE, UP = 0x2, 0x4, 0x10000, 0x20000, 0x40000
     results = []
     for flags, pressure, dx in ((INRANGE | UPDATE, 0, 0), (INRANGE | INCONTACT | DOWN, 512, 0), (INRANGE | INCONTACT | UPDATE, 700, 10), (INRANGE | UP, 0, 10)):
@@ -114,8 +155,11 @@ def inject_pen(x, y):
         p.pen.info.pixel = W.POINT(x + dx, y)
         p.pen.pen_mask = 1
         p.pen.pressure = pressure
+        require_front()
         ok = user.InjectSyntheticPointerInput(C.c_void_p(device), C.byref(p), 1)
-        results.append(1 if ok else -C.get_last_error())
+        if not ok:
+            raise OSError(f'InjectSyntheticPointerInput failed: {C.get_last_error()}')
+        results.append(1)
         time.sleep(0.1)
     user.DestroySyntheticPointerDevice(C.c_void_p(device))
     return results
@@ -135,18 +179,22 @@ try:
         raise RuntimeError('NO_WINDOW')
     main = max(wins, key=lambda w: (w[3] - w[1]) * (w[4] - w[2]))
     hwnd, left, top, right, bottom = main
+    target_hwnd = hwnd
     report['windows'] = len(wins)
     report['rect'] = [left, top, right, bottom]
-    send(key(0x12), key(0x12, flags=2))
+    # Windows lets a background program take the front only just after a key press, so tap Alt first.
+    user.keybd_event(0x12, 0, 0, 0)
+    user.keybd_event(0x12, 0, 2, 0)
     report['foreground'] = bool(user.SetForegroundWindow(hwnd))
     time.sleep(0.4)
+    require_front()
     shot((left, top, right, bottom), out_dir / f'{name}-a.png')
     x, y = left + (right - left) * 3 // 5, top + (bottom - top) * 3 // 5
-    user.SetCursorPos(x, y)
+    move_cursor(x, y)
     time.sleep(0.2)
     send(mouse(2))
     time.sleep(0.05)
-    user.SetCursorPos(x + 12, y + 6)
+    move_cursor(x + 12, y + 6)
     time.sleep(0.05)
     send(mouse(4))
     time.sleep(0.2)
@@ -164,7 +212,7 @@ try:
     report['exit'] = process.returncode
 except subprocess.TimeoutExpired:
     report['exit'] = 'TIMEOUT'
-except RuntimeError as e:
+except (RuntimeError, OSError) as e:
     report['error'] = str(e)
 finally:
     if process.poll() is None:
@@ -177,4 +225,7 @@ if data.exists():
     d = json.load(open(data, encoding='utf-8-sig'))
     report['events'] = d.get('InputEvents')
     report['first_ms'] = d.get('FirstFrameMs')
+report['missing'] = missing_events(report.get('events') or [])
 print(json.dumps(report, indent=0)[:3000])
+if report.get('error') or report.get('exit') != 0 or report['missing']:
+    sys.exit('INPUT_CHECK_FAILED: ' + str(report.get('error') or ', '.join(report['missing']) or report.get('exit')))

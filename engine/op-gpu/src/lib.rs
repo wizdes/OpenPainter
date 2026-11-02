@@ -5,6 +5,8 @@ pub mod layer;
 pub mod pipeline_stats;
 pub mod presenter;
 #[cfg(windows)]
+pub mod overlay;
+#[cfg(windows)]
 pub mod win32;
 use std::sync::{
     Arc,

@@ -8,8 +8,22 @@ Add-Type @'
 using System; using System.Runtime.InteropServices;
 public static class W5Fg {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr w);
-    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, IntPtr extra);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", SetLastError=true)] static extern uint SendInput(uint count, INPUT[] input, int size);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr w, out uint process);
+    [StructLayout(LayoutKind.Sequential)] public struct KEY { public ushort vk, scan; public uint flags, time; public IntPtr extra; }
+    [StructLayout(LayoutKind.Explicit, Size=40)] public struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public KEY key; }
+    public static void EnsureFront(int process) {
+        uint owner;
+        GetWindowThreadProcessId(GetForegroundWindow(), out owner);
+        if (owner != process) throw new InvalidOperationException("NOT_IN_FRONT");
+    }
+    public static void SendKey(ushort vk, int process) {
+        EnsureFront(process);
+        var pair = new INPUT[] { new INPUT { type=1, key=new KEY { vk=vk } }, new INPUT { type=1, key=new KEY { vk=vk, flags=2 } } };
+        if (SendInput(2, pair, Marshal.SizeOf(typeof(INPUT))) != 2) throw new InvalidOperationException("SENDINPUT_FAILED: " + Marshal.GetLastWin32Error());
+    }
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int l, t, r, b; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr w, out RECT r);
 }
@@ -20,12 +34,14 @@ $p = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -PassThru
 try {
     Start-Sleep -Seconds 3
     $p.Refresh()
+    # Windows lets a background program take the front only just after a key press, so tap Alt first.
     [W5Fg]::keybd_event(0x12, 0, 0, [IntPtr]::Zero); [W5Fg]::keybd_event(0x12, 0, 2, [IntPtr]::Zero)
-    [void][W5Fg]::SetForegroundWindow($p.MainWindowHandle)
+    if (![W5Fg]::SetForegroundWindow($p.MainWindowHandle)) { throw 'SET_FOREGROUND_FAILED' }
     Start-Sleep -Milliseconds 500
+    if ([W5Fg]::GetForegroundWindow() -ne $p.MainWindowHandle) { throw 'NOT_IN_FRONT' }
     $stops = @()
     foreach ($i in 1..6) {
-        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [W5Fg]::SendKey(9, $p.Id)
         Start-Sleep -Milliseconds 400
         $f = $ua::FocusedElement
         $stops += "$($f.Current.Name) [$($f.Current.ControlType.ProgrammaticName -replace 'ControlType\.','')]"
@@ -33,21 +49,28 @@ try {
     "tab stops: " + ($stops -join ' -> ')
     $window = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
     $byName = { param($root, $name) $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.PropertyCondition]::new($ua::NameProperty, $name)) }
-    $menu = & $byName $window 'Test menu'
+    $menu = & $byName $window 'File menu'
     $pattern = $null
+    [W5Fg]::EnsureFront($p.Id)
     if ($menu.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) { $pattern.Invoke() }
     else {
         $menu.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
-        Start-Sleep -Milliseconds 500
-        (& $byName $window 'Open dialog').GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
     }
+    Start-Sleep -Milliseconds 500
+    $open = & $byName $ua::RootElement 'Open dialog'
+    if ($null -eq $open) { throw 'UIA_OPEN_DIALOG_MISSING' }
+    [W5Fg]::EnsureFront($p.Id)
+    $open.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
     Start-Sleep -Seconds 1
     # UI Automation's Invoke leaves a WinUI menu open with its item focused, so try the key a person would press.
     if ($ua::FocusedElement.Current.Name -eq 'Open dialog') {
         "Invoke did not open the dialog; pressing Enter"
-        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        [W5Fg]::SendKey(13, $p.Id)
     }
     Start-Sleep -Seconds 2
+    $dialog = & $byName $ua::RootElement 'Test dialog'
+    if ($null -eq $dialog) { throw 'UIA_DIALOG_MISSING' }
+    if ($null -eq (& $byName $dialog 'Number box')) { throw 'UIA_NUMBER_BOX_MISSING' }
     $r = New-Object W5Fg+RECT
     [void][W5Fg]::GetWindowRect($p.MainWindowHandle, [ref]$r)
     $b = New-Object Drawing.Bitmap ($r.r - $r.l), ($r.b - $r.t)
@@ -58,6 +81,7 @@ try {
     "top-level windows: " + ($all -join ' | ')
     $f = $ua::FocusedElement
     "focused after opening: $($f.Current.Name) [$($f.Current.ControlType.ProgrammaticName)]"
+    'FOCUS_WALK_PASS'
 } finally {
     $p.Refresh()
     if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }

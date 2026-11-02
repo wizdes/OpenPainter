@@ -88,12 +88,14 @@ public sealed class Shell : Window {
     readonly Stopwatch clock = Stopwatch.StartNew();
     readonly List<string> events = [];
     readonly CanvasHost? native;
-    bool ticking;
+    volatile bool ticking;
+    Thread? overlayClockThread;
     nint engine;
     ulong doc, view;
     int ticks;
     Window? panelWindow;
     public Button MenuButton { get; } = new() { Content = "Test menu", Name = "TestMenu" };
+    public Button FileMenuButton { get; } = new() { Content = "File", Name = "FileMenu", Focusable = false };
     public Button PanelButton { get; } = new() { Content = "Floating panel", Name = "FloatingPanel" };
     public Border CanvasInput { get; } = new() { Name = "Canvas", Focusable = true, Background = Avalonia.Media.Brushes.Transparent };
     public List<string> EventLog => events;
@@ -108,7 +110,7 @@ public sealed class Shell : Window {
         DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
         top.Children.Add(MenuButton); top.Children.Add(PanelButton);
         // A real pop-up menu, to prove it draws above the native canvas window.
-        var fileMenu = new Button { Content = "File", Name = "FileMenu" };
+        var fileMenu = FileMenuButton;
         AutomationProperties.SetName(fileMenu, "File menu");
         var openItem = new MenuItem { Header = "Open dialog" };
         openItem.Click += (_, _) => OpenDialog();
@@ -135,7 +137,10 @@ public sealed class Shell : Window {
             CanvasInput.GotFocus += (_, e) => { if (e.NavigationMethod == NavigationMethod.Tab) native.TakeFocus(); };
         }
         canvasLayer.Children.Add(CanvasInput);
-        CanvasInput.KeyDown += (_, e) => events.Add($"key:{e.Key}");
+        CanvasInput.KeyDown += (_, e) => {
+            events.Add($"key:{e.Key}");
+            if (e.Key == Key.Tab) { MenuButton.Focus(NavigationMethod.Tab); e.Handled = true; }
+        };
         CanvasInput.TextInput += (_, e) => events.Add($"text:{e.Text}");
         CanvasInput.PointerPressed += (_, e) => LogPointer("down", e);
         CanvasInput.PointerMoved += (_, e) => LogPointer("move", e);
@@ -178,6 +183,7 @@ public sealed class Shell : Window {
         Engine.Check(Engine.op_doc_new(engine, 1600, 1000, 96, 0xffffffff, out doc), "DOC_NEW");
         Engine.Check(Engine.op_view_attach(engine, doc, native.Hwnd, out view), "VIEW_ATTACH");
         UpdateView(); ticking = true; NextFrame();
+        SetOverlay();
         if (OverlayThread && !Pan && !CallbackOnly) StartOverlayThread();
     }
     void UpdateView() {
@@ -189,21 +195,45 @@ public sealed class Shell : Window {
     static readonly bool Pan = Environment.GetEnvironmentVariable("SPIKE_PAN") == "1";
     // SPIKE_CALLBACK_ONLY: the UI frame callback does almost nothing, to see its own rate.
     static readonly bool CallbackOnly = Environment.GetEnvironmentVariable("SPIKE_CALLBACK_ONLY") == "1";
+    static readonly bool OverlaySet = Environment.GetEnvironmentVariable("SPIKE_OVERLAY_SET") == "1";
+    unsafe void SetOverlay() {
+        OverlayPoint* lasso = stackalloc OverlayPoint[200];
+        for (int i = 0; i < 200; i++) {
+            var a = 2 * Math.PI * i / 200;
+            lasso[i] = new OverlayPoint(280 + 110 * Math.Cos(a) + 12 * Math.Sin(3 * a), 240 + 85 * Math.Sin(a));
+        }
+        OverlayPoint* crop = stackalloc OverlayPoint[4] {
+            new(90, 70), new(620, 100), new(590, 490), new(60, 460)
+        };
+        OverlayItem* items = stackalloc OverlayItem[12];
+        int count = 0;
+        if (OverlaySet) {
+            items[count++] = new OverlayItem { Kind=1, Flags=1, Points=lasso, PointCount=200 };
+            items[count++] = new OverlayItem { Kind=3, X=420, Y=150, Width=180, Height=130 };
+            foreach (var p in new[] { new OverlayPoint(100,80), new OverlayPoint(350,80), new OverlayPoint(600,80),
+                new OverlayPoint(100,300), new OverlayPoint(600,300), new OverlayPoint(100,460), new OverlayPoint(600,460) })
+                items[count++] = new OverlayItem { Kind=4, X=p.X, Y=p.Y };
+        } else {
+            items[count++] = new OverlayItem { Kind=2, X=80, Y=80, Width=400, Height=300 };
+        }
+        items[count++] = new OverlayItem { Kind=6, Points=crop, PointCount=4 };
+        items[count++] = new OverlayItem { Kind=7, X=120, Y=130, Height=22 };
+        Engine.Check(Engine.op_view_set_overlay(engine, view, items, (nuint)count), "VIEW_OVERLAY_SET");
+    }
     // The ants clock runs off the UI thread: op_view_set_overlay only stores the newest state and wakes the render thread.
     static readonly bool OverlayThread = Environment.GetEnvironmentVariable("SPIKE_OVERLAY_THREAD") != "0";
     void StartOverlayThread() {
-        new Thread(() => {
-            var dash = 0;
+        overlayClockThread = new Thread(() => {
             var clock = Stopwatch.StartNew();
             long next = 0;
             while (ticking) {
-                var o = new Overlay { Ants = new Rect(80, 80, 400, 300), Crop = new Rect(40, 40, 650, 450), Caret = new Rect(120, 130, 2, 22), DashOffset = dash++ % 32 };
-                Engine.Check(Engine.op_view_set_overlay(engine, view, ref o), "VIEW_OVERLAY");
+                Engine.Check(Engine.op_view_set_overlay_dash(engine, view, (clock.Elapsed.TotalSeconds / 0.6 * 8) % 8), "VIEW_OVERLAY_DASH");
                 next += 16;
                 var wait = next - clock.ElapsedMilliseconds;
                 if (wait > 0) Thread.Sleep((int)wait);
             }
-        }) { IsBackground = true, Name = "ants" }.Start();
+        }) { IsBackground = true, Name = "ants" };
+        overlayClockThread.Start();
     }
     void Tick() {
         if (view == 0 || native is null) return;
@@ -214,8 +244,7 @@ public sealed class Shell : Window {
         ticks++;
         if (CallbackOnly && ticks % 30 != 0) return;
         if (!OverlayThread && !Pan && !CallbackOnly) {
-            var o = new Overlay { Ants = new Rect(80, 80, 400, 300), Crop = new Rect(40, 40, 650, 450), Caret = new Rect(120, 130, 2, 22), DashOffset = ticks % 32 };
-            Engine.Check(Engine.op_view_set_overlay(engine, view, ref o), "VIEW_OVERLAY");
+            Engine.Check(Engine.op_view_set_overlay_dash(engine, view, (clock.Elapsed.TotalSeconds / 0.6 * 8) % 8), "VIEW_OVERLAY_DASH");
         }
         if (measurePath is not null) Measure();
     }
@@ -240,7 +269,9 @@ public sealed class Shell : Window {
         Close();
     }
     void StopEngine() {
-        ticking = false; panelWindow?.Close();
+        ticking = false;
+        if (overlayClockThread is not null && !overlayClockThread.Join(1000)) throw new InvalidOperationException("ANTS_THREAD_TIMEOUT");
+        panelWindow?.Close();
         if (view != 0) { Engine.Check(Engine.op_view_detach(engine, view), "VIEW_DETACH"); view = 0; }
         if (engine != 0) { Engine.op_engine_free(engine); engine = 0; }
     }
