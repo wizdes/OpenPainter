@@ -8,7 +8,7 @@ use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -164,7 +164,7 @@ fn save_impl(
             name.to_string_lossy(),
             std::process::id()
         ));
-        match OpenOptions::new().write(true).create_new(true).open(&temp) {
+        match crate::temp_file_options().open(&temp) {
             Ok(file) => break (temp, file),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(e.into()),
@@ -1175,6 +1175,59 @@ mod tests {
                 .ends_with(".tmp"))
         );
         assert!(load_opaint(&path).is_ok());
+    }
+
+    /// The real save, while it is writing: the temporary file must already be
+    /// private, and nobody else may open it.
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_real_save_keeps_its_temporary_file_private_while_writing() {
+        use std::io::Read;
+        let dir = tempfile::tempdir().unwrap();
+        let grant = std::process::Command::new("icacls")
+            .arg(dir.path())
+            .args(["/grant", "Users:(OI)(CI)R"])
+            .output()
+            .unwrap();
+        assert!(grant.status.success());
+        let store = Arc::new(TileStore::with_default_budget(dir.path()).unwrap());
+        let doc = DocState::new(store, 300, 300, 72.0).unwrap();
+        let path = dir.path().join("private.opaint");
+        save_opaint(&doc, &path).unwrap();
+        let folder = dir.path().to_path_buf();
+        let mut checked = 0;
+        let mut check = |_bytes: u64| {
+            let Some(temp) = fs::read_dir(&folder)
+                .unwrap()
+                .map(|e| e.unwrap().path())
+                .find(|p| p.to_string_lossy().ends_with(".tmp"))
+            else {
+                return;
+            };
+            let acl = std::process::Command::new("icacls")
+                .arg(&temp)
+                .output()
+                .unwrap();
+            let text = String::from_utf8_lossy(&acl.stdout).into_owned();
+            assert!(!text.contains("BUILTIN\Users"), "{text}");
+            let mut bytes = Vec::new();
+            match fs::File::open(&temp).and_then(|mut f| f.read_to_end(&mut bytes)) {
+                Err(e) => assert_eq!(e.raw_os_error(), Some(32), "{e}"),
+                Ok(_) => panic!("another handle could open the temporary file"),
+            }
+            checked += 1;
+        };
+        save_opaint_with_hooks(
+            &doc.add_layer(1, "two").unwrap(),
+            &path,
+            SaveHooks {
+                fail_after_bytes: None,
+                on_write: Some(&mut check),
+                cancel: None,
+            },
+        )
+        .unwrap();
+        assert!(checked > 0, "the hook never saw the temporary file");
     }
 
     #[test]

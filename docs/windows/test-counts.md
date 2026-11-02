@@ -81,7 +81,7 @@ The measured files contain **114** literal test-bearing Rust files and **687** l
 | `op-formats/tests/corpus.rs` | 7 | 7 |  |
 | `op-formats/tests/io.rs` | 17 | 17 |  |
 | `op-formats/tests/opaint.rs` | 9 | 9 |  |
-| `op-formats/src/lib.rs` | 9 | 9 | New Windows save tests. |
+| `op-formats/src/lib.rs` | 9 | 9 | Windows save tests. |
 | `op-formats/tests/opaint_limits.rs` | 19 | 19 |  |
 | `op-formats/tests/png.rs` | 6 | 6 |  |
 | `op-formats/tests/png16.rs` | 2 | 2 |  |
@@ -165,7 +165,7 @@ The line is where each test failed. W2 owns the recovery folder change: Windows 
 ## What changed
 
 - `op-core/src/tiles.rs`: spill reads and writes use `seek_read` and `seek_write` with an explicit offset on one shared handle. These move the handle's cursor, but nothing depends on the cursor. The test reads from 8 threads.
-- `op-formats/src/lib.rs`, `op-formats/src/opaint.rs`, `op-engine/src/document_file.rs`, and `op-engine/src/recovery.rs`: when a file already exists, its temporary file is made private to the saver before any bytes go in. Streams, creation time and hidden and system attributes are copied onto it. The old access rules are read, the two swap in one atomic rename, and the rules are then applied exactly. A crash in between leaves the file too private, never too open. A stream that cannot be copied stops the save. `ReplaceFileW` was tried and dropped: a review proved a gap where no file has the name, and a killed process then lost a recovery record. Recovery manifests use the plain rename and do their own folder flush. A read-only or write-denied target, or a folder, is refused at once. A held target is retried for about 2 s. Not kept: owner, mandatory label, compression, encryption. After the rename, a failed flush or failed rule copy is printed, not returned, because the save is complete.
+- `op-formats/src/lib.rs`, `op-formats/src/opaint.rs`, `op-engine/src/document_file.rs`, and `op-engine/src/recovery.rs`: when a file already exists, its temporary file is made private to the saver before any bytes go in. Streams, creation time and hidden and system attributes are copied onto it. The old access rules are read, the two swap in one atomic rename, and the rules are then applied exactly. A crash in between leaves the file too private, never too open. A stream that cannot be copied stops the save. `ReplaceFileW` was tried and dropped: a review proved a gap where no file has the name, and a killed process then lost a recovery record. Recovery manifests use the plain rename and do their own folder flush. A read-only or write-denied target, or a folder, is refused at once. A held target is retried for about 2 s. Not kept: owner, mandatory label, compression, encryption. A crash after the rename leaves only the owner and SYSTEM on the list, and later saves keep that list. After the rename, a failed flush or failed rule copy is printed, not returned, because the save is complete.
 - `op-engine/src/recovery.rs`: Windows URL decoding now keeps drive letters, Unicode and UNC paths. A save past the old 260-character limit passes. On Windows, a record whose original file cannot be checked is now offered as possibly older, while a file that is really gone stays safe. The Mac and Linux keep the old rule until a Mac session tests the new one. Manifests now reject Windows backslashes and colons in snapshot names. File identity uses the volume and file index from `GetFileInformationByHandle`.
 - `op-color/src/lib.rs`: lcms2 panics on a wide character it cannot convert. On Windows that includes a valid surrogate pair, because `wchar_t` is 16 bits there. Only the name falls back to "Embedded ICC profile", and the rest of the profile is still used.
 - `xtask/src/fuzz.rs` and `op-formats/examples/common/capped_alloc.rs`: the Windows fuzz watchdog reads a process's working set and uses `TerminateProcess`. The worker reports that Windows has no `setrlimit`; its Rust allocation cap and the driver watchdog stay active.
@@ -204,13 +204,16 @@ The first failing reference pixel is `(16, 6)` in `Mandelbrot_Fractal_default_im
 
 Two earlier failures were intermittent. `op-engine/tests/jobs.rs:461` ended twice with Windows `STATUS_ACCESS_VIOLATION` when GPU creation was on; the same test passed with `OP_FORCE_CPU=1` and in the final workspace run. `op-ffi/tests/jobs.rs:133` timed out waiting five seconds for ticket 102 in the first non-GPU run, then passed alone and in the final run. These passes do not erase the failures. W3 should pin and retest the GPU backend; W19 should check job timing under load.
 
-**NOT RUN:** Mac and Linux runtime suites; an actual UNC share; the macOS-only `low_disk` disk-image test on Windows; the W3 Windows view host; the remaining `op-gpu` test files after the interrupted run; a fresh independent review (the builder brief forbids other models and agents). The Windows `sync_dir` branch checks that a directory exists. A backup-semantics handle followed by `sync_all` returned error 5 here. The write-through file rename covers committed file replacement, but a crash-durability proof for recovery folder creation and deletion remains **NOT RUN** and belongs with W2's folder redesign.
+- Folder sync: a write handle with `FILE_FLAG_BACKUP_SEMANTICS` flushes a folder on Windows. A read handle gives error 5.
 
 ## One-line follow-ups
 
 - W2: move the lock out of the record folder, close it before folder moves, then rerun every recovery and huge-document test.
 - W3: pin DX12 or WARP, finish the GPU suite, and retest the color table and GPU-enabled job crash.
 - Mac session: a missing external drive still counts as "really gone"; `mac/OpenPainterKit/Sources/Shell/RecoverySheet.swift:58` says "The file changed" for every stale record; decide whether the stricter Windows rule should apply there too.
+- W10: `replace_synced_file` prints a failed access-rule restore, and the app cannot show it. Add a warning the caller can show.
+- W10: test `document_file.rs` `write_atomic` keeping rules and streams. A real save test covers `opaint.rs` only.
+- W10: a target deleted during a long save stays private with no message, and one created during a save is exposed until the save ends. Both are rare.
 - W10: a killed save leaves a private temporary file in the user's folder, and nothing clears it, as on the Mac.
 - W10: on a network path a plain reader blocks the rename, and the save fails after about 2 s with a clear message (`\\localhost\C$`, measured).
 - User's list: Mandelbrot differs by up to 23 of 255 levels. Decide once a Mac run shows whether the Mac still matches the reference.

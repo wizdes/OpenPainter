@@ -12,7 +12,7 @@ use op_core::tiles::{TILE_BYTES, TILE_SIZE, TileCoord, TileData, TileStore};
 use serde_json::json;
 #[cfg(unix)]
 use std::fs::File;
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -84,7 +84,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
             name.to_string_lossy(),
             std::process::id()
         ));
-        match OpenOptions::new().write(true).create_new(true).open(&temp) {
+        match op_formats::temp_file_options().open(&temp) {
             Ok(f) => break (temp, f),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(internal(format!("cannot write {}: {e}", path.display()))),

@@ -58,6 +58,20 @@ pub fn sync_folder(dir: &std::path::Path) -> std::io::Result<()> {
     }
 }
 
+/// How a save opens its new temporary file. On Windows nobody else may open
+/// it while the save holds it: a handle opened before the file turned private
+/// would keep its rights and could read everything written later.
+pub fn temp_file_options() -> std::fs::OpenOptions {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.share_mode(0);
+    }
+    options
+}
+
 /// The targets a save must refuse at once, with a clear reason.
 #[cfg(windows)]
 fn refuse_target(target: &std::path::Path) -> std::io::Result<()> {
@@ -310,8 +324,10 @@ fn copy_streams(from: &std::path::Path, to: &std::path::Path) -> std::io::Result
 /// Order matters. Streams, creation time and attributes go onto the temporary
 /// file first, while it is private and fully ours. The old rules are read
 /// before the rename, and applied after it. A crash between those two leaves
-/// the file private to the saver: too narrow, and never wider. Not kept:
-/// owner, mandatory label, compression and encryption.
+/// the file with only the owner and SYSTEM on its list, and later saves keep
+/// that list. Other people then lose access until someone restores it, which
+/// is the safe way to fail. Not kept: owner, mandatory label, compression and
+/// encryption.
 #[cfg(windows)]
 pub fn replace_synced_file(
     temp: &std::path::Path,
@@ -542,7 +558,7 @@ mod windows_replace_tests {
     }
 
     #[test]
-    fn a_target_that_denies_writing_is_refused_with_details_kept() {
+    fn a_target_that_denies_writing_is_refused() {
         let root = tempfile::tempdir().unwrap();
         let user = std::env::var("USERNAME").unwrap();
         let target = root.path().join("a.opaint");
@@ -557,7 +573,7 @@ mod windows_replace_tests {
     }
 
     #[test]
-    fn a_rename_error_means_the_target_did_not_change() {
+    fn a_missing_temporary_file_leaves_the_target_alone() {
         let root = tempfile::tempdir().unwrap();
         let target = root.path().join("a.opaint");
         std::fs::write(&target, b"old").unwrap();
