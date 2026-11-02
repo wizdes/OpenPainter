@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
 using PaintDotNet;
 using PaintDotNet.Effects;
 using PaintDotNet.Effects.Gpu;
@@ -52,14 +53,18 @@ public sealed class CaptureEffect : Effect
                 File.WriteAllText(job.OutputPath, JsonSerializer.Serialize(infos.Select(i => TryDescribe(i, host)), JsonOptions));
             else if (job.Mode == "api")
                 File.WriteAllText(job.OutputPath, DescribePublicApi(infos, host));
-            else if (job.Mode == "capture")
+            else if (job.Mode is "capture" or "identity")
             {
                 using var current = source.Clone();
                 using var bitmap = current.CreateAliasedBitmap();
                 bitmap.Save(job.OutputPath, ImageFormat.Png);
             }
             else throw new InvalidDataException($"Unknown mode: {job.Mode}");
-            File.WriteAllText(resultPath, JsonSerializer.Serialize(new { ok = true, outputPath = job.OutputPath }, JsonOptions));
+            using var sourceBitmap = source.CreateAliasedBitmap();
+            File.WriteAllText(resultPath, JsonSerializer.Serialize(new { ok = true, outputPath = job.OutputPath,
+                width = source.Width, height = source.Height, layerCount = 1,
+                layerCountSource = "one PNG opened in a fresh isolated process",
+                surfaceSha256 = SurfaceHash(sourceBitmap) }, JsonOptions));
         }
         catch (Exception error)
         {
@@ -70,6 +75,24 @@ public sealed class CaptureEffect : Effect
         {
             if (donePath is not null) File.WriteAllText(donePath, "done");
         }
+    }
+
+    private static string SurfaceHash(Bitmap bitmap)
+    {
+        var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+        var data = bitmap.LockBits(rect, ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var row = new byte[bitmap.Width * 4];
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, row.Length);
+                hash.AppendData(row);
+            }
+            return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+        }
+        finally { bitmap.UnlockBits(data); }
     }
 
     private static object Describe(IEffectInfo2 info, IEffect host)

@@ -13,14 +13,19 @@ namespace OpenPainter.Capture.Driver;
 internal static class Program
 {
     private const string Pin = @"C:\agent-work\pdn-5.1.12";
+    private const string ExpectedVersion = "5.112.9563.32325";
+    private const string ExpectedExeSha256 = "73697e348b3ab3e4168befa5ceae6b04d6fcf5a4d4e83f301f6a1257cef08222";
     private static readonly string PinExe = Path.Combine(Pin, "paintdotnet.exe");
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = false, WriteIndented = true };
+    private static bool resultExistedAtStart;
+    private static readonly List<object> ObservedSettings = [];
 
     [STAThread]
     private static int Main(string[] args)
     {
         try
         {
+            resultExistedAtStart = args.Length >= 2 && args[0] == "--job" && ResultExists(args[1]);
             var anyPaint = RefuseOutsidePaint();
             if (args.Length == 3 && args[0] == "--install" && args[1] == "--plugin")
             {
@@ -36,8 +41,8 @@ internal static class Program
         }
         catch (Exception error)
         {
-            Console.Error.WriteLine(error);
-            if (args.Length >= 2 && args[0] == "--job") WriteFailure(args[1], error);
+            Console.Error.WriteLine(args.Length >= 2 && args[0] == "--job" ? $"{args[1]}: {error}" : error);
+            if (args.Length >= 2 && args[0] == "--job" && Decisions.MayWriteFailure(resultExistedAtStart)) WriteFailure(args[1], error);
             return 1;
         }
     }
@@ -47,11 +52,26 @@ internal static class Program
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllText(jobPath));
-            var result = document.RootElement.GetProperty("resultPath").GetString();
+            var root = document.RootElement;
+            var output = root.GetProperty("outputPath").GetString()!;
+            Decisions.ValidateDistinctPaths(root.GetProperty("inputPath").GetString()!, output,
+                root.GetProperty("resultPath").GetString()!, root.GetProperty("donePath").GetString()!,
+                Path.Combine(Path.GetDirectoryName(output)!, "manifest.json"));
+            var result = root.GetProperty("resultPath").GetString();
             if (!string.IsNullOrWhiteSpace(result) && Path.IsPathFullyQualified(result))
-                File.WriteAllText(result, JsonSerializer.Serialize(new { ok = false, error = error.ToString() }, JsonOptions));
+            {
+                using var stream = new FileStream(result, FileMode.CreateNew, FileAccess.Write);
+                JsonSerializer.Serialize(stream, new { ok = false, error = error.ToString() }, JsonOptions);
+            }
         }
         catch (Exception writeError) { Console.Error.WriteLine($"Could not write job failure result: {writeError}"); }
+    }
+
+    private static bool ResultExists(string jobPath)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(jobPath));
+        return document.RootElement.TryGetProperty("resultPath", out var path) &&
+            path.ValueKind == JsonValueKind.String && File.Exists(path.GetString());
     }
 
     private static bool RefuseOutsidePaint()
@@ -85,8 +105,34 @@ internal static class Program
     private static void Run(string jobPath, TimeSpan timeout)
     {
         jobPath = Path.GetFullPath(jobPath);
-        var job = JsonSerializer.Deserialize<Job>(File.ReadAllText(jobPath), JsonOptions)
-            ?? throw new InvalidDataException("Job JSON is empty.");
+        var jobText = File.ReadAllText(jobPath);
+        ObservedSettings.Clear();
+        var job = Decisions.ParseJob(jobText);
+        var clock = Stopwatch.StartNew();
+        var manifestPath = Path.Combine(Path.GetDirectoryName(job.OutputPath)!, "manifest.json");
+        Decisions.ValidateDistinctPaths(job.InputPath, job.OutputPath, job.ResultPath, job.DonePath, manifestPath);
+        if (File.Exists(manifestPath)) throw new IOException($"Manifest already exists: {manifestPath}");
+        var originalInputHash = Hash(job.InputPath);
+        var catalogPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../docs/windows/pdn-5.1-effects.toml"));
+        var controlsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../docs/windows/pdn-5.1-controls.json"));
+        if (!File.Exists(catalogPath)) throw new FileNotFoundException("Effect catalog is absent.", catalogPath);
+        if (!File.Exists(controlsPath)) throw new FileNotFoundException("Effect controls are absent.", controlsPath);
+        var catalog = File.ReadAllText(catalogPath);
+        using var controls = JsonDocument.Parse(File.ReadAllText(controlsPath));
+        foreach (var effect in job.Effects ?? [])
+        {
+            var id = effect.GetProperty("id").GetString() ?? throw new InvalidDataException("Effect id is empty.");
+            if (!Decisions.CatalogContains(catalog, id)) throw new InvalidDataException($"Unknown effect id '{id}'.");
+            var row = controls.RootElement.EnumerateArray().FirstOrDefault(r => r.GetProperty("id").GetString() == id);
+            if (row.ValueKind == JsonValueKind.Undefined) throw new InvalidDataException($"No control list for '{id}'.");
+            Decisions.ValidateEffectJson(effect.GetRawText(), row.GetProperty("labels").EnumerateArray().Select(x => x.GetString()!));
+        }
+        if (job.Mode is not ("capture" or "identity" or "catalog" or "api"))
+            throw new InvalidDataException($"Unknown job mode '{job.Mode}'.");
+        if (job.Mode == "capture" && (job.Effects is null || job.Effects.Count == 0))
+            throw new InvalidDataException("Capture mode needs an effect; use identity mode to check unchanged input.");
+        if (job.Mode == "identity" && job.Effects is { Count: > 0 })
+            throw new InvalidDataException("Identity mode must have no effects.");
         if (job.Mode == "capture" && job.Effects is { Count: > 1 })
         {
             var temporary = new List<string>();
@@ -95,6 +141,7 @@ internal static class Program
             {
                 for (var index = 0; index < job.Effects.Count; index++)
                 {
+                    Decisions.RequireBeforeDeadline(clock.Elapsed, timeout);
                     var last = index == job.Effects.Count - 1;
                     var prefix = Path.Combine(Path.GetDirectoryName(job.OutputPath)!,
                         ".opcapture-" + Guid.NewGuid().ToString("N"));
@@ -106,11 +153,12 @@ internal static class Program
                     if (!last) temporary.AddRange(new[] { output, result, done });
                     var step = job with { InputPath = currentInput, OutputPath = output,
                         ResultPath = result, DonePath = done, Effects = new List<JsonElement> { job.Effects[index] } };
-                    File.WriteAllText(stepPath, JsonSerializer.Serialize(step, JsonOptions));
-                    RunOne(stepPath, timeout);
+                    File.WriteAllText(stepPath, Decisions.WriteJob(step));
+                    RunOne(stepPath, timeout, clock);
                     currentInput = output;
                 }
-                WriteManifest(job);
+                Decisions.RequireUnchangedHash(originalInputHash, Hash(job.InputPath));
+                WriteManifest(job, originalInputHash, catalogPath, clock, timeout);
             }
             finally
             {
@@ -119,34 +167,42 @@ internal static class Program
             }
             return;
         }
-        RunOne(jobPath, timeout);
-        WriteManifest(job);
+        RunOne(jobPath, timeout, clock);
+        Decisions.RequireUnchangedHash(originalInputHash, Hash(job.InputPath));
+        WriteManifest(job, originalInputHash, catalogPath, clock, timeout);
     }
 
-    private static void RunOne(string jobPath, TimeSpan timeout)
+    private static void RunOne(string jobPath, TimeSpan timeout, Stopwatch deadline)
     {
         jobPath = Path.GetFullPath(jobPath);
-        var job = JsonSerializer.Deserialize<Job>(File.ReadAllText(jobPath), JsonOptions)
-            ?? throw new InvalidDataException("Job JSON is empty.");
-        foreach (var value in new[] { job.InputPath, job.OutputPath, job.DonePath, job.ResultPath })
-            if (string.IsNullOrWhiteSpace(value) || !Path.IsPathFullyQualified(value))
-                throw new InvalidDataException("Job paths must be absolute.");
+        var job = Decisions.ParseJob(File.ReadAllText(jobPath));
+        Decisions.RequireBeforeDeadline(deadline.Elapsed, timeout);
+        Decisions.ValidateDistinctPaths(job.InputPath, job.OutputPath, job.DonePath, job.ResultPath,
+            Path.Combine(Path.GetDirectoryName(job.OutputPath)!, "manifest.json"));
         if (!File.Exists(job.InputPath)) throw new FileNotFoundException("Input PNG is absent.", job.InputPath);
         if (!string.Equals(Path.GetExtension(job.InputPath), ".png", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Input must be PNG.");
         if (File.Exists(job.DonePath) || File.Exists(job.ResultPath) || File.Exists(job.OutputPath))
             throw new IOException("Done, result, and output paths must be unused for each run.");
         if (!File.Exists(PinExe)) throw new FileNotFoundException("Pinned paint.net is absent.", PinExe);
+        Decisions.RequirePin(FileVersionInfo.GetVersionInfo(PinExe).FileVersion ?? "", Hash(PinExe), ExpectedVersion, ExpectedExeSha256);
 
         var desktopName = "OpenPainterCapture_" + Guid.NewGuid().ToString("N");
         var desktop = Native.CreateDesktopW(desktopName, IntPtr.Zero, IntPtr.Zero, 0, Native.DesktopAllAccess, IntPtr.Zero);
         if (desktop == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateDesktop failed.");
         uint pid = 0;
         Thread? triggerThread = null;
-        var deadline = Stopwatch.StartNew();
+        var inputHash = Hash(job.InputPath);
+        var inputSize = Decisions.PngSize(File.ReadAllBytes(job.InputPath));
+        var userFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Paint.NET");
+        var userCache = Path.Combine(userFolder, "Optimization");
+        var savedCache = Decisions.SaveCache(userCache);
+        var userBefore = Snapshot(userFolder);
         try
         {
+            if (RefuseOutsidePaint()) throw new InvalidOperationException("Another paint.net process appeared before launch.");
             pid = StartPin(desktopName, jobPath, job.InputPath);
+            RequireOnlyStartedProcess(pid);
             Exception? triggerError = null;
             triggerThread = new Thread(() =>
             {
@@ -158,7 +214,7 @@ internal static class Program
             while (!File.Exists(job.DonePath))
             {
                 if (triggerError is not null) throw new InvalidOperationException("Could not invoke the capture effect.", triggerError);
-                if (deadline.Elapsed >= timeout) throw new TimeoutException($"No done file after {timeout.TotalSeconds} seconds.");
+                Decisions.RequireBeforeDeadline(deadline.Elapsed, timeout);
                 Thread.Sleep(100);
             }
             if (!triggerThread.Join(TimeSpan.FromSeconds(3)))
@@ -168,6 +224,26 @@ internal static class Program
             if (!result.RootElement.GetProperty("ok").GetBoolean())
                 throw new InvalidOperationException(result.RootElement.GetProperty("error").GetString());
             if (!File.Exists(job.OutputPath)) throw new IOException("Plugin reported success without output.");
+            if (job.Mode is "capture" or "identity")
+            {
+                Decisions.RequirePngSize(File.ReadAllBytes(job.OutputPath), inputSize.Width, inputSize.Height);
+                using var decodedOutput = new System.Drawing.Bitmap(job.OutputPath);
+                if (decodedOutput.Width != inputSize.Width || decodedOutput.Height != inputSize.Height)
+                    throw new InvalidDataException("Output PNG could not decode at the expected size.");
+            }
+            Decisions.RequireCaptureResult(result.RootElement.GetProperty("width").GetInt32(),
+                result.RootElement.GetProperty("height").GetInt32(), result.RootElement.GetProperty("layerCount").GetInt32(),
+                inputSize.Width, inputSize.Height);
+            Decisions.RequireUnchangedHash(inputHash, Hash(job.InputPath));
+            if (job.Mode == "identity" && !string.Equals(result.RootElement.GetProperty("surfaceSha256").GetString(),
+                    Decisions.DecodedSurfaceHash(job.InputPath), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("No-effect surface hash does not match decoded input.");
+        }
+        catch (Exception error)
+        {
+            // The checks in finally can throw too, and that would hide this one.
+            Console.Error.WriteLine($"Capture step failed: {error}");
+            throw;
         }
         finally
         {
@@ -176,11 +252,18 @@ internal static class Program
             if (pid != 0) StopPinByPid(pid);
             if (!Native.CloseDesktop(desktop))
                 Console.Error.WriteLine($"CloseDesktop failed: {Marshal.GetLastWin32Error()}");
+            RemoveRunSessionFiles(userFolder, userBefore);
+            // Another copy may own a newer cache, so restore only when no copy is running.
+            if (!RefuseOutsidePaint()) Decisions.RestoreCache(userCache, savedCache);
+            var changed = Decisions.ChangedEntries(userBefore, Snapshot(userFolder));
+            if (changed.Count > 0)
+                throw new InvalidDataException($"User paint.net data changed during capture: {string.Join(", ", changed)}");
         }
     }
 
     private static uint StartPin(string desktopName, string jobPath, string inputPath)
     {
+        if (RefuseOutsidePaint()) throw new InvalidOperationException("Another paint.net process appeared before launch.");
         var environment = Environment.GetEnvironmentVariables().Cast<DictionaryEntry>()
             .ToDictionary(e => (string)e.Key, e => (string)e.Value!, StringComparer.OrdinalIgnoreCase);
         environment["OPENPAINTER_CAPTURE_JOB"] = jobPath;
@@ -201,6 +284,14 @@ internal static class Program
         finally { Marshal.FreeHGlobal(environmentPointer); }
     }
 
+    private static void RequireOnlyStartedProcess(uint pid)
+    {
+        var all = Process.GetProcesses().Where(p => p.ProcessName.StartsWith("paintdotnet", StringComparison.OrdinalIgnoreCase))
+            .Select(p => { try { return (uint)p.Id; } finally { p.Dispose(); } }).ToArray();
+        if (!Decisions.ProcessIsolated(pid, all, pid))
+            throw new InvalidOperationException($"Another paint.net process appeared after starting PID {pid}.");
+    }
+
     private static IntPtr FindWindow(uint pid, Func<string, bool> matches)
     {
         var found = IntPtr.Zero;
@@ -218,7 +309,7 @@ internal static class Program
         return found;
     }
 
-    private static void TriggerOnDesktop(IntPtr desktop, uint pid, Stopwatch clock, TimeSpan timeout, Job job)
+    private static void TriggerOnDesktop(IntPtr desktop, uint pid, Stopwatch clock, TimeSpan timeout, CaptureJob job)
     {
         if (!Native.SetThreadDesktop(desktop))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "SetThreadDesktop failed.");
@@ -230,6 +321,11 @@ internal static class Program
             if (window == IntPtr.Zero) Thread.Sleep(100);
         }
         if (window == IntPtr.Zero) throw new TimeoutException("Pinned paint.net did not create a hidden window.");
+        var paintPids = Process.GetProcesses().Where(p => p.ProcessName.StartsWith("paintdotnet", StringComparison.OrdinalIgnoreCase))
+            .Select(p => { try { return (uint)p.Id; } finally { p.Dispose(); } }).ToArray();
+        Native.GetWindowThreadProcessId(window, out var windowPid);
+        if (!Decisions.ProcessIsolated(pid, paintPids, windowPid))
+            throw new InvalidOperationException($"Started PID {pid} is not the sole paint.net window owner.");
         var root = AutomationElement.FromHandle(window);
         if (root is null) throw new InvalidOperationException("UI Automation could not find paint.net window.");
         foreach (var effect in job.Effects ?? new List<JsonElement>())
@@ -237,8 +333,9 @@ internal static class Program
             var given = effect.TryGetProperty("parameters", out var p) && p.ValueKind == JsonValueKind.Object
                 ? p.EnumerateObject().ToList()
                 : new List<JsonProperty>();
-            ApplyThroughMenu(root, pid, desktop, effect.GetProperty("id").GetString()
-                ?? throw new InvalidDataException("Effect id is empty."), given);
+            var id = effect.GetProperty("id").GetString() ?? throw new InvalidDataException("Effect id is empty.");
+            try { ApplyThroughMenu(root, pid, desktop, id, given); }
+            catch (Exception error) { throw new InvalidOperationException($"{id}: {error.Message}", error); }
         }
         OpenMenuItem(root, "Effects", null, "OpenPainter Capture");
     }
@@ -250,8 +347,8 @@ internal static class Program
         if (parts.Length < 4) throw new InvalidDataException($"Bad effect id: {id}");
         var name = string.Join("/", parts[3..]);
         // Layers > Rotate / Zoom is listed under the hidden category "donotdisplay".
-        var top = parts[1] switch { "adjustment" => "Adjustments", "donotdisplay" => "Layers", _ => "Effects" };
-        OpenMenuItem(root, top, parts[2].Length == 0 ? null : parts[2], name);
+        var top = parts[1] switch { "adjustment" => "Adjustments", "donotdisplay" => "Layers", "effect" => "Effects", _ => throw new InvalidDataException($"Unknown effect category '{parts[1]}'.") };
+        var invoke = OpenMenuItem(root, top, parts[2].Length == 0 ? null : parts[2], name);
         var timer = Stopwatch.StartNew();
         var dialog = IntPtr.Zero;
         while (dialog == IntPtr.Zero && timer.Elapsed < TimeSpan.FromSeconds(5))
@@ -259,6 +356,8 @@ internal static class Program
             dialog = FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase));
             if (dialog == IntPtr.Zero) Thread.Sleep(100);
         }
+        var opened = dialog != IntPtr.Zero;
+        var closed = false;
         if (dialog != IntPtr.Zero)
         {
             Thread.Sleep(1500);
@@ -269,6 +368,9 @@ internal static class Program
                 throw new InvalidOperationException($"{name} has no dialog, so its parameters cannot be set.");
             foreach (var parameter in parameters)
                 Native.SetLabelledNumber(dialog, parameter.Name, parameter.Value.GetRawText());
+            var settings = Native.ReadAllNumbers(dialog);
+            Decisions.RequireSettings(parameters.ToDictionary(p => p.Name, p => p.Value.GetDouble()), settings);
+            lock (ObservedSettings) ObservedSettings.Add(new { id, numbers = settings, otherControls = Native.ReadOtherControls(dialog) });
             if (parameters.Count > 0)
             {
                 Thread.Sleep(1000);
@@ -290,11 +392,16 @@ internal static class Program
                 if (closing.Elapsed > TimeSpan.FromSeconds(60)) throw new TimeoutException($"{name} did not finish.");
                 Thread.Sleep(100);
             }
+            closed = true;
         }
         else if (parameters.Count > 0)
         {
             throw new InvalidOperationException($"{name} opened no dialog, so its parameters cannot be set.");
         }
+        if (!invoke.Thread.Join(TimeSpan.FromSeconds(5))) throw new TimeoutException($"{id}: invoke did not finish.");
+        if (!Decisions.InvocationSucceeded(name, opened, closed, invoke.Error?.GetBaseException().Message))
+            throw new InvalidOperationException($"{id}: effect invocation did not complete: {invoke.Error?.GetBaseException().Message ?? "no dialog observed"}");
+        if (!opened) lock (ObservedSettings) ObservedSettings.Add(new { id, numbers = new Dictionary<string,double>(), otherControls = new Dictionary<string,string>() });
         Thread.Sleep(500);
     }
 
@@ -305,16 +412,17 @@ internal static class Program
         Console.Error.WriteLine($"Dialog shot {path}: {outcome}");
     }
 
-    private static void OpenMenuItem(AutomationElement root, string top, string? submenu, string name)
+    private static Invocation OpenMenuItem(AutomationElement root, string top, string? submenu, string name)
     {
         // Menu items only: a floating panel is also called Layers.
-        Expand(FindNamed(root, top, TimeSpan.FromSeconds(10), ControlType.MenuItem));
-        if (submenu is not null) Expand(FindNamed(root, submenu, TimeSpan.FromSeconds(10), ControlType.MenuItem));
-        var item = FindNamed(root, name, TimeSpan.FromSeconds(10), ControlType.MenuItem);
+        var branch = FindNamed(root, top, TimeSpan.FromSeconds(10), ControlType.MenuItem);
+        Expand(branch);
+        if (submenu is not null) { branch = FindNamed(branch, submenu, TimeSpan.FromSeconds(10), ControlType.MenuItem, true); Expand(branch); }
+        var item = FindNamed(branch, name, TimeSpan.FromSeconds(10), ControlType.MenuItem, true);
         if (!item.TryGetCurrentPattern(InvokePattern.Pattern, out var action))
             throw new InvalidOperationException($"{name} has no UI Automation Invoke action.");
         var desktop = Native.GetThreadDesktop(Native.GetCurrentThreadId());
-        InvokeWithoutWaiting(item, desktop);
+        return InvokeWithoutWaiting(item, desktop);
     }
 
     private static void Expand(AutomationElement element)
@@ -328,8 +436,10 @@ internal static class Program
 
     // A menu item that opens a modal dialog may not return until the dialog
     // closes, so the invoke runs on its own thread on the same desktop.
-    private static void InvokeWithoutWaiting(AutomationElement element, IntPtr desktop)
+    private sealed class Invocation { public required Thread Thread; public Exception? Error; }
+    private static Invocation InvokeWithoutWaiting(AutomationElement element, IntPtr desktop)
     {
+        Invocation? state = null;
         var thread = new Thread(() =>
         {
             try
@@ -337,10 +447,12 @@ internal static class Program
                 if (!Native.SetThreadDesktop(desktop)) throw new Win32Exception(Marshal.GetLastWin32Error());
                 ((InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
             }
-            catch (Exception error) { Console.Error.WriteLine($"Invoke failed: {error.GetBaseException().Message}"); }
+            catch (Exception error) { state!.Error = error; }
         }) { IsBackground = true };
+        state = new Invocation { Thread = thread };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
+        return state;
     }
 
     private static uint currentPid;
@@ -358,7 +470,8 @@ internal static class Program
         foreach (var handle in handles) yield return AutomationElement.FromHandle(handle);
     }
 
-    private static AutomationElement FindNamed(AutomationElement root, string name, TimeSpan timeout, ControlType? type = null)
+    private static AutomationElement FindNamed(AutomationElement root, string name, TimeSpan timeout,
+        ControlType? type = null, bool branchOnly = false)
     {
         var timer = Stopwatch.StartNew();
         Condition condition = new OrCondition(
@@ -369,15 +482,16 @@ internal static class Program
             condition = new AndCondition(condition, new PropertyCondition(AutomationElement.ControlTypeProperty, type));
         while (timer.Elapsed < timeout)
         {
-            foreach (var window in ProcessWindows(root))
+            foreach (var window in branchOnly ? new[] { root } : ProcessWindows(root))
             {
-                var found = window.FindFirst(TreeScope.Descendants, condition);
-                if (found is not null) return found;
+                var found = window.FindAll(TreeScope.Descendants, condition);
+                Decisions.RequireSingleMatch(found.Count, name);
+                if (found.Count == 1) return found[0];
             }
             Thread.Sleep(100);
         }
         var seen = new List<string>();
-        foreach (var window in ProcessWindows(root))
+        foreach (var window in branchOnly ? new[] { root } : ProcessWindows(root))
         {
             var items = window.FindAll(TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem));
@@ -403,22 +517,69 @@ internal static class Program
         catch (ArgumentException) { /* Already exited. */ }
     }
 
-    private static void WriteManifest(Job job)
+    private static void WriteManifest(CaptureJob job, string originalInputHash, string catalogPath,
+        Stopwatch clock, TimeSpan timeout)
     {
+        Decisions.RequireBeforeDeadline(clock.Elapsed, timeout);
+        var gpu = GpuInfo();
+        Decisions.RequireBeforeDeadline(clock.Elapsed, timeout);
         var manifest = new
         {
             paintNetFileVersion = FileVersionInfo.GetVersionInfo(PinExe).FileVersion,
+            paintNetExeSha256 = Hash(PinExe),
+            driverSha256 = Hash(System.Reflection.Assembly.GetExecutingAssembly().Location),
+            pluginSha256 = Hash(Path.Combine(Pin, "Effects", "CaptureEffect.dll")),
+            effectCatalogSha256 = Hash(catalogPath),
             parameters = job.Effects,
+            observedSettings = ObservedSettings,
             inputIcc = ReadPngIcc(job.InputPath),
-            inputSha256 = Hash(job.InputPath), outputSha256 = Hash(job.OutputPath),
-            gpu = GpuInfo()
+            inputSha256 = originalInputHash, outputSha256 = Hash(job.OutputPath),
+            gpu
         };
         var path = Path.Combine(Path.GetDirectoryName(job.OutputPath)!, "manifest.json");
         if (File.Exists(path)) throw new IOException($"Manifest already exists: {path}");
         File.WriteAllText(path, JsonSerializer.Serialize(manifest, JsonOptions));
+        Decisions.RequireBeforeDeadline(clock.Elapsed, timeout);
     }
 
     private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+
+    private static Dictionary<string,string> Snapshot(string folder)
+    {
+        var entries = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        SnapshotRegistry(@"Software\paint.net", entries);
+        if (!Directory.Exists(folder)) return entries;
+        foreach (var directory in Directory.EnumerateDirectories(folder, "*", SearchOption.AllDirectories))
+            entries[Path.GetRelativePath(folder, directory)] = "dir";
+        foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+        {
+            var info = new FileInfo(file);
+            entries[Path.GetRelativePath(folder, file)] = $"{info.Length}:{info.LastWriteTimeUtc.Ticks}";
+        }
+        return entries;
+    }
+
+    private static void SnapshotRegistry(string path, Dictionary<string,string> entries)
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(path);
+        if (key is null) return;
+        foreach (var name in key.GetValueNames())
+        {
+            var value = key.GetValue(name, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames);
+            var text = value is byte[] bytes ? Convert.ToHexString(bytes) : value is string[] lines ? string.Join("\n", lines) : Convert.ToString(value);
+            entries[$@"HKCU\{path}\{name}"] = $"{key.GetValueKind(name)}:{text}";
+        }
+        foreach (var child in key.GetSubKeyNames()) SnapshotRegistry($@"{path}\{child}", entries);
+    }
+
+    private static void RemoveRunSessionFiles(string folder, Dictionary<string,string> before)
+    {
+        var files = Decisions.RunSessionFiles(before, Snapshot(folder));
+        if (files.Count == 0) return;
+        // A file that appears while another copy runs could be that copy's, so it stays and the check names it.
+        if (RefuseOutsidePaint()) return;
+        Decisions.RemoveRunFiles(folder, files);
+    }
 
     private static object GpuInfo()
     {
@@ -426,14 +587,19 @@ internal static class Program
             "--query-gpu=name,driver_version --format=csv,noheader")
         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true })
             ?? throw new IOException("nvidia-smi did not start.");
-        var output = process.StandardOutput.ReadToEnd().Trim();
-        var error = process.StandardError.ReadToEnd();
-        if (!process.WaitForExit(5000))
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        var gpuClock = Stopwatch.StartNew();
+        var readers = Task.WhenAll(stdout, stderr);
+        var exited = process.WaitForExit(5000);
+        var remaining = Math.Max(0, 5000 - (int)gpuClock.ElapsedMilliseconds);
+        if (!exited || !Decisions.ReadersFinishedWithin(readers, TimeSpan.FromMilliseconds(remaining)))
         {
-            process.Kill();
-            process.WaitForExit();
+            if (!process.HasExited) process.Kill();
             throw new TimeoutException("nvidia-smi did not finish in five seconds.");
         }
+        var output = stdout.GetAwaiter().GetResult().Trim();
+        var error = stderr.GetAwaiter().GetResult();
         if (process.ExitCode != 0)
             throw new IOException($"nvidia-smi failed: {error}");
         var parts = output.Split(',', 2);
@@ -469,7 +635,4 @@ internal static class Program
         }
         return "none";
     }
-
-    private sealed record Job(string Mode, string InputPath, string OutputPath, string ResultPath,
-        string DonePath, List<JsonElement>? Effects);
 }

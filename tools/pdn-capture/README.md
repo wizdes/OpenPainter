@@ -1,58 +1,62 @@
 # paint.net capture kit (W4)
 
-This kit uses the pinned paint.net 5.1.12 copy at `C:\agent-work\pdn-5.1.12`. The plugin is a normal effect. The driver runs paint.net on a new hidden Windows desktop and asks UI Automation to open **Effects > OpenPainter Capture**. It never takes a screen capture, calls `SendInput`, or switches the visible desktop. UI Automation on the real paint.net window has not been tested yet.
+The driver starts paint.net 5.1.12 on a hidden Windows desktop. It opens a built-in effect from the pinned catalog, sets number boxes by their exact dialog labels, then asks the plugin to save the current surface. Root must run the real paint.net checks; the `agent` account cannot start it. No image goes in this public repo.
 
-## Build and install
+## Build and test
 
-Run these commands as the account that can run the pin. Build does not start paint.net. Install is a separate step and writes only `Effects\CaptureEffect.dll` in the pin.
+From the repo root, with .NET 10 on `PATH`:
 
 ```powershell
-$dotnet = Join-Path $env:USERPROFILE '.dotnet10\dotnet.exe'
-$env:DOTNET_ROOT = Join-Path $env:USERPROFILE '.dotnet10'
-& $dotnet build tools/pdn-capture/plugin/CaptureEffect.csproj -v:q -p:NoWarn=MSB3277
-& $dotnet build tools/pdn-capture/driver/PdnCaptureDriver.csproj -v:q
-& $dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll --install --plugin tools/pdn-capture/plugin/bin/Debug/net9.0-windows/CaptureEffect.dll
+dotnet test tools/pdn-capture/tests/PdnCaptureTests.csproj -v:q
+dotnet build tools/pdn-capture/driver/PdnCaptureDriver.csproj -v:q
+dotnet build tools/pdn-capture/plugin/CaptureEffect.csproj -v:q -p:NoWarn=MSB3277
 ```
 
-Close every other paint.net copy before running. The pin hands a second launch to the first process. Run preflight and then the driver from the repo root. The input must be an absolute PNG path. Output, result, and done paths must be absolute and unused. The output folder must already exist.
+The driver pins file version `5.112.9563.32325` and executable SHA-256 `73697e348b3ab3e4168befa5ceae6b04d6fcf5a4d4e83f301f6a1257cef08222`. It refuses a changed executable. Root should verify these values against its clean pin before the real run.
+
+## Real run by root
+
+Run as the account that can start the pin, with the user's paint.net closed. The driver checks again before and after every launch. If another paint.net process appears, it stops only its own PID.
+
+paint.net ignores `LOCALAPPDATA` and `APPDATA`: root set both to a private folder, and the folder stayed empty. So a capture cannot be kept out of the user's `%LOCALAPPDATA%\Paint.NET`. paint.net does two things there, and the driver undoes both:
+
+- It creates a scratch folder under `SessionData`, and a stopped process leaves it behind. The driver deletes only entries that are new and inside a session folder that is new.
+- It rewrites `Optimization\Startup.N.profile`, a speed cache with no settings or pictures. The driver saves that folder before the run and puts back the same bytes and times.
+
+The driver then compares every file (size and time), every folder and every value under `HKCU\Software\paint.net` with the state before the run, and fails by listing anything that differs. If another paint.net copy is running at that point, it undoes nothing, so the check names the changes.
+
+paint.net settings for this copy live in `PaintDotNet.AppSettings.json` in the pin, because the pin runs in portable mode.
 
 ```powershell
+dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll --install --plugin tools/pdn-capture/plugin/bin/Debug/net9.0-windows/CaptureEffect.dll
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/preflight.ps1 -Level capture
-& $dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll --job C:\captures\job.json --timeout-seconds 120
+dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll --job C:\captures\identity-job.json --timeout-seconds 120
+dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll --job C:\captures\effect-job.json --timeout-seconds 120
 ```
 
-Example job:
+Use a new output directory for every run because each successful run writes `manifest.json` there. Create those directories before running. Example effect job:
 
 ```json
 {
   "mode": "capture",
   "inputPath": "C:\\captures\\input.png",
-  "outputPath": "C:\\captures\\output.png",
-  "resultPath": "C:\\captures\\result.json",
-  "donePath": "C:\\captures\\done.txt",
+  "outputPath": "C:\\captures\\effect\\effect.png",
+  "resultPath": "C:\\captures\\effect\\effect-result.json",
+  "donePath": "C:\\captures\\effect\\effect-done.txt",
   "effects": [
-    { "id": "paintdotnet.effects/Effect//Effect name from catalog", "parameters": { "Amount": 10 } }
+    { "id": "paintdotnet.effects.gpu/effect/blurs/gaussian blur", "parameters": { "Radius": 7 } }
   ]
 }
 ```
 
-For a catalog, use the same paths with `"mode": "catalog"` and `"effects": []`. `outputPath` then holds the catalog JSON. Each entry has a locally made ID, name, category, submenu, property defaults, ranges, choices, and `schemaAvailable`. The ID is assembled from the assembly filename, category, submenu, and localized name; it is not a paint.net ID. Always copy IDs from the catalog produced by the same pinned build and language.
+For the identity job, use `"mode": "identity"`, `"effects": []`, and different output, result and done paths. The output and manifest paths must also differ from the input and from each other. Identity mode checks the plugin's source-surface hash against the decoded PNG. A successful capture writes `ok: true`, source width, height, reported layer count and surface hash to the result JSON. The driver checks the PNG signature and dimensions, input file hash before and after, and the result fields. It writes `manifest.json` beside the output. The manifest records the pin, driver, plugin, catalog, input and output hashes, number box values, unread list and check box names, ICC data and the installed GPU reported by `nvidia-smi`. That GPU report does not prove which GPU paint.net used.
 
-The plugin writes `resultPath` for success or failure and then writes `donePath`. The driver also writes a job failure result when it fails before the plugin responds. The driver reads both and writes `manifest.json` beside the output after a successful run. The manifest records paint.net's file version, the requested effects and parameters, the PNG iCCP profile name and chunk SHA-256 or `none`, input and output SHA-256, and the first GPU name and driver version from `nvidia-smi`.
+The four no-dialog effects are Auto-Level, Black and White, Invert Alpha and Invert Colors. All other effects must open and close a dialog. An invoke error fails by effect ID. The known `Catastrophic failure` message is accepted only after that same dialog opened and closed, because the observed dialog path and plugin result then both completed. A missing dialog cannot turn that error into success.
 
-For a job with more than one effect, the driver starts a fresh pinned process for each effect and passes the previous PNG as the next input. It deletes the temporary PNGs after the job. Root must check whether this PNG round trip changes color profile handling or pixels for chained effects.
+## W14 work left
 
-## How a capture runs, and its limits
-
-1. The driver starts the pin on a hidden desktop with the input PNG, one effect per process.
-2. UI Automation opens the effect's real menu item. The dialog stays open on the hidden desktop.
-3. A posted Enter message presses OK, or a posted click when settings were typed, because Tab leaves focus on the reset button. UI Automation cannot do this: the menu invoke stays in progress while the modal dialog is open, so later calls into the process wait.
-4. UI Automation opens **OpenPainter Capture**, and the plugin writes the current layer as a PNG. It renders nothing itself.
-
-Limits, measured on 2026-11-02:
-
-- **Number settings work; other kinds do not yet.** A job gives `"parameters": { "Radius": 7 }`. The name is the label shown in the dialog. The driver types the value by window message, presses Tab, and reads the box back. A wrong label, a value that does not stick, or an effect with no dialog fails by name. Lists, check boxes, color wheels, curves and random seeds cannot be set yet.
-- **The plugin API route did not work.** `IEffectsService2` lists 54 built-in effects, and each offers `IBitmapEffectRenderer`. `SetToken` refuses null, and `IEffectConfigForm.Token` throws "Operation is not valid", even after `SetEffect` and with the dialog open. Built-in effects arrive as closed proxies, so no parameter schema is public. The catalog therefore has names and categories, with no parameters.
-- **Effects with a random seed differ between runs.** Add Noise and Clouds gave different hashes on two runs with default parameters. They need a fixed seed, or a comparison that does not use hashes, in W14.
-- A failed menu invoke can print "Invoke failed: Catastrophic failure" when the dialog closes. The run still reports its own result.
-- Each capture takes about 16 s.
+- Set and read list boxes, check boxes, color wheels and curves.
+- Fix random seeds or choose a comparison rule for random effects.
+- Add `targets.toml` rows and the M54 loader, including its evidence checks.
+- Run real captures for one and many effects. Check color profile and pixel behavior across chained PNG round trips.
+- Confirm the plugin's reported layer count through paint.net's public API; the current render callback exposes a surface, not a document layer list.

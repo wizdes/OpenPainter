@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using System.Text;
 using System.Runtime.InteropServices;
 
@@ -89,6 +90,8 @@ internal static class Native
     internal static extern int GetClassNameW(IntPtr window, StringBuilder name, int count);
     [DllImport("user32.dll")]
     internal static extern int GetDlgCtrlID(IntPtr window);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageTimeoutW", SetLastError = true)]
     private static extern IntPtr SendText(IntPtr window, uint message, IntPtr wParam, string text, uint flags, uint ms, out IntPtr result);
@@ -130,20 +133,80 @@ internal static class Native
         if (edit.Handle == IntPtr.Zero) throw new System.IO.InvalidDataException($"Label '{label}' has no number box after it.");
 
         const uint WmSetText = 0x000C, WmLButtonDown = 0x0201, WmLButtonUp = 0x0202, WmKeyDown = 0x0100, WmKeyUp = 0x0101, AbortIfHung = 2;
-        PostMessageW(edit.Handle, WmLButtonDown, 1, 0x00050005);
-        PostMessageW(edit.Handle, WmLButtonUp, 0, 0x00050005);
+        RequirePosted(edit.Handle, WmLButtonDown, 1, 0x00050005, label);
+        RequirePosted(edit.Handle, WmLButtonUp, 0, 0x00050005, label);
         Thread.Sleep(200);
         if (SendText(edit.Handle, WmSetText, 0, value, AbortIfHung, 5000, out _) == IntPtr.Zero)
             throw new Win32Exception(Marshal.GetLastWin32Error(), $"Could not type into '{label}'.");
         Thread.Sleep(100);
-        PostMessageW(edit.Handle, WmKeyDown, 0x09, 1);
-        PostMessageW(edit.Handle, WmKeyUp, 0x09, unchecked((IntPtr)0xC0000001));
+        RequirePosted(edit.Handle, WmKeyDown, 0x09, 1, label);
+        RequirePosted(edit.Handle, WmKeyUp, 0x09, unchecked((IntPtr)0xC0000001), label);
         Thread.Sleep(400);
         var shown = ReadText(edit.Handle);
         var style = System.Globalization.NumberStyles.Float;
         var culture = System.Globalization.CultureInfo.InvariantCulture;
         if (!double.TryParse(shown, style, culture, out var got) || !double.TryParse(value, style, culture, out var want) || got != want)
             throw new InvalidOperationException($"'{label}' shows '{shown}' after setting '{value}'.");
+    }
+
+    internal static Dictionary<string,double> ReadAllNumbers(IntPtr dialog)
+    {
+        var controls = new List<(IntPtr Handle, string Class, string Text)>();
+        EnumChildWindows(dialog, (child, _) =>
+        {
+            var cls = new StringBuilder(256);
+            GetClassNameW(child, cls, 256);
+            var title = new StringBuilder(256);
+            GetWindowTextW(child, title, 256);
+            controls.Add((child, cls.ToString(), title.ToString()));
+            return true;
+        }, IntPtr.Zero);
+        var found = new Dictionary<string,double>(StringComparer.Ordinal);
+        for (var i = 0; i < controls.Count; i++)
+        {
+            if (!controls[i].Class.Contains(".Edit.", StringComparison.Ordinal)) continue;
+            var label = controls.Take(i).LastOrDefault(c => !string.IsNullOrWhiteSpace(c.Text) &&
+                !c.Class.Contains(".Edit.", StringComparison.Ordinal)).Text;
+            if (string.IsNullOrWhiteSpace(label)) throw new InvalidDataException("Number box has no label.");
+            var shown = ReadText(controls[i].Handle);
+            if (!double.TryParse(shown, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var number))
+                throw new InvalidDataException($"Number box '{label}' shows '{shown}'.");
+            if (!found.TryAdd(label, number)) throw new InvalidDataException($"Duplicate number label '{label}'.");
+        }
+        return found;
+    }
+
+    internal static Dictionary<string,string> ReadOtherControls(IntPtr dialog)
+    {
+        var found = new Dictionary<string,string>(StringComparer.Ordinal);
+        var lastLabel = "";
+        EnumChildWindows(dialog, (child, _) =>
+        {
+            var cls = new StringBuilder(256);
+            GetClassNameW(child, cls, 256);
+            var title = new StringBuilder(256);
+            GetWindowTextW(child, title, 256);
+            var kind = cls.ToString();
+            var buttonStyle = kind.Equals("Button", StringComparison.OrdinalIgnoreCase) ?
+                GetWindowLongPtr(child, -16).ToInt64() & 0xF : -1;
+            if (kind.Contains("ComboBox", StringComparison.OrdinalIgnoreCase) ||
+                kind.Contains("CheckBox", StringComparison.OrdinalIgnoreCase) ||
+                buttonStyle is 2 or 3 or 5 or 6)
+            {
+                var name = string.IsNullOrWhiteSpace(title.ToString()) ? lastLabel : title.ToString();
+                if (string.IsNullOrWhiteSpace(name)) throw new InvalidDataException("List or check box has no label.");
+                if (!found.TryAdd(name, "unread")) throw new InvalidDataException($"Duplicate control label '{name}'.");
+            }
+            else if (!string.IsNullOrWhiteSpace(title.ToString())) lastLabel = title.ToString();
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    private static void RequirePosted(IntPtr window, uint message, IntPtr wParam, IntPtr lParam, string name)
+    {
+        Decisions.RequirePosted(PostMessageW(window, message, wParam, lParam), name);
     }
 
     /// <summary>Presses a dialog button by posting a click to it. Focus can sit on another button, so Enter is not safe here.</summary>
@@ -160,8 +223,8 @@ internal static class Native
             return false;
         }, IntPtr.Zero);
         if (button == IntPtr.Zero) throw new System.IO.InvalidDataException($"Dialog has no button named '{text}'.");
-        PostMessageW(button, WmLButtonDown, 1, 0x00050005);
-        PostMessageW(button, WmLButtonUp, 0, 0x00050005);
+        RequirePosted(button, WmLButtonDown, 1, 0x00050005, text);
+        RequirePosted(button, WmLButtonUp, 0, 0x00050005, text);
     }
 
     /// <summary>Class, id, position and title of every child of a window, for finding a dialog's controls.</summary>
@@ -204,9 +267,8 @@ internal static class Native
         if (!PostMessageW(target, WmKeyDown, 0x0D, 1) || !PostMessageW(target, WmChar, 0x0D, 1) ||
             !PostMessageW(target, WmKeyUp, 0x0D, unchecked((IntPtr)0xC0000001)))
         {
-            const int ErrorInvalidWindowHandle = 1400;
             var error = Marshal.GetLastWin32Error();
-            if (error != ErrorInvalidWindowHandle) throw new Win32Exception(error, "Could not post Enter.");
+            throw new Win32Exception(error, "Could not post Enter.");
         }
     }
 }
