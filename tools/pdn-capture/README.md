@@ -16,14 +16,14 @@ The driver pins file version `5.112.9563.32325` and executable SHA-256 `73697e34
 
 ## Real run by root
 
-Run as the account that can start the pin, with the user's paint.net closed. The driver checks again before and after every launch. If another paint.net process appears, it stops only its own PID.
+Run as the account that can start the pin, with the user's paint.net closed. The driver checks before launch, on each wait-loop poll, while waiting for the UI thread, and before cleanup. If it sees another paint.net process, the job fails by name, stops only its own PID, and skips all cleanup and cache restore. A copy that appears and exits between two looks inside one poll remains a limit.
 
 paint.net ignores `LOCALAPPDATA` and `APPDATA`: root set both to a private folder, and the folder stayed empty. So a capture cannot be kept out of the user's `%LOCALAPPDATA%\Paint.NET`. paint.net does two things there, and the driver undoes both:
 
-- It creates a scratch folder under `SessionData`, and a stopped process leaves it behind. The driver deletes only entries that are new and inside a session folder that is new.
-- It rewrites `Optimization\Startup.N.profile`, a speed cache with no settings or pictures. The driver saves that folder before the run and puts back the same bytes and times.
+- It creates a scratch folder under `SessionData`, and a stopped process leaves it behind. The driver deletes only entries that are new and inside a session folder that is new. It refuses to delete through a folder link.
+- It rewrites `Optimization\Startup.N.profile`, a speed cache with no settings or pictures. The driver saves and restores only files whose whole name is `Startup.<digits>.profile`. Other changed files stay in place and the final check names them.
 
-The driver then compares every file (size and time), every folder and every value under `HKCU\Software\paint.net` with the state before the run, and fails by listing anything that differs. If another paint.net copy is running at that point, it undoes nothing, so the check names the changes.
+The driver then compares every file (SHA-256 of its bytes, attributes, size and last-write time), every folder, and every registry key and value under `HKCU\Software\paint.net` with the state before the run. It records folder links without following them. Multi-string registry values keep their array boundaries. The job fails by listing anything that differs.
 
 paint.net settings for this copy live in `PaintDotNet.AppSettings.json` in the pin, because the pin runs in portable mode.
 
@@ -34,7 +34,9 @@ dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll -
 dotnet tools/pdn-capture/driver/bin/Debug/net10.0-windows/PdnCaptureDriver.dll --job C:\captures\effect-job.json --timeout-seconds 120
 ```
 
-Use a new output directory for every run because each successful run writes `manifest.json` there. Create those directories before running. Example effect job:
+`--install` prints `Installed` and the plugin path. A successful `--job` exits 0 and normally prints no text; check its result JSON for `ok: true` and its output and manifest files. A failed `--job` exits 1 and prints the job path and error on stderr. If the result path was unused when the job began, its JSON says `ok: false`. The preflight script reports its own checks.
+
+Use a new output directory for every run because each successful run writes `manifest.json` there. Create those directories before running. The output, result, done and manifest paths must be unused files or directories before the first launch, including for a chain. Example effect job:
 
 ```json
 {
@@ -51,7 +53,9 @@ Use a new output directory for every run because each successful run writes `man
 
 For the identity job, use `"mode": "identity"`, `"effects": []`, and different output, result and done paths. The output and manifest paths must also differ from the input and from each other. Identity mode checks the plugin's source-surface hash against the decoded PNG. A successful capture writes `ok: true`, source width, height, reported layer count and surface hash to the result JSON. The driver checks the PNG signature and dimensions, input file hash before and after, and the result fields. It writes `manifest.json` beside the output. The manifest records the pin, driver, plugin, catalog, input and output hashes, number box values, unread list and check box names, ICC data and the installed GPU reported by `nvidia-smi`. That GPU report does not prove which GPU paint.net used.
 
-The four no-dialog effects are Auto-Level, Black and White, Invert Alpha and Invert Colors. All other effects must open and close a dialog. An invoke error fails by effect ID. The known `Catastrophic failure` message is accepted only after that same dialog opened and closed, because the observed dialog path and plugin result then both completed. A missing dialog cannot turn that error into success.
+The four no-dialog effects are Auto-Level, Black and White, Invert Alpha and Invert Colors. All other effects must open and close a dialog that remains present and has a button named OK. The driver clicks that button even with default settings. A matching window that vanishes before this check does not count as a dialog. An invoke error fails by effect ID. The known `Catastrophic failure` message is accepted only after that same dialog opened and closed, because the observed dialog path and plugin result then both completed. A missing dialog cannot turn that error into success. If the capture plugin's invocation ends in error, the driver waits five seconds for its done file; if none arrives, it reports that error by name. A done file lets the result JSON decide success or failure.
+
+Job and effect fields cannot be repeated. Number labels must match the control file exactly. Posterize now accepts Red, Green, Blue and Alpha number settings. A failed run replaces a result file made during that run with `ok: false`; it leaves a result file that existed before the run alone.
 
 ## W14 work left
 

@@ -42,7 +42,7 @@ internal static class Program
         catch (Exception error)
         {
             Console.Error.WriteLine(args.Length >= 2 && args[0] == "--job" ? $"{args[1]}: {error}" : error);
-            if (args.Length >= 2 && args[0] == "--job" && Decisions.MayWriteFailure(resultExistedAtStart)) WriteFailure(args[1], error);
+            if (args.Length >= 2 && args[0] == "--job") WriteFailure(args[1], error);
             return 1;
         }
     }
@@ -60,8 +60,7 @@ internal static class Program
             var result = root.GetProperty("resultPath").GetString();
             if (!string.IsNullOrWhiteSpace(result) && Path.IsPathFullyQualified(result))
             {
-                using var stream = new FileStream(result, FileMode.CreateNew, FileAccess.Write);
-                JsonSerializer.Serialize(stream, new { ok = false, error = error.ToString() }, JsonOptions);
+                Decisions.WriteFailureResult(result, resultExistedAtStart, error.ToString());
             }
         }
         catch (Exception writeError) { Console.Error.WriteLine($"Could not write job failure result: {writeError}"); }
@@ -111,7 +110,7 @@ internal static class Program
         var clock = Stopwatch.StartNew();
         var manifestPath = Path.Combine(Path.GetDirectoryName(job.OutputPath)!, "manifest.json");
         Decisions.ValidateDistinctPaths(job.InputPath, job.OutputPath, job.ResultPath, job.DonePath, manifestPath);
-        if (File.Exists(manifestPath)) throw new IOException($"Manifest already exists: {manifestPath}");
+        Decisions.RequireUnusedPaths(job.OutputPath, job.ResultPath, job.DonePath, manifestPath);
         var originalInputHash = Hash(job.InputPath);
         var catalogPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../docs/windows/pdn-5.1-effects.toml"));
         var controlsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../docs/windows/pdn-5.1-controls.json"));
@@ -182,8 +181,8 @@ internal static class Program
         if (!File.Exists(job.InputPath)) throw new FileNotFoundException("Input PNG is absent.", job.InputPath);
         if (!string.Equals(Path.GetExtension(job.InputPath), ".png", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Input must be PNG.");
-        if (File.Exists(job.DonePath) || File.Exists(job.ResultPath) || File.Exists(job.OutputPath))
-            throw new IOException("Done, result, and output paths must be unused for each run.");
+        Decisions.RequireUnusedPaths(job.DonePath, job.ResultPath, job.OutputPath,
+            Path.Combine(Path.GetDirectoryName(job.OutputPath)!, "manifest.json"));
         if (!File.Exists(PinExe)) throw new FileNotFoundException("Pinned paint.net is absent.", PinExe);
         Decisions.RequirePin(FileVersionInfo.GetVersionInfo(PinExe).FileVersion ?? "", Hash(PinExe), ExpectedVersion, ExpectedExeSha256);
 
@@ -198,11 +197,19 @@ internal static class Program
         var userCache = Path.Combine(userFolder, "Optimization");
         var savedCache = Decisions.SaveCache(userCache);
         var userBefore = Snapshot(userFolder);
+        var otherProcessSeen = false;
         try
         {
-            if (RefuseOutsidePaint()) throw new InvalidOperationException("Another paint.net process appeared before launch.");
+            if (PaintPids().Length > 0)
+            {
+                otherProcessSeen = true;
+                throw new InvalidOperationException("Another paint.net process appeared before launch.");
+            }
             pid = StartPin(desktopName, jobPath, job.InputPath);
-            RequireOnlyStartedProcess(pid);
+            var startedPids = PaintPids();
+            otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, startedPids);
+            if (!Decisions.ProcessIsolated(pid, startedPids, pid))
+                throw new InvalidOperationException($"Another paint.net process appeared after starting PID {pid}.");
             Exception? triggerError = null;
             triggerThread = new Thread(() =>
             {
@@ -213,11 +220,22 @@ internal static class Program
             triggerThread.Start();
             while (!File.Exists(job.DonePath))
             {
+                otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, PaintPids());
+                if (otherProcessSeen) throw new InvalidOperationException($"Another paint.net process appeared during capture beside PID {pid}.");
                 if (triggerError is not null) throw new InvalidOperationException("Could not invoke the capture effect.", triggerError);
                 Decisions.RequireBeforeDeadline(deadline.Elapsed, timeout);
                 Thread.Sleep(100);
             }
-            if (!triggerThread.Join(TimeSpan.FromSeconds(3)))
+            otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, PaintPids());
+            if (otherProcessSeen) throw new InvalidOperationException($"Another paint.net process appeared during capture beside PID {pid}.");
+            var joinWait = Stopwatch.StartNew();
+            while (triggerThread.IsAlive && joinWait.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, PaintPids());
+                if (otherProcessSeen) throw new InvalidOperationException($"Another paint.net process appeared during capture beside PID {pid}.");
+                Thread.Sleep(100);
+            }
+            if (triggerThread.IsAlive)
                 throw new TimeoutException("UI Automation thread did not finish.");
             if (triggerError is not null) throw new InvalidOperationException("Effect trigger failed.", triggerError);
             using var result = JsonDocument.Parse(File.ReadAllText(job.ResultPath));
@@ -252,18 +270,30 @@ internal static class Program
             if (pid != 0) StopPinByPid(pid);
             if (!Native.CloseDesktop(desktop))
                 Console.Error.WriteLine($"CloseDesktop failed: {Marshal.GetLastWin32Error()}");
-            RemoveRunSessionFiles(userFolder, userBefore);
-            // Another copy may own a newer cache, so restore only when no copy is running.
-            if (!RefuseOutsidePaint()) Decisions.RestoreCache(userCache, savedCache);
+            otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, PaintPids());
+            if (!otherProcessSeen) RemoveRunSessionFiles(userFolder, userBefore, pid, ref otherProcessSeen);
+            otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, PaintPids());
+            if (!otherProcessSeen) Decisions.RestoreCache(userCache, savedCache);
             var changed = Decisions.ChangedEntries(userBefore, Snapshot(userFolder));
+            if (otherProcessSeen)
+                throw new InvalidOperationException($"Another paint.net process appeared during capture beside PID {pid}; cleanup and cache restore skipped. Changed user data: {string.Join(", ", changed)}");
             if (changed.Count > 0)
                 throw new InvalidDataException($"User paint.net data changed during capture: {string.Join(", ", changed)}");
         }
     }
 
+    private static uint[] PaintPids()
+    {
+        var found = new List<uint>();
+        foreach (var process in Process.GetProcesses())
+            using (process)
+                if (process.ProcessName.StartsWith("paintdotnet", StringComparison.OrdinalIgnoreCase))
+                    found.Add((uint)process.Id);
+        return found.ToArray();
+    }
+
     private static uint StartPin(string desktopName, string jobPath, string inputPath)
     {
-        if (RefuseOutsidePaint()) throw new InvalidOperationException("Another paint.net process appeared before launch.");
         var environment = Environment.GetEnvironmentVariables().Cast<DictionaryEntry>()
             .ToDictionary(e => (string)e.Key, e => (string)e.Value!, StringComparer.OrdinalIgnoreCase);
         environment["OPENPAINTER_CAPTURE_JOB"] = jobPath;
@@ -282,14 +312,6 @@ internal static class Program
             return process.dwProcessId;
         }
         finally { Marshal.FreeHGlobal(environmentPointer); }
-    }
-
-    private static void RequireOnlyStartedProcess(uint pid)
-    {
-        var all = Process.GetProcesses().Where(p => p.ProcessName.StartsWith("paintdotnet", StringComparison.OrdinalIgnoreCase))
-            .Select(p => { try { return (uint)p.Id; } finally { p.Dispose(); } }).ToArray();
-        if (!Decisions.ProcessIsolated(pid, all, pid))
-            throw new InvalidOperationException($"Another paint.net process appeared after starting PID {pid}.");
     }
 
     private static IntPtr FindWindow(uint pid, Func<string, bool> matches)
@@ -337,7 +359,20 @@ internal static class Program
             try { ApplyThroughMenu(root, pid, desktop, id, given); }
             catch (Exception error) { throw new InvalidOperationException($"{id}: {error.Message}", error); }
         }
-        OpenMenuItem(root, "Effects", null, "OpenPainter Capture");
+        var captureInvoke = OpenMenuItem(root, "Effects", null, "OpenPainter Capture");
+        while (captureInvoke.Thread.IsAlive && !File.Exists(job.DonePath))
+        {
+            Decisions.RequireBeforeDeadline(clock.Elapsed, timeout);
+            Thread.Sleep(100);
+        }
+        if (!captureInvoke.Thread.IsAlive && captureInvoke.Error is { } invokeError)
+        {
+            var finished = Stopwatch.StartNew();
+            while (!File.Exists(job.DonePath) && finished.Elapsed < TimeSpan.FromSeconds(5)) Thread.Sleep(100);
+            if (Decisions.InvocationErrorNeedsFailure(true, invokeError.GetBaseException().Message,
+                    File.Exists(job.DonePath), finished.Elapsed))
+                throw new InvalidOperationException($"OpenPainter Capture: {invokeError.GetBaseException().Message}", invokeError);
+        }
     }
 
     private static void ApplyThroughMenu(AutomationElement root, uint pid, IntPtr desktop, string id, List<JsonProperty> parameters)
@@ -356,43 +391,44 @@ internal static class Program
             dialog = FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase));
             if (dialog == IntPtr.Zero) Thread.Sleep(100);
         }
-        var opened = dialog != IntPtr.Zero;
+        var opened = false;
         var closed = false;
         if (dialog != IntPtr.Zero)
         {
             Thread.Sleep(1500);
-            SaveWindowImage(dialog, Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_SHOT"));
-            var dumpPath = Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_CONTROLS");
-            if (dumpPath is not null) File.WriteAllLines(dumpPath, Native.DescribeChildren(dialog));
-            if (parameters.Count > 0 && FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) == IntPtr.Zero)
+            var stayed = FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) != IntPtr.Zero;
+            var hasOk = stayed && Native.HasButton(dialog, "OK");
+            opened = Decisions.RequireDialogOpened(name, stayed, hasOk);
+            if (!stayed && parameters.Count > 0)
                 throw new InvalidOperationException($"{name} has no dialog, so its parameters cannot be set.");
-            foreach (var parameter in parameters)
-                Native.SetLabelledNumber(dialog, parameter.Name, parameter.Value.GetRawText());
-            var settings = Native.ReadAllNumbers(dialog);
-            Decisions.RequireSettings(parameters.ToDictionary(p => p.Name, p => p.Value.GetDouble()), settings);
-            lock (ObservedSettings) ObservedSettings.Add(new { id, numbers = settings, otherControls = Native.ReadOtherControls(dialog) });
-            if (parameters.Count > 0)
+            if (opened)
             {
-                Thread.Sleep(1000);
-                SaveWindowImage(dialog, Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_SET_SHOT"));
+                SaveWindowImage(dialog, Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_SHOT"));
+                var dumpPath = Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_CONTROLS");
+                if (dumpPath is not null) File.WriteAllLines(dumpPath, Native.DescribeChildren(dialog));
+                Decisions.RequireUnambiguous(parameters.Select(p => p.Name), Native.ReadAllNumbers(dialog));
+                foreach (var parameter in parameters)
+                    Native.SetLabelledNumber(dialog, parameter.Name, parameter.Value.GetRawText());
+                var settings = Native.ReadAllNumbers(dialog);
+                Decisions.RequireSettings(parameters.ToDictionary(p => p.Name, p => p.Value.GetDouble()), settings);
+                lock (ObservedSettings) ObservedSettings.Add(new { id, numbers = settings, otherControls = Native.ReadOtherControls(dialog) });
+                if (parameters.Count > 0)
+                {
+                    Thread.Sleep(1000);
+                    SaveWindowImage(dialog, Environment.GetEnvironmentVariable("OPENPAINTER_CAPTURE_SET_SHOT"));
+                }
+                // The menu invoke stays in progress while the modal dialog is open,
+                // so UI Automation calls into this process wait. A window message
+                // to the button stays inside the app: this is not SendInput.
+                Native.ClickButton(dialog, "OK");
+                var closing = Stopwatch.StartNew();
+                while (FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) != IntPtr.Zero)
+                {
+                    if (closing.Elapsed > TimeSpan.FromSeconds(60)) throw new TimeoutException($"{name} did not finish.");
+                    Thread.Sleep(100);
+                }
+                closed = true;
             }
-            // The menu invoke stays in progress while the modal dialog is open,
-            // so UI Automation calls into this process wait. A window message
-            // to the dialog's focused control does not, and it stays inside
-            // the app: this is not SendInput.
-            // A window that has gone was a progress window: the effect has no dialog.
-            if (FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) != IntPtr.Zero)
-            {
-                if (parameters.Count > 0) Native.ClickButton(dialog, "OK");
-                else Native.PressEnter(dialog);
-            }
-            var closing = Stopwatch.StartNew();
-            while (FindWindow(pid, t => t.StartsWith(name, StringComparison.OrdinalIgnoreCase)) != IntPtr.Zero)
-            {
-                if (closing.Elapsed > TimeSpan.FromSeconds(60)) throw new TimeoutException($"{name} did not finish.");
-                Thread.Sleep(100);
-            }
-            closed = true;
         }
         else if (parameters.Count > 0)
         {
@@ -546,16 +582,8 @@ internal static class Program
 
     private static Dictionary<string,string> Snapshot(string folder)
     {
-        var entries = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        var entries = Decisions.SnapshotFiles(folder);
         SnapshotRegistry(@"Software\paint.net", entries);
-        if (!Directory.Exists(folder)) return entries;
-        foreach (var directory in Directory.EnumerateDirectories(folder, "*", SearchOption.AllDirectories))
-            entries[Path.GetRelativePath(folder, directory)] = "dir";
-        foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
-        {
-            var info = new FileInfo(file);
-            entries[Path.GetRelativePath(folder, file)] = $"{info.Length}:{info.LastWriteTimeUtc.Ticks}";
-        }
         return entries;
     }
 
@@ -563,21 +591,22 @@ internal static class Program
     {
         using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(path);
         if (key is null) return;
+        entries[$@"HKCU\{path}"] = "key";
         foreach (var name in key.GetValueNames())
         {
             var value = key.GetValue(name, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames);
-            var text = value is byte[] bytes ? Convert.ToHexString(bytes) : value is string[] lines ? string.Join("\n", lines) : Convert.ToString(value);
+            var text = Decisions.FormatRegistryValue(value);
             entries[$@"HKCU\{path}\{name}"] = $"{key.GetValueKind(name)}:{text}";
         }
         foreach (var child in key.GetSubKeyNames()) SnapshotRegistry($@"{path}\{child}", entries);
     }
 
-    private static void RemoveRunSessionFiles(string folder, Dictionary<string,string> before)
+    private static void RemoveRunSessionFiles(string folder, Dictionary<string,string> before, uint pid, ref bool otherProcessSeen)
     {
         var files = Decisions.RunSessionFiles(before, Snapshot(folder));
         if (files.Count == 0) return;
-        // A file that appears while another copy runs could be that copy's, so it stays and the check names it.
-        if (RefuseOutsidePaint()) return;
+        otherProcessSeen = Decisions.ObserveOtherProcess(otherProcessSeen, pid, PaintPids());
+        if (otherProcessSeen) return;
         Decisions.RemoveRunFiles(folder, files);
     }
 

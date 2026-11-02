@@ -161,20 +161,22 @@ internal static class Native
             controls.Add((child, cls.ToString(), title.ToString()));
             return true;
         }, IntPtr.Zero);
-        var found = new Dictionary<string,double>(StringComparer.Ordinal);
+        var labels = new List<string>();
+        var shown = new List<double>();
         for (var i = 0; i < controls.Count; i++)
         {
             if (!controls[i].Class.Contains(".Edit.", StringComparison.Ordinal)) continue;
             var label = controls.Take(i).LastOrDefault(c => !string.IsNullOrWhiteSpace(c.Text) &&
                 !c.Class.Contains(".Edit.", StringComparison.Ordinal)).Text;
             if (string.IsNullOrWhiteSpace(label)) throw new InvalidDataException("Number box has no label.");
-            var shown = ReadText(controls[i].Handle);
-            if (!double.TryParse(shown, System.Globalization.NumberStyles.Float,
+            var text = ReadText(controls[i].Handle);
+            if (!double.TryParse(text, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var number))
-                throw new InvalidDataException($"Number box '{label}' shows '{shown}'.");
-            if (!found.TryAdd(label, number)) throw new InvalidDataException($"Duplicate number label '{label}'.");
+                throw new InvalidDataException($"Number box '{label}' shows '{text}'.");
+            labels.Add(label);
+            shown.Add(number);
         }
-        return found;
+        return Decisions.NumberKeys(labels).Zip(shown).ToDictionary(p => p.First, p => p.Second, StringComparer.Ordinal);
     }
 
     internal static Dictionary<string,string> ReadOtherControls(IntPtr dialog)
@@ -213,18 +215,28 @@ internal static class Native
     internal static void ClickButton(IntPtr dialog, string text)
     {
         const uint WmLButtonDown = 0x0201, WmLButtonUp = 0x0202;
+        var button = FindButton(dialog, text);
+        if (button == IntPtr.Zero) throw new System.IO.InvalidDataException($"Dialog has no button named '{text}'.");
+        RequirePosted(button, WmLButtonDown, 1, 0x00050005, text);
+        RequirePosted(button, WmLButtonUp, 0, 0x00050005, text);
+    }
+
+    internal static bool HasButton(IntPtr dialog, string text) => FindButton(dialog, text) != IntPtr.Zero;
+
+    private static IntPtr FindButton(IntPtr dialog, string text)
+    {
         var button = IntPtr.Zero;
         EnumChildWindows(dialog, (child, _) =>
         {
             var title = new StringBuilder(256);
+            var cls = new StringBuilder(256);
             GetWindowTextW(child, title, 256);
-            if (title.ToString() != text) return true;
+            GetClassNameW(child, cls, 256);
+            if (title.ToString() != text || !Decisions.IsButtonClass(cls.ToString())) return true;
             button = child;
             return false;
         }, IntPtr.Zero);
-        if (button == IntPtr.Zero) throw new System.IO.InvalidDataException($"Dialog has no button named '{text}'.");
-        RequirePosted(button, WmLButtonDown, 1, 0x00050005, text);
-        RequirePosted(button, WmLButtonUp, 0, 0x00050005, text);
+        return button;
     }
 
     /// <summary>Class, id, position and title of every child of a window, for finding a dialog's controls.</summary>
@@ -247,28 +259,4 @@ internal static class Native
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessageW(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetGUIThreadInfo(uint thread, ref GuiThreadInfo info);
-    [StructLayout(LayoutKind.Sequential)]
-    private struct GuiThreadInfo
-    {
-        public int cbSize, flags;
-        public IntPtr hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
-        public Rect rcCaret;
-    }
-
-    internal static void PressEnter(IntPtr dialog)
-    {
-        const uint WmKeyDown = 0x0100, WmKeyUp = 0x0101, WmChar = 0x0102;
-        var thread = GetWindowThreadProcessId(dialog, out _);
-        var info = new GuiThreadInfo { cbSize = Marshal.SizeOf<GuiThreadInfo>() };
-        var target = GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : dialog;
-        if (!PostMessageW(target, WmKeyDown, 0x0D, 1) || !PostMessageW(target, WmChar, 0x0D, 1) ||
-            !PostMessageW(target, WmKeyUp, 0x0D, unchecked((IntPtr)0xC0000001)))
-        {
-            var error = Marshal.GetLastWin32Error();
-            throw new Win32Exception(error, "Could not post Enter.");
-        }
-    }
 }

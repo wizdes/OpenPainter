@@ -3,6 +3,7 @@ using System.IO;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 
 namespace OpenPainter.Capture.Driver;
 
@@ -43,6 +44,25 @@ public static class Decisions
         return error is null || opened && closed && error.Contains("Catastrophic failure", StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool DialogOpened(bool windowStillPresent, bool hasOkButton) => windowStillPresent && hasOkButton;
+
+    public static bool RequireDialogOpened(string name, bool windowStillPresent, bool hasOkButton)
+    {
+        if (windowStillPresent && !hasOkButton)
+            throw new InvalidDataException($"{name}: dialog has no button named 'OK'.");
+        return DialogOpened(windowStillPresent, hasOkButton);
+    }
+
+    /// <summary>paint.net draws its own OK button in a plain WindowsForms Window class, so only a text label or a text box is ruled out.</summary>
+    public static bool IsButtonClass(string className) =>
+        !className.Contains("STATIC", StringComparison.OrdinalIgnoreCase) && !className.Contains("EDIT", StringComparison.OrdinalIgnoreCase);
+
+    public static bool ObserveOtherProcess(bool previouslySeen, uint started, IEnumerable<uint> paintPids) =>
+        previouslySeen || paintPids.Any(pid => pid != started);
+
+    public static bool InvocationErrorNeedsFailure(bool invocationFinished, string? error, bool doneExists, TimeSpan sinceFinished) =>
+        invocationFinished && error is not null && !doneExists && sinceFinished >= TimeSpan.FromSeconds(5);
+
     public static void ValidateJobJson(string json)
     {
         using var doc = JsonDocument.Parse(json);
@@ -61,15 +81,21 @@ public static class Decisions
         using var doc = JsonDocument.Parse(json);
         var effect = doc.RootElement;
         if (effect.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Effect must be an object.");
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in effect.EnumerateObject())
+        {
             if (field.Name is not ("id" or "parameters")) throw new InvalidDataException($"Unknown effect field '{field.Name}'.");
+            if (!seen.Add(field.Name)) throw new InvalidDataException($"Duplicate effect field '{field.Name}'.");
+        }
         if (!effect.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String)
             throw new InvalidDataException("Effect id is required.");
         if (!effect.TryGetProperty("parameters", out var parameters)) return;
         if (parameters.ValueKind != JsonValueKind.Object) throw new InvalidDataException($"{id.GetString()}: parameters must be an object.");
         var names = labels.ToHashSet(StringComparer.Ordinal);
+        var seenParameters = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in parameters.EnumerateObject())
         {
+            if (!seenParameters.Add(field.Name)) throw new InvalidDataException($"{id.GetString()}: duplicate parameter '{field.Name}'.");
             if (!names.Contains(field.Name)) throw new InvalidDataException($"{id.GetString()}: unknown number label '{field.Name}'.");
             if (field.Value.ValueKind != JsonValueKind.Number || !field.Value.TryGetDouble(out var n) || !double.IsFinite(n))
                 throw new InvalidDataException($"{id.GetString()}: '{field.Name}' must be a finite number.");
@@ -82,6 +108,12 @@ public static class Decisions
             throw new InvalidDataException("Job paths must be absolute.");
         if (paths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length)
             throw new InvalidDataException("Input, output, result, done, and manifest paths must differ.");
+    }
+
+    public static void RequireUnusedPaths(params string[] paths)
+    {
+        foreach (var path in paths)
+            if (File.Exists(path) || Directory.Exists(path)) throw new IOException($"Path already exists: {path}");
     }
 
     public static bool CatalogContains(string toml, string id) =>
@@ -164,13 +196,15 @@ public static class Decisions
     /// <summary>Deletes the named files, then any session folders that are left empty. paint.net marks its files read-only.</summary>
     public static void RemoveRunFiles(string folder, IEnumerable<string> files)
     {
-        var sessionData = Path.Combine(folder, "SessionData") + Path.DirectorySeparatorChar;
+        var sessionRoot = Path.GetFullPath(Path.Combine(folder, "SessionData"));
+        var sessionData = sessionRoot + Path.DirectorySeparatorChar;
         var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
         {
-            var path = Path.Combine(folder, file);
+            var path = Path.GetFullPath(Path.Combine(folder, file));
             if (!path.StartsWith(sessionData, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Refusing to delete a file outside SessionData: {file}");
+            RequireNoReparsePoint(path, sessionRoot);
             if (Directory.Exists(path))
             {
                 directories.Add(path);
@@ -184,8 +218,63 @@ public static class Decisions
             for (var current = directory;
                  current.StartsWith(sessionData, StringComparison.OrdinalIgnoreCase) && Directory.Exists(current) && !Directory.EnumerateFileSystemEntries(current).Any();
                  current = Path.GetDirectoryName(current)!)
+            {
+                RequireNoReparsePoint(current, sessionRoot);
                 Directory.Delete(current);
+            }
     }
+
+    private static void RequireNoReparsePoint(string path, string sessionRoot)
+    {
+        var parents = new Stack<string>();
+        for (var current = path; current.StartsWith(sessionRoot, StringComparison.OrdinalIgnoreCase); current = Path.GetDirectoryName(current)!)
+        {
+            parents.Push(current);
+            if (current.Equals(sessionRoot, StringComparison.OrdinalIgnoreCase)) break;
+        }
+        foreach (var current in parents)
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException($"Refusing to delete through folder link: {current}");
+    }
+
+    public static Dictionary<string,string> SnapshotFiles(string folder)
+    {
+        var entries = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        if (!Directory.Exists(folder)) return entries;
+        void Visit(string directory)
+        {
+            foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+            {
+                var relative = Path.GetRelativePath(folder, entry);
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    entries[relative] = $"link:{attributes}";
+                    continue;
+                }
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    entries[relative] = "dir";
+                    Visit(entry);
+                }
+                else
+                {
+                    var info = new FileInfo(entry);
+                    var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(entry)));
+                    entries[relative] = $"{attributes}:{info.Length}:{info.LastWriteTimeUtc.Ticks}:{hash}";
+                }
+            }
+        }
+        Visit(folder);
+        return entries;
+    }
+
+    public static string FormatRegistryValue(object? value) => value switch
+    {
+        byte[] bytes => Convert.ToHexString(bytes),
+        string[] lines => JsonSerializer.Serialize(lines),
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? "",
+    };
 
     /// <summary>SHA-256 of the file's decoded pixels as straight-alpha BGRA rows. Redrawing would round low-alpha pixels, so this reads them directly.</summary>
     public static string DecodedSurfaceHash(string path)
@@ -216,20 +305,45 @@ public static class Decisions
     /// </summary>
     public static List<SavedFile> SaveCache(string cache) =>
         !Directory.Exists(cache) ? [] :
-        Directory.GetFiles(cache).Select(f => new SavedFile(f, File.ReadAllBytes(f), File.GetLastWriteTimeUtc(f))).ToList();
+        Directory.GetFiles(cache).Where(IsStartupProfile)
+            .Select(f => new SavedFile(f, File.ReadAllBytes(f), File.GetLastWriteTimeUtc(f))).ToList();
+
+    private static bool IsStartupProfile(string path) =>
+        Regex.IsMatch(Path.GetFileName(path), @"\AStartup\.[0-9]+\.profile\z", RegexOptions.CultureInvariant);
 
     public static void RestoreCache(string cache, List<SavedFile> saved)
     {
         if (!Directory.Exists(cache)) return;
         var keep = saved.Select(f => f.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var file in Directory.GetFiles(cache))
-            if (!keep.Contains(file)) File.Delete(file);
+            if (IsStartupProfile(file) && !keep.Contains(file)) File.Delete(file);
         foreach (var file in saved)
         {
             if (!File.Exists(file.Path) || !File.ReadAllBytes(file.Path).AsSpan().SequenceEqual(file.Bytes))
                 File.WriteAllBytes(file.Path, file.Bytes);
             File.SetLastWriteTimeUtc(file.Path, file.WrittenUtc);
         }
+    }
+
+    /// <summary>Some dialogs put two boxes under one label, such as a center point's X and Y. The second is Label#2.</summary>
+    public static List<string> NumberKeys(IEnumerable<string> labels)
+    {
+        var seen = new Dictionary<string,int>(StringComparer.Ordinal);
+        var keys = new List<string>();
+        foreach (var label in labels)
+        {
+            seen[label] = seen.GetValueOrDefault(label) + 1;
+            keys.Add(seen[label] == 1 ? label : $"{label}#{seen[label]}");
+        }
+        return keys;
+    }
+
+    /// <summary>A job cannot say which box it means under a shared label, so setting one fails until W14 adds a way.</summary>
+    public static void RequireUnambiguous(IEnumerable<string> requested, IReadOnlyDictionary<string,double> read)
+    {
+        foreach (var label in requested)
+            if (read.ContainsKey($"{label}#2"))
+                throw new InvalidDataException($"Label '{label}' has more than one number box, so it cannot be set yet.");
     }
 
     public static void RequireBeforeDeadline(TimeSpan elapsed, TimeSpan limit)
@@ -245,4 +359,11 @@ public static class Decisions
     }
 
     public static bool MayWriteFailure(bool resultExistedAtStart) => !resultExistedAtStart;
+
+    public static void WriteFailureResult(string path, bool resultExistedAtStart, string error)
+    {
+        if (resultExistedAtStart) return;
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
+        JsonSerializer.Serialize(stream, new { ok = false, error }, JobJson);
+    }
 }

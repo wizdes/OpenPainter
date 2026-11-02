@@ -46,7 +46,182 @@ public sealed class DecisionTests
     public void RejectUnknownJobFieldAndPathCollision()
     {
         Assert.ThrowsAny<Exception>(() => Decisions.ValidateJobJson("{\"mode\":\"capture\",\"typo\":1}"));
-        Assert.ThrowsAny<Exception>(() => Decisions.ValidateDistinctPaths("a", "b", "b", "d", "m"));
+        var paths = new[] { @"C:\a\input", @"C:\a\output", @"C:\a\result", @"C:\a\done", @"C:\a\manifest" };
+        for (var left = 0; left < paths.Length; left++)
+            for (var right = left + 1; right < paths.Length; right++)
+            {
+                var pair = (string[])paths.Clone();
+                pair[right] = pair[left];
+                var error = Assert.Throws<InvalidDataException>(() => Decisions.ValidateDistinctPaths(pair));
+                Assert.Contains("must differ", error.Message);
+            }
+    }
+
+    [Theory]
+    [InlineData(true, true, "gaussian blur", true)]
+    [InlineData(true, false, "gaussian blur", false)]
+    [InlineData(false, false, "auto-level", false)]
+    [InlineData(false, false, "gaussian blur", false)]
+    public void DialogMustStillHaveOk(bool stayed, bool ok, string name, bool expected)
+    {
+        Assert.Equal(expected, Decisions.DialogOpened(stayed, ok));
+        if (!stayed) Assert.Equal(name == "auto-level", Decisions.InvocationSucceeded(name, false, false, null));
+    }
+
+    [Fact]
+    public void StayedDialogWithoutOkFailsByName()
+    {
+        var error = Assert.Throws<InvalidDataException>(() => Decisions.RequireDialogOpened("posterize", true, false));
+        Assert.Contains("posterize", error.Message);
+        Assert.Contains("OK", error.Message);
+    }
+
+    [Theory]
+    [InlineData("Button", true)]
+    [InlineData("WindowsForms10.BUTTON.app.0.123", true)]
+    [InlineData("Static", false)]
+    [InlineData("WindowsForms10.Window.8.app.0.358a177_r3_ad1", true)]
+    [InlineData("WindowsForms10.STATIC.app.0.358a177_r3_ad1", false)]
+    [InlineData("WindowsForms10.EDIT.app.0.358a177_r3_ad1", false)]
+    public void OkControlMustBeAButton(string className, bool expected)
+        => Assert.Equal(expected, Decisions.IsButtonClass(className));
+
+    [Fact]
+    public void OtherProcessSeenStaysSeen()
+    {
+        Assert.True(Decisions.ObserveOtherProcess(false, 12, [12u, 13u]));
+        Assert.True(Decisions.ObserveOtherProcess(true, 12, [12u]));
+        Assert.False(Decisions.ObserveOtherProcess(false, 12, [12u]));
+    }
+
+    [Fact]
+    public void OnlyWholeStartupProfilesAreRestored()
+    {
+        var folder = Directory.CreateTempSubdirectory("pdn-profile-").FullName;
+        try
+        {
+            var cache = Path.Combine(folder, "Optimization");
+            Directory.CreateDirectory(cache);
+            var other = Path.Combine(cache, "Startup.x.profile");
+            File.WriteAllText(other, "before");
+            var saved = Decisions.SaveCache(cache);
+            var before = Decisions.SnapshotFiles(folder);
+            File.WriteAllText(other, "after");
+            File.WriteAllText(Path.Combine(cache, "new.txt"), "new");
+            Decisions.RestoreCache(cache, saved);
+            Assert.Equal("after", File.ReadAllText(other));
+            Assert.True(File.Exists(Path.Combine(cache, "new.txt")));
+            Assert.Contains(@"Optimization\Startup.x.profile", Decisions.ChangedEntries(before, Decisions.SnapshotFiles(folder)));
+            Assert.Contains(@"Optimization\new.txt", Decisions.ChangedEntries(before, Decisions.SnapshotFiles(folder)));
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public void SnapshotDetectsBytesAndAttributes()
+    {
+        var folder = Directory.CreateTempSubdirectory("pdn-snapshot-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "one");
+            File.WriteAllText(path, "abc");
+            var before = Decisions.SnapshotFiles(folder);
+            var time = File.GetLastWriteTimeUtc(path);
+            File.WriteAllText(path, "xyz");
+            File.SetLastWriteTimeUtc(path, time);
+            Assert.Contains("one", Decisions.ChangedEntries(before, Decisions.SnapshotFiles(folder)));
+            File.WriteAllText(path, "abc");
+            File.SetLastWriteTimeUtc(path, time);
+            File.SetAttributes(path, FileAttributes.ReadOnly);
+            Assert.Contains("one", Decisions.ChangedEntries(before, Decisions.SnapshotFiles(folder)));
+        }
+        finally { File.SetAttributes(Path.Combine(folder, "one"), FileAttributes.Normal); Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public void RegistryArraysHaveDistinctText()
+        => Assert.NotEqual(Decisions.FormatRegistryValue(new[] { "a\nb", "c" }),
+            Decisions.FormatRegistryValue(new[] { "a", "b\nc" }));
+
+    [Fact]
+    public void FailureResultReplacesOnlyAResultCreatedDuringRun()
+    {
+        var folder = Directory.CreateTempSubdirectory("pdn-result-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "result.json");
+            File.WriteAllText(path, "{\"ok\":true}");
+            Decisions.WriteFailureResult(path, false, "broken");
+            Assert.False(JsonDocument.Parse(File.ReadAllText(path)).RootElement.GetProperty("ok").GetBoolean());
+            File.WriteAllText(path, "original");
+            Decisions.WriteFailureResult(path, true, "broken");
+            Assert.Equal("original", File.ReadAllText(path));
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public void InvocationErrorWaitsFiveSecondsForDone()
+    {
+        Assert.False(Decisions.InvocationErrorNeedsFailure(true, "broken", true, TimeSpan.FromSeconds(5)));
+        Assert.False(Decisions.InvocationErrorNeedsFailure(true, "broken", false, TimeSpan.FromSeconds(4)));
+        Assert.True(Decisions.InvocationErrorNeedsFailure(true, "broken", false, TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void AllFinalPathsMustBeUnusedBeforeChain()
+    {
+        var folder = Directory.CreateTempSubdirectory("pdn-path-").FullName;
+        try
+        {
+            foreach (var kind in new[] { "output", "result", "done", "manifest" })
+            foreach (var directory in new[] { false, true })
+            {
+                var path = Path.Combine(folder, kind);
+                if (directory) Directory.CreateDirectory(path); else File.WriteAllText(path, "x");
+                var error = Assert.Throws<IOException>(() => Decisions.RequireUnusedPaths(path));
+                Assert.Contains(kind, error.Message);
+                if (directory) Directory.Delete(path); else File.Delete(path);
+            }
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    [Theory]
+    [InlineData("{\"id\":\"x\",\"id\":\"x\"}", "id")]
+    [InlineData("{\"id\":\"x\",\"parameters\":{},\"parameters\":{}}", "parameters")]
+    [InlineData("{\"id\":\"x\",\"parameters\":{\"Radius\":1,\"Radius\":2}}", "Radius")]
+    public void DuplicateEffectFieldsFailByName(string json, string name)
+    {
+        var error = Assert.Throws<InvalidDataException>(() => Decisions.ValidateEffectJson(json, ["Radius"]));
+        Assert.Contains(name, error.Message);
+    }
+
+    [Fact]
+    public void PosterizeLabelsAreInRealControlFile()
+    {
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../docs/windows/pdn-5.1-controls.json"));
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        var row = doc.RootElement.EnumerateArray().Single(x => x.GetProperty("id").GetString() == "paintdotnet.effects.gpu/adjustment//posterize");
+        Assert.Equal(new[] { "Red", "Green", "Blue", "Alpha" }, row.GetProperty("labels").EnumerateArray().Select(x => x.GetString()));
+    }
+
+    [Fact]
+    public void RunFilesRefuseAReparsePoint()
+    {
+        var folder = Directory.CreateTempSubdirectory("pdn-link-").FullName;
+        try
+        {
+            var outside = Directory.CreateDirectory(Path.Combine(folder, "outside")).FullName;
+            var session = Directory.CreateDirectory(Path.Combine(folder, "SessionData", "run")).FullName;
+            var link = Path.Combine(session, "link");
+            try { Directory.CreateSymbolicLink(link, outside); }
+            catch (Exception error) when (error is UnauthorizedAccessException or IOException)
+            { Assert.Skip($"Cannot create directory link: {error.Message}"); }
+            Assert.Contains(@"SessionData\run\link", Decisions.SnapshotFiles(folder).Keys);
+            Assert.Throws<InvalidOperationException>(() => Decisions.RemoveRunFiles(folder, [@"SessionData\run\link\anything"]));
+        }
+        finally { Directory.Delete(folder, true); }
     }
 
     [Fact]
@@ -88,6 +263,20 @@ public sealed class DecisionTests
         Assert.False(Decisions.ProcessIsolated(12, new[] { 12u, 13u }, 12));
         Assert.False(Decisions.ProcessIsolated(12, new[] { 12u }, 13));
         Assert.True(Decisions.ProcessIsolated(12, new[] { 12u }, 12));
+    }
+
+    [Fact]
+    public void BoxesUnderOneLabelAreNumberedInOrder()
+        => Assert.Equal(new[] { "Center", "Center#2", "Radius", "Center#3" },
+            Decisions.NumberKeys(["Center", "Center", "Radius", "Center"]));
+
+    [Fact]
+    public void SettingALabelWithTwoBoxesFailsByName()
+    {
+        var read = new Dictionary<string,double>{{"Center",0},{"Center#2",0},{"Radius",1}};
+        Decisions.RequireUnambiguous(["Radius"], read);
+        var error = Assert.Throws<InvalidDataException>(() => Decisions.RequireUnambiguous(["Center"], read));
+        Assert.Contains("Center", error.Message);
     }
 
     [Fact]

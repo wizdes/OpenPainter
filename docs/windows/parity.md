@@ -31,7 +31,9 @@ Input: one 64 by 64 opaque gradient PNG, with default parameters, run twice on a
 
 The driver can now set number settings in a real effect dialog. This was the largest risk to W14.
 
-The W4 fix round adds a driver test project with 49 passing cases. The driver now checks the full catalog ID, exact number labels and number values, final number box values, dialog open and close, process ownership, job paths, PNG dimensions, input hash and job deadline. paint.net ignores `LOCALAPPDATA` and `APPDATA`, so the driver removes the run's own session scratch files, restores the speed cache, then fails by name if the user's folder or registry values differ in any way. The README says how.
+The first W4 fix round added the driver test project and the real runs below. The second fix round has 69 passing kit tests on the builder machine; root has not repeated the paint.net jobs yet. The driver checks full catalog IDs, exact number labels and values, dialog presence and its OK button, process ownership throughout the wait, unused paths before a chain, PNG dimensions, input hash and the job deadline. It rejects duplicate effect fields and parameter names. Posterize lists Red, Green, Blue and Alpha as number labels.
+
+paint.net ignores `LOCALAPPDATA` and `APPDATA`. The driver removes only its own new session entries and restores only `Startup.<digits>.profile` files. It refuses folder links during deletion and does not follow them when recording the user folder. Its final check compares file bytes by SHA-256, attributes, size and time, as well as registry keys and values. It keeps multi-string registry array boundaries. If another paint.net copy is seen, it skips cleanup and restore and fails by name. A copy that appears and exits between two looks inside one poll remains a limit. A failed run writes `ok: false` to a result path that was unused when the run began. See the README for the root run commands.
 
 Root's real run on paint.net 5.1.12, 2026-11-02, on a 64 by 48 input with three alpha levels:
 
@@ -48,7 +50,13 @@ Root's real run on paint.net 5.1.12, 2026-11-02, on a 64 by 48 input with three 
 | Radius 99999 | Fails by name: `'Radius' shows '300.0'` | No output |
 | Unknown ID, wrong label case, output path equal to result path | Each fails by name before launch | No output |
 
-After each job, the user's `SessionData` folder was empty and the check passed. NOT RUN: another paint.net copy opening during a capture. Only its decision function has a test, because opening one would put a window on the user's screen.
+After each job, the user's `SessionData` folder was empty and the check passed. Root repeated these jobs on the second fix round, and each passed or failed the same way, with the same output hashes.
+
+Root then ran all 54 effects through the final driver, one at a time, with default settings and a press of the real OK button: 54 of 54 finished. 45 ran before the last small fix and 9 after it, because those 9 have two number boxes under one label, such as a center point's X and Y. The manifest records the second box as `Label#2`, and setting a shared label fails by name until W14 adds a way.
+
+Nine effects left the pixels unchanged at their defaults: Brightness / Contrast, Curves, Exposure, Highlights / Shadows, Hue / Saturation, Temperature / Tint, Straighten, Levels and Rotate / Zoom. Their defaults may do nothing, but this run does not prove it. W14 must capture each with settings that change pixels.
+
+NOT RUN: another paint.net copy opening during a capture. Only its decision function has a test, because opening one would put a window on the user's screen.
 
 | Check | Result |
 | --- | --- |

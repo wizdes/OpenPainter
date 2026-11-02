@@ -114,7 +114,7 @@
  {
   "id": "paintdotnet.effects.gpu/adjustment//posterize",
   "controls": {},
-  "labels": []
+  "labels": ["Red", "Green", "Blue", "Alpha"]
  },
  {
   "id": "paintdotnet.effects.gpu/adjustment//sepia",

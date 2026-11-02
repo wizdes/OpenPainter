@@ -17,7 +17,7 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
   - Mac run owed. The Mac code type-checks only.
 - [x] W3: GPU and canvas on DX12, code committed 2026-11-02. Reviewed at the end of Phase A. Results: `test-counts.md`, `w3-host.md`. One crash is unresolved: WARP, a forced removal, and a window attaching and detaching, 5 of 5 runs. W18 owns it.
   - Real device removal recovers on WARP, and is deliberately not run on the RTX. Mac run owed. The Mac code type-checks only.
-- [x] W4: capture kit. Number settings work. A wrong capture now fails by name, checked on real paint.net in 13 jobs. Add Noise and Clouds are not repeatable; W14 owns that, the other control types and the rows. See `parity.md`.
+- [x] W4: capture kit. Number settings work. A wrong capture now fails by name, after two review rounds. Checked on real paint.net: 13 named jobs and all 54 effects at default settings. Add Noise and Clouds are not repeatable; W14 owns that, the other control types and the rows. See `parity.md`.
 - [ ] W5 to W20: see `PLAN.md`
 
 ## Open items
