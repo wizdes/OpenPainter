@@ -231,7 +231,15 @@ fn zero_reverse_rotate_update_and_selection() {
     )
     .unwrap();
     let pixels = bytes(&s.preview().unwrap());
-    assert_eq!(pixels.chunks_exact(4).filter(|p| p[3] > 0).count(), 1);
+    assert_eq!(
+        pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[3] > 0)
+            .count(),
+        1
+    );
     assert!(pixels[(20 * 40 + 20) * 4 + 3] <= 128);
     let fill = ShapeSession::new(
         base(),

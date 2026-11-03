@@ -593,7 +593,7 @@ fn m26_own_defaults_keep_all_five_oracle_inputs() {
                 &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
             )
             .unwrap();
-            for pixel in input.pixels.chunks_exact(4) {
+            for pixel in input.pixels.as_chunks::<4>().0 {
                 let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
                 let actual = (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params);
                 assert_eq!(actual, source, "{id} {}", case["input"]);
@@ -646,7 +646,7 @@ fn m26_own_endpoint_variants_cover_all_five_oracle_inputs() {
                     &std::fs::read(root.join(case["input"].as_str().unwrap())).unwrap(),
                 )
                 .unwrap();
-                for pixel in input.pixels.chunks_exact(4) {
+                for pixel in input.pixels.as_chunks::<4>().0 {
                     let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
                     let actual = (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params);
                     assert_eq!(actual[3], source[3], "{id} {field} {endpoint}");
@@ -1510,7 +1510,7 @@ fn gaussian_24mp_cpu_timing() {
 fn gaussian_provisional_gamma_and_quality_change_pixels() {
     let mut doc = document(33, 1);
     let mut tile = doc.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
-    for pixel in tile.chunks_exact_mut(4) {
+    for pixel in tile.as_chunks_mut::<4>().0 {
         pixel.copy_from_slice(&[0, 0, 0, 255]);
     }
     tile[16 * 4..16 * 4 + 4].copy_from_slice(&[255, 255, 255, 255]);

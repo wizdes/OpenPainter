@@ -50,7 +50,7 @@ impl Profile {
         if table_end > bytes.len() {
             return Err(Error::InvalidProfile("ICC tag table is truncated".into()));
         }
-        for tag in bytes[132..table_end].chunks_exact(12) {
+        for tag in bytes[132..table_end].as_chunks::<12>().0 {
             let offset = u32::from_be_bytes(tag[4..8].try_into().unwrap()) as usize;
             let length = u32::from_be_bytes(tag[8..12].try_into().unwrap()) as usize;
             if offset < table_end
@@ -371,9 +371,14 @@ pub fn convert_rgba(
     if !rgba.len().is_multiple_of(4) {
         return Err(Error::Pixels);
     }
-    let input: Vec<_> = rgba.chunks_exact(4).map(|p| [p[0], p[1], p[2]]).collect();
+    let input: Vec<_> = rgba
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|p| [p[0], p[1], p[2]])
+        .collect();
     let output = convert_rgb(src, dst, intent, bpc, &input)?;
-    for (p, rgb) in rgba.chunks_exact_mut(4).zip(output) {
+    for (p, rgb) in rgba.as_chunks_mut::<4>().0.iter_mut().zip(output) {
         p[..3].copy_from_slice(&rgb)
     }
     Ok(())

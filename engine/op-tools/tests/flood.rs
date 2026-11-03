@@ -145,10 +145,7 @@ fn legacy_oracle_masks_are_byte_exact() {
         let mut pixels = vec![0; reader.output_buffer_size()];
         let info = reader.next_frame(&mut pixels).unwrap();
         assert_eq!(info.color_type, png::ColorType::Rgba);
-        let p: Vec<[u8; 4]> = pixels[..info.buffer_size()]
-            .chunks_exact(4)
-            .map(|x| x.try_into().unwrap())
-            .collect();
+        let p: Vec<[u8; 4]> = pixels[..info.buffer_size()].as_chunks::<4>().0.to_vec();
         let d = doc(info.width, info.height, &p);
         let percents: &[u32] = if name == "threshold" {
             &[50]

@@ -134,5 +134,5 @@ fn one_pixel_and_strong_reduction_keep_valid_channels() {
     let reduced =
         op_ops::image::legacy::resize(&source_2d, 4000, 8, 7, 1, Resampling::SuperSampling);
     assert_eq!(reduced.len(), 7 * 4);
-    assert!(reduced.chunks_exact(4).all(|p| p[3] > 0));
+    assert!(reduced.as_chunks::<4>().0.iter().all(|p| p[3] > 0));
 }

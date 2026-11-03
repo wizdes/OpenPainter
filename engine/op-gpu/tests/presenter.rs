@@ -318,7 +318,9 @@ fn view_color_matches_direct_lcms2_within_delta_e_2000_one() {
     renderer.set_lut(&gpu.device, &gpu.queue, Some(&lut));
     let actual = render(&gpu, &mut renderer, width, height, &params(1.0, 0.0, 0.0));
     let inputs: Vec<[f32; 3]> = doc
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .map(|p| {
             [
                 p[0] as f32 / 255.0,

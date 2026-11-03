@@ -79,7 +79,7 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
     match output.color_type {
         png::ColorType::Rgba => pixels.extend_from_slice(&raw[..output.buffer_size()]),
         png::ColorType::Rgb => {
-            for p in raw[..output.buffer_size()].chunks_exact(3) {
+            for p in raw[..output.buffer_size()].as_chunks::<3>().0.iter() {
                 pixels.extend_from_slice(&[p[0], p[1], p[2], 255]);
             }
         }
@@ -101,17 +101,21 @@ pub fn decode_png(bytes: &[u8]) -> Result<DecodedImage> {
                 let src = op_color::Profile::from_icc(icc).map_err(err)?;
                 let dst = op_color::Profile::builtin("srgb").map_err(err)?;
                 let gray: Vec<u8> = raw[..output.buffer_size()]
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|p| p[0])
                     .collect();
                 let alpha: Vec<u8> = raw[..output.buffer_size()]
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|p| p[1])
                     .collect();
                 pixels = op_color::expand_gray(&gray, Some(&alpha), &src, &dst).map_err(err)?;
                 gray_expanded = true;
             } else {
-                for p in raw[..output.buffer_size()].chunks_exact(2) {
+                for p in raw[..output.buffer_size()].as_chunks::<2>().0.iter() {
                     pixels.extend_from_slice(&[p[0], p[0], p[0], p[1]]);
                 }
             }

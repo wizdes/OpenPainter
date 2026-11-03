@@ -25,4 +25,5 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
 ## Open items
 
 - This PC's key on the Macs (the user must add it). The Linux box is done. Decision 5 waits for W19.
-- Astra reviewed the plan at the end of Phase A; its plan findings are in `PLAN.md`. Open from it: `xtask` runs the whole workspace even for `fast`, and does not call the capture tests, the test program or the release matrix. Fix this before W7.
+- Astra reviewed the plan at the end of Phase A; its plan findings are in `PLAN.md`. The `xtask` levels it flagged are fixed: two fresh Opus reviews, see `test-counts.md`. Astra did not review that fix, because of the usage limit.
+- Known failures that keep `fast` and `milestone` red: 2 Mandelbrot rows (W14 owns them) and `continuous_edits_still_write_within_the_max_interval` when the machine is loaded (the user decides its limit).

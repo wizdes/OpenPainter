@@ -153,7 +153,7 @@ impl Engine {
         let mut state = DocState::new(store.clone(), width, height, dpi).map_err(internal)?;
         if background != [0, 0, 0, 0] {
             let mut tile = vec![0; TILE_BYTES];
-            for p in tile.chunks_exact_mut(4) {
+            for p in tile.as_chunks_mut::<4>().0 {
                 p.copy_from_slice(&background);
             }
             for ty in 0..height.div_ceil(TILE_SIZE as u32) {

@@ -193,7 +193,15 @@ pub struct ViewRenderer {
 
 impl ViewRenderer {
     #[cfg(windows)]
-    pub fn set_overlay(&mut self, device: &wgpu::Device, scene: Option<std::sync::Arc<crate::overlay::Overlay>>, dash: f32, scale: f32, width: u32, height: u32) {
+    pub fn set_overlay(
+        &mut self,
+        device: &wgpu::Device,
+        scene: Option<std::sync::Arc<crate::overlay::Overlay>>,
+        dash: f32,
+        scale: f32,
+        width: u32,
+        height: u32,
+    ) {
         if scene.is_some() && self.overlay.is_none() {
             self.overlay = Some(crate::overlay::OverlayGpu::new(device, self.format));
         }

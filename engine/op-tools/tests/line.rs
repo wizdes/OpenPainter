@@ -213,7 +213,15 @@ fn soft_selection_multiplies_line_coverage() {
     .preview()
     .unwrap();
     let pixels = bytes(&line);
-    assert_eq!(pixels.chunks_exact(4).filter(|p| p[3] > 0).count(), 1);
+    assert_eq!(
+        pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[3] > 0)
+            .count(),
+        1
+    );
     assert!(pixels[(16 * 32 + 16) * 4 + 3] > 0);
     assert!(pixels[(16 * 32 + 16) * 4 + 3] <= 128);
 }

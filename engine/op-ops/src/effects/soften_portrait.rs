@@ -50,9 +50,14 @@ pub fn reference_rgba8(
     let bc = crate::effects::brightness_contrast::spec();
     let params = json!({"Brightness":lighting,"Contrast":-lighting / 2});
     let mut output = Vec::with_capacity(bytes.len());
-    for (src, blurred) in bytes.chunks_exact(4).zip(blur.chunks_exact(4)) {
-        let src: [u8; 4] = src.try_into().unwrap();
-        let blurred: [u8; 4] = blurred.try_into().unwrap();
+    for (src, blurred) in bytes
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(blur.as_chunks::<4>().0.iter())
+    {
+        let src: [u8; 4] = *src;
+        let blurred: [u8; 4] = *blurred;
         let adjusted = (bc.render_cpu)(&|_, _| blurred, 0, 0, &Prepared::default(), &params);
         let gray = intensity(src);
         let warm = warmth as f32 / 100.0;

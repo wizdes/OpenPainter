@@ -7,6 +7,11 @@
 set -euo pipefail
 
 tier="${1:-fast}"
+# The copy below has no .git, so the fast level cannot ask Git what changed.
+all_changed=""
+if [ "$tier" = fast ]; then
+  all_changed="--all-changed"
+fi
 if ! command -v limactl >/dev/null 2>&1; then
   echo "SKIP Linux check: limactl is missing"
   exit 0
@@ -28,4 +33,4 @@ if [ "$mac_hash" != "$vm_hash" ]; then
 fi
 echo "Linux source hash matches: $mac_hash"
 
-limactl shell op-linux -- bash -lc "cd $dest/engine && export CARGO_HOME=/tmp/op-linux-cargo CARGO_TARGET_DIR=/tmp/op-linux-target VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json && cargo xtask check --tier $tier"
+limactl shell op-linux -- bash -lc "cd $dest/engine && export CARGO_HOME=/tmp/op-linux-cargo CARGO_TARGET_DIR=/tmp/op-linux-target VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json && cargo xtask check --tier $tier $all_changed"

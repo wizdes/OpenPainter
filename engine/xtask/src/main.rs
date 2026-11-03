@@ -1,11 +1,37 @@
 //! Run the workspace check tiers.
 
 use std::fs;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, Instant};
 
+mod changed;
 mod fuzz;
+
+use changed::{CSharpProject, FastPlan};
+
+/// The fast level's time limit in `docs/windows/PLAN.md` section 4.1.
+const FAST_LIMIT_SECONDS: u64 = 120;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Os {
+    Windows,
+    Macos,
+    Linux,
+}
+
+impl Os {
+    fn current() -> Self {
+        if cfg!(windows) {
+            Self::Windows
+        } else if cfg!(target_os = "macos") {
+            Self::Macos
+        } else {
+            Self::Linux
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Status {
@@ -13,6 +39,8 @@ enum Status {
     Fail,
     Skip,
     NotRun,
+    /// Prints NOT RUN and is listed as owed, but does not fail the level.
+    Owed,
 }
 
 impl Status {
@@ -21,7 +49,7 @@ impl Status {
             Self::Pass => "PASS",
             Self::Fail => "FAIL",
             Self::Skip => "SKIP",
-            Self::NotRun => "NOT RUN",
+            Self::NotRun | Self::Owed => "NOT RUN",
         }
     }
 }
@@ -41,6 +69,18 @@ fn engine_dir(runtime: Option<std::ffi::OsString>, compiled: &str) -> PathBuf {
     manifest.parent().expect("workspace parent").to_path_buf()
 }
 
+/// How a command's result is read, beyond its exit code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OutputRule {
+    ExitCode,
+    /// `dotnet test` exits 0 when it runs no tests, so the total must be above 0.
+    DotnetTotal,
+    /// The host exits 0 with `NOT RUN` lines, so those lines are read.
+    HostScenarios,
+}
+
+const HOST_MANIFEST: &str = "tools/win32-host/Cargo.toml";
+
 /// One command a tier runs, with any extra environment it needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CommandStep {
@@ -52,9 +92,17 @@ struct CommandStep {
     in_repo: bool,
     /// A missing program is a SKIP instead of a FAIL.
     skip_if_missing: bool,
+    output: OutputRule,
+    /// A part that must draw on the GPU, so an environment that turns the GPU
+    /// off fails it.
+    needs_gpu: bool,
 }
 
 impl CommandStep {
+    fn runs_cargo_test(&self) -> bool {
+        self.program == "cargo" && self.args.first() == Some(&"test")
+    }
+
     fn cargo(args: &[&'static str], env: &[(&'static str, &'static str)]) -> Self {
         let prefix: String = env
             .iter()
@@ -67,6 +115,8 @@ impl CommandStep {
             env: env.to_vec(),
             in_repo: false,
             skip_if_missing: false,
+            output: OutputRule::ExitCode,
+            needs_gpu: false,
         }
     }
 }
@@ -80,10 +130,14 @@ fn proptest_cases(tier: &str) -> Option<&'static str> {
     }
 }
 
-/// The engine checks every tier runs first.
+fn fmt_step() -> CommandStep {
+    CommandStep::cargo(&["fmt", "--all", "--check"], &[])
+}
+
+/// The engine checks the milestone and checkpoint tiers run first.
 fn base_steps() -> Vec<CommandStep> {
     vec![
-        CommandStep::cargo(&["fmt", "--all", "--check"], &[]),
+        fmt_step(),
         CommandStep::cargo(
             &[
                 "clippy",
@@ -118,6 +172,8 @@ fn deep_steps(tier: &str) -> Vec<CommandStep> {
             env: Vec::new(),
             in_repo: true,
             skip_if_missing: true,
+            output: OutputRule::ExitCode,
+            needs_gpu: false,
         },
     ];
     if tier == "checkpoint" {
@@ -186,17 +242,926 @@ fn robustness_steps(tier: &str) -> Vec<CommandStep> {
     ]
 }
 
-fn run_step(steps: &mut Vec<Step>, step: &CommandStep, engine: &Path, repo: &Path) {
-    let dir = if step.in_repo { repo } else { engine };
-    run_with(
+/// The full-disk test compiles to zero tests off macOS, so a pass there would
+/// prove nothing.
+fn is_macos_only(step: &CommandStep) -> bool {
+    step.args.contains(&"low_disk")
+}
+
+/// `dotnet test` for one C# project. The two last switches stop the build from
+/// leaving MSBuild and compiler servers running after the level ends. The
+/// environment turns off the usage reports that .NET and Avalonia's build send.
+fn csharp_step(project: &CSharpProject) -> CommandStep {
+    let mut args = vec![
+        "test",
+        project.project,
+        "-v:q",
+        "-nr:false",
+        "-p:UseSharedCompilation=false",
+    ];
+    args.extend_from_slice(project.args);
+    CommandStep {
+        name: format!("{}: dotnet test {}", project.part, project.project),
+        program: "dotnet",
+        args,
+        env: vec![
+            ("AVALONIA_TELEMETRY_OPTOUT", "1"),
+            ("DOTNET_CLI_TELEMETRY_OPTOUT", "1"),
+        ],
+        in_repo: true,
+        skip_if_missing: false,
+        output: OutputRule::DotnetTotal,
+        needs_gpu: false,
+    }
+}
+
+/// The C# tests of the milestone and checkpoint tiers. All 3 projects target
+/// Windows, so Mac and Linux runs print a SKIP row instead.
+fn csharp_steps(tier: &str, windows: bool) -> Vec<CommandStep> {
+    if !windows || !matches!(tier, "milestone" | "checkpoint") {
+        return Vec::new();
+    }
+    changed::CSHARP_TESTS.iter().map(csharp_step).collect()
+}
+
+/// The checkpoint tier's GPU parts on Windows, on each adapter: the suites of
+/// `docs/windows/test-counts.md`, then the Win32 test host. The host needs a
+/// signed-in desktop session and fails by name without one.
+fn windows_gpu_steps(tier: &str, windows: bool) -> Vec<CommandStep> {
+    if !windows || tier != "checkpoint" {
+        return Vec::new();
+    }
+    let mut steps = Vec::new();
+    for (adapter, label) in [("hardware", "RTX"), ("warp", "WARP")] {
+        let env = [("OP_GPU_ADAPTER", adapter)];
+        let suites: [&[&'static str]; 4] = [
+            &[
+                "test",
+                "-p",
+                "op-gpu",
+                "--no-fail-fast",
+                "-j",
+                "8",
+                "--",
+                "--test-threads=1",
+            ],
+            &[
+                "test",
+                "-p",
+                "op-ffi",
+                "--no-fail-fast",
+                "-j",
+                "8",
+                "--",
+                "--test-threads=1",
+            ],
+            &[
+                "test",
+                "-p",
+                "op-engine",
+                "--test",
+                "m54_parity",
+                "--test",
+                "engine",
+                "--test",
+                "jobs",
+                "--test",
+                "gpu_effects",
+                "--no-fail-fast",
+                "-j",
+                "8",
+                "--",
+                "--test-threads=1",
+            ],
+            &[
+                "test",
+                "-p",
+                "op-engine",
+                "--lib",
+                "--no-fail-fast",
+                "-j",
+                "8",
+                "--",
+                "--test-threads=1",
+            ],
+        ];
+        for suite in suites {
+            let mut step = CommandStep::cargo(suite, &env);
+            step.name = format!("GPU matrix on {label}: {}", step.name);
+            step.needs_gpu = true;
+            steps.push(step);
+        }
+    }
+    for (adapter, label) in [("hardware", "RTX"), ("warp", "WARP")] {
+        let mut step = CommandStep::cargo(
+            &[
+                "run",
+                "--manifest-path",
+                "tools/win32-host/Cargo.toml",
+                "-j",
+                "8",
+            ],
+            &[("OP_GPU_ADAPTER", adapter)],
+        );
+        step.name = format!("Win32 test host on {label}: {}", step.name);
+        step.in_repo = true;
+        step.output = OutputRule::HostScenarios;
+        step.needs_gpu = true;
+        steps.push(step);
+    }
+    steps
+}
+
+/// Format, lint and build for the Win32 test host, which is outside the
+/// workspace. None of the three opens a window.
+fn host_static_steps() -> Vec<CommandStep> {
+    let suites: [(&str, &[&'static str]); 3] = [
+        (
+            "format",
+            &["fmt", "--manifest-path", HOST_MANIFEST, "--check"],
+        ),
+        (
+            "lint",
+            &[
+                "clippy",
+                "--manifest-path",
+                HOST_MANIFEST,
+                "--no-deps",
+                "--all-targets",
+                "-j",
+                "8",
+                "--",
+                "-D",
+                "warnings",
+            ],
+        ),
+        (
+            "build",
+            &["build", "--manifest-path", HOST_MANIFEST, "-j", "8"],
+        ),
+    ];
+    suites
+        .into_iter()
+        .map(|(label, args)| {
+            let mut step = CommandStep::cargo(args, &[]);
+            step.name = format!("Win32 test host {label}: {}", step.name);
+            step.in_repo = true;
+            step
+        })
+        .collect()
+}
+
+/// A named part of a level that this run does not reach.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct UnreachedPart {
+    name: &'static str,
+    reason: &'static str,
+    /// Listed as owed instead of failing the level.
+    owed: bool,
+}
+
+const fn fails_level(name: &'static str, reason: &'static str) -> UnreachedPart {
+    UnreachedPart {
+        name,
+        reason,
+        owed: false,
+    }
+}
+
+/// Parts that `docs/windows/PLAN.md` section 4.1 names and this run does not
+/// reach. Each prints NOT RUN and fails the level. The one exception is the
+/// paint.net comparison off Windows: captured images are private, so a Mac or
+/// Linux run lists it as owed and does not fail.
+fn unreached_parts(tier: &str, windows: bool) -> Vec<UnreachedPart> {
+    match (tier, windows) {
+        ("milestone", true) => vec![
+            fails_level("headless UI on the AOT build", "W7 adds it"),
+            fails_level("9 to 12 critical flows", "W7 adds them"),
+        ],
+        ("checkpoint", true) => vec![
+            fails_level("all real-window flows", "W7 adds the first of them"),
+            fails_level(
+                "paint.net comparison",
+                "no level step yet; the capture kit runs by hand",
+            ),
+            fails_level("Mac run", "run this level on the Mac and record the result"),
+            fails_level("Linux run", "run this level on Linux and record the result"),
+        ],
+        ("checkpoint", false) => vec![UnreachedPart {
+            name: "paint.net comparison",
+            reason: "captured images are private to the capture repo",
+            owed: true,
+        }],
+        _ => Vec::new(),
+    }
+}
+
+fn record_unreached(steps: &mut Vec<Step>, part: UnreachedPart) {
+    if part.owed {
+        println!("NOT RUN 0.00s {}: {} (owed)", part.name, part.reason);
+        steps.push(Step {
+            name: part.name.into(),
+            duration: Duration::ZERO,
+            status: Status::Owed,
+        });
+    } else {
+        not_run(steps, part.name, part.reason);
+    }
+}
+
+/// Why this run has no Swift build, or None when it has one. Only macOS has
+/// xcodebuild, and `mac/project.yml` is on the Windows branch and in Linux copies.
+fn swift_build_skip(os: Os, has_project: bool) -> Option<&'static str> {
+    if os != Os::Macos {
+        Some("the Mac app builds only on macOS")
+    } else if has_project {
+        None
+    } else {
+        Some("mac/project.yml is absent")
+    }
+}
+
+fn swift_part(os: Os, has_project: bool) -> Part {
+    if let Some(reason) = swift_build_skip(os, has_project) {
+        return Part::skip("Swift build", reason);
+    }
+    // TODO: Generate the Xcode project from project.yml before this build when the Mac app exists.
+    Part::Command(CommandStep {
+        name: "Swift build".into(),
+        program: "xcodebuild",
+        args: vec![
+            "-project",
+            "mac/OpenPainter.xcodeproj",
+            "-scheme",
+            "OpenPainter",
+            "build",
+        ],
+        env: Vec::new(),
+        in_repo: true,
+        skip_if_missing: false,
+        output: OutputRule::ExitCode,
+        needs_gpu: false,
+    })
+}
+
+/// One thing a level does, in the order it does it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Part {
+    Command(CommandStep),
+    /// A cargo command on the crates a change reached.
+    CrateCommand(Vec<String>),
+    Skip {
+        name: String,
+        reason: String,
+    },
+    Fail {
+        name: String,
+        reason: String,
+    },
+    NotRun {
+        name: String,
+        reason: String,
+    },
+    Unreached(UnreachedPart),
+    /// One command for each file in `tests/scenarios`, listed when it runs.
+    Scenarios,
+    Script(&'static str),
+}
+
+impl Part {
+    fn skip(name: &str, reason: &str) -> Self {
+        Self::Skip {
+            name: name.into(),
+            reason: reason.into(),
+        }
+    }
+
+    /// The name of the row this part prints.
+    fn name(&self) -> String {
+        match self {
+            Self::Command(step) => step.name.clone(),
+            Self::CrateCommand(args) => format!("cargo {}", args.join(" ")),
+            Self::Skip { name, .. } | Self::Fail { name, .. } | Self::NotRun { name, .. } => {
+                name.clone()
+            }
+            Self::Unreached(part) => part.name.to_owned(),
+            Self::Scenarios => "opcli scenarios".to_owned(),
+            Self::Script(name) => (*name).to_owned(),
+        }
+    }
+}
+
+const WINDOWS_ONLY: &str = "this part exists only on Windows";
+
+/// The parts of a level that exist only on Windows. A Mac or Linux run prints a
+/// SKIP row for each, so none is silently left out.
+fn windows_only_names(tier: &str) -> &'static [&'static str] {
+    match tier {
+        "milestone" => &[
+            "C# tests",
+            "Win32 test host",
+            "headless UI on the AOT build",
+            "9 to 12 critical flows",
+        ],
+        "checkpoint" => &[
+            "C# tests",
+            "Win32 test host",
+            "GPU matrix on RTX and WARP",
+            "all real-window flows",
+        ],
+        _ => &[],
+    }
+}
+
+/// The row for changed code that nothing tested, or None when there is none.
+fn no_test_row(paths: &[String]) -> Option<Part> {
+    const SHOWN: usize = 5;
+    if paths.is_empty() {
+        return None;
+    }
+    let mut names = paths
+        .iter()
+        .take(SHOWN)
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    if paths.len() > SHOWN {
+        names.push_str(", and more");
+    }
+    Some(Part::NotRun {
+        name: format!("changed files with no test: {}, {names}", paths.len()),
+        reason: "no crate, C# project or host reads them".into(),
+    })
+}
+
+/// What the fast level runs, given the changed files or the reason they are
+/// unknown.
+fn fast_parts(os: Os, has_project: bool, plan: &Result<FastPlan, String>) -> Vec<Part> {
+    let mut parts = vec![Part::Command(fmt_step())];
+    let plan = match plan {
+        Ok(plan) => plan,
+        Err(reason) => {
+            let unknown = "the changed files are unknown".to_owned();
+            parts.push(Part::Fail {
+                name: "changed files".into(),
+                reason: reason.clone(),
+            });
+            for name in ["changed crates", "changed C# tests"] {
+                parts.push(Part::NotRun {
+                    name: name.into(),
+                    reason: unknown.clone(),
+                });
+            }
+            parts.push(swift_part(os, has_project));
+            return parts;
+        }
+    };
+    if let Some(since) = &plan.nothing_changed_since {
+        parts.push(Part::skip(
+            "changed crates and C# tests",
+            &format!("nothing changed since {since}"),
+        ));
+    }
+    parts.extend(
+        fast_crate_commands(&plan.crates)
+            .into_iter()
+            .map(Part::CrateCommand),
+    );
+    if plan.host {
+        if os == Os::Windows {
+            parts.extend(host_static_steps().into_iter().map(Part::Command));
+        } else {
+            parts.push(Part::skip("Win32 test host", WINDOWS_ONLY));
+        }
+    }
+    for project in &plan.csharp {
+        let step = csharp_step(project);
+        if os == Os::Windows {
+            parts.push(Part::Command(step));
+        } else {
+            parts.push(Part::skip(&step.name, WINDOWS_ONLY));
+        }
+    }
+    if os != Os::Windows {
+        parts.push(Part::skip("headless UI for the changed area", WINDOWS_ONLY));
+    }
+    // Only the Swift build reads the rest of `mac/`, and only macOS has it.
+    let mut no_test = plan.no_test.clone();
+    if os != Os::Macos {
+        no_test.extend_from_slice(&plan.swift_only);
+    }
+    parts.extend(no_test_row(&no_test));
+    parts.push(swift_part(os, has_project));
+    parts
+}
+
+/// What a level runs, in order. `plan` is read only by the fast level.
+fn level_parts(
+    tier: &str,
+    os: Os,
+    has_project: bool,
+    plan: &Result<FastPlan, String>,
+) -> Vec<Part> {
+    if tier == "fast" {
+        return fast_parts(os, has_project, plan);
+    }
+    let windows = os == Os::Windows;
+    let mut parts: Vec<Part> = base_steps().into_iter().map(Part::Command).collect();
+    parts.push(swift_part(os, has_project));
+    for step in deep_steps(tier).into_iter().chain(robustness_steps(tier)) {
+        if os != Os::Macos && is_macos_only(&step) {
+            parts.push(Part::skip(
+                &step.name,
+                "this test compiles to zero tests off macOS",
+            ));
+        } else {
+            parts.push(Part::Command(step));
+        }
+    }
+    if matches!(tier, "milestone" | "checkpoint") {
+        parts.push(Part::Scenarios);
+    }
+    parts.extend(csharp_steps(tier, windows).into_iter().map(Part::Command));
+    if windows && matches!(tier, "milestone" | "checkpoint") {
+        parts.extend(host_static_steps().into_iter().map(Part::Command));
+    }
+    parts.extend(
+        windows_gpu_steps(tier, windows)
+            .into_iter()
+            .map(Part::Command),
+    );
+    if tier == "checkpoint" {
+        for script in checkpoint_scripts() {
+            if os == Os::Macos {
+                parts.push(Part::Script(script));
+            } else {
+                parts.push(Part::skip(script, "the Mac app builds only on macOS"));
+            }
+        }
+    }
+    if !windows {
+        parts.extend(
+            windows_only_names(tier)
+                .iter()
+                .map(|name| Part::skip(name, WINDOWS_ONLY)),
+        );
+    }
+    parts.extend(
+        unreached_parts(tier, windows)
+            .into_iter()
+            .map(Part::Unreached),
+    );
+    parts
+}
+
+/// `cargo clippy` and `cargo test` for the crates a change reaches. Clippy's
+/// `--no-deps` keeps it from linting crates the change did not reach.
+fn fast_crate_commands(crates: &[String]) -> Vec<Vec<String>> {
+    if crates.is_empty() {
+        return Vec::new();
+    }
+    let selected: Vec<String> = crates
+        .iter()
+        .flat_map(|name| ["-p".to_owned(), name.clone()])
+        .collect();
+    let command = |verb: &str, tail: &[&str]| {
+        let mut args = vec![verb.to_owned()];
+        args.extend_from_slice(&selected);
+        args.extend(tail.iter().map(|arg| (*arg).to_owned()));
+        args
+    };
+    vec![
+        command(
+            "clippy",
+            &["--no-deps", "--all-targets", "--", "-D", "warnings"],
+        ),
+        command("test", &["--no-fail-fast"]),
+    ]
+}
+
+fn fast_plan(engine: &Path, repo: &Path) -> Result<FastPlan, String> {
+    let changed = changed::changed_files(repo)?;
+    println!("Changed files are measured from {}.", changed.base);
+    let members = changed::workspace_members(engine)?;
+    let script_tests_run = Os::current() != Os::Windows;
+    let mut plan = changed::plan(&changed.paths, &members, script_tests_run);
+    if changed.paths.is_empty() {
+        plan.nothing_changed_since = Some(changed.since);
+    }
+    Ok(plan)
+}
+
+/// The plan for `--all-changed`: Git is not asked.
+fn whole_tree_plan(engine: &Path) -> Result<FastPlan, String> {
+    println!(
+        "{ALL_CHANGED}: Git is not asked; every crate and every C# project counts as changed."
+    );
+    let members = changed::workspace_members(engine)?;
+    Ok(changed::plan_everything(&members))
+}
+
+fn print_path_list(heading: &str, paths: &[String]) {
+    if paths.is_empty() {
+        return;
+    }
+    println!("{} {heading}:", paths.len());
+    for path in paths.iter().take(20) {
+        println!("  {path}");
+    }
+    if paths.len() > 20 {
+        println!("  and {} more", paths.len() - 20);
+    }
+}
+
+fn print_fast_plan(plan: &FastPlan) {
+    if plan.crates.is_empty() && plan.csharp.is_empty() && !plan.host {
+        println!("Nothing maps to a crate, a C# test project or the host.");
+    }
+    if !plan.crates.is_empty() {
+        println!("Changed crates and dependents: {}", plan.crates.join(", "));
+    }
+    for project in &plan.csharp {
+        println!("Changed C# test project: {}", project.project);
+    }
+    if plan.host {
+        println!("The Win32 test host is reached.");
+    }
+    print_path_list("changed files need no test", &plan.no_test_needed);
+    print_path_list("changed files only the Swift build reads", &plan.swift_only);
+    print_path_list("changed files have no test", &plan.no_test);
+}
+
+/// The line that reports how long a level took.
+fn time_line(tier: &str, seconds: f64) -> String {
+    if tier != "fast" {
+        return format!("{tier} level took {seconds:.2} s");
+    }
+    let over = if seconds >= FAST_LIMIT_SECONDS as f64 {
+        ": OVER THE LIMIT"
+    } else {
+        ""
+    };
+    format!("fast level took {seconds:.2} s; the limit is {FAST_LIMIT_SECONDS} s{over}")
+}
+
+/// Where a level runs and what the shell set.
+struct RunPlace<'a> {
+    engine: &'a Path,
+    repo: &'a Path,
+    shell_env: &'a dyn Fn(&str) -> Option<String>,
+}
+
+fn run_step(steps: &mut Vec<Step>, step: &CommandStep, place: &RunPlace) {
+    let dir = if step.in_repo {
+        place.repo
+    } else {
+        place.engine
+    };
+    if stopped_by_shell(
         steps,
         &step.name,
-        dir,
-        step.program,
-        &step.args,
-        &step.env,
-        step.skip_if_missing,
-    );
+        step.runs_cargo_test(),
+        step.needs_gpu,
+        place.shell_env,
+    ) {
+        return;
+    }
+    match step.output {
+        OutputRule::ExitCode => run_with(
+            steps,
+            &step.name,
+            dir,
+            step.program,
+            &step.args,
+            &step.env,
+            step.skip_if_missing,
+        ),
+        OutputRule::DotnetTotal | OutputRule::HostScenarios => {
+            run_reading_output(steps, step, dir);
+        }
+    }
+}
+
+/// Shell settings that would let a part pass without testing anything. With
+/// `OP_GPU_TESTS=0` the GPU tests print SKIP and return as passed. With
+/// `OP_FORCE_CPU=1` the engine draws effects on the CPU. With `OP_BLESS` set, a
+/// golden test overwrites its image and passes. Any value fails, so nobody has
+/// to know which values count.
+fn shell_setting_problem(
+    runs_cargo_test: bool,
+    needs_gpu: bool,
+    shell_env: &dyn Fn(&str) -> Option<String>,
+) -> Option<String> {
+    let set = |names: &[&str]| -> String {
+        names
+            .iter()
+            .filter_map(|name| shell_env(name).map(|value| format!("{name}={value}")))
+            .collect::<Vec<_>>()
+            .join(" and ")
+    };
+    let mut problems = Vec::new();
+    if runs_cargo_test || needs_gpu {
+        let gpu_off = set(&["OP_FORCE_CPU", "OP_GPU_TESTS"]);
+        if !gpu_off.is_empty() {
+            problems.push(format!("{gpu_off} could let this part pass with no GPU"));
+        }
+    }
+    if runs_cargo_test {
+        let bless = set(&["OP_BLESS"]);
+        if !bless.is_empty() {
+            problems.push(format!(
+                "{bless} makes a golden test overwrite its image and pass"
+            ));
+        }
+    }
+    if problems.is_empty() {
+        None
+    } else {
+        Some(format!("{}; unset it in the shell", problems.join("; ")))
+    }
+}
+
+/// Fails the part by name, without running it, when the shell has a setting
+/// that would spoil it.
+fn stopped_by_shell(
+    steps: &mut Vec<Step>,
+    name: &str,
+    runs_cargo_test: bool,
+    needs_gpu: bool,
+    shell_env: &dyn Fn(&str) -> Option<String>,
+) -> bool {
+    let Some(reason) = shell_setting_problem(runs_cargo_test, needs_gpu, shell_env) else {
+        return false;
+    };
+    fail(steps, &format!("{name}: {reason}"), "this part did not run");
+    true
+}
+
+/// Runs a command, prints its output as it comes, and judges it by that output.
+fn run_reading_output(steps: &mut Vec<Step>, step: &CommandStep, dir: &Path) {
+    println!("Running {}", step.name);
+    let start = Instant::now();
+    let mut command = Command::new(step.program);
+    command
+        .args(&step.args)
+        .current_dir(dir)
+        .stdout(Stdio::piped());
+    for (key, value) in &step.env {
+        command.env(key, value);
+    }
+    let finished = command.spawn().and_then(|mut child| {
+        let mut text = String::new();
+        if let Some(stdout) = child.stdout.take() {
+            let mut reader = BufReader::new(stdout);
+            let mut line = Vec::new();
+            while reader.read_until(b'\n', &mut line)? > 0 {
+                let mut out = std::io::stdout().lock();
+                out.write_all(&line)?;
+                out.flush()?;
+                text.push_str(&String::from_utf8_lossy(&line));
+                line.clear();
+            }
+        }
+        Ok((child.wait()?, text))
+    });
+    let (result, skip_row) = match finished {
+        Ok((exit, text)) => match step.output {
+            OutputRule::DotnetTotal => (dotnet_result(exit.success(), &text), None),
+            OutputRule::HostScenarios => {
+                let warp = step.env.contains(&("OP_GPU_ADAPTER", "warp"));
+                host_result(exit.success(), &text, warp)
+            }
+            OutputRule::ExitCode => (exit_result(exit.success()), None),
+        },
+        Err(error) => (Err(format!("could not run: {error}")), None),
+    };
+    let duration = start.elapsed();
+    let (status, name) = match result {
+        Ok(()) => (Status::Pass, step.name.clone()),
+        Err(reason) => {
+            eprintln!("{}: {reason}", step.name);
+            (Status::Fail, format!("{}: {reason}", step.name))
+        }
+    };
+    println!("{} {:.2}s {name}", status.label(), duration.as_secs_f64());
+    steps.push(Step {
+        name,
+        duration,
+        status,
+    });
+    if let Some(scenarios) = skip_row {
+        skip(
+            steps,
+            &format!("{} scenarios: {scenarios}", host_label(step)),
+            HOST_RTX_SKIP,
+        );
+    }
+}
+
+/// True for all 4 scenarios: the host runs them in one branch, only with
+/// `OP_GPU_ADAPTER=warp`. Three call `RemoveDevice`, which `op-ffi` refuses
+/// elsewhere. The fourth forces a frame panic and checks that the device stays.
+const HOST_RTX_SKIP: &str = "the host runs these device recovery scenarios only on WARP: 3 remove the device, which it never does on the RTX, and 1 forces a frame panic";
+
+fn host_label(step: &CommandStep) -> &str {
+    step.name.split(':').next().unwrap_or(&step.name)
+}
+
+fn exit_result(success: bool) -> Result<(), String> {
+    if success {
+        Ok(())
+    } else {
+        Err("the command failed".into())
+    }
+}
+
+/// `dotnet test` exits 0 when no test ran, and then prints no total line. A real
+/// run on .NET 10.0.403 did this both with a filter that matches nothing and with
+/// a project that has no test class.
+fn dotnet_result(success: bool, stdout: &str) -> Result<(), String> {
+    exit_result(success)?;
+    let summaries: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.contains("Failed:") && line.contains("Total:"))
+        .collect();
+    if summaries.is_empty() {
+        return Err("dotnet test printed no total line, so no test ran".into());
+    }
+    for line in summaries {
+        if summary_count(line, "Total:") == Some("0") {
+            return Err("dotnet test ran Total: 0 tests".into());
+        }
+        // A run where every test is skipped proves nothing either.
+        match summary_count(line, "Passed:") {
+            Some("0") => return Err("dotnet test ran with Passed: 0".into()),
+            None => return Err("dotnet test printed no Passed count".into()),
+            Some(_) => {}
+        }
+    }
+    Ok(())
+}
+
+/// The number after a label such as `Total:` in `dotnet test`'s summary line.
+fn summary_count<'a>(line: &'a str, label: &str) -> Option<&'a str> {
+    let rest = line.split(label).nth(1)?;
+    Some(rest.split(',').next()?.trim())
+}
+
+/// The line that every good host run prints near its end. `desktop-close: PASS`
+/// comes after it, but a good run can print a warning to stderr in its place.
+const HOST_END_LINE: &str = "validation-errors: PASS";
+
+/// The host exits 0 even when it did not run a scenario, so its output decides
+/// the part. On WARP any `NOT RUN` line fails. On the RTX the WARP-only scenarios
+/// are not run: the names come back for a SKIP row, and any other reason for a
+/// `NOT RUN` line fails. A run with no end line did not finish its checks.
+fn host_result(success: bool, stdout: &str, warp: bool) -> (Result<(), String>, Option<String>) {
+    const RTX_REASON: &str = "NOT RUN (OP_GPU_ADAPTER is not warp)";
+    let lines: Vec<(&str, &str)> = stdout
+        .lines()
+        .filter_map(|line| line.split_once(": NOT RUN"))
+        .collect();
+    let names = |list: &[(&str, &str)]| {
+        list.iter()
+            .map(|(name, _)| *name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    if let Err(reason) = exit_result(success) {
+        return (Err(reason), None);
+    }
+    if warp && !lines.is_empty() {
+        return (Err(format!("not run on WARP: {}", names(&lines))), None);
+    }
+    let unexpected: Vec<(&str, &str)> = stdout
+        .lines()
+        .filter(|line| line.contains(": NOT RUN") && !line.ends_with(RTX_REASON))
+        .filter_map(|line| line.split_once(": NOT RUN"))
+        .collect();
+    if !unexpected.is_empty() {
+        return (
+            Err(format!(
+                "not run for another reason: {}",
+                names(&unexpected)
+            )),
+            None,
+        );
+    }
+    if !stdout.lines().any(|line| line.starts_with(HOST_END_LINE)) {
+        return (
+            Err(format!("the host did not print its {HOST_END_LINE} line")),
+            None,
+        );
+    }
+    if lines.is_empty() {
+        return (Ok(()), None);
+    }
+    (Ok(()), Some(names(&lines)))
+}
+
+fn run_part(steps: &mut Vec<Step>, part: &Part, place: &RunPlace) {
+    match part {
+        Part::Command(step) => run_step(steps, step, place),
+        Part::CrateCommand(args) => {
+            let name = part.name();
+            let runs_cargo_test = args.first().is_some_and(|verb| verb == "test");
+            if stopped_by_shell(steps, &name, runs_cargo_test, false, place.shell_env) {
+                return;
+            }
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            run(steps, &name, place.engine, "cargo", &args);
+        }
+        Part::Skip { name, reason } => skip(steps, name, reason),
+        Part::Fail { name, reason } => fail(steps, name, reason),
+        Part::NotRun { name, reason } => not_run(steps, name, reason),
+        Part::Unreached(unreached) => record_unreached(steps, *unreached),
+        Part::Scenarios => run_scenarios(steps, place.engine, place.repo),
+        Part::Script(script) => run_script(steps, script, place.repo, None),
+    }
+}
+
+fn run_scenarios(steps: &mut Vec<Step>, engine: &Path, repo: &Path) {
+    let scenario_dir = repo.join("tests/scenarios");
+    let mut scenarios = match fs::read_dir(&scenario_dir) {
+        Ok(entries) => {
+            let mut paths = Vec::new();
+            for entry in entries {
+                match entry {
+                    Ok(entry) => {
+                        let path = entry.path();
+                        if path
+                            .extension()
+                            .is_some_and(|extension| extension == "json")
+                        {
+                            paths.push(path);
+                        }
+                    }
+                    Err(error) => fail(steps, "opcli scenarios", &error.to_string()),
+                }
+            }
+            paths
+        }
+        Err(error) => {
+            fail(
+                steps,
+                "opcli scenarios",
+                &format!("cannot read {}: {error}", scenario_dir.display()),
+            );
+            Vec::new()
+        }
+    };
+    scenarios.sort();
+    if scenarios.is_empty()
+        && !steps
+            .iter()
+            .any(|step| step.name == "opcli scenarios" && matches!(step.status, Status::Fail))
+    {
+        skip(steps, "opcli scenarios", "no tests/scenarios/*.json files");
+    }
+    for scenario in scenarios {
+        let name = format!("opcli scenario {}", scenario.display());
+        let argument = scenario.to_string_lossy();
+        let out = std::env::temp_dir().join(format!(
+            "op-scenario-{}-{}",
+            std::process::id(),
+            scenario.file_stem().unwrap_or_default().to_string_lossy()
+        ));
+        let out = out.to_string_lossy();
+        run(
+            steps,
+            &name,
+            engine,
+            "cargo",
+            &[
+                "run", "--quiet", "-p", "op-cli", "--", "scenario", &argument, "-o", &out,
+            ],
+        );
+    }
+}
+
+const ALL_CHANGED: &str = "--all-changed";
+const USAGE: &str = "Usage: cargo xtask check --tier fast|milestone|window|checkpoint|speed [--all-changed, with fast only]";
+
+/// Reads the `check` arguments into the level and whether Git is left out.
+fn parse_check_args(args: &[String]) -> Result<(&str, bool), String> {
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (tier, all_changed) = match args.as_slice() {
+        ["check", "--tier", tier] => (*tier, false),
+        ["check", "--tier", tier, flag] if *flag == ALL_CHANGED => (*tier, true),
+        _ => return Err(USAGE.to_owned()),
+    };
+    if !matches!(
+        tier,
+        "fast" | "milestone" | "window" | "checkpoint" | "speed"
+    ) {
+        return Err(format!("Unknown tier: {tier}"));
+    }
+    if all_changed && tier != "fast" {
+        return Err(format!(
+            "{ALL_CHANGED} works only with --tier fast, and this is {tier}"
+        ));
+    }
+    Ok((tier, all_changed))
 }
 
 fn main() -> ExitCode {
@@ -208,18 +1173,13 @@ fn main() -> ExitCode {
         );
         return fuzz::main(&engine, &args[1..]);
     }
-    if args.len() != 3 || args[0] != "check" || args[1] != "--tier" {
-        eprintln!("Usage: cargo xtask check --tier fast|milestone|window|checkpoint|speed");
-        return ExitCode::from(2);
-    }
-    let tier = args[2].as_str();
-    if !matches!(
-        tier,
-        "fast" | "milestone" | "window" | "checkpoint" | "speed"
-    ) {
-        eprintln!("Unknown tier: {tier}");
-        return ExitCode::from(2);
-    }
+    let (tier, all_changed) = match parse_check_args(&args) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("{message}");
+            return ExitCode::from(2);
+        }
+    };
     if matches!(tier, "window" | "speed") {
         let mut steps = Vec::new();
         for part in pending_parts(tier) {
@@ -241,101 +1201,31 @@ fn main() -> ExitCode {
         env!("CARGO_MANIFEST_DIR"),
     );
     let repo = engine.parent().expect("repository parent");
+    let os = Os::current();
+    let start = Instant::now();
     let mut steps = Vec::new();
-    for step in base_steps() {
-        run_step(&mut steps, &step, &engine, repo);
-    }
-    if repo.join("mac/project.yml").is_file() {
-        // TODO: Generate the Xcode project from project.yml before this build when the Mac app exists.
-        run(
-            &mut steps,
-            "Swift build",
-            repo,
-            "xcodebuild",
-            &[
-                "-project",
-                "mac/OpenPainter.xcodeproj",
-                "-scheme",
-                "OpenPainter",
-                "build",
-            ],
-        );
+    let plan = if tier != "fast" {
+        Ok(FastPlan::default())
+    } else if all_changed {
+        whole_tree_plan(&engine)
     } else {
-        skip(&mut steps, "Swift build", "mac/project.yml is absent");
+        fast_plan(&engine, repo)
+    };
+    if tier == "fast"
+        && let Ok(plan) = &plan
+    {
+        print_fast_plan(plan);
     }
-    for step in deep_steps(tier).iter().chain(&robustness_steps(tier)) {
-        run_step(&mut steps, step, &engine, repo);
-    }
-    if matches!(tier, "milestone" | "checkpoint") {
-        let scenario_dir = repo.join("tests/scenarios");
-        let mut scenarios = match fs::read_dir(&scenario_dir) {
-            Ok(entries) => {
-                let mut paths = Vec::new();
-                for entry in entries {
-                    match entry {
-                        Ok(entry) => {
-                            let path = entry.path();
-                            if path
-                                .extension()
-                                .is_some_and(|extension| extension == "json")
-                            {
-                                paths.push(path);
-                            }
-                        }
-                        Err(error) => fail(&mut steps, "opcli scenarios", &error.to_string()),
-                    }
-                }
-                paths
-            }
-            Err(error) => {
-                fail(
-                    &mut steps,
-                    "opcli scenarios",
-                    &format!("cannot read {}: {error}", scenario_dir.display()),
-                );
-                Vec::new()
-            }
-        };
-        scenarios.sort();
-        if scenarios.is_empty()
-            && !steps
-                .iter()
-                .any(|step| step.name == "opcli scenarios" && matches!(step.status, Status::Fail))
-        {
-            skip(
-                &mut steps,
-                "opcli scenarios",
-                "no tests/scenarios/*.json files",
-            );
-        }
-        for scenario in scenarios {
-            let name = format!("opcli scenario {}", scenario.display());
-            let argument = scenario.to_string_lossy();
-            let out = std::env::temp_dir().join(format!(
-                "op-scenario-{}-{}",
-                std::process::id(),
-                scenario.file_stem().unwrap_or_default().to_string_lossy()
-            ));
-            let out = out.to_string_lossy();
-            run(
-                &mut steps,
-                &name,
-                &engine,
-                "cargo",
-                &[
-                    "run", "--quiet", "-p", "op-cli", "--", "scenario", &argument, "-o", &out,
-                ],
-            );
-        }
-    }
-    if tier == "checkpoint" {
-        for script in checkpoint_scripts() {
-            if cfg!(target_os = "macos") {
-                run_script(&mut steps, script, repo, None);
-            } else {
-                skip(&mut steps, script, "the Mac app builds only on macOS");
-            }
-        }
+    let shell_env =
+        |name: &str| std::env::var_os(name).map(|value| value.to_string_lossy().into_owned());
+    let place = RunPlace {
+        engine: &engine,
+        repo,
+        shell_env: &shell_env,
+    };
+    let has_project = repo.join("mac/project.yml").is_file();
+    for part in level_parts(tier, os, has_project, &plan) {
+        run_part(&mut steps, &part, &place);
     }
     println!("\nSummary");
     println!("{:<8} {:>10}  Step", "Result", "Duration");
@@ -347,6 +1237,12 @@ fn main() -> ExitCode {
             step.name
         );
     }
+    for step in &steps {
+        if matches!(step.status, Status::Owed) {
+            println!("Owed: {}", step.name);
+        }
+    }
+    println!("{}", time_line(tier, start.elapsed().as_secs_f64()));
     if tier_failed(&steps) {
         ExitCode::FAILURE
     } else {
@@ -427,7 +1323,7 @@ fn run_with(
 fn skip(steps: &mut Vec<Step>, name: &str, reason: &str) {
     println!("SKIP 0.00s {name}: {reason}");
     steps.push(Step {
-        name: name.into(),
+        name: format!("{name}: {reason}"),
         duration: Duration::ZERO,
         status: Status::Skip,
     });
@@ -893,5 +1789,997 @@ mod tests {
     fn perf_compare_refuses_another_machine() {
         let (ok, text) = perf_compare("machine", &[], &[("machine", "\"Other Mac\"")]);
         assert!(!ok && text.contains("the baseline is from"), "{text}");
+    }
+
+    #[test]
+    fn fast_runs_clippy_and_tests_on_the_changed_crates_only() {
+        let crates = ["op-color".to_owned(), "op-core".to_owned()];
+        assert_eq!(
+            fast_crate_commands(&crates),
+            [
+                vec![
+                    "clippy",
+                    "-p",
+                    "op-color",
+                    "-p",
+                    "op-core",
+                    "--no-deps",
+                    "--all-targets",
+                    "--",
+                    "-D",
+                    "warnings"
+                ],
+                vec!["test", "-p", "op-color", "-p", "op-core", "--no-fail-fast"],
+            ]
+        );
+    }
+
+    #[test]
+    fn fast_with_no_changed_crate_runs_no_cargo_clippy_or_test() {
+        assert!(fast_crate_commands(&[]).is_empty());
+        assert_eq!(fmt_step().name, "cargo fmt --all --check");
+    }
+
+    #[test]
+    fn a_git_failure_fails_the_fast_level_by_name_and_tests_nothing() {
+        // The repository has no commit, so `git merge-base` must fail.
+        let dir = std::env::temp_dir().join(format!("op-xtask-fast-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let init = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&dir)
+            .status()
+            .unwrap();
+        assert!(init.success());
+        let engine = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let reason = fast_plan(engine, &dir).unwrap_err();
+        fs::remove_dir_all(&dir).unwrap();
+        assert!(reason.contains("git merge-base"), "{reason}");
+
+        let parts = fast_parts(Os::Windows, false, &Err(reason));
+        assert_eq!(
+            names(&parts),
+            [
+                "cargo fmt --all --check",
+                "changed files",
+                "changed crates",
+                "changed C# tests",
+                "Swift build",
+            ]
+        );
+        let mut steps = Vec::new();
+        for part in &parts[1..4] {
+            run_part(&mut steps, part, &test_place(&dir_for_tests()));
+        }
+        assert_eq!(steps[0].name, "changed files");
+        assert!(matches!(steps[0].status, Status::Fail));
+        assert!(matches!(steps[1].status, Status::NotRun));
+        assert!(matches!(steps[2].status, Status::NotRun));
+        assert!(tier_failed(&steps));
+    }
+
+    #[test]
+    fn a_level_passes_when_every_part_passed_or_was_skipped() {
+        let step = |status| Step {
+            name: "part".into(),
+            duration: Duration::ZERO,
+            status,
+        };
+        assert!(!tier_failed(&[step(Status::Pass), step(Status::Skip)]));
+    }
+
+    #[test]
+    fn a_not_run_part_fails_the_level() {
+        for (tier, count) in [("milestone", 2), ("checkpoint", 4)] {
+            let parts = unreached_parts(tier, true);
+            assert_eq!(parts.len(), count, "{tier}");
+            let mut steps = Vec::new();
+            for part in parts {
+                record_unreached(&mut steps, part);
+            }
+            assert!(steps.iter().all(|step| step.status.label() == "NOT RUN"));
+            assert!(tier_failed(&steps), "{tier}");
+        }
+    }
+
+    #[test]
+    fn the_comparison_is_owed_on_mac_and_linux_and_does_not_fail_the_level() {
+        let parts = unreached_parts("checkpoint", false);
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0].name, "paint.net comparison");
+        let mut steps = Vec::new();
+        record_unreached(&mut steps, parts[0]);
+        assert_eq!(steps[0].status.label(), "NOT RUN");
+        assert!(matches!(steps[0].status, Status::Owed));
+        assert!(!tier_failed(&steps));
+    }
+
+    #[test]
+    fn the_comparison_fails_the_level_on_windows() {
+        let parts = unreached_parts("checkpoint", true);
+        let part = parts
+            .iter()
+            .find(|part| part.name == "paint.net comparison")
+            .unwrap();
+        assert!(!part.owed);
+        let mut steps = Vec::new();
+        record_unreached(&mut steps, *part);
+        assert!(tier_failed(&steps));
+    }
+
+    #[test]
+    fn only_the_comparison_can_be_owed() {
+        for tier in ["fast", "milestone", "checkpoint"] {
+            for windows in [true, false] {
+                for part in unreached_parts(tier, windows) {
+                    assert!(!part.owed || part.name == "paint.net comparison");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_pending_parts_are_named_on_windows_and_absent_elsewhere() {
+        let names = |tier, windows| -> Vec<&str> {
+            unreached_parts(tier, windows)
+                .iter()
+                .map(|part| part.name)
+                .collect()
+        };
+        assert_eq!(
+            names("milestone", true),
+            ["headless UI on the AOT build", "9 to 12 critical flows"]
+        );
+        assert_eq!(
+            names("checkpoint", true),
+            [
+                "all real-window flows",
+                "paint.net comparison",
+                "Mac run",
+                "Linux run"
+            ]
+        );
+        assert!(names("fast", true).is_empty());
+        assert!(names("fast", false).is_empty());
+        assert!(names("milestone", false).is_empty());
+    }
+
+    #[test]
+    fn milestone_and_checkpoint_run_the_three_csharp_projects_on_windows_only() {
+        for tier in ["milestone", "checkpoint"] {
+            let steps = csharp_steps(tier, true);
+            let projects: Vec<_> = steps.iter().map(|step| step.args[1]).collect();
+            assert_eq!(
+                projects,
+                [
+                    "tools/pdn-capture/tests/PdnCaptureTests.csproj",
+                    "tools/ui-spike/tests/SpikeTests.csproj",
+                    "tools/ui-look/tests/UiLookTests.csproj",
+                ]
+            );
+            assert!(steps.iter().all(|step| step.program == "dotnet"
+                && step.args[0] == "test"
+                && step.in_repo
+                && !step.skip_if_missing));
+            assert!(steps[0].name.starts_with("capture-kit tests: "));
+            assert!(csharp_steps(tier, false).is_empty());
+        }
+        assert!(csharp_steps("fast", true).is_empty());
+    }
+
+    #[test]
+    fn csharp_tests_turn_off_usage_reports() {
+        for project in &changed::CSHARP_TESTS {
+            let step = csharp_step(project);
+            assert!(step.env.contains(&("AVALONIA_TELEMETRY_OPTOUT", "1")));
+            assert!(step.env.contains(&("DOTNET_CLI_TELEMETRY_OPTOUT", "1")));
+        }
+    }
+
+    #[test]
+    fn ui_spike_tests_use_the_release_build_the_readme_names() {
+        let step = &csharp_steps("milestone", true)[1];
+        assert!(step.args.ends_with(&["-c", "Release"]));
+    }
+
+    #[test]
+    fn checkpoint_runs_the_gpu_matrix_and_the_host_on_rtx_and_warp_on_windows() {
+        let steps = windows_gpu_steps("checkpoint", true);
+        assert_eq!(steps.len(), 10);
+        for (range, adapter, label) in [(0..4, "hardware", "RTX"), (4..8, "warp", "WARP")] {
+            for step in &steps[range] {
+                assert_eq!(step.env, [("OP_GPU_ADAPTER", adapter)]);
+                assert!(step.name.starts_with(&format!("GPU matrix on {label}: ")));
+                assert!(step.args.ends_with(&["--", "--test-threads=1"]));
+                assert!(step.args.contains(&"--no-fail-fast"));
+            }
+        }
+        for suite in [&steps[0], &steps[4]] {
+            assert_eq!(&suite.args[..3], ["test", "-p", "op-gpu"]);
+        }
+        for suite in [&steps[1], &steps[5]] {
+            assert_eq!(&suite.args[..3], ["test", "-p", "op-ffi"]);
+        }
+        for suite in [&steps[2], &steps[6]] {
+            for name in ["m54_parity", "engine", "jobs", "gpu_effects"] {
+                assert!(suite.args.contains(&name));
+            }
+        }
+        for suite in [&steps[3], &steps[7]] {
+            assert!(suite.args.contains(&"--lib"));
+        }
+        for (step, adapter, label) in [(&steps[8], "hardware", "RTX"), (&steps[9], "warp", "WARP")]
+        {
+            assert_eq!(step.env, [("OP_GPU_ADAPTER", adapter)]);
+            assert!(
+                step.name
+                    .starts_with(&format!("Win32 test host on {label}: "))
+            );
+            assert!(step.args.contains(&"tools/win32-host/Cargo.toml"));
+            assert!(step.in_repo);
+        }
+    }
+
+    #[test]
+    fn the_gpu_parts_stay_off_mac_linux_and_the_lower_levels() {
+        assert!(windows_gpu_steps("checkpoint", false).is_empty());
+        assert!(windows_gpu_steps("milestone", true).is_empty());
+        assert!(windows_gpu_steps("fast", true).is_empty());
+    }
+
+    #[test]
+    fn only_the_full_disk_test_is_macos_only() {
+        let flags: Vec<bool> = robustness_steps("checkpoint")
+            .iter()
+            .map(is_macos_only)
+            .collect();
+        assert_eq!(flags, [false, false, true]);
+    }
+
+    #[test]
+    fn only_macos_has_the_swift_build_even_with_the_mac_project_present() {
+        for os in [Os::Windows, Os::Linux] {
+            assert_eq!(
+                swift_build_skip(os, true),
+                Some("the Mac app builds only on macOS")
+            );
+            assert!(matches!(swift_part(os, true), Part::Skip { .. }));
+        }
+        assert_eq!(swift_build_skip(Os::Macos, true), None);
+        assert!(matches!(swift_part(Os::Macos, true), Part::Command(_)));
+        assert_eq!(
+            swift_build_skip(Os::Macos, false),
+            Some("mac/project.yml is absent")
+        );
+    }
+
+    fn names(parts: &[Part]) -> Vec<String> {
+        parts.iter().map(Part::name).collect()
+    }
+
+    fn dir_for_tests() -> PathBuf {
+        std::env::temp_dir()
+    }
+
+    fn no_shell_env(_: &str) -> Option<String> {
+        None
+    }
+
+    fn test_place(dir: &Path) -> RunPlace<'_> {
+        RunPlace {
+            engine: dir,
+            repo: dir,
+            shell_env: &no_shell_env,
+        }
+    }
+
+    /// A command that prints one line and exits 0 on any OS.
+    fn echo_step(
+        line: &'static str,
+        output: OutputRule,
+        env: &[(&'static str, &'static str)],
+    ) -> CommandStep {
+        let mut step = CommandStep::cargo(&[], env);
+        step.name = "part".into();
+        step.output = output;
+        if cfg!(windows) {
+            step.program = "cmd";
+            // Rust quotes an argument with a space, and `cmd /C` removes those
+            // quotes only when they wrap the whole command.
+            // `line` may hold a newline; `&` runs a second echo for it.
+            let text = format!("echo {}", line.replace('\n', "& echo "));
+            step.args = vec!["/C", Box::leak(text.into_boxed_str())];
+        } else {
+            step.program = "echo";
+            step.args = vec![line];
+        }
+        step
+    }
+
+    fn sample_plan() -> FastPlan {
+        FastPlan {
+            crates: vec!["op-core".into()],
+            csharp: vec![&changed::CSHARP_TESTS[2]],
+            host: true,
+            ..FastPlan::default()
+        }
+    }
+
+    fn host_names() -> Vec<String> {
+        host_static_steps().into_iter().map(|s| s.name).collect()
+    }
+
+    const FMT: &str = "cargo fmt --all --check";
+    const CLIPPY: &str = "cargo clippy -p op-core --no-deps --all-targets -- -D warnings";
+    const TEST: &str = "cargo test -p op-core --no-fail-fast";
+    const UI_LOOK: &str = "ui-look tests: dotnet test tools/ui-look/tests/UiLookTests.csproj";
+
+    #[test]
+    fn fast_on_windows_runs_each_part_in_order() {
+        let parts = level_parts("fast", Os::Windows, true, &Ok(sample_plan()));
+        let mut want: Vec<String> = [FMT, CLIPPY, TEST].map(str::to_owned).to_vec();
+        want.extend(host_names());
+        want.push(UI_LOOK.to_owned());
+        want.push("Swift build".to_owned());
+        assert_eq!(names(&parts), want);
+        assert!(matches!(parts.last(), Some(Part::Skip { .. })));
+        assert!(
+            parts[..parts.len() - 1]
+                .iter()
+                .all(|part| !matches!(part, Part::Skip { .. }))
+        );
+    }
+
+    #[test]
+    fn fast_on_mac_and_linux_prints_skip_rows_for_the_windows_parts() {
+        for os in [Os::Macos, Os::Linux] {
+            let parts = level_parts("fast", os, false, &Ok(sample_plan()));
+            assert_eq!(
+                names(&parts),
+                [
+                    FMT,
+                    CLIPPY,
+                    TEST,
+                    "Win32 test host",
+                    UI_LOOK,
+                    "headless UI for the changed area",
+                    "Swift build",
+                ]
+            );
+            for part in &parts[3..6] {
+                assert!(matches!(part, Part::Skip { .. }), "{part:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn fast_with_no_change_runs_format_only() {
+        let parts = level_parts("fast", Os::Windows, true, &Ok(FastPlan::default()));
+        assert_eq!(names(&parts), [FMT, "Swift build"]);
+    }
+
+    #[test]
+    fn changed_code_with_no_test_fails_the_fast_level_by_name() {
+        let plan = FastPlan {
+            no_test: vec!["tools/catalog/a.py".into(), "perf/b.toml".into()],
+            no_test_needed: vec!["docs/windows/PLAN.md".into()],
+            ..FastPlan::default()
+        };
+        let parts = fast_parts(Os::Windows, true, &Ok(plan));
+        let row = "changed files with no test: 2, tools/catalog/a.py, perf/b.toml";
+        assert_eq!(names(&parts), [FMT, row, "Swift build"]);
+        let mut steps = Vec::new();
+        run_part(&mut steps, &parts[1], &test_place(&dir_for_tests()));
+        assert_eq!(steps[0].status.label(), "NOT RUN");
+        assert_eq!(steps[0].name, row);
+        assert!(tier_failed(&steps));
+    }
+
+    #[test]
+    fn a_long_list_of_changed_files_with_no_test_is_cut_short() {
+        let paths: Vec<String> = (0..7).map(|n| format!("f{n}")).collect();
+        let row = no_test_row(&paths).unwrap().name();
+        assert_eq!(
+            row,
+            "changed files with no test: 7, f0, f1, f2, f3, f4, and more"
+        );
+        assert_eq!(no_test_row(&[]), None);
+    }
+
+    #[test]
+    fn nothing_changed_prints_a_skip_row_with_the_branch_and_hash() {
+        let plan = FastPlan {
+            nothing_changed_since: Some("origin/windows 097af23".into()),
+            ..FastPlan::default()
+        };
+        let parts = fast_parts(Os::Windows, true, &Ok(plan));
+        assert_eq!(
+            names(&parts),
+            [FMT, "changed crates and C# tests", "Swift build"]
+        );
+        let mut steps = Vec::new();
+        run_part(&mut steps, &parts[1], &test_place(&dir_for_tests()));
+        assert!(matches!(steps[0].status, Status::Skip));
+        assert_eq!(
+            steps[0].name,
+            "changed crates and C# tests: nothing changed since origin/windows 097af23"
+        );
+        assert!(!tier_failed(&steps));
+    }
+
+    /// A throwaway repository with one commit and an origin/main at that commit.
+    /// The caller removes the folder.
+    fn clean_repo(tag: &str) -> (PathBuf, String) {
+        let dir = std::env::temp_dir().join(format!("op-xtask-{tag}-{}", std::process::id()));
+        if dir.exists() {
+            fs::remove_dir_all(&dir).unwrap();
+        }
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("kept.txt"), "line\n").unwrap();
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&dir)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{args:?}");
+            String::from_utf8(output.stdout).unwrap()
+        };
+        git(&["init", "-q"]);
+        git(&["add", "."]);
+        git(&[
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "first",
+        ]);
+        git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        let short = git(&["rev-parse", "--short", "HEAD"]).trim().to_owned();
+        (dir, short)
+    }
+
+    #[test]
+    fn the_fast_plan_says_when_git_found_no_changed_file() {
+        let (dir, short) = clean_repo("clean-plan");
+        let engine = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let clean = fast_plan(engine, &dir).unwrap();
+        fs::write(dir.join("new.txt"), "line\n").unwrap();
+        let changed = fast_plan(engine, &dir).unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(
+            clean.nothing_changed_since,
+            Some(format!("origin/main {short}"))
+        );
+        assert_eq!(changed.nothing_changed_since, None);
+    }
+
+    #[test]
+    fn a_changed_script_has_no_test_on_windows_and_reaches_xtask_elsewhere() {
+        let (dir, _) = clean_repo("script-plan");
+        fs::create_dir_all(dir.join("scripts")).unwrap();
+        fs::write(dir.join("scripts/a.sh"), "true\n").unwrap();
+        let engine = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let plan = fast_plan(engine, &dir).unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+        if cfg!(windows) {
+            assert_eq!(plan.no_test, ["scripts/a.sh"]);
+            assert!(plan.crates.is_empty());
+        } else {
+            assert_eq!(plan.crates, ["xtask"]);
+            assert!(plan.no_test.is_empty());
+        }
+    }
+
+    #[test]
+    fn a_docs_change_alone_passes_the_fast_level() {
+        let plan = FastPlan {
+            no_test_needed: vec!["docs/windows/PLAN.md".into()],
+            ..FastPlan::default()
+        };
+        let parts = fast_parts(Os::Windows, true, &Ok(plan));
+        assert_eq!(names(&parts), [FMT, "Swift build"]);
+    }
+
+    #[test]
+    fn a_change_only_the_swift_build_reads_needs_a_mac() {
+        let plan = || {
+            Ok(FastPlan {
+                swift_only: vec!["mac/project.yml".into()],
+                ..FastPlan::default()
+            })
+        };
+        let row = "changed files with no test: 1, mac/project.yml";
+        for os in [Os::Windows, Os::Linux] {
+            assert!(names(&fast_parts(os, true, &plan())).contains(&row.to_owned()));
+        }
+        assert!(!names(&fast_parts(Os::Macos, true, &plan())).contains(&row.to_owned()));
+    }
+
+    #[test]
+    fn milestone_on_windows_runs_each_part_in_order() {
+        let parts = level_parts("milestone", Os::Windows, true, &Ok(FastPlan::default()));
+        let mut want: Vec<String> = base_steps().into_iter().map(|s| s.name).collect();
+        want.push("Swift build".into());
+        want.extend(deep_steps("milestone").into_iter().map(|s| s.name));
+        want.push("opcli scenarios".into());
+        want.extend(csharp_steps("milestone", true).into_iter().map(|s| s.name));
+        want.extend(host_names());
+        want.push("headless UI on the AOT build".into());
+        want.push("9 to 12 critical flows".into());
+        assert_eq!(names(&parts), want);
+    }
+
+    #[test]
+    fn checkpoint_on_windows_runs_each_part_in_order() {
+        let parts = level_parts("checkpoint", Os::Windows, true, &Ok(FastPlan::default()));
+        let mut want: Vec<String> = base_steps().into_iter().map(|s| s.name).collect();
+        want.push("Swift build".into());
+        want.extend(deep_steps("checkpoint").into_iter().map(|s| s.name));
+        want.extend(robustness_steps("checkpoint").into_iter().map(|s| s.name));
+        want.push("opcli scenarios".into());
+        want.extend(csharp_steps("checkpoint", true).into_iter().map(|s| s.name));
+        want.extend(host_names());
+        want.extend(
+            windows_gpu_steps("checkpoint", true)
+                .into_iter()
+                .map(|s| s.name),
+        );
+        want.push("scripts/perf-check.sh".into());
+        for name in [
+            "all real-window flows",
+            "paint.net comparison",
+            "Mac run",
+            "Linux run",
+        ] {
+            want.push(name.into());
+        }
+        assert_eq!(names(&parts), want);
+    }
+
+    #[test]
+    fn milestone_on_mac_and_linux_prints_skip_rows_for_the_windows_parts() {
+        for os in [Os::Macos, Os::Linux] {
+            let parts = level_parts("milestone", os, true, &Ok(FastPlan::default()));
+            let mut want: Vec<String> = base_steps().into_iter().map(|s| s.name).collect();
+            want.push("Swift build".into());
+            want.extend(deep_steps("milestone").into_iter().map(|s| s.name));
+            want.push("opcli scenarios".into());
+            for name in [
+                "C# tests",
+                "Win32 test host",
+                "headless UI on the AOT build",
+                "9 to 12 critical flows",
+            ] {
+                want.push(name.into());
+            }
+            assert_eq!(names(&parts), want);
+            let skips = parts.iter().filter(|p| matches!(p, Part::Skip { .. }));
+            assert_eq!(skips.count(), if os == Os::Linux { 5 } else { 4 });
+        }
+    }
+
+    #[test]
+    fn checkpoint_on_mac_and_linux_prints_skip_rows_for_the_windows_parts() {
+        for os in [Os::Macos, Os::Linux] {
+            let parts = level_parts("checkpoint", os, true, &Ok(FastPlan::default()));
+            let mut want: Vec<String> = base_steps().into_iter().map(|s| s.name).collect();
+            want.push("Swift build".into());
+            want.extend(deep_steps("checkpoint").into_iter().map(|s| s.name));
+            want.extend(robustness_steps("checkpoint").into_iter().map(|s| s.name));
+            want.push("opcli scenarios".into());
+            want.push("scripts/perf-check.sh".into());
+            for name in [
+                "C# tests",
+                "Win32 test host",
+                "GPU matrix on RTX and WARP",
+                "all real-window flows",
+                "paint.net comparison",
+            ] {
+                want.push(name.into());
+            }
+            assert_eq!(names(&parts), want);
+            let last = &parts[parts.len() - 2];
+            assert!(matches!(last, Part::Skip { .. }), "{last:?}");
+        }
+    }
+
+    #[test]
+    fn the_low_disk_test_runs_only_on_macos_and_prints_skip_elsewhere() {
+        let low_disk = |os| {
+            level_parts("checkpoint", os, true, &Ok(FastPlan::default()))
+                .into_iter()
+                .find(|part| part.name().contains("low_disk"))
+                .unwrap()
+        };
+        assert!(matches!(low_disk(Os::Macos), Part::Command(_)));
+        for os in [Os::Windows, Os::Linux] {
+            let Part::Skip { reason, .. } = low_disk(os) else {
+                panic!("low_disk must print SKIP on {os:?}");
+            };
+            assert_eq!(reason, "this test compiles to zero tests off macOS");
+        }
+    }
+
+    #[test]
+    fn the_host_is_format_lint_and_build_with_warnings_as_errors() {
+        let steps = host_static_steps();
+        assert_eq!(steps.len(), 3);
+        for step in &steps {
+            assert!(step.in_repo, "{}", step.name);
+            assert!(step.args.contains(&HOST_MANIFEST), "{}", step.name);
+        }
+        assert_eq!(steps[0].args[0], "fmt");
+        assert!(steps[0].args.contains(&"--check"));
+        assert_eq!(steps[1].args[0], "clippy");
+        assert!(steps[1].args.ends_with(&["--", "-D", "warnings"]));
+        assert_eq!(steps[2].args[0], "build");
+    }
+
+    #[test]
+    fn only_the_gpu_parts_read_the_gpu_settings_and_only_the_host_reads_its_scenarios() {
+        let gpu = windows_gpu_steps("checkpoint", true);
+        assert!(gpu.iter().all(|step| step.needs_gpu));
+        assert!(gpu[..8].iter().all(|s| s.output == OutputRule::ExitCode));
+        assert!(
+            gpu[8..]
+                .iter()
+                .all(|s| s.output == OutputRule::HostScenarios)
+        );
+        assert!(base_steps().iter().all(|step| !step.needs_gpu));
+        assert!(
+            csharp_steps("milestone", true)
+                .iter()
+                .all(|step| step.output == OutputRule::DotnetTotal)
+        );
+    }
+
+    #[test]
+    fn a_setting_that_turns_the_gpu_off_fails_a_gpu_part_by_name() {
+        let dir = dir_for_tests();
+        let mut step = echo_step("hello", OutputRule::ExitCode, &[]);
+        step.name = "GPU matrix on RTX: suite".into();
+        step.needs_gpu = true;
+
+        let mut steps = Vec::new();
+        run_step(&mut steps, &step, &test_place(&dir));
+        assert!(matches!(steps[0].status, Status::Pass));
+
+        for (setting, value) in [("OP_GPU_TESTS", "0"), ("OP_FORCE_CPU", "1")] {
+            let shell_env = move |name: &str| (name == setting).then(|| value.to_owned());
+            let place = RunPlace {
+                engine: &dir,
+                repo: &dir,
+                shell_env: &shell_env,
+            };
+            let mut steps = Vec::new();
+            run_step(&mut steps, &step, &place);
+            assert!(steps[0].name.starts_with("GPU matrix on RTX: suite: "));
+            assert!(steps[0].name.contains(setting), "{}", steps[0].name);
+            assert!(matches!(steps[0].status, Status::Fail), "{setting}");
+        }
+    }
+
+    #[test]
+    fn a_shell_setting_problem_names_each_variable_set() {
+        assert_eq!(shell_setting_problem(true, true, &no_shell_env), None);
+        let all = |name: &str| Some(format!("{name}-value"));
+        let text = shell_setting_problem(true, false, &all).unwrap();
+        assert!(text.contains("OP_FORCE_CPU=OP_FORCE_CPU-value"), "{text}");
+        assert!(text.contains("OP_GPU_TESTS=OP_GPU_TESTS-value"), "{text}");
+        assert!(text.contains("OP_BLESS=OP_BLESS-value"), "{text}");
+        // The host runs no golden test, so only the GPU settings count for it.
+        let text = shell_setting_problem(false, true, &all).unwrap();
+        assert!(text.contains("OP_FORCE_CPU"), "{text}");
+        assert!(!text.contains("OP_BLESS"), "{text}");
+        // A part with neither is left alone.
+        assert_eq!(shell_setting_problem(false, false, &all), None);
+    }
+
+    /// Runs a part with one variable set in the shell.
+    fn row_with_setting(part: &Part, setting: &'static str) -> Step {
+        let dir = dir_for_tests();
+        let shell_env = move |name: &str| (name == setting).then(|| "1".to_owned());
+        let place = RunPlace {
+            engine: &dir,
+            repo: &dir,
+            shell_env: &shell_env,
+        };
+        let mut steps = Vec::new();
+        run_part(&mut steps, part, &place);
+        steps.remove(0)
+    }
+
+    #[test]
+    fn every_cargo_test_part_of_every_level_fails_by_name_on_a_spoiling_setting() {
+        let mut parts = level_parts("fast", Os::Windows, true, &Ok(sample_plan()));
+        parts.extend(level_parts(
+            "milestone",
+            Os::Linux,
+            true,
+            &Ok(FastPlan::default()),
+        ));
+        parts.extend(level_parts(
+            "checkpoint",
+            Os::Macos,
+            true,
+            &Ok(FastPlan::default()),
+        ));
+        parts.extend(level_parts(
+            "checkpoint",
+            Os::Windows,
+            true,
+            &Ok(FastPlan::default()),
+        ));
+        let tests: Vec<&Part> = parts
+            .iter()
+            .filter(|part| !matches!(part, Part::Skip { .. }))
+            .filter(|part| part.name().contains("cargo test"))
+            .collect();
+        assert!(tests.len() >= 14, "{}", tests.len());
+        for part in tests {
+            for setting in ["OP_BLESS", "OP_GPU_TESTS", "OP_FORCE_CPU"] {
+                let step = row_with_setting(part, setting);
+                assert!(matches!(step.status, Status::Fail), "{}", step.name);
+                assert!(step.name.starts_with(&part.name()), "{}", step.name);
+                assert!(step.name.contains(setting), "{}", step.name);
+            }
+        }
+    }
+
+    #[test]
+    fn a_setting_does_not_stop_a_part_that_runs_no_cargo_test() {
+        let echo = Part::Command(echo_step("hello", OutputRule::ExitCode, &[]));
+        assert!(matches!(
+            row_with_setting(&echo, "OP_BLESS").status,
+            Status::Pass
+        ));
+        let clippy = Part::CrateCommand(vec!["clippy".to_owned(), "--version".to_owned()]);
+        assert!(matches!(
+            row_with_setting(&clippy, "OP_BLESS").status,
+            Status::Pass
+        ));
+    }
+
+    const PASSED: &str = "Passed!  - Failed:     0, Passed:    74, Skipped:     0, Total:    74, Duration: 933 ms - PdnCaptureTests.dll (net10.0)";
+
+    #[test]
+    fn a_dotnet_run_counts_only_with_tests_in_its_total() {
+        assert_eq!(dotnet_result(true, PASSED), Ok(()));
+        let none = "Test run for a.dll\nA total of 1 test files matched the specified pattern.\n";
+        assert!(
+            dotnet_result(true, none)
+                .unwrap_err()
+                .contains("no total line")
+        );
+        let zero =
+            "Passed!  - Failed:     0, Passed:     0, Skipped:     0, Total:     0, Duration: 1 ms";
+        assert!(dotnet_result(true, zero).unwrap_err().contains("Total: 0"));
+        let all_skipped =
+            "Passed!  - Failed:     0, Passed:     0, Skipped:     5, Total:     5, Duration: 1 ms";
+        assert!(
+            dotnet_result(true, all_skipped)
+                .unwrap_err()
+                .contains("Passed: 0")
+        );
+        let no_passed = "Passed!  - Failed:     0, Skipped:     5, Total:     5, Duration: 1 ms";
+        assert!(
+            dotnet_result(true, no_passed)
+                .unwrap_err()
+                .contains("no Passed count")
+        );
+        assert!(dotnet_result(false, PASSED).is_err());
+    }
+
+    #[test]
+    fn a_dotnet_step_with_no_total_line_fails_and_one_with_a_total_passes() {
+        let dir = dir_for_tests();
+        let mut steps = Vec::new();
+        let none = echo_step(
+            "A total of 1 test files matched",
+            OutputRule::DotnetTotal,
+            &[],
+        );
+        run_step(&mut steps, &none, &test_place(&dir));
+        assert!(matches!(steps[0].status, Status::Fail));
+        assert!(steps[0].name.contains("no total line"), "{}", steps[0].name);
+        let some = echo_step(PASSED, OutputRule::DotnetTotal, &[]);
+        run_step(&mut steps, &some, &test_place(&dir));
+        assert!(matches!(steps[1].status, Status::Pass));
+        assert_eq!(steps[1].name, "part");
+    }
+
+    const HOST_LINE: &str = "RemoveDevice-idle: NOT RUN (OP_GPU_ADAPTER is not warp)";
+
+    /// The end of a real host run on the RTX, 2026-11-02.
+    const REAL_RTX_END: &str = "destroy-before-frame: PASS
+RemoveDevice-idle: NOT RUN (OP_GPU_ADAPTER is not warp)
+RemoveDevice-retry-three-errors-second-view: NOT RUN (OP_GPU_ADAPTER is not warp)
+RemoveDevice-surface-retry: NOT RUN (OP_GPU_ADAPTER is not warp)
+frame-panic-keeps-device: NOT RUN (OP_GPU_ADAPTER is not warp)
+validation-errors: PASS (0)
+desktop-close: PASS
+";
+
+    #[test]
+    fn a_real_rtx_run_passes_and_names_all_4_scenarios() {
+        let (result, skipped) = host_result(true, REAL_RTX_END, false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            skipped.as_deref(),
+            Some(
+                "RemoveDevice-idle, RemoveDevice-retry-three-errors-second-view, \
+                 RemoveDevice-surface-retry, frame-panic-keeps-device"
+            )
+        );
+    }
+
+    #[test]
+    fn a_silent_host_fails_by_name_on_either_adapter() {
+        for warp in [true, false] {
+            for text in ["", "attach: PASS\n"] {
+                let (result, skipped) = host_result(true, text, warp);
+                assert!(result.unwrap_err().contains(HOST_END_LINE), "{text}");
+                assert_eq!(skipped, None);
+            }
+        }
+    }
+
+    #[test]
+    fn a_good_run_may_end_without_the_desktop_close_line() {
+        let text = "attach: PASS\nvalidation-errors: PASS (0)\n";
+        assert_eq!(host_result(true, text, true), (Ok(()), None));
+    }
+
+    #[test]
+    fn the_skip_reason_is_true_for_the_panic_scenario_as_well() {
+        assert!(HOST_RTX_SKIP.contains("only on WARP"));
+        assert!(HOST_RTX_SKIP.contains("3 remove the device"));
+        assert!(HOST_RTX_SKIP.contains("1 forces a frame panic"));
+        assert!(!HOST_RTX_SKIP.starts_with("device removal"));
+    }
+
+    #[test]
+    fn the_host_on_the_rtx_passes_with_the_scenarios_named_for_a_skip_row() {
+        let text = format!(
+            "attach: PASS\n{HOST_LINE}\nframe-panic: NOT RUN (OP_GPU_ADAPTER is not warp)\nvalidation-errors: PASS (0)\n"
+        );
+        let (result, skipped) = host_result(true, &text, false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(skipped.as_deref(), Some("RemoveDevice-idle, frame-panic"));
+    }
+
+    #[test]
+    fn the_host_on_warp_fails_on_any_not_run_line() {
+        let (result, skipped) = host_result(true, HOST_LINE, true);
+        assert!(result.unwrap_err().contains("RemoveDevice-idle"));
+        assert_eq!(skipped, None);
+    }
+
+    #[test]
+    fn the_host_with_no_not_run_lines_passes_and_a_bad_exit_fails() {
+        let text = "attach: PASS\nvalidation-errors: PASS (0)\n";
+        assert_eq!(host_result(true, text, true), (Ok(()), None));
+        assert_eq!(host_result(true, text, false), (Ok(()), None));
+        assert!(host_result(false, text, true).0.is_err());
+    }
+
+    #[test]
+    fn the_host_on_the_rtx_fails_on_a_not_run_line_with_another_reason() {
+        let (result, _) = host_result(
+            true,
+            "other: NOT RUN (no desktop)\nvalidation-errors: PASS (0)\n",
+            false,
+        );
+        assert!(result.unwrap_err().contains("other"));
+    }
+
+    #[test]
+    fn the_host_step_prints_a_skip_row_on_the_rtx_and_fails_on_warp() {
+        let dir = dir_for_tests();
+        let rtx = echo_step(
+            "RemoveDevice-idle: NOT RUN (OP_GPU_ADAPTER is not warp)\nvalidation-errors: PASS (0)",
+            OutputRule::HostScenarios,
+            &[("OP_GPU_ADAPTER", "hardware")],
+        );
+        let mut steps = Vec::new();
+        run_step(&mut steps, &rtx, &test_place(&dir));
+        assert_eq!(steps.len(), 2);
+        assert!(matches!(steps[0].status, Status::Pass));
+        assert!(matches!(steps[1].status, Status::Skip));
+        assert!(
+            steps[1].name.contains("RemoveDevice-idle"),
+            "{}",
+            steps[1].name
+        );
+        assert!(!tier_failed(&steps));
+
+        let warp = echo_step(
+            HOST_LINE,
+            OutputRule::HostScenarios,
+            &[("OP_GPU_ADAPTER", "warp")],
+        );
+        let mut steps = Vec::new();
+        run_step(&mut steps, &warp, &test_place(&dir));
+        assert_eq!(steps.len(), 1);
+        assert!(matches!(steps[0].status, Status::Fail));
+        assert!(tier_failed(&steps));
+    }
+
+    fn strings(list: &[&str]) -> Vec<String> {
+        list.iter().map(|text| (*text).to_owned()).collect()
+    }
+
+    #[test]
+    fn the_check_arguments_take_all_changed_with_fast_only() {
+        assert_eq!(
+            parse_check_args(&strings(&["check", "--tier", "fast"])),
+            Ok(("fast", false))
+        );
+        assert_eq!(
+            parse_check_args(&strings(&["check", "--tier", "fast", "--all-changed"])),
+            Ok(("fast", true))
+        );
+        assert_eq!(
+            parse_check_args(&strings(&["check", "--tier", "milestone"])),
+            Ok(("milestone", false))
+        );
+        let args = strings(&["check", "--tier", "milestone", "--all-changed"]);
+        let error = parse_check_args(&args);
+        assert!(error.unwrap_err().contains("only with --tier fast"));
+        assert!(parse_check_args(&strings(&["check", "--tier", "nope"])).is_err());
+        assert!(parse_check_args(&strings(&["check", "--tier", "fast", "--other"])).is_err());
+        assert!(parse_check_args(&strings(&["check"])).is_err());
+    }
+
+    #[test]
+    fn the_linux_check_passes_all_changed_only_for_the_fast_level() {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/linux-check.sh");
+        let text = fs::read_to_string(script).unwrap();
+        assert!(text.contains("all_changed=\"--all-changed\""), "{text}");
+        assert!(text.contains("if [ \"$tier\" = fast ]"), "{text}");
+        assert!(
+            text.contains("cargo xtask check --tier $tier $all_changed"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn the_whole_tree_plan_needs_no_git_and_reaches_the_host() {
+        // This plan never asks Git, the same as in the Linux check's copy.
+        let engine = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let plan = whole_tree_plan(engine).unwrap();
+        assert!(plan.crates.contains(&"xtask".to_owned()));
+        assert_eq!(plan.csharp.len(), 3);
+        assert!(plan.host);
+    }
+
+    #[test]
+    fn a_folder_with_no_git_fails_by_name_without_the_flag() {
+        let dir = std::env::temp_dir().join(format!("op-xtask-no-git-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let engine = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let reason = fast_plan(engine, &dir).unwrap_err();
+        fs::remove_dir_all(&dir).unwrap();
+        assert!(
+            reason.contains("git merge-base HEAD origin/main"),
+            "{reason}"
+        );
+    }
+
+    #[test]
+    fn the_fast_time_line_names_the_limit_and_says_when_it_is_over() {
+        assert_eq!(
+            time_line("fast", 12.5),
+            "fast level took 12.50 s; the limit is 120 s"
+        );
+        assert!(time_line("fast", 120.0).ends_with("OVER THE LIMIT"));
+        assert_eq!(
+            time_line("milestone", 900.0),
+            "milestone level took 900.00 s"
+        );
     }
 }

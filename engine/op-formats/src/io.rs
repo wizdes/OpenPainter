@@ -187,7 +187,9 @@ fn decode_png(bytes: &[u8]) -> Result<Decoded> {
     let raw = &buf[..frame.buffer_size()];
     let rgba8 = if depth == png::BitDepth::Sixteen {
         let values: Vec<u8> = raw
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|p| round16(u16::from_be_bytes([p[0], p[1]])))
             .collect();
         expand(&values, n)
@@ -226,8 +228,8 @@ fn decode_png(bytes: &[u8]) -> Result<Decoded> {
     {
         let src = op_color::Profile::from_icc(icc).map_err(codec)?;
         let dst = op_color::Profile::builtin("srgb").map_err(codec)?;
-        let gray: Vec<u8> = out.rgba8.chunks_exact(4).map(|p| p[0]).collect();
-        let alpha: Vec<u8> = out.rgba8.chunks_exact(4).map(|p| p[3]).collect();
+        let gray: Vec<u8> = out.rgba8.as_chunks::<4>().0.iter().map(|p| p[0]).collect();
+        let alpha: Vec<u8> = out.rgba8.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
         out.rgba8 = op_color::expand_gray(&gray, Some(&alpha), &src, &dst).map_err(codec)?;
         out.icc = Some(dst.bytes().to_vec());
     }
@@ -320,9 +322,15 @@ fn decode_jpeg(bytes: &[u8]) -> Result<Decoded> {
             return Err(Error::Invalid("CMYK JPEG pixel count"));
         }
         let ink: Vec<[u8; 4]> = if space == ColorSpace::YCCK {
-            raw.chunks_exact(4).map(ycck_to_ink).collect()
+            raw.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| ycck_to_ink(p))
+                .collect()
         } else {
-            raw.chunks_exact(4)
+            raw.as_chunks::<4>()
+                .0
+                .iter()
                 .map(|p| [255 - p[0], 255 - p[1], 255 - p[2], 255 - p[3]])
                 .collect()
         };
@@ -402,7 +410,9 @@ fn encode_jpeg(image: &Decoded, opt: &Options) -> Result<Vec<u8>> {
     let h = u16::try_from(image.height).map_err(|_| Error::Invalid("JPEG height"))?;
     let rgb: Vec<u8> = image
         .rgba8
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .flat_map(|p| p[..3].to_vec())
         .collect();
     let mut out = Vec::new();
@@ -464,11 +474,17 @@ fn decode_gif(bytes: &[u8]) -> Result<Decoded> {
 fn encode_gif(image: &Decoded, dither: bool) -> Result<Vec<u8>> {
     let w = u16::try_from(image.width).map_err(|_| Error::Invalid("GIF width"))?;
     let h = u16::try_from(image.height).map_err(|_| Error::Invalid("GIF height"))?;
-    let transparent = image.rgba8.chunks_exact(4).any(|p| p[3] < 128);
+    let transparent = image.rgba8.as_chunks::<4>().0.iter().any(|p| p[3] < 128);
     let first = usize::from(transparent);
     let max_colors = 256 - first;
     let mut exact = std::collections::BTreeSet::<[u8; 3]>::new();
-    for p in image.rgba8.chunks_exact(4).filter(|p| p[3] >= 128) {
+    for p in image
+        .rgba8
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .filter(|p| p[3] >= 128)
+    {
         exact.insert([p[0], p[1], p[2]]);
         if exact.len() > max_colors {
             break;
@@ -479,7 +495,13 @@ fn encode_gif(image: &Decoded, dither: bool) -> Result<Vec<u8>> {
     } else {
         // Median cut over 5-bit color bins bounds memory and gives stable output.
         let mut bins = std::collections::BTreeMap::<u16, (u64, u64, u64, u64)>::new();
-        for p in image.rgba8.chunks_exact(4).filter(|p| p[3] >= 128) {
+        for p in image
+            .rgba8
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[3] >= 128)
+        {
             let key = ((p[0] as u16 >> 3) << 10) | ((p[1] as u16 >> 3) << 5) | (p[2] as u16 >> 3);
             let v = bins.entry(key).or_default();
             v.0 += p[0] as u64;
@@ -588,7 +610,7 @@ fn encode_gif(image: &Decoded, dither: bool) -> Result<Vec<u8>> {
             }
         }
     } else {
-        for p in image.rgba8.chunks_exact(4) {
+        for p in image.rgba8.as_chunks::<4>().0.iter() {
             if p[3] < 128 {
                 indexed.push(0);
                 continue;

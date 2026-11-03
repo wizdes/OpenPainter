@@ -35,7 +35,7 @@ fn new_document_fills_the_background_and_keeps_the_resolution() {
         assert!(!dirty(&e, id), "a new image is not modified");
         let px = e.query(id, "doc.pixels", json!({})).unwrap();
         assert_eq!(px.len(), 5 * 3 * 4);
-        assert!(px.chunks_exact(4).all(|p| p == color), "{label}");
+        assert!(px.as_chunks::<4>().0.iter().all(|p| *p == color), "{label}");
         let res: Value =
             serde_json::from_slice(&e.query(id, "doc.resolution", json!({})).unwrap()).unwrap();
         assert_eq!(res["dpi"], 300.0);
@@ -64,7 +64,7 @@ fn five_layers(store: Arc<TileStore>) -> DocState {
         }
         for tx in 0..2 {
             let mut tile = vec![0; TILE_BYTES];
-            for (n, p) in tile.chunks_exact_mut(4).enumerate() {
+            for (n, p) in tile.as_chunks_mut::<4>().0.iter_mut().enumerate() {
                 p.copy_from_slice(&[
                     (n * 7 + i * 31) as u8,
                     (n * 3 + tx * 50) as u8,

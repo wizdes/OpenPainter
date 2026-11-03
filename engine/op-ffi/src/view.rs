@@ -43,7 +43,10 @@ pub const OP_VIEW_SUSPENDED: u32 = 2;
 #[cfg(windows)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-pub struct OpOverlayPoint { pub x: f64, pub y: f64 }
+pub struct OpOverlayPoint {
+    pub x: f64,
+    pub y: f64,
+}
 
 /// Windows overlay item kinds: path=1, rectangle=2, ellipse=3, handle=4,
 /// pivot=5, crop=6, caret=7, edit frame=8, underline=9, flood handle=10,
@@ -64,39 +67,99 @@ pub struct OpOverlayItem {
 }
 #[cfg(windows)]
 impl Default for OpOverlayItem {
-    fn default() -> Self { Self { kind:0, flags:0, points:std::ptr::null(), point_count:0, x:0.0, y:0.0, width:0.0, height:0.0 } }
+    fn default() -> Self {
+        Self {
+            kind: 0,
+            flags: 0,
+            points: std::ptr::null(),
+            point_count: 0,
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
+    }
 }
 
 #[cfg(windows)]
-fn parse_overlay_items(items: *const OpOverlayItem, count: usize) -> Result<Arc<op_gpu::overlay::Overlay>, OpStatus> {
+fn parse_overlay_items(
+    items: *const OpOverlayItem,
+    count: usize,
+) -> Result<Arc<op_gpu::overlay::Overlay>, OpStatus> {
     use op_gpu::overlay::{Item, Point};
-    if count > 10_000 || (count > 0 && items.is_null()) { return Err(OpStatus::OP_ERR_BAD_ARGUMENT); }
-    let source = if count == 0 { &[][..] } else { unsafe { std::slice::from_raw_parts(items, count) } };
-    let mut parsed=Vec::with_capacity(count);
-    let pt=|x:f64,y:f64| Point::new(x as f32,y as f32);
+    if count > 10_000 || (count > 0 && items.is_null()) {
+        return Err(OpStatus::OP_ERR_BAD_ARGUMENT);
+    }
+    let source = if count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(items, count) }
+    };
+    let mut parsed = Vec::with_capacity(count);
+    let pt = |x: f64, y: f64| Point::new(x as f32, y as f32);
     for i in source {
-        if i.flags & !1 != 0 || ![i.x,i.y,i.width,i.height].iter().all(|n|n.is_finite()) { return Err(OpStatus::OP_ERR_BAD_ARGUMENT); }
-        let points = if i.point_count == 0 { Vec::new() } else {
-            if i.point_count > 1_000_000 || i.points.is_null() { return Err(OpStatus::OP_ERR_BAD_ARGUMENT); }
-            unsafe { std::slice::from_raw_parts(i.points,i.point_count) }.iter().map(|p|pt(p.x,p.y)).collect::<Vec<_>>()
+        if i.flags & !1 != 0 || ![i.x, i.y, i.width, i.height].iter().all(|n| n.is_finite()) {
+            return Err(OpStatus::OP_ERR_BAD_ARGUMENT);
+        }
+        let points = if i.point_count == 0 {
+            Vec::new()
+        } else {
+            if i.point_count > 1_000_000 || i.points.is_null() {
+                return Err(OpStatus::OP_ERR_BAD_ARGUMENT);
+            }
+            unsafe { std::slice::from_raw_parts(i.points, i.point_count) }
+                .iter()
+                .map(|p| pt(p.x, p.y))
+                .collect::<Vec<_>>()
         };
-        let item=match i.kind {
-            1 if i.point_count >= 2 => Item::path(points,i.flags == 1),
-            2 if i.point_count == 0 && i.flags == 0 => Item::Rectangle {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
-            3 if i.point_count == 0 && i.flags == 0 => Item::Ellipse {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
-            4 if i.point_count == 0 && i.flags == 0 => Item::handle(pt(i.x,i.y)),
-            5 if i.point_count == 0 && i.flags == 0 => Item::Pivot(pt(i.x,i.y)),
-            6 if i.point_count == 4 && i.flags == 0 => Item::crop([points[0],points[1],points[2],points[3]]),
-            7 if i.point_count == 0 && i.flags == 0 => Item::Caret {x:i.x as f32,y:i.y as f32,height:i.height as f32},
-            8 if i.point_count == 0 && i.flags == 0 => Item::EditFrame {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
-            9 if i.point_count == 2 && i.flags == 0 => Item::Underline {from:points[0],to:points[1]},
-            10 if i.point_count == 0 && i.flags == 0 => Item::FloodHandle(pt(i.x,i.y)),
-            11 if i.point_count == 0 && i.flags == 0 => Item::ZoomRectangle {x:i.x as f32,y:i.y as f32,width:i.width as f32,height:i.height as f32},
+        let item = match i.kind {
+            1 if i.point_count >= 2 => Item::path(points, i.flags == 1),
+            2 if i.point_count == 0 && i.flags == 0 => Item::Rectangle {
+                x: i.x as f32,
+                y: i.y as f32,
+                width: i.width as f32,
+                height: i.height as f32,
+            },
+            3 if i.point_count == 0 && i.flags == 0 => Item::Ellipse {
+                x: i.x as f32,
+                y: i.y as f32,
+                width: i.width as f32,
+                height: i.height as f32,
+            },
+            4 if i.point_count == 0 && i.flags == 0 => Item::handle(pt(i.x, i.y)),
+            5 if i.point_count == 0 && i.flags == 0 => Item::Pivot(pt(i.x, i.y)),
+            6 if i.point_count == 4 && i.flags == 0 => {
+                Item::crop([points[0], points[1], points[2], points[3]])
+            }
+            7 if i.point_count == 0 && i.flags == 0 => Item::Caret {
+                x: i.x as f32,
+                y: i.y as f32,
+                height: i.height as f32,
+            },
+            8 if i.point_count == 0 && i.flags == 0 => Item::EditFrame {
+                x: i.x as f32,
+                y: i.y as f32,
+                width: i.width as f32,
+                height: i.height as f32,
+            },
+            9 if i.point_count == 2 && i.flags == 0 => Item::Underline {
+                from: points[0],
+                to: points[1],
+            },
+            10 if i.point_count == 0 && i.flags == 0 => Item::FloodHandle(pt(i.x, i.y)),
+            11 if i.point_count == 0 && i.flags == 0 => Item::ZoomRectangle {
+                x: i.x as f32,
+                y: i.y as f32,
+                width: i.width as f32,
+                height: i.height as f32,
+            },
             _ => return Err(OpStatus::OP_ERR_BAD_ARGUMENT),
         };
         parsed.push(item);
     }
-    op_gpu::overlay::Overlay::new(parsed).map(Arc::new).map_err(|_|OpStatus::OP_ERR_BAD_ARGUMENT)
+    op_gpu::overlay::Overlay::new(parsed)
+        .map(Arc::new)
+        .map_err(|_| OpStatus::OP_ERR_BAD_ARGUMENT)
 }
 
 /// Where and how a view shows its document. Sizes and positions are in points;
@@ -449,6 +512,11 @@ struct HostState {
     stop: bool,
 }
 
+/// A view waiting for a device rebuild: its window, the panel flag, its last
+/// statistics and its error count.
+#[cfg(windows)]
+type PendingRecovery = (Arc<View>, isize, bool, op_gpu::win32::WindowStats, u64);
+
 struct Host {
     /// The owning `OpEngine`, valid until `engine_freeing` has joined the thread.
     engine: usize,
@@ -459,7 +527,7 @@ struct Host {
     #[cfg(windows)]
     recreate_after: Mutex<Option<Instant>>,
     #[cfg(windows)]
-    pending_recovery: Mutex<Vec<(Arc<View>, isize, bool, op_gpu::win32::WindowStats, u64)>>,
+    pending_recovery: Mutex<Vec<PendingRecovery>>,
     #[cfg(target_os = "macos")]
     counters: Arc<op_gpu::layer::LayerCounters>,
     #[cfg(windows)]
@@ -624,19 +692,33 @@ impl Host {
                 continue;
             }
             match unsafe {
-                if panel { op_gpu::win32::Win32Target::new_panel(&gpu.instance, hwnd as *mut c_void, self.counters.clone()) }
-                else { op_gpu::win32::Win32Target::new(&gpu.instance, hwnd as *mut c_void, self.counters.clone()) }
+                if panel {
+                    op_gpu::win32::Win32Target::new_panel(
+                        &gpu.instance,
+                        hwnd as *mut c_void,
+                        self.counters.clone(),
+                    )
+                } else {
+                    op_gpu::win32::Win32Target::new(
+                        &gpu.instance,
+                        hwnd as *mut c_void,
+                        self.counters.clone(),
+                    )
+                }
             } {
                 Ok(mut target) => {
                     let profile = recovery_profile(&view.request.lock(), target.display_icc());
-                    let problem = (!profile.is_empty()).then(|| self
-                        .engine()
-                        .core()
-                        .snapshot(view.doc)
-                        .ok()
-                        .and_then(|snap| {
-                            display_table(snap.state.profile.as_deref(), &profile).err()
-                        })).flatten();
+                    let problem = (!profile.is_empty())
+                        .then(|| {
+                            self.engine()
+                                .core()
+                                .snapshot(view.doc)
+                                .ok()
+                                .and_then(|snap| {
+                                    display_table(snap.state.profile.as_deref(), &profile).err()
+                                })
+                        })
+                        .flatten();
                     if let Some(e) = &problem {
                         eprintln!(
                             "op-ffi view: recovery display table unavailable: {e}; drawing without display conversion"
@@ -645,7 +727,8 @@ impl Host {
                     {
                         let mut request = view.request.lock();
                         if !request.display_sent {
-                            request.display_icc = (problem.is_none() && !profile.is_empty()).then_some(profile);
+                            request.display_icc =
+                                (problem.is_none() && !profile.is_empty()).then_some(profile);
                             request.display_gen += 1;
                         }
                     }
@@ -834,10 +917,10 @@ fn render_loop(host: Arc<Host>) {
             let ok = catch_unwind(AssertUnwindSafe(|| pooled(|| render_one(&host, &v))));
             if ok.is_err() {
                 #[cfg(windows)]
-                if let Some(gpu) = host.gpu.lock().as_ref() {
-                    if gpu.removed() {
-                        gpu.lost.store(true, Ordering::SeqCst);
-                    }
+                if let Some(gpu) = host.gpu.lock().as_ref()
+                    && gpu.removed()
+                {
+                    gpu.lost.store(true, Ordering::SeqCst);
                 }
                 record_error(&v, OpStatus::OP_ERR_PANIC);
             }
@@ -1150,7 +1233,14 @@ fn render_one(host: &Host, v: &View) {
     };
     let renderer = &mut r.renderer;
     #[cfg(windows)]
-    renderer.set_overlay(&gpu.device, req.overlay.clone(), req.overlay_dash as f32, req.scale as f32, width, height);
+    renderer.set_overlay(
+        &gpu.device,
+        req.overlay.clone(),
+        req.overlay_dash as f32,
+        req.scale as f32,
+        width,
+        height,
+    );
     let result = r
         .target
         .present(&gpu.device, &gpu.queue, width, height, |enc, target| {
@@ -1325,17 +1415,38 @@ pub extern "C" fn op_view_attach(
 /// until detach and sends its current size through `op_view_set`.
 #[cfg(windows)]
 #[unsafe(no_mangle)]
-pub extern "C" fn op_view_attach_panel(p: *mut OpEngine, doc: u64, panel: *mut c_void, out_view: *mut u64) -> OpStatus {
+pub extern "C" fn op_view_attach_panel(
+    p: *mut OpEngine,
+    doc: u64,
+    panel: *mut c_void,
+    out_view: *mut u64,
+) -> OpStatus {
     guard(|| {
-        if out_view.is_null() || panel.is_null() { return OpStatus::OP_ERR_BAD_ARGUMENT; }
-        let e = match engine(p) { Ok(e) => e, Err(s) => return s };
-        if e.core().snapshot(doc).is_err() { return OpStatus::OP_ERR_NO_SUCH_DOC; }
+        if out_view.is_null() || panel.is_null() {
+            return OpStatus::OP_ERR_BAD_ARGUMENT;
+        }
+        let e = match engine(p) {
+            Ok(e) => e,
+            Err(s) => return s,
+        };
+        if e.core().snapshot(doc).is_err() {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        }
         pooled(|| attach(p, doc, panel, out_view, true))
     })
 }
 
 #[cfg(any(target_os = "macos", windows))]
-fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, panel: bool) -> OpStatus {
+fn attach(
+    p: *mut OpEngine,
+    doc: u64,
+    layer: *mut c_void,
+    out_view: *mut u64,
+    panel: bool,
+) -> OpStatus {
+    // Only Windows has a panel; the Mac attaches a layer.
+    #[cfg(not(windows))]
+    let _ = panel;
     let host = host_for(p);
     let gpu = match host.gpu() {
         Ok(g) => g,
@@ -1362,11 +1473,16 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, pa
     };
     #[cfg(windows)]
     let target = match unsafe {
-        if panel { op_gpu::win32::Win32Target::new_panel(&gpu.instance, layer, host.counters.clone()) }
-        else { op_gpu::win32::Win32Target::new(&gpu.instance, layer, host.counters.clone()) }
+        if panel {
+            op_gpu::win32::Win32Target::new_panel(&gpu.instance, layer, host.counters.clone())
+        } else {
+            op_gpu::win32::Win32Target::new(&gpu.instance, layer, host.counters.clone())
+        }
     } {
         Ok(t) => t,
-        Err(e) if e == "invalid HWND" || e == "invalid SwapChainPanel" => return OpStatus::OP_ERR_BAD_ARGUMENT,
+        Err(e) if e == "invalid HWND" || e == "invalid SwapChainPanel" => {
+            return OpStatus::OP_ERR_BAD_ARGUMENT;
+        }
         Err(e) => {
             eprintln!("op-ffi view: attach failed: {e}");
             return OpStatus::OP_ERR_INTERNAL;
@@ -1375,12 +1491,14 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, pa
     #[cfg(windows)]
     let display_icc: Arc<[u8]> = Arc::from(target.display_icc());
     #[cfg(windows)]
-    let display_problem = (!display_icc.is_empty()).then(|| host
-        .engine()
-        .core()
-        .snapshot(doc)
-        .ok()
-        .and_then(|snap| display_table(snap.state.profile.as_deref(), &display_icc).err())).flatten();
+    let display_problem =
+        (!display_icc.is_empty())
+            .then(|| {
+                host.engine().core().snapshot(doc).ok().and_then(|snap| {
+                    display_table(snap.state.profile.as_deref(), &display_icc).err()
+                })
+            })
+            .flatten();
     #[cfg(windows)]
     if let Some(e) = &display_problem {
         eprintln!(
@@ -1407,7 +1525,8 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, pa
             #[cfg(target_os = "macos")]
             display_icc: None,
             #[cfg(windows)]
-            display_icc: (display_problem.is_none() && !display_icc.is_empty()).then_some(display_icc),
+            display_icc: (display_problem.is_none() && !display_icc.is_empty())
+                .then_some(display_icc),
             #[cfg(windows)]
             display_sent: false,
             #[cfg(target_os = "macos")]
@@ -1482,7 +1601,13 @@ fn attach(p: *mut OpEngine, doc: u64, layer: *mut c_void, out_view: *mut u64, pa
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-fn attach(_p: *mut OpEngine, _doc: u64, _layer: *mut c_void, _out: *mut u64, _panel: bool) -> OpStatus {
+fn attach(
+    _p: *mut OpEngine,
+    _doc: u64,
+    _layer: *mut c_void,
+    _out: *mut u64,
+    _panel: bool,
+) -> OpStatus {
     OpStatus::OP_ERR_UNSUPPORTED
 }
 
@@ -1573,12 +1698,26 @@ pub extern "C" fn op_view_set(p: *mut OpEngine, view: u64, state: *const OpViewS
 /// Copies a list of Windows overlay items once. A zero count clears it.
 #[cfg(windows)]
 #[unsafe(no_mangle)]
-pub extern "C" fn op_view_set_overlay(p: *mut OpEngine, view: u64, items: *const OpOverlayItem, count: usize) -> OpStatus {
+pub extern "C" fn op_view_set_overlay(
+    p: *mut OpEngine,
+    view: u64,
+    items: *const OpOverlayItem,
+    count: usize,
+) -> OpStatus {
     guard(|| {
-        if let Err(s) = engine(p) { return s; }
-        let next = match parse_overlay_items(items,count) { Ok(value)=>value, Err(status)=>return status };
-        let Some(host) = find_host(p) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
-        let Some(v) = host.view(view) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
+        if let Err(s) = engine(p) {
+            return s;
+        }
+        let next = match parse_overlay_items(items, count) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let Some(host) = find_host(p) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
+        let Some(v) = host.view(view) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
         v.request.lock().overlay = Some(next);
         v.dirty.store(true, Ordering::Release);
         host.wake.notify_all();
@@ -1589,12 +1728,24 @@ pub extern "C" fn op_view_set_overlay(p: *mut OpEngine, view: u64, items: *const
 /// Changes only the phase of retained marching ants; no points are copied.
 #[cfg(windows)]
 #[unsafe(no_mangle)]
-pub extern "C" fn op_view_set_overlay_dash(p: *mut OpEngine, view: u64, dash_offset: f64) -> OpStatus {
+pub extern "C" fn op_view_set_overlay_dash(
+    p: *mut OpEngine,
+    view: u64,
+    dash_offset: f64,
+) -> OpStatus {
     guard(|| {
-        if let Err(s) = engine(p) { return s; }
-        if !dash_offset.is_finite() || !(dash_offset as f32).is_finite() { return OpStatus::OP_ERR_BAD_ARGUMENT; }
-        let Some(host) = find_host(p) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
-        let Some(v) = host.view(view) else { return OpStatus::OP_ERR_NO_SUCH_DOC; };
+        if let Err(s) = engine(p) {
+            return s;
+        }
+        if !dash_offset.is_finite() || !(dash_offset as f32).is_finite() {
+            return OpStatus::OP_ERR_BAD_ARGUMENT;
+        }
+        let Some(host) = find_host(p) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
+        let Some(v) = host.view(view) else {
+            return OpStatus::OP_ERR_NO_SUCH_DOC;
+        };
         v.request.lock().overlay_dash = dash_offset;
         v.dirty.store(true, Ordering::Release);
         host.wake.notify_all();

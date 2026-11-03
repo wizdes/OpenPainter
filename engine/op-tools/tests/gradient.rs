@@ -12,7 +12,7 @@ fn doc() -> DocState {
     )
     .unwrap();
     let mut tile = vec![0; 256 * 256 * 4];
-    for p in tile.chunks_exact_mut(4) {
+    for p in tile.as_chunks_mut::<4>().0 {
         p.copy_from_slice(&[40, 80, 120, 200]);
     }
     d.write_tile(

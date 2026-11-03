@@ -14,7 +14,7 @@ fn doc(w: u32, h: u32, fill: [u8; 4]) -> DocState {
     )
     .unwrap();
     let mut tile = vec![0; 256 * 256 * 4];
-    for p in tile.chunks_exact_mut(4) {
+    for p in tile.as_chunks_mut::<4>().0 {
         p.copy_from_slice(&fill);
     }
     let mut d = d;

@@ -226,7 +226,7 @@ pub fn composite_tile(doc: &DocState, coord: TileCoord) -> Result<TileData, DocE
             continue;
         }
         let tile = doc.read_tile(index, coord)?;
-        for (acc, rgba) in state.iter_mut().zip(tile.chunks_exact(4)) {
+        for (acc, rgba) in state.iter_mut().zip(tile.as_chunks::<4>().0.iter()) {
             acc.over(
                 [rgba[0], rgba[1], rgba[2], rgba[3]].into(),
                 layer.blend,

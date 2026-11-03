@@ -160,7 +160,7 @@ pub fn base64_decode(s: &str) -> Result<Vec<u8>> {
     }
     let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
     let chunks = bytes.len() / 4;
-    for (i, chunk) in bytes.chunks_exact(4).enumerate() {
+    for (i, chunk) in bytes.as_chunks::<4>().0.iter().enumerate() {
         let last = i + 1 == chunks;
         let pad = chunk.iter().rev().take_while(|&&c| c == b'=').count();
         if pad > 2 || (pad > 0 && !last) {

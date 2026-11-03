@@ -246,7 +246,7 @@ fn invert_tiles(ctx: &RunCtx, s: &DocState, delay_ms: u64) -> Result<Outcome> {
         ctx.check()?;
         ctx.sleep(delay_ms)?;
         let mut tile = s.read_tile(s.active_layer, *coord).map_err(internal)?;
-        for px in tile.chunks_exact_mut(4) {
+        for px in tile.as_chunks_mut::<4>().0 {
             for c in &mut px[..3] {
                 *c = 255 - *c;
             }
@@ -536,7 +536,7 @@ fn decode_base64(s: &str) -> Result<Vec<u8>> {
         return Err(bad("invalid base64 ICC"));
     }
     let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
-    for (i, chunk) in bytes.chunks_exact(4).enumerate() {
+    for (i, chunk) in bytes.as_chunks::<4>().0.iter().enumerate() {
         let mut v = [0u8; 4];
         for j in 0..4 {
             v[j] = match chunk[j] {

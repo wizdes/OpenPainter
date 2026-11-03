@@ -68,10 +68,15 @@ pub fn reference_rgba8(
     let bc = crate::effects::brightness_contrast::spec();
     let params = json!({"Brightness":brightness,"Contrast":contrast});
     let mut output = Vec::with_capacity(bytes.len());
-    for (src, blurred) in bytes.chunks_exact(4).zip(blur.chunks_exact(4)) {
-        let blurred: [u8; 4] = blurred.try_into().unwrap();
+    for (src, blurred) in bytes
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(blur.as_chunks::<4>().0.iter())
+    {
+        let blurred: [u8; 4] = *blurred;
         let adjusted = (bc.render_cpu)(&|_, _| blurred, 0, 0, &Prepared::default(), &params);
-        output.extend_from_slice(&legacy_blend(adjusted, src.try_into().unwrap(), false));
+        output.extend_from_slice(&legacy_blend(adjusted, *src, false));
     }
     output
 }

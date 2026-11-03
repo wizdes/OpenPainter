@@ -64,7 +64,9 @@ fn parse_points(text: &str) -> Result<Vec<StrokeSample>> {
         return Err(bad("points must be finite"));
     }
     Ok(numbers
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .enumerate()
         .map(|(i, c)| StrokeSample {
             x: c[0],

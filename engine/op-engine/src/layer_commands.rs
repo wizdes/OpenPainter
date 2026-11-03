@@ -127,7 +127,12 @@ fn merge_down(ctx: &RunCtx, s: &DocState, _: &Value) -> Result<Outcome> {
             let below = s.read_tile(bottom, coord).map_err(internal)?;
             let above = s.read_tile(top, coord).map_err(internal)?;
             let mut out = Vec::with_capacity(below.len());
-            for (b, t) in below.chunks_exact(4).zip(above.chunks_exact(4)) {
+            for (b, t) in below
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(above.as_chunks::<4>().0.iter())
+            {
                 let px = composite_pixel(
                     Rgba8::from([b[0], b[1], b[2], b[3]]),
                     Rgba8::from([t[0], t[1], t[2], t[3]]),

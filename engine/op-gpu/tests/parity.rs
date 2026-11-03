@@ -206,8 +206,10 @@ fn exhaustive_alpha_grid() {
                 .unwrap();
             assert!(gpu.dispatch_count() > before);
             let expected: Vec<u8> = bottom
-                .chunks_exact(4)
-                .zip(top.chunks_exact(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(top.as_chunks::<4>().0.iter())
                 .flat_map(|(b, s)| {
                     <[u8; 4]>::from(composite_pixel(
                         [b[0], b[1], b[2], b[3]].into(),

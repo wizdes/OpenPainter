@@ -71,7 +71,7 @@ fn png_without_phys_opens_at_96_dpi() {
 #[test]
 fn jpeg_quality_and_subsampling_change_the_size() {
     let mut rgba = pixels(64, 64);
-    for p in rgba.chunks_exact_mut(4) {
+    for p in rgba.as_chunks_mut::<4>().0 {
         p[3] = 255;
     }
     let size = |q: u32, s: &str| {

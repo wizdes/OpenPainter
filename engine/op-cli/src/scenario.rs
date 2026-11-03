@@ -184,7 +184,7 @@ fn jpeg(engine: &Engine, doc: u64, info: &Value, out: &Value) -> Res<Vec<u8>> {
 /// JPEG has no alpha: each channel becomes (c * a + 255 * (255 - a) + 127) / 255,
 /// exactly as `DocumentSaver.onWhite` in the Mac app.
 pub fn on_white(mut rgba: Vec<u8>) -> Vec<u8> {
-    for p in rgba.chunks_exact_mut(4) {
+    for p in rgba.as_chunks_mut::<4>().0 {
         let a = p[3] as u32;
         if a == 255 {
             continue;

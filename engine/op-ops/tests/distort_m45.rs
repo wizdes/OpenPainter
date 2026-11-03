@@ -118,7 +118,7 @@ fn m54_every_registered_effect_has_a_target_and_deterministic_tiles() {
             let mut built = DocState::new(store(), 258, 64, 96.0).unwrap();
             for x in 0..2 {
                 let mut bytes = vec![0; TILE_BYTES];
-                for pixel in bytes.chunks_exact_mut(4) {
+                for pixel in bytes.as_chunks_mut::<4>().0 {
                     pixel.copy_from_slice(&[80, 120, 160, 255]);
                 }
                 built = built

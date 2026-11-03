@@ -71,7 +71,7 @@ fn heal_preview_commit_undo_and_cancel() {
 fn spot_heal_preview_and_cancel_keep_committed_bytes() {
     let e = Engine::new(None).unwrap();
     let mut pixels = vec![125u8; 48 * 48 * 4];
-    for px in pixels.chunks_exact_mut(4) {
+    for px in pixels.as_chunks_mut::<4>().0 {
         px[3] = 255;
     }
     for y in 22..27 {

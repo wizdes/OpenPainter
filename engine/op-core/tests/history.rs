@@ -95,19 +95,19 @@ impl Fill {
         };
         match self {
             Fill::Noise => {
-                for chunk in bytes.chunks_exact_mut(8) {
+                for chunk in bytes.as_chunks_mut::<8>().0 {
                     chunk.copy_from_slice(&next_random(&mut n).to_le_bytes());
                 }
             }
             Fill::ClearNoise => {
-                for chunk in bytes.chunks_exact_mut(4) {
+                for chunk in bytes.as_chunks_mut::<4>().0 {
                     let rgb = next_random(&mut n).to_le_bytes();
                     chunk.copy_from_slice(&[rgb[0], rgb[1], rgb[2] | 1, 0]);
                 }
             }
             Fill::ClearColor => {
                 let rgb = next_random(&mut n).to_le_bytes();
-                for chunk in bytes.chunks_exact_mut(4) {
+                for chunk in bytes.as_chunks_mut::<4>().0 {
                     chunk.copy_from_slice(&[rgb[0], rgb[1] | 1, rgb[2], 0]);
                 }
             }
@@ -120,7 +120,7 @@ impl Fill {
             Fill::Split => {
                 let seed = next_random(&mut n);
                 let (top, bottom) = bytes.split_at_mut(TILE_BYTES / 2);
-                for chunk in top.chunks_exact_mut(8) {
+                for chunk in top.as_chunks_mut::<8>().0 {
                     chunk.copy_from_slice(&next_random(&mut n).to_le_bytes());
                 }
                 for (offset, byte) in bottom.iter_mut().enumerate() {

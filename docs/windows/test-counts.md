@@ -397,3 +397,55 @@ Root ran `cargo test --manifest-path engine/Cargo.toml --workspace --no-fail-fas
 
 `main` moved to `10367e6`: W4 at `22db5b4` plus the change diagram `docs/diagrams/phase-a-windows.html`. W5 and W6 stay on `windows` until the Phase B review, because W5's engine overlay code has not had its fresh review.
 
+
+## What each `xtask` level runs, 2026-11-02
+
+`cargo xtask check --tier <level>` follows `PLAN.md` section 4.1. A part that a run does not reach prints NOT RUN and fails the level. The one exception is the paint.net comparison on a Mac or Linux run: it prints NOT RUN, is listed as `Owed:`, and does not fail. A part that exists only on another OS prints SKIP with its reason and does not fail. `dotnet` must be .NET 10 on `PATH`; if it is missing, the part fails by name.
+
+| Level | Runs on Windows | Prints NOT RUN on Windows | Prints SKIP on a Mac or Linux run |
+| --- | --- | --- | --- |
+| fast | `cargo fmt --all --check`; clippy and tests for the changed crates and their dependents; format, lint and build for the Win32 test host, if reached; `dotnet test` for each changed C# project | `changed files with no test`. If Git fails: `changed crates`, `changed C# tests`, and `changed files` prints FAIL | The host and each C# project, if reached; `headless UI for the changed area` |
+| milestone | Format, lint and test the workspace; release tests; oracle tests; scenarios; the 3 C# projects; format, lint and build for the host | `headless UI on the AOT build`, `9 to 12 critical flows`, until W7 adds them | `C# tests`, `Win32 test host`, `headless UI on the AOT build`, `9 to 12 critical flows` |
+| checkpoint | As milestone, plus benchmarks, fuzz, the 200 MP test, the 4 GPU suites on the RTX and on WARP, and the host on each | `all real-window flows`, `paint.net comparison`, `Mac run`, `Linux run` | `C# tests`, `Win32 test host`, `GPU matrix on RTX and WARP`, `all real-window flows` |
+
+The Swift build runs only on macOS. Windows and Linux print SKIP, even with `mac/project.yml` present. The `low_disk` test compiles to zero tests off macOS, so Windows and Linux print SKIP. `scripts/perf-check.sh` also runs only on macOS.
+
+### How the fast level finds the change
+
+The level compares with the merge base of `HEAD` and the branch's upstream. A branch with no upstream uses `origin/main`. It prints the branch and the short hash it used. Uncommitted and untracked files are added. A rename lists both paths.
+
+Paths map like this:
+
+- A file in a crate folder reaches that crate and every crate that depends on it, dev dependencies included.
+- `engine/Cargo.toml`, `engine/Cargo.lock`, `engine/.cargo/` and the shared `tests/` folder reach every crate. A `.py` file under `tests/` is the exception: no crate runs it, so it has no test.
+- `docs/reports/parity-matrix.md` reaches `op-engine`.
+- On a Mac or Linux run, `scripts/*.sh` reaches `xtask`. The tests of those scripts exist only on Unix, so on a Windows run the path has no test.
+- A file in `tools/pdn-capture`, `tools/ui-spike` or `tools/ui-look` reaches that tool's test project, except a `.md` file there.
+- `docs/windows/pdn-5.1-controls.json` reaches the capture-kit tests.
+- The icon table, the icon files, the Mac source folders the icon tests read, and `tests/fixtures/plasma_alpha_512x384.png` reach `ui-look`.
+- A file in `tools/win32-host`, or any change that reaches `op-ffi` or `op-color`, reaches the host.
+
+If Git finds no changed file at all, the level runs `cargo fmt` and adds the row `SKIP changed crates and C# tests: nothing changed since <branch> <short hash>`.
+
+A path that reaches none of these goes in one of 3 groups:
+
+- A path under `docs/`, a `.md` file, `.gitignore`, `.gitattributes` or `LICENSE` needs no test. It is listed and does not fail.
+- A path under `mac/` counts only for the Swift build. A Mac run is covered by that build. A Windows or Linux run treats the path as having no test.
+- Any other path adds the row `NOT RUN changed files with no test: <count>, <first names>`, which fails the level.
+
+`--all-changed` is for a tree with no Git, and it works only with `fast`. Every crate, every C# project and the host count as changed, and the output says so. `scripts/linux-check.sh` passes it for `fast`, because its copy has no `.git`. Without the flag, a missing Git fails by name and the level tests nothing.
+
+The fast limit is printed, not enforced: a run over 120 s prints `OVER THE LIMIT` and does not fail for that reason. A change to `op-core` reaches every crate, so that run cannot meet the limit.
+
+### Results a level reads from a part's output
+
+An exit code of 0 is not enough for these parts:
+
+- `dotnet test` exits 0 when no test runs. I ran it on .NET 10.0.403 with a filter that matches nothing and with a project that has no test class. Both exit 0 and print no total line. A run with `Total: 0`, `Passed: 0`, no `Passed` count or no total line now fails the part by name, so a run where every test is skipped fails.
+- The host exits 0 when `OP_GPU_ADAPTER` is not `warp`, and prints 4 `NOT RUN` lines. The host runs these 4 device recovery scenarios only on WARP: 3 remove the device, which it never does on the RTX, and 1 forces a frame panic. On the RTX, the part passes and adds a SKIP row that names them. A `NOT RUN` line with any other reason fails. On WARP, any `NOT RUN` line fails the part.
+- A good host run always prints `validation-errors: PASS (0)` near its end. A run with exit 0 and no such line fails by name, so a silent host fails. `desktop-close: PASS` comes after it, but a good run can print a warning in its place, so the level does not ask for that line.
+
+These shell settings would let a part pass without testing anything. Each one fails the part by name at any value, and the part does not run:
+
+- `OP_GPU_TESTS` and `OP_FORCE_CPU`, for every `cargo test` part at every level, and for the host. With `OP_GPU_TESTS=0`, the GPU tests print SKIP and return as passed. With `OP_FORCE_CPU=1`, the engine draws effects on the CPU.
+- `OP_BLESS`, for every `cargo test` part at every level. With it set, a golden test such as `op-tools/tests/brush.rs` overwrites its image and passes.

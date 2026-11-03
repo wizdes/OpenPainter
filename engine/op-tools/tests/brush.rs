@@ -118,7 +118,7 @@ fn pressure_and_eraser() {
     let o = run(&d, c, &path, &[2]);
     assert!(pix(&o, 100, 16)[3] > pix(&o, 20, 16)[3]);
     let mut t = vec![0; TILE_SIZE * TILE_SIZE * 4];
-    for px in t.chunks_exact_mut(4) {
+    for px in t.as_chunks_mut::<4>().0 {
         px.copy_from_slice(&[10, 20, 30, 100]);
     }
     let d = d
@@ -289,7 +289,7 @@ fn empty_selection_and_full_alpha_erase() {
     );
     assert_eq!(pix(&out, 16, 16), [0, 0, 0, 0]);
     let mut tile = vec![0; TILE_SIZE * TILE_SIZE * 4];
-    for px in tile.chunks_exact_mut(4) {
+    for px in tile.as_chunks_mut::<4>().0 {
         px.copy_from_slice(&[10, 20, 30, 255]);
     }
     let base = base

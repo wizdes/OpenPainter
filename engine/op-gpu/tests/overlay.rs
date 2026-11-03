@@ -70,8 +70,7 @@ fn pixels(items: Vec<Item>, zoom: f32, dash: f32) -> Vec<u8> {
     queue.submit(Some(encoder.finish()));
     readback.map_async(wgpu::MapMode::Read, .., |result| result.unwrap());
     device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
-    let bytes = readback.get_mapped_range(..).to_vec();
-    bytes
+    readback.get_mapped_range(..).to_vec()
 }
 
 fn rgb(p: &[u8], x: usize, y: usize) -> [u8; 3] {

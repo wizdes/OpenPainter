@@ -54,7 +54,7 @@ fn alpha(s: &DocState, x: usize, y: usize) -> u8 {
 }
 fn painted(s: &DocState) -> usize {
     let t = s.read_tile(0, TileCoord { x: 0, y: 0 }).unwrap();
-    t.chunks_exact(4).filter(|p| p[3] > 0).count()
+    t.as_chunks::<4>().0.iter().filter(|p| p[3] > 0).count()
 }
 /// One dab at (64, 64) with the given pressure.
 fn dab(settings: BrushSettings, pressure: f64, hardness: f64) -> DocState {

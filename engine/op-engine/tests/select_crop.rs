@@ -311,7 +311,7 @@ fn selection_path_gives_rectangle_rings_and_mask_edges() {
     let (e, id) = {
         let e = Engine::new(None).unwrap();
         let mut px = vec![0u8; 3 * 3 * 4];
-        for p in px.chunks_exact_mut(4) {
+        for p in px.as_chunks_mut::<4>().0 {
             p.copy_from_slice(&[0, 0, 0, 255]);
         }
         px[(3 + 1) * 4..(3 + 1) * 4 + 4].copy_from_slice(&[255, 255, 255, 255]);

@@ -87,7 +87,7 @@ fn jpeg_writes_the_density_in_inches() {
 fn gif_dither_spreads_error_and_plain_maps_to_nearest() {
     // 300 distinct colors force a reduced palette.
     let mut image = gradient(60, 40);
-    for p in image.rgba8.chunks_exact_mut(4) {
+    for p in image.rgba8.as_chunks_mut::<4>().0 {
         p[3] = 255;
     }
     let plain = encode(Format::Gif, &image, &Options::default()).unwrap();

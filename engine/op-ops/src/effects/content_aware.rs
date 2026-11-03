@@ -72,7 +72,7 @@ fn lab(rgb: &[u8]) -> [f32; 3] {
     [116.0 * y - 16.0, 500.0 * (x - y), 200.0 * (y - z)]
 }
 fn labs(rgba: &[u8]) -> Vec<[f32; 3]> {
-    rgba.chunks_exact(4).map(lab).collect()
+    rgba.as_chunks::<4>().0.iter().map(|p| lab(p)).collect()
 }
 
 fn downsample(a: &Level) -> Level {

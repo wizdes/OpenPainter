@@ -30,7 +30,7 @@ impl RgbaImage {
         match info.color_type {
             png::ColorType::Rgba => data.extend_from_slice(source),
             png::ColorType::Rgb => {
-                for pixel in source.chunks_exact(3) {
+                for pixel in source.as_chunks::<3>().0 {
                     data.extend_from_slice(&[pixel[0], pixel[1], pixel[2], 255]);
                 }
             }
@@ -40,7 +40,7 @@ impl RgbaImage {
                 }
             }
             png::ColorType::GrayscaleAlpha => {
-                for pixel in source.chunks_exact(2) {
+                for pixel in source.as_chunks::<2>().0 {
                     data.extend_from_slice(&[pixel[0], pixel[0], pixel[0], pixel[1]]);
                 }
             }
@@ -163,8 +163,10 @@ pub fn compare(expected: &RgbaImage, actual: &RgbaImage, tol: Tolerance) -> Comp
     };
     for (index, (left, right)) in expected
         .data
-        .chunks_exact(4)
-        .zip(actual.data.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(actual.data.as_chunks::<4>().0)
         .enumerate()
     {
         if left[3] == 0 && right[3] == 0 {

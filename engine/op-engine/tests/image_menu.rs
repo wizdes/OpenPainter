@@ -31,7 +31,9 @@ fn nearest_resize_and_canvas_anchor() {
         engine
             .query(id, "doc.pixels", json!({}))
             .unwrap()
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|p| p[0])
             .collect::<Vec<_>>(),
         [10, 10, 20, 20]
@@ -47,7 +49,9 @@ fn nearest_resize_and_canvas_anchor() {
         engine
             .query(id, "doc.pixels", json!({}))
             .unwrap()
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|p| p[0])
             .collect::<Vec<_>>(),
         [0, 10, 10, 20, 20]
@@ -116,7 +120,9 @@ fn flips_rotations_and_crop_restore_on_undo() {
         assert_eq!(
             e.query(id, "doc.pixels", json!({}))
                 .unwrap()
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .map(|p| p[0])
                 .collect::<Vec<_>>(),
             want,

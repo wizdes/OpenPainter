@@ -104,7 +104,9 @@ fn jpeg_files() {
     );
 
     let rgb: Vec<u8> = quadrants()
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .flat_map(|p| [p[0], p[1], p[2]])
         .collect();
     let mut bytes = Vec::new();
@@ -267,7 +269,7 @@ fn bmp_files() {
         ..Options::default()
     };
     let mut opaque = img.clone();
-    for p in opaque.rgba8.chunks_exact_mut(4) {
+    for p in opaque.rgba8.as_chunks_mut::<4>().0 {
         p[3] = 255;
     }
     write(

@@ -49,7 +49,9 @@ fn load(name: &str) -> Decoded {
 fn pixels(image: &Decoded) -> Vec<[u8; 4]> {
     image
         .rgba8
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .map(|p| [p[0], p[1], p[2], p[3]])
         .collect()
 }

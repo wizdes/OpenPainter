@@ -74,7 +74,9 @@ unsafe impl Send for Win32Target {}
 
 impl Win32Target {
     pub fn enter_window_desktop(&self) -> Result<(), String> {
-        if self.panel { return Ok(()); }
+        if self.panel {
+            return Ok(());
+        }
         let owner = unsafe { GetWindowThreadProcessId(self.hwnd, std::ptr::null_mut()) };
         if owner == 0 {
             return Err("HWND owner thread was not found".into());
@@ -92,6 +94,8 @@ impl Win32Target {
         }
         Ok(())
     }
+    /// # Safety
+    ///
     /// The caller must keep `hwnd` alive through detach.
     pub unsafe fn new(
         instance: &wgpu::Instance,
@@ -122,10 +126,18 @@ impl Win32Target {
         Ok(target)
     }
 
+    /// # Safety
+    ///
     /// The caller passes a live SwapChainPanel COM pointer and keeps it alive
     /// until detach. wgpu retains a reference while the surface exists.
-    pub unsafe fn new_panel(instance: &wgpu::Instance, panel: *mut c_void, counters: Arc<WindowCounters>) -> Result<Self, String> {
-        if panel.is_null() { return Err("invalid SwapChainPanel".into()); }
+    pub unsafe fn new_panel(
+        instance: &wgpu::Instance,
+        panel: *mut c_void,
+        counters: Arc<WindowCounters>,
+    ) -> Result<Self, String> {
+        if panel.is_null() {
+            return Err("invalid SwapChainPanel".into());
+        }
         let mut target = Self {
             hwnd: panel as isize,
             panel: true,
@@ -148,7 +160,9 @@ impl Win32Target {
     pub fn hwnd(&self) -> isize {
         self.hwnd
     }
-    pub fn is_panel(&self) -> bool { self.panel }
+    pub fn is_panel(&self) -> bool {
+        self.panel
+    }
     pub fn tag_is_display(&self) -> bool {
         false
     }
@@ -175,14 +189,21 @@ impl Win32Target {
             return Err("HWND was destroyed".into());
         }
         let surface = if self.panel {
-            unsafe { instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::SwapChainPanel(self.hwnd as *mut c_void)) }
+            unsafe {
+                instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::SwapChainPanel(
+                    self.hwnd as *mut c_void,
+                ))
+            }
         } else {
             let hwnd = NonZeroIsize::new(self.hwnd).ok_or("invalid HWND")?;
-            unsafe { instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
-                raw_display_handle: RawDisplayHandle::Windows(WindowsDisplayHandle::new()),
-                raw_window_handle: RawWindowHandle::Win32(Win32WindowHandle::new(hwnd)),
-            }) }
-        }.map_err(|e| format!("create DX12 surface: {e}"))?;
+            unsafe {
+                instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
+                    raw_display_handle: RawDisplayHandle::Windows(WindowsDisplayHandle::new()),
+                    raw_window_handle: RawWindowHandle::Win32(Win32WindowHandle::new(hwnd)),
+                })
+            }
+        }
+        .map_err(|e| format!("create DX12 surface: {e}"))?;
         self.surface = Some(surface);
         self.counters.live_surfaces.fetch_add(1, Ordering::SeqCst);
         Ok(())
@@ -276,27 +297,6 @@ impl Drop for Win32Target {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn failed_surface_does_not_decrement_uncounted_target() {
-        let counters = Arc::new(WindowCounters::default());
-        drop(Win32Target {
-            hwnd: 0,
-            panel: false,
-            surface: None,
-            configured: None,
-            display_icc: Vec::new(),
-            counters: counters.clone(),
-            counted: false,
-            stats: WindowStats::default(),
-        });
-        assert_eq!(counters.live_targets.load(Ordering::SeqCst), 0);
-    }
-}
-
 fn display_profile(hwnd: *mut c_void) -> Result<Vec<u8>, String> {
     let hwnd = hwnd as isize;
     let dc = unsafe { GetDC(hwnd) };
@@ -325,4 +325,25 @@ fn display_profile(hwnd: *mut c_void) -> Result<Vec<u8>, String> {
     })();
     unsafe { ReleaseDC(hwnd, dc) };
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_surface_does_not_decrement_uncounted_target() {
+        let counters = Arc::new(WindowCounters::default());
+        drop(Win32Target {
+            hwnd: 0,
+            panel: false,
+            surface: None,
+            configured: None,
+            display_icc: Vec::new(),
+            counters: counters.clone(),
+            counted: false,
+            stats: WindowStats::default(),
+        });
+        assert_eq!(counters.live_targets.load(Ordering::SeqCst), 0);
+    }
 }

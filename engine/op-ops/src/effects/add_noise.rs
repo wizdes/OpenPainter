@@ -167,7 +167,7 @@ fn prepare(doc: &DocState, _: &SelectionState, p: &Value) -> Result<Prepared> {
 pub fn reference_rgba8(width: u32, height: u32, bytes: &[u8]) -> Vec<u8> {
     let deltas = delta_map(width, height, 64, 100, 100.0, DEFAULT_SEED);
     let mut output = bytes.to_vec();
-    for (pixel, delta) in output.chunks_exact_mut(4).zip(deltas) {
+    for (pixel, delta) in output.as_chunks_mut::<4>().0.iter_mut().zip(deltas) {
         for channel in 0..3 {
             pixel[channel] = (i32::from(pixel[channel]) + delta[channel]).clamp(0, 255) as u8;
         }

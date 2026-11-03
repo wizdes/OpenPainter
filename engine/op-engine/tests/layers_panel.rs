@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 fn doc(e: &Engine) -> u64 {
     let mut px = vec![0u8; 40 * 24 * 4];
-    for (i, p) in px.chunks_exact_mut(4).enumerate() {
+    for (i, p) in px.as_chunks_mut::<4>().0.iter_mut().enumerate() {
         p.copy_from_slice(&[(i % 251) as u8, 40, 200, 255]);
     }
     e.import_pixels(40, 24, &px, None).unwrap()

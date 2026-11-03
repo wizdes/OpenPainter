@@ -2,10 +2,10 @@
 pub mod gaussian;
 #[cfg(target_os = "macos")]
 pub mod layer;
-pub mod pipeline_stats;
-pub mod presenter;
 #[cfg(windows)]
 pub mod overlay;
+pub mod pipeline_stats;
+pub mod presenter;
 #[cfg(windows)]
 pub mod win32;
 use std::sync::{
@@ -189,7 +189,10 @@ pub fn poll_gpu_with_timeout(
         timeout: Some(timeout),
     };
     #[cfg(not(windows))]
-    let poll = wgpu::PollType::wait_indefinitely();
+    let poll = {
+        let _ = timeout;
+        wgpu::PollType::wait_indefinitely()
+    };
     device.poll(poll).map(|_| ()).map_err(|error| match error {
         wgpu::PollError::Timeout => GpuError::WaitTimeout(operation),
         _ => GpuError::DeviceLost,
@@ -574,7 +577,9 @@ impl GpuContext {
         let output = self.texture(width, height);
         let field = op_ops::effects::clouds::reference_rgba8(width, height, seed);
         let values: Vec<[f32; 4]> = field
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|pixel| [f32::from(pixel[0]), 0.0, 0.0, 0.0])
             .collect();
         let table = self
@@ -649,7 +654,7 @@ impl GpuContext {
         Self::checked_len(width, height, original)?;
         let output = self.texture(width, height);
         let mut source = Vec::with_capacity(original.len());
-        for pixel in original.chunks_exact(4) {
+        for pixel in original.as_chunks::<4>().0 {
             source.extend(pixel.iter().map(|value| f32::from(*value)));
         }
         let table = self
@@ -1878,7 +1883,9 @@ impl GpuContext {
                 let output = self.texture(width, height);
                 let acc = self.accumulator(width, height);
                 let floats: Vec<f32> = dst
-                    .chunks_exact(4)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .flat_map(|p| p.iter().map(|&x| x as f32))
                     .collect();
                 self.queue

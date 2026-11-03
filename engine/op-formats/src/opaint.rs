@@ -826,7 +826,13 @@ fn load_opaint_from_reader<R: Read + std::io::Seek>(
             if mask.width != width || mask.height != height {
                 return Err(invalid("selection PNG size mismatch"));
             }
-            let bytes = mask.pixels.chunks_exact(4).map(|p| p[0]).collect();
+            let bytes = mask
+                .pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| p[0])
+                .collect();
             doc = doc.set_selection(SelectionState::Active(SelectionSource::Coverage(Arc::new(
                 MaskGrid::new(width, height, bytes)
                     .ok_or_else(|| invalid("selection size mismatch"))?,
@@ -992,7 +998,7 @@ fn composite(
                         },
                     )
                     .map_err(other)?;
-                for (pixel, src) in acc.iter_mut().zip(tile.chunks_exact(4)) {
+                for (pixel, src) in acc.iter_mut().zip(tile.as_chunks::<4>().0.iter()) {
                     let sa = src[3] as f32 / 255.0 * layer.opacity as f32 / 255.0;
                     if sa == 0.0 {
                         continue;

@@ -221,10 +221,10 @@ fn run_one(target: &str, data: &[u8], store: &Arc<TileStore>, template: &[u8]) -
         // driver's resident-size watchdog must kill the worker.
         "selftest-coom" => unsafe {
             unsafe extern "C" {
-                fn malloc(size: usize) -> *mut u8;
+                fn malloc(size: usize) -> *mut std::ffi::c_void;
             }
             let n = 3_usize << 30;
-            let p = malloc(n);
+            let p = malloc(n).cast::<u8>();
             if !p.is_null() {
                 for i in (0..n).step_by(4096) {
                     std::ptr::write_volatile(p.add(i), 1);

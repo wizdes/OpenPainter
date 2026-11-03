@@ -98,7 +98,7 @@ impl GpuOp for EffectOp {
         let spec = find_effect(self.effect_id).expect("registered effect");
         let params = spec.default_params();
         let mut out = inputs.bottom.clone();
-        for pixel in out.chunks_exact_mut(4) {
+        for pixel in out.as_chunks_mut::<4>().0 {
             let original = [pixel[0], pixel[1], pixel[2], pixel[3]];
             pixel.copy_from_slice(&(spec.render_cpu)(
                 &|_, _| original,
@@ -131,8 +131,10 @@ impl GpuOp for CompositeOp {
     fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
         inputs
             .bottom
-            .chunks_exact(4)
-            .zip(inputs.top.chunks_exact(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(inputs.top.as_chunks::<4>().0.iter())
             .flat_map(|(b, s)| {
                 <[u8; 4]>::from(composite_pixel(
                     Rgba8::from([b[0], b[1], b[2], b[3]]),
@@ -173,8 +175,10 @@ impl GpuOp for ToolOp {
     fn cpu(&self, inputs: &Inputs) -> Vec<u8> {
         inputs
             .bottom
-            .chunks_exact(4)
-            .zip(inputs.top.chunks_exact(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(inputs.top.as_chunks::<4>().0.iter())
             .flat_map(|(b, s)| {
                 <[u8; 4]>::from(tool_composite(
                     Rgba8::from([b[0], b[1], b[2], b[3]]),
@@ -379,7 +383,12 @@ pub fn run(ctx: &mut GpuContext, inputs: &Inputs) -> crate::Result<Vec<(String, 
             return Err(GpuError::Map(format!("{} submitted no dispatch", op.id())));
         }
         let mut worst = 0;
-        for (a, b) in expected.chunks_exact(4).zip(actual.chunks_exact(4)) {
+        for (a, b) in expected
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(actual.as_chunks::<4>().0.iter())
+        {
             if !op.compare_hidden_color() && a[3] == 0 && b[3] == 0 {
                 continue;
             }

@@ -273,6 +273,15 @@ pub struct DocState {
     next_layer_id: Arc<AtomicU64>,
     store: Arc<TileStore>,
 }
+/// Takes the next layer id. Rust 1.99 renames `fetch_update` to `try_update`,
+/// but the Mac builds with Rust 1.97, so this keeps the older name.
+#[allow(deprecated)]
+fn take_layer_id(next: &AtomicU64) -> std::result::Result<LayerId, TileError> {
+    next.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+        .map(LayerId)
+        .map_err(|_| TileError::Overflow)
+}
+
 impl DocState {
     pub fn new(store: Arc<TileStore>, width: u32, height: u32, dpi: f64) -> Result<Self> {
         if width == 0 || height == 0 || !dpi.is_finite() || dpi <= 0.0 {
@@ -407,11 +416,7 @@ impl DocState {
             return Err(DocError::TooManyLayers);
         }
         let mut next = self.advanced();
-        let id = LayerId(
-            self.next_layer_id
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-                .map_err(|_| TileError::Overflow)?,
-        );
+        let id = take_layer_id(&self.next_layer_id)?;
         next.layers.insert(
             index,
             Arc::new(LayerState::blank(
@@ -456,11 +461,7 @@ impl DocState {
         }
         check_pixel_budget(self.layers.len() + 1, self.width, self.height)?;
         let mut next = self.advanced();
-        layer.id = LayerId(
-            self.next_layer_id
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-                .map_err(|_| TileError::Overflow)?,
-        );
+        layer.id = take_layer_id(&self.next_layer_id)?;
         layer.name.push_str(" copy");
         layer.name = cap_layer_name(std::mem::take(&mut layer.name));
         next.layers.insert(index + 1, Arc::new(layer));

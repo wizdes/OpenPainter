@@ -1088,11 +1088,11 @@ impl FolderLock {
             };
             // Another process removed this lock file just before it was
             // locked. The caller goes round again and locks the live one.
-            return match lock.held() {
+            match lock.held() {
                 Ok(true) => Ok(Some(lock)),
                 Ok(false) => Ok(None),
                 Err(e) => Err(e),
-            };
+            }
         }
         #[cfg(not(windows))]
         {
@@ -1217,7 +1217,7 @@ impl FolderLock {
             }
             let result = remove_sidecars(&this.dir);
             drop(this.file);
-            return result;
+            result
         }
         #[cfg(not(windows))]
         {

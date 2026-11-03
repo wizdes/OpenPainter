@@ -1042,7 +1042,7 @@ mod tests {
         let l = limits(4096, 256 * 1024 * 1024, 2048);
         let plan = Plan::new(Call::Params(GpuKernel::Median, [5, 50, 0]), 5);
         let edge = timed_chunk_edge(&l, &plan).expect("default Median has room beyond its halo");
-        assert!(edge >= 16 && edge < 2048, "edge={edge}");
+        assert!((16..2048).contains(&edge), "edge={edge}");
         let input = edge + 10;
         assert!(
             op_gpu::windows_job_too_long(GpuKernel::Median, input, input, [5, 50, 0]).is_none()

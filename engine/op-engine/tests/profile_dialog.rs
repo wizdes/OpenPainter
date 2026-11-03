@@ -16,7 +16,7 @@ const SRGB_TO_P3_RELATIVE_BPC: [u8; 16] = [
 ];
 /// `doc.pixels` clears the color of fully transparent pixels.
 fn visible(mut px: [u8; 16]) -> [u8; 16] {
-    for p in px.chunks_exact_mut(4) {
+    for p in px.as_chunks_mut::<4>().0 {
         if p[3] == 0 {
             p.copy_from_slice(&[0, 0, 0, 0]);
         }

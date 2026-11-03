@@ -172,7 +172,13 @@ fn all_exif_orientations() {
         image.metadata.exif = Some(exif_with_orientation(orientation));
         let bytes = encode(Format::Png, &image, &Options::default()).unwrap();
         let decoded = decode(&bytes).unwrap();
-        let ids: Vec<u8> = decoded.rgba8.chunks_exact(4).map(|p| p[0]).collect();
+        let ids: Vec<u8> = decoded
+            .rgba8
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| p[0])
+            .collect();
         assert_eq!(
             ids,
             expected[(orientation - 1) as usize],
@@ -218,8 +224,10 @@ fn jpeg_quality_95_psnr() {
     let decoded = decode(&encode(Format::Jpeg, &image, &options).unwrap()).unwrap();
     let mse: f64 = image
         .rgba8
-        .chunks_exact(4)
-        .zip(decoded.rgba8.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(decoded.rgba8.as_chunks::<4>().0.iter())
         .flat_map(|(a, b)| (0..3).map(|c| ((a[c] as f64) - (b[c] as f64)).powi(2)))
         .sum::<f64>()
         / (32.0 * 32.0 * 3.0);

@@ -215,7 +215,12 @@ fn parse_ring(text: &str) -> Result<Vec<(f64, f64)>> {
     if !numbers.len().is_multiple_of(2) || numbers.iter().any(|n| !n.is_finite()) {
         return Err(bad("points must be finite x y pairs"));
     }
-    let ring: Vec<(f64, f64)> = numbers.chunks_exact(2).map(|c| (c[0], c[1])).collect();
+    let ring: Vec<(f64, f64)> = numbers
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| (c[0], c[1]))
+        .collect();
     if ring.len() < 3 {
         return Err(bad("a selection outline needs at least three points"));
     }

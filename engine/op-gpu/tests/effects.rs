@@ -166,7 +166,7 @@ fn registered_effect_kernels_are_byte_exact_and_dispatch() {
                 | GpuKernel::Clouds
         );
         let mut expected = bytes.clone();
-        for pixel in expected.chunks_exact_mut(4) {
+        for pixel in expected.as_chunks_mut::<4>().0 {
             match kernel {
                 GpuKernel::InvertColors => pixel[..3].iter_mut().for_each(|v| *v = 255 - *v),
                 GpuKernel::InvertAlpha => pixel[3] = 255 - pixel[3],
@@ -571,7 +571,7 @@ fn m41_gpu_seeded_noise_matches_cpu_for_endpoints_and_hidden_color() {
             width, height, intensity, saturation, coverage, seed,
         );
         let mut expected = bytes.clone();
-        for (pixel, delta) in expected.chunks_exact_mut(4).zip(deltas) {
+        for (pixel, delta) in expected.as_chunks_mut::<4>().0.iter_mut().zip(deltas) {
             for channel in 0..3 {
                 pixel[channel] = (i32::from(pixel[channel]) + delta[channel]).clamp(0, 255) as u8;
             }
@@ -724,7 +724,9 @@ fn configurable_adjustments_match_cpu_on_random_pixels() {
                 .insert("LinkLevels".into(), false.into());
         }
         let expected: Vec<u8> = source
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|pixel| {
                 let original = [pixel[0], pixel[1], pixel[2], pixel[3]];
                 (spec.render_cpu)(
@@ -773,7 +775,7 @@ fn m26_lut_kernels_match_tables_in_both_curve_modes() {
                 .unwrap();
             assert_eq!(gpu.dispatch_count(), before + 1);
             let mut expected = bytes.clone();
-            for pixel in expected.chunks_exact_mut(4) {
+            for pixel in expected.as_chunks_mut::<4>().0 {
                 if luminosity {
                     let old = ((7471 * u32::from(pixel[2])
                         + 38470 * u32::from(pixel[1])
@@ -812,7 +814,9 @@ fn m26_highlights_shadows_gpu_matches_cpu() {
             .unwrap()
             .insert("Shadows".into(), shadows.into());
         let expected: Vec<u8> = bytes
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|pixel| {
                 let original = [pixel[0], pixel[1], pixel[2], pixel[3]];
                 (spec.render_cpu)(
@@ -906,7 +910,9 @@ fn m26_prepared_tables_match_cpu_on_metal() {
             .effect_kernel_with_lut(kernel, width, 1, &bytes, lut, luminosity)
             .unwrap();
         let expected: Vec<u8> = bytes
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|pixel| {
                 let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
                 (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params)
@@ -947,7 +953,9 @@ fn m26_prepared_tables_match_cpu_on_metal() {
             .effect_kernel_with_lut(kernel, width, 1, &bytes, lut, false)
             .unwrap();
         let expected: Vec<u8> = bytes
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|pixel| {
                 let source = [pixel[0], pixel[1], pixel[2], pixel[3]];
                 (spec.render_cpu)(&|_, _| source, 0, 0, &prepared, &params)

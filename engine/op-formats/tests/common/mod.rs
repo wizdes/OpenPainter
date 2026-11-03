@@ -135,7 +135,9 @@ pub fn assert_close(got: &[[u8; 4]], want: &[[u8; 4]], tolerance: i32, label: &s
 pub fn through_op_color(icc: &[u8]) -> Vec<[u8; 4]> {
     let profile = op_color::Profile::from_icc(icc).unwrap();
     let (rgba, _) = op_color::import_cmyk(&INKS, &profile).unwrap();
-    rgba.chunks_exact(4)
+    rgba.as_chunks::<4>()
+        .0
+        .iter()
         .map(|p| [p[0], p[1], p[2], p[3]])
         .collect()
 }
