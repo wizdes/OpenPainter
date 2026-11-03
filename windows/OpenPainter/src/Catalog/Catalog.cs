@@ -18,8 +18,17 @@ public sealed record CatalogEntry(
     string? Icon,
     IReadOnlyList<CatalogEntry> Items);
 
+/// One tool in the Mac's order. `Options` names its options row, and `Key` is its letter.
+public sealed record CatalogTool(string Id, string Label, string Key, string Options, string? Icon, bool Functional);
+
+/// One floating panel in the Mac's order.
+public sealed record CatalogPanel(string Id, string Title, string Shortcut, string? Icon);
+
 public sealed record MacCatalog(IReadOnlyList<CatalogEntry> Menus)
 {
+    public IReadOnlyList<CatalogTool> Tools { get; init; } = [];
+    public IReadOnlyList<CatalogPanel> Panels { get; init; } = [];
+
     const string ResourceName = "mac-catalog.json";
 
     /// The copy built into the program.
@@ -36,7 +45,11 @@ public sealed record MacCatalog(IReadOnlyList<CatalogEntry> Menus)
         var root = document.RootElement;
         var schema = root.GetProperty("schema").GetInt32();
         if (schema != 1) throw new InvalidDataException($"CATALOG: unknown schema {schema}");
-        return new MacCatalog(root.GetProperty("menus").EnumerateArray().Select(Entry).ToList());
+        return new MacCatalog(root.GetProperty("menus").EnumerateArray().Select(Entry).ToList())
+        {
+            Tools = root.TryGetProperty("tools", out var tools) ? tools.EnumerateArray().Select(Tool).ToList() : [],
+            Panels = root.TryGetProperty("panels", out var panels) ? panels.EnumerateArray().Select(Panel).ToList() : [],
+        };
     }
 
     static CatalogEntry Entry(JsonElement e)
@@ -59,6 +72,16 @@ public sealed record MacCatalog(IReadOnlyList<CatalogEntry> Menus)
             Text(e, "icon"),
             e.TryGetProperty("items", out var items) ? items.EnumerateArray().Select(Entry).ToList() : []);
     }
+
+    static CatalogTool Tool(JsonElement e) => new(
+        Need(e, "id", "tool"), Need(e, "label", "tool"), Need(e, "key", "tool"), Need(e, "options", "tool"), Text(e, "icon"),
+        e.GetProperty("functional").GetBoolean());
+
+    static CatalogPanel Panel(JsonElement e) =>
+        new(Need(e, "id", "panel"), Need(e, "title", "panel"), Need(e, "shortcut", "panel"), Text(e, "icon"));
+
+    static string Need(JsonElement e, string name, string what) =>
+        Text(e, name) ?? throw new InvalidDataException($"CATALOG: a {what} row has no {name}");
 
     static string? Text(JsonElement e, string name) => e.TryGetProperty(name, out var v) ? v.GetString() : null;
 }

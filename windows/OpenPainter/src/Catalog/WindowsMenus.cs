@@ -150,6 +150,55 @@ public static class WindowsKeys
         return text.ToString();
     }
 
+    /// The catalog's words for a key press from a window message, or null for a key the
+    /// menus never name. `vk` is the Windows virtual key.
+    public static string? FromVirtualKey(int vk, bool ctrl, bool shift, bool alt)
+    {
+        const int F1 = 0x70, F24 = 0x87, Add = 0x6B, Subtract = 0x6D, Delete = 0x2E, PageUp = 0x21, PageDown = 0x22;
+        const int OemPlus = 0xBB, OemComma = 0xBC, OemMinus = 0xBD, OemQuestion = 0xBF, OemTilde = 0xC0, OemQuotes = 0xDE;
+        string? key = vk switch
+        {
+            >= 'A' and <= 'Z' or >= '0' and <= '9' => ((char)vk).ToString(),
+            >= F1 and <= F24 => $"F{vk - F1 + 1}",
+            Delete => "Delete",
+            PageUp => "PageUp",
+            PageDown => "PageDown",
+            OemPlus or Add => "+",
+            OemMinus or Subtract => "-",
+            OemQuotes => "'",
+            OemComma => ",",
+            OemTilde => "`",
+            OemQuestion => "?",
+            _ => null,
+        };
+        return key is null ? null : Words(key, ctrl, shift, alt);
+    }
+
+    /// The same words for a key press from Avalonia, which is what the Tab stops in the row see.
+    public static string? FromAvalonia(Key key, KeyModifiers modifiers)
+    {
+        string? name = key switch
+        {
+            >= Key.A and <= Key.Z => ((char)('A' + (key - Key.A))).ToString(),
+            >= Key.D0 and <= Key.D9 => ((char)('0' + (key - Key.D0))).ToString(),
+            >= Key.F1 and <= Key.F24 => $"F{key - Key.F1 + 1}",
+            Key.Delete => "Delete",
+            Key.PageUp => "PageUp",
+            Key.PageDown => "PageDown",
+            Key.OemPlus or Key.Add => "+",
+            Key.OemMinus or Key.Subtract => "-",
+            Key.OemQuotes => "'",
+            Key.OemComma => ",",
+            Key.OemTilde => "`",
+            Key.OemQuestion => "?",
+            _ => null,
+        };
+        return name is null ? null : Words(name, modifiers.HasFlag(KeyModifiers.Control), modifiers.HasFlag(KeyModifiers.Shift), modifiers.HasFlag(KeyModifiers.Alt));
+    }
+
+    static string Words(string key, bool ctrl, bool shift, bool alt) =>
+        (ctrl ? "Ctrl+" : "") + (shift ? "Shift+" : "") + (alt ? "Alt+" : "") + key;
+
     /// The gesture a menu shows, from the Windows words.
     public static KeyGesture Gesture(string text)
     {

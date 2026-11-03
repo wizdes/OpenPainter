@@ -6,8 +6,10 @@
 // second. A native child keeps the Tab key, so it hands focus back on Tab.
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
+using Avalonia.Threading;
 
 namespace OpenPainter.Canvas;
 
@@ -15,10 +17,14 @@ public sealed unsafe class CanvasHost : NativeControlHost
 {
     const string ClassName = "OpenPainterCanvas";
     const uint WsChild = 0x40000000, WsVisible = 0x10000000, WsTabStop = 0x00010000;
-    const uint WmSetFocus = 0x0007, WmKillFocus = 0x0008, WmEraseBackground = 0x0014, WmKeyDown = 0x0100, WmChar = 0x0102,
-        WmMouseMove = 0x0200, WmLeftDown = 0x0201, WmLeftUp = 0x0202, WmMouseWheel = 0x020A,
-        WmPointerUpdate = 0x0245, WmPointerDown = 0x0246, WmPointerUp = 0x0247;
-    const int VkTab = 9, VkShift = 0x10, PointerTypePen = 3;
+    const uint WmSetFocus = 0x0007, WmKillFocus = 0x0008, WmEraseBackground = 0x0014, WmSetCursor = 0x0020, WmKeyDown = 0x0100, WmKeyUp = 0x0101, WmChar = 0x0102,
+        WmMouseMove = 0x0200, WmLeftDown = 0x0201, WmLeftUp = 0x0202, WmRightDown = 0x0204, WmRightUp = 0x0205, WmMouseWheel = 0x020A, WmMouseHWheel = 0x020E,
+        WmCaptureChanged = 0x0215, WmPointerUpdate = 0x0245, WmPointerDown = 0x0246, WmPointerUp = 0x0247, WmMouseLeave = 0x02A3;
+    const int VkTab = 9, VkShift = 0x10, VkAlt = 0x12, VkSpace = 0x20, PointerTypePen = 3;
+    const int MkShift = 4, MkControl = 8, WheelDelta = 120, HtClient = 1;
+    const uint WheelScrollLines = 0x68, WheelPageScroll = uint.MaxValue, TrackLeave = 2;
+    const int CursorArrow = 32512, CursorCross = 32515, CursorMove = 32646;
+    const double PointsPerLine = 16;
     const uint RootAncestor = 2;
     const int PenInfoSize = 136, PenPressureOffset = 104;
     const double PenPressureRange = 1024;
@@ -45,6 +51,16 @@ public sealed unsafe class CanvasHost : NativeControlHost
     [DllImport("user32.dll")] static extern bool GetPointerType(uint id, out int type);
     [DllImport("user32.dll", SetLastError = true)] static extern bool GetPointerPenInfo(uint id, byte* info);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern nint GetModuleHandleW(string? name);
+    [DllImport("user32.dll")] static extern nint SetCapture(nint hwnd);
+    [DllImport("user32.dll")] static extern bool ReleaseCapture();
+    [DllImport("user32.dll")] static extern nint SetCursor(nint cursor);
+    [DllImport("user32.dll")] static extern nint LoadCursorW(nint instance, nint name);
+    [DllImport("user32.dll")] static extern bool ScreenToClient(nint hwnd, ref NativePoint point);
+    [DllImport("user32.dll", SetLastError = true)] static extern bool SystemParametersInfoW(uint action, uint param, uint* value, uint winIni);
+    [DllImport("user32.dll", SetLastError = true)] static extern bool TrackMouseEvent(ref TrackEvent track);
+
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] struct TrackEvent { public uint Size, Flags; public nint Target; public uint Hover; }
 
     static bool s_registered;
     static CanvasHost? s_current;
@@ -56,6 +72,50 @@ public sealed unsafe class CanvasHost : NativeControlHost
     public event Action<bool>? TabOut;
 
     public nint Hwnd { get; private set; }
+
+    /// Where pointer, wheel and space bar input goes. Each call runs on the UI thread, right
+    /// in the window message, so it does not wait for a UI frame.
+    public ViewController? View { get; set; }
+
+    /// Layout pixels to window pixels, kept by the main window.
+    public double Scale { get; set; } = 1;
+
+    /// A mouse button went down here. Avalonia never sees it, so open popups must be told.
+    public event Action? Pressed;
+
+    /// A key other than Tab and space, with whether it repeats. True means it was used.
+    public event Func<int, bool, bool>? KeyPressed;
+
+    bool _leaveTracked;
+
+    Point Points(nint l) => new((short)(l & 0xffff) / Scale, (short)((l >> 16) & 0xffff) / Scale);
+
+    void ShowCursor()
+    {
+        var name = View?.Cursor switch { CanvasCursor.Cross => CursorCross, CanvasCursor.Move => CursorMove, _ => CursorArrow };
+        SetCursor(LoadCursorW(0, name));
+    }
+
+    static double LinesPerNotch(double viewHeight)
+    {
+        uint lines = 3;
+        if (!SystemParametersInfoW(WheelScrollLines, 0, &lines, 0))
+            throw new InvalidOperationException($"CANVAS_WHEEL: {Marshal.GetLastWin32Error()}");
+        // Windows' "one screen at a time" setting.
+        return lines == WheelPageScroll ? viewHeight / PointsPerLine : lines;
+    }
+
+    void Wheel(nint hwnd, nuint w, nint l, bool sideways)
+    {
+        if (View is null) return;
+        var at = new NativePoint { X = (short)(l & 0xffff), Y = (short)((l >> 16) & 0xffff) };
+        if (!ScreenToClient(hwnd, ref at)) throw new InvalidOperationException($"CANVAS_WHEEL: ScreenToClient: {Marshal.GetLastWin32Error()}");
+        var flags = (int)((ulong)w & 0xffff);
+        var notches = (short)(((ulong)w >> 16) & 0xffff) / (double)WheelDelta;
+        // A tilt to the right is a positive delta, and it moves the image left.
+        var (x, y) = sideways ? (-notches, 0.0) : (0.0, notches);
+        View.Wheel(new Point(at.X / Scale, at.Y / Scale), x, y, LinesPerNotch(View.View.ViewSize.Height), (flags & MkControl) != 0, (flags & MkShift) != 0);
+    }
 
     public void TakeFocus()
     {
@@ -107,8 +167,23 @@ public sealed unsafe class CanvasHost : NativeControlHost
         input?.Invoke($"pen:{phase}:{*(uint*)(info + PenPressureOffset) / PenPressureRange:F2}");
     }
 
+    /// A throw must not cross this native boundary, because it would end the process with
+    /// no words. It goes to the UI thread, which shows it and stops the program.
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
     static nint OnMessage(nint hwnd, uint message, nuint w, nint l)
+    {
+        try
+        {
+            return Handle(hwnd, message, w, l);
+        }
+        catch (Exception e)
+        {
+            Dispatcher.UIThread.Post(() => throw new InvalidOperationException($"CANVAS_INPUT: {e.Message}", e));
+            return 0;
+        }
+    }
+
+    static nint Handle(nint hwnd, uint message, nuint w, nint l)
     {
         var host = s_current;
         var input = host?.NativeInput;
@@ -116,13 +191,64 @@ public sealed unsafe class CanvasHost : NativeControlHost
         {
             // The engine paints every pixel, so Windows must not clear it first.
             case WmEraseBackground: return 1;
+            case WmSetCursor when (l & 0xffff) == HtClient && host is not null:
+                host.ShowCursor();
+                return 1;
             case WmLeftDown:
                 SetFocus(hwnd);
                 input?.Invoke($"pointer:down:{(short)(l & 0xffff)},{(short)((l >> 16) & 0xffff)}:1.00:Mouse");
+                if (host is not null)
+                {
+                    host.Pressed?.Invoke();
+                    SetCapture(hwnd);
+                    host.View?.PointerDown(host.Points(l), CanvasButton.Left, GetKeyState(VkAlt) < 0);
+                }
                 return 0;
-            case WmMouseMove: input?.Invoke($"pointer:move:{(short)(l & 0xffff)},{(short)((l >> 16) & 0xffff)}:1.00:Mouse"); return 0;
-            case WmLeftUp: input?.Invoke("pointer:up:1.00:Mouse"); return 0;
-            case WmMouseWheel: input?.Invoke($"wheel:{(short)((long)w >> 16)}"); return 0;
+            case WmMouseMove:
+                input?.Invoke($"pointer:move:{(short)(l & 0xffff)},{(short)((l >> 16) & 0xffff)}:1.00:Mouse");
+                if (host is not null)
+                {
+                    if (!host._leaveTracked)
+                    {
+                        var track = new TrackEvent { Size = (uint)sizeof(TrackEvent), Flags = TrackLeave, Target = hwnd };
+                        if (!TrackMouseEvent(ref track)) throw new InvalidOperationException($"CANVAS_LEAVE: {Marshal.GetLastWin32Error()}");
+                        host._leaveTracked = true;
+                    }
+                    host.View?.PointerMove(host.Points(l));
+                }
+                return 0;
+            case WmMouseLeave:
+                if (host is not null)
+                {
+                    host._leaveTracked = false;
+                    host.View?.PointerLeft();
+                }
+                return 0;
+            case WmLeftUp:
+                input?.Invoke("pointer:up:1.00:Mouse");
+                host?.View?.PointerUp(host.Points(l));
+                ReleaseCapture();
+                return 0;
+            case WmRightDown:
+                SetFocus(hwnd);
+                if (host is not null)
+                {
+                    host.Pressed?.Invoke();
+                    host.View?.PointerDown(host.Points(l), CanvasButton.Right, GetKeyState(VkAlt) < 0);
+                }
+                return 0;
+            case WmRightUp:
+                return 0;
+            case WmCaptureChanged:
+                host?.View?.CancelDrag();
+                return 0;
+            case WmMouseWheel:
+                input?.Invoke($"wheel:{(short)((long)w >> 16)}");
+                host?.Wheel(hwnd, w, l, sideways: false);
+                return 0;
+            case WmMouseHWheel:
+                host?.Wheel(hwnd, w, l, sideways: true);
+                return 0;
             case WmPointerDown: LogPen("down", w); break;
             case WmPointerUpdate: LogPen("move", w); break;
             case WmPointerUp: LogPen("up", w); break;
@@ -134,12 +260,30 @@ public sealed unsafe class CanvasHost : NativeControlHost
                     host?.TabOut?.Invoke(GetKeyState(VkShift) < 0);
                     return 0;
                 }
+                if ((int)w == VkSpace)
+                {
+                    host?.View?.SpaceDown();
+                    host?.ShowCursor();
+                    return 0;
+                }
+                if (host?.KeyPressed?.Invoke((int)w, ((l >> 30) & 1) != 0) == true) return 0;
+                break;
+            case WmKeyUp:
+                if ((int)w == VkSpace)
+                {
+                    host?.View?.SpaceUp();
+                    host?.ShowCursor();
+                    return 0;
+                }
                 break;
             case WmChar:
                 if ((int)w != VkTab) input?.Invoke($"text:{(char)w}");
                 return 0;
             case WmSetFocus: input?.Invoke("focus:canvas"); break;
-            case WmKillFocus: input?.Invoke("blur:canvas"); break;
+            case WmKillFocus:
+                input?.Invoke("blur:canvas");
+                host?.View?.FocusLost();
+                break;
         }
         return DefWindowProcW(hwnd, message, w, l);
     }

@@ -28,6 +28,9 @@ public sealed class App : Application
                 desktop.Shutdown(1);
             };
             var window = new MainWindow(Options);
+            if (Options.TestOpenMenu is { } menu)
+                window.Opened += (_, _) => DispatcherTimer.RunOnce(() => window.TitleBar.Menus.Items.OfType<Avalonia.Controls.MenuItem>().Single(m => (string?)m.Header == menu).Open(), TimeSpan.FromMilliseconds(1000));
+            if (Options.TestOpenMore) window.Opened += (_, _) => DispatcherTimer.RunOnce(window.Options.OpenMore, TimeSpan.FromMilliseconds(1000));
             if (Options.ExitAfterMs is { } ms) TestReport.Arrange(window, ms, Options.ReportPath, code => ExitCode = code);
             desktop.MainWindow = window;
         }

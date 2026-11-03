@@ -18,11 +18,15 @@ public static class Icons
 
     public static string Folder { get; set; } = Path.Combine(AppContext.BaseDirectory, "assets", "icons");
 
-    public static IconArt Load(string name)
+    /// The art drawn at `size`. 20 is the main folder. Each other size has its own folder,
+    /// so an icon never draws scaled from another size, and a missing file is an error.
+    public static IconArt Load(string name, double size = Tokens.IconSize)
     {
-        if (Cache.TryGetValue(name, out var art)) return art;
-        art = Read(Path.Combine(Folder, name + ".svg"));
-        Cache[name] = art;
+        var key = $"{size}/{name}";
+        if (Cache.TryGetValue(key, out var art)) return art;
+        art = Read(size == Tokens.IconSize ? Path.Combine(Folder, name + ".svg") : Path.Combine(Folder, $"{size}", name + ".svg"));
+        if (art.ViewBox != size) throw new InvalidDataException($"ICON: {name} at {size} has art of size {art.ViewBox}");
+        Cache[key] = art;
         return art;
     }
 
@@ -60,7 +64,7 @@ public sealed class IconView : Control
 
     public IconView(string name, Color color, double size = Tokens.IconSize)
     {
-        _art = Icons.Load(name);
+        _art = Icons.Load(name, size);
         _brush = new SolidColorBrush(color);
         Width = size;
         Height = size;

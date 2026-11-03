@@ -119,6 +119,87 @@ public sealed unsafe class CanvasSession : IDisposable
         Check(Native.op_view_set(_engine, _view, &state), "VIEW_SET");
     }
 
+    /// Shows the Zoom tool's rectangle, in document points, or clears it. The engine keeps
+    /// a copy, and it draws in the same frame as the document.
+    public void SetZoomRectangle(Avalonia.Rect? document)
+    {
+        if (_view == 0) return;
+        const uint StaticZoomRectangle = 11;   // OpOverlayItem's kinds.
+        if (document is not { } r)
+        {
+            Check(Native.op_view_set_overlay(_engine, _view, null, 0), "VIEW_OVERLAY");
+            return;
+        }
+        var item = new OpOverlayItem { kind = StaticZoomRectangle, x = r.X, y = r.Y, width = r.Width, height = r.Height };
+        Check(Native.op_view_set_overlay(_engine, _view, &item, 1), "VIEW_OVERLAY");
+    }
+
+    /// Makes a small straight-alpha RGBA copy of the image on the canvas thread, then gives
+    /// it to `ready` on the UI thread: the strip's preview.
+    public void LoadPreview(int maxWidth, int maxHeight, Action<byte[], int, int> ready)
+    {
+        _work.Add(() =>
+        {
+            var (width, height) = ImageSize();
+            var query = Encoding.UTF8.GetBytes("doc.pixels\0");
+            var empty = "{}"u8.ToArray();
+            OpBuffer buffer = default;
+            fixed (byte* id = query, json = empty)
+                Check(Native.op_query(_engine, _doc, id, json, (nuint)empty.Length, &buffer), "DOC_PIXELS");
+            try
+            {
+                var expected = (long)width * height * 4;
+                if ((long)buffer.len != expected) throw new InvalidOperationException($"DOC_PIXELS: {buffer.len} bytes, expected {expected}");
+                var (w, h, small) = Shrink(new ReadOnlySpan<byte>(buffer.ptr, (int)buffer.len), (int)width, (int)height, maxWidth, maxHeight);
+                Dispatcher.UIThread.Post(() => ready(small, w, h));
+            }
+            finally
+            {
+                Native.op_buffer_free(&buffer);
+            }
+        });
+    }
+
+    /// A box average of up to 4 by 4 samples per preview pixel, so a 24 MP image stays quick.
+    public static (int Width, int Height, byte[] Rgba) Shrink(ReadOnlySpan<byte> rgba, int width, int height, int maxWidth, int maxHeight)
+    {
+        const int Samples = 4;
+        var fit = Math.Min(1, Math.Min((double)maxWidth / width, (double)maxHeight / height));
+        var w = Math.Max(1, (int)Math.Round(width * fit));
+        var h = Math.Max(1, (int)Math.Round(height * fit));
+        var result = new byte[w * h * 4];
+        for (var y = 0; y < h; y++)
+        {
+            for (var x = 0; x < w; x++)
+            {
+                long r = 0, g = 0, b = 0, a = 0;
+                for (var sy = 0; sy < Samples; sy++)
+                {
+                    var py = Math.Min(height - 1, (int)((y + (sy + .5) / Samples) * height / h));
+                    for (var sx = 0; sx < Samples; sx++)
+                    {
+                        var px = Math.Min(width - 1, (int)((x + (sx + .5) / Samples) * width / w));
+                        var at = (py * (long)width + px) * 4;
+                        var alpha = rgba[(int)at + 3];
+                        r += rgba[(int)at] * alpha;
+                        g += rgba[(int)at + 1] * alpha;
+                        b += rgba[(int)at + 2] * alpha;
+                        a += alpha;
+                    }
+                }
+                var to = (y * w + x) * 4;
+                if (a > 0)
+                {
+                    result[to] = (byte)(r / a);
+                    result[to + 1] = (byte)(g / a);
+                    result[to + 2] = (byte)(b / a);
+                    result[to + 3] = (byte)(a / (Samples * Samples));
+                }
+            }
+        }
+        return (w, h, result);
+    }
+
     /// The fill around the image: the stage color, as on the Mac.
     public void SetBackground(byte red, byte green, byte blue)
     {

@@ -145,6 +145,7 @@ public sealed partial class TestReport
         text.Append("\n  },\n");
 
         await CheckCaptionInput(hwnd, problems, text);
+        await CheckShell(hwnd, problems, text);
 
         // A real menu opens as its own window, with its icons from disk.
         menu.Open();
@@ -178,7 +179,7 @@ public sealed partial class TestReport
             text.Append($"  \"drawable\": [{info.drawable_width}, {info.drawable_height}],\n  \"scale\": {info.scale},\n");
         }
         text.Append($"  \"image\": \"{_window.Status.ImageValue.Text}\",\n");
-        text.Append($"  \"title\": \"{_window.Title}\",\n");
+        text.Append($"  \"title\": \"{_window.Title}\",\n  \"palette\": \"{_window.Palette.Name}\",\n  \"theme\": \"{_window.ActualThemeVariant}\",\n");
         text.Append($"  \"problems\": [{string.Join(", ", problems.Select(p => $"\"{p}\""))}]\n}}\n");
         File.WriteAllText(path, text.ToString());
         return problems;

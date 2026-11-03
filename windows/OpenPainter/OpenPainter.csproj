@@ -23,6 +23,8 @@
     <Compile Include="../../tools/ui-look/app/src/Ui.cs" Link="src/Look/Ui.cs" />
     <EmbeddedResource Include="../assets/catalog/mac-catalog.json" LogicalName="mac-catalog.json" />
     <Content Include="../assets/icons/*.svg" Link="assets/icons/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../assets/icons/16/*.svg" Link="assets/icons/16/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../assets/icons/12/*.svg" Link="assets/icons/12/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../engine/target/release/op_ffi.dll" Link="op_ffi.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../../engine/target/release/op_ffi.dll')" />
   </ItemGroup>
 </Project>

@@ -1,11 +1,13 @@
 // The 28 pixel status bar, with the Mac's words and order (StatusBarView.swift):
 // the tool hint on the left; Selection, Cursor, Image, Profile, Units, the zoom
 // field, Fit, 100% and the zoom slider on the right. On a tight window the hint
-// hides first. The values and buttons get their math in a later stage of W7.
+// hides first.
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
+using OpenPainter.Canvas;
 using UiLook;
 
 namespace OpenPainter.Shell;
@@ -14,9 +16,14 @@ public sealed class StatusBar : Grid
 {
     /// The space StatusBarView.swift keeps before it hides the hint.
     const double HintMargin = 40;
-    const double MinimumZoom = 0.01, MaximumZoom = 32;   // ZoomPresets.minimum and maximum.
 
     readonly StackPanel _right;
+    bool _showing;
+    string _shownText = "100%";
+
+    /// The field holds something other than what the view last showed there.
+    bool Typing => ZoomField.Text != _shownText;
+    double _zoom = 1;
 
     public TextBlock Hint { get; }
     public TextBlock SelectionValue { get; }
@@ -28,6 +35,12 @@ public sealed class StatusBar : Grid
     public Button FitButton { get; }
     public Button ActualButton { get; }
     public Slider ZoomSlider { get; }
+
+    /// A new zoom from the field or the slider, or the 100% button.
+    public event Action<double>? ZoomChosen;
+
+    /// The Fit button.
+    public event Action? FitChosen;
 
     public StatusBar(Palette p)
     {
@@ -78,14 +91,60 @@ public sealed class StatusBar : Grid
         ActualButton = Ui.Push(p, "100%", 52);
         _right.Children.Add(FitButton);
         _right.Children.Add(ActualButton);
-        ZoomSlider = Ui.Slide(p, Math.Log(MinimumZoom), Math.Log(MaximumZoom), 0, 96);
+        ZoomSlider = Ui.Slide(p, Math.Log(ZoomPresets.Minimum), Math.Log(ZoomPresets.Maximum), 0, 96);
         AutomationProperties.SetName(ZoomSlider, "Zoom slider");
         _right.Children.Add(ZoomSlider);
         SetColumn(_right, 1);
         Children.Add(_right);
 
         SizeChanged += (_, _) => UpdateHint();
+
+        FitButton.Click += (_, _) => FitChosen?.Invoke();
+        ActualButton.Click += (_, _) => ZoomChosen?.Invoke(1);
+        ZoomField.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            CommitTyping();
+            e.Handled = true;
+        };
+        ZoomField.LostFocus += (_, _) => CommitTyping();
+        ZoomSlider.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty && !_showing)
+                ZoomChosen?.Invoke(ZoomPresets.Clamp(Math.Exp(ZoomSlider.Value)));
+        };
     }
+
+    /// Shows a zoom without reporting a change. The field keeps what the user is typing.
+    public void ShowZoom(double zoom)
+    {
+        _zoom = zoom;
+        _showing = true;
+        if (!Typing) ShowText(ZoomPresets.Label(zoom));
+        ZoomSlider.Value = Math.Log(zoom);
+        _showing = false;
+    }
+
+    /// Takes what the user typed in the zoom field. Bad input shows the real zoom again, as
+    /// on the Mac. The native canvas takes focus with no word to Avalonia, so a press there
+    /// calls this too, and the field does not rely on its focus state.
+    public void CommitTyping()
+    {
+        if (!Typing) return;
+        var zoom = ZoomPresets.ParseField(ZoomField.Text);
+        ShowText(ZoomPresets.Label(_zoom));
+        if (zoom is { } chosen) ZoomChosen?.Invoke(chosen);
+    }
+
+    void ShowText(string text)
+    {
+        _shownText = text;
+        ZoomField.Text = text;
+    }
+
+    /// The pointer's position in whole document pixels, or a dash when it is off the canvas.
+    public void ShowCursor(Point? at) =>
+        CursorValue.Text = at is { } p ? $"{(long)Math.Floor(p.X)}, {(long)Math.Floor(p.Y)}" : "–";
 
     void UpdateHint() => Hint.IsVisible = HintFits(_right.Bounds.Width + _right.Margin.Right, Bounds.Width);
 

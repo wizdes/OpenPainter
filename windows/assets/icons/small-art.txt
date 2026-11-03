@@ -1,0 +1,8 @@
+# Smaller Fluent art, for icons that draw at 16 or 12: file, package name, SHA-256 of the unchanged package file.
+16/window-close.svg dismiss_16_regular 16ad1ebc24e77252d69c5b2a8c036ce428621d4045cc3ac64599267c604dd0c6
+16/cmd-undo.svg arrow_undo_16_regular 12942cbdda117162eb112c4bbeadf343c7c88d6044ce01fa1b97f42f72d1e076
+16/cmd-redo.svg arrow_redo_16_regular 5d17841a523fba76547fc721fa8cfc141f4ff8c1ab64ab0fcf778e35982a6c27
+16/opt-minus.svg subtract_16_regular 70e6ea1034de2462d670562e50d108a8ba9e26f110a22858cca03b866989147a
+16/opt-plus.svg add_16_regular b8b037be8992c6da600a47388aec7bc3df66b7d7748d12a6e50a7e8a1eee603e
+16/opt-overflow.svg chevron_double_right_16_regular 67f59dacb708a2662ffedef5c63e360e08ec225af5959ca87a9ca0cfc862c2ba
+12/window-close.svg dismiss_12_regular d71ea501fbd6b56ad0646b5f5bc8baf83c3772dfb19c3a3157033c50f368c635

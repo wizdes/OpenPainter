@@ -102,6 +102,7 @@ public sealed class TitleRow : Grid
 public sealed class CatalogMenuItem : MenuItem
 {
     public const string GesturePart = "PART_InputGestureText";
+    public const string IconPart = "PART_IconPresenter";
 
     protected override Type StyleKeyOverride => typeof(MenuItem);
 
@@ -111,6 +112,11 @@ public sealed class CatalogMenuItem : MenuItem
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
+        // Fluent's icon box is 16, which would scale the 20 pixel art down and blur it.
+        var box = e.NameScope.Find<Control>(IconPart)
+            ?? throw new InvalidOperationException($"MENU: Fluent's MenuItem template has no {IconPart}");
+        box.Width = Tokens.IconSize;
+        box.Height = Tokens.IconSize;
         if (Entry.Key is null) return;
         var text = e.NameScope.Find<TextBlock>(GesturePart)
             ?? throw new InvalidOperationException($"MENU: Fluent's MenuItem template has no {GesturePart}");
@@ -140,41 +146,18 @@ public static class MenuBuilder
             };
             WindowDecorationProperties.SetElementRole(top, WindowDecorationsElementRole.User);
             KeyboardNavigation.SetIsTabStop(top, false);
-            Fill(top, menu.Items, palette, actions);
+            Fill(top.Items, menu.Items, palette, actions);
+            top.SubmenuOpened += LoadOnce(top, palette);
             bar.Items.Add(top);
         }
         return bar;
     }
 
-    static void Fill(MenuItem parent, IReadOnlyList<MenuEntry> entries, Palette palette, IReadOnlyDictionary<string, Action> actions)
+    /// Icons load the first time a menu opens, so they cost nothing at startup.
+    static EventHandler<Avalonia.Interactivity.RoutedEventArgs> LoadOnce(MenuItem parent, Palette palette)
     {
-        foreach (var entry in entries)
-        {
-            if (entry.Kind == EntryKind.Separator)
-            {
-                parent.Items.Add(new Separator());
-                continue;
-            }
-            var item = new CatalogMenuItem(entry) { Header = entry.Title, FontSize = Tokens.FontBody };
-            AutomationProperties.SetName(item, entry.Title);
-            if (entry.Key is not null) item.InputGesture = WindowsKeys.Gesture(entry.Key);
-            if (entry.Kind == EntryKind.Menu)
-            {
-                Fill(item, entry.Items, palette, actions);
-            }
-            else if (actions.TryGetValue(entry.Action, out var action))
-            {
-                item.Click += (_, _) => action();
-            }
-            else
-            {
-                item.IsEnabled = false;
-            }
-            parent.Items.Add(item);
-        }
-        // Icons load the first time a menu opens, so they cost nothing at startup.
         var loaded = false;
-        parent.SubmenuOpened += (_, e) =>
+        return (_, e) =>
         {
             if (loaded || !ReferenceEquals(e.Source, parent)) return;
             loaded = true;
@@ -182,10 +165,49 @@ public static class MenuBuilder
         };
     }
 
-    public static void LoadIcons(MenuItem parent, Palette palette)
+    /// An item works when the actions name its path, or its action.
+    public static bool TryAction(MenuEntry entry, IReadOnlyDictionary<string, Action> actions, out Action action) =>
+        actions.TryGetValue(entry.Path, out action!) || actions.TryGetValue(entry.Action, out action!);
+
+    public static void Fill(ItemCollection parent, IReadOnlyList<MenuEntry> entries, Palette palette, IReadOnlyDictionary<string, Action> actions)
     {
-        foreach (var item in parent.Items.OfType<MenuItem>())
+        foreach (var entry in entries)
+        {
+            if (entry.Kind == EntryKind.Separator)
+            {
+                parent.Add(new Separator());
+                continue;
+            }
+            var item = new CatalogMenuItem(entry) { Header = entry.Title, FontSize = Tokens.FontBody };
+            AutomationProperties.SetName(item, entry.Title);
+            if (entry.Key is not null) item.InputGesture = WindowsKeys.Gesture(entry.Key);
+            if (entry.Kind == EntryKind.Menu)
+            {
+                Fill(item.Items, entry.Items, palette, actions);
+                item.SubmenuOpened += LoadOnce(item, palette);
+            }
+            else if (TryAction(entry, actions, out var action))
+            {
+                item.Click += (_, _) => action();
+                if (entry.Action.StartsWith(PanelActionPrefix, StringComparison.Ordinal)) item.ToggleType = MenuItemToggleType.CheckBox;
+            }
+            else
+            {
+                item.IsEnabled = false;
+            }
+            parent.Add(item);
+        }
+    }
+
+    public const string PanelActionPrefix = "panel:";
+
+    public static void LoadIcons(MenuItem parent, Palette palette) => LoadIcons(parent.Items.OfType<MenuItem>(), palette);
+
+    /// At 20, because 48 of the icon files have no 16 pixel art: 33 Fluent files and the 15 own-work files.
+    public static void LoadIcons(IEnumerable<MenuItem> items, Palette palette)
+    {
+        foreach (var item in items)
             if (item is CatalogMenuItem { Entry.Icon: not null } catalogItem)
-                item.Icon = new IconView(catalogItem.Entry.Icon, item.IsEnabled ? palette.Ink : palette.Disabled, Tokens.SmallIconSize);
+                item.Icon = new IconView(catalogItem.Entry.Icon, item.IsEnabled ? palette.Ink : palette.Disabled);
     }
 }
