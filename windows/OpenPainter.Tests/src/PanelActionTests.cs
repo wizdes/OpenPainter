@@ -17,6 +17,15 @@ public static partial class PanelActions
         ("Layer Properties", "mac/OpenPainterKit/Sources/Shell/LayerProperties.swift", "class LayerPropertiesController"),
     ];
 
+    /// Stage 2's panels. They read and count the same way as `Sources`. ThePanelsLeftForStage2HaveAPlace
+    /// holds `Sources` to its three names and is a committed test, so these sit beside it until
+    /// that test may change.
+    public static readonly (string Panel, string File, string From)[] Stage2Sources =
+    [
+        ("Tools", "mac/OpenPainterKit/Sources/Shell/PanelViews.swift", "class ToolsPanelView"),
+        ("Colors", "mac/OpenPainterKit/Sources/Shell/ColorsPanel.swift", "class ColorsPanelView"),
+    ];
+
     [GeneratedRegex(@"^\s*//.*$", RegexOptions.Multiline)] private static partial Regex CommentLine();
     [GeneratedRegex(@"""((?:layer|edit|history|preview)\.\w+)""")] private static partial Regex EngineCommand();
     [GeneratedRegex(@"#selector\((\w+)(?:\(_:\))?\)")] private static partial Regex Selector();
@@ -43,7 +52,7 @@ public static partial class PanelActions
         return found.ToList();
     }
 
-    public static IReadOnlyList<string> All() => Sources.SelectMany(s =>
+    public static IReadOnlyList<string> All() => Sources.Concat(Stage2Sources).SelectMany(s =>
     {
         var source = Repo.Read(s.File);
         var from = source.IndexOf(s.From, StringComparison.Ordinal);
@@ -102,6 +111,30 @@ public static partial class PanelActions
         ["Layer Properties: selector cancel"] = ["CancelLeavesLayersHistoryAndPixelsAsTheyWere"],
         ["Layer Properties: selector ok"] = ["OkAfterManyChangesIsOneStepWithTheLastValues"],
         ["Layer Properties: callback Close"] = ["ThePanelCommandsAreOffWhileItIsUpAndComeBack"],
+
+        ["Tools: selector picked"] = ["AClickOnAToolCellSelectsItAndTheRowHintAndCursorFollow", "AToolThatCannotRunYetIsStillSelectableAndSaysSo"],
+        // The Swift file's shared list row, which History and Layers use.
+        ["Tools: control titleLabel"] = ["TheListShowsTheTopLayerFirstAndMarksTheActiveOne"],
+        ["Tools: control detailLabel"] = ["TheDetailLineIsTheMacs", "TheDetailLineFitsTheDefaultPanelWidth"],
+
+        ["Colors: button swapButton"] = ["TheSwatchesSwapResetAndMoveTheNotch"],
+        ["Colors: button resetButton"] = ["TheSwatchesSwapResetAndMoveTheNotch"],
+        ["Colors: button moreButton"] = ["MoreShowsSlidersFieldsAndAll96AndResizesThePanels"],
+        ["Colors: button addColorButton"] = ["PaletteClicksAddModeAndTheChosenMark"],
+        ["Colors: button paletteButton"] = ["TheMenuHasTheMacsItemsAndSaveWaitsForW10"],
+        ["Colors: selector swap"] = ["TheSwatchesSwapResetAndMoveTheNotch"],
+        ["Colors: selector reset"] = ["TheSwatchesSwapResetAndMoveTheNotch"],
+        ["Colors: selector hexEntered"] = ["TheHexFieldRefusesBadInputAndKeepsAlpha", "EndingAnUnchangedFieldEditKeepsAColorSetElsewhere"],
+        ["Colors: selector entered"] = ["MoreShowsSlidersFieldsAndAll96AndResizesThePanels", "EndingAnUnchangedFieldEditKeepsAColorSetElsewhere"],
+        ["Colors: selector toggleMore"] = ["MoreShowsSlidersFieldsAndAll96AndResizesThePanels"],
+        ["Colors: selector addColorToggled"] = ["PaletteClicksAddModeAndTheChosenMark"],
+        ["Colors: selector showPaletteMenu"] = ["TheMenuHasTheMacsItemsAndSaveWaitsForW10"],
+        ["Colors: selector loadPaletteChosen"] = ["LoadPaletteAsksForAFileAndLoadsWhatComesBack", "PaletteSaveAndLoadRoundTripAndReport"],
+        // The menu item waits for W10. The save itself works and is tested.
+        ["Colors: selector savePaletteChosen"] = ["TheMenuHasTheMacsItemsAndSaveWaitsForW10", "PaletteSaveAndLoadRoundTripAndReport"],
+        ["Colors: selector resetPalette"] = ["ResetToDefaultPaletteBringsItBackAndSaysSo"],
+        ["Colors: callback Pick"] = ["TheWheelEditsTheActiveSlotAndARightClickTheOther", "PaletteClicksAddModeAndTheChosenMark", "TheSwatchesSwapResetAndMoveTheNotch"],
+        ["Colors: callback Change"] = ["MoreShowsSlidersFieldsAndAll96AndResizesThePanels"],
     };
 
     /// What is wrong with a list of actions against the covered table, each by name.
@@ -164,6 +197,18 @@ public sealed class PanelActionTests
         var problems = PanelActions.Problems(["a"], covered, new HashSet<string>());
         Assert.Contains("a: no test named GoneTest", problems);
         Assert.Contains("no such action on the Mac: b", problems);
+    }
+
+    [Fact]
+    public void ToolsAndColorsJoinTheListFromTheirSwiftSources()
+    {
+        var all = PanelActions.All();
+        Assert.Contains("Tools: selector picked", all);
+        Assert.Contains("Colors: selector hexEntered", all);
+        Assert.Contains("Colors: button paletteButton", all);
+        Assert.Contains("Colors: callback Pick", all);
+        Assert.Equal(["Tools", "Colors"], PanelActions.Stage2Sources.Select(s => s.Panel));
+        Assert.All(PanelActions.Stage2Sources, s => Assert.True(File.Exists(Repo.File(s.File)), s.File));
     }
 
     [Fact]

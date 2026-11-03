@@ -667,8 +667,6 @@ public sealed class PanelStateTests
         history.UpdateLayout();
         Assert.Equal(3, history.GetVisualDescendants().OfType<IconView>().Count());
         Assert.Same(w.Panels.History, history.Body);
-        Assert.Null(w.Panels.Panels[PanelLayout.Tools].Body);
-        Assert.Null(w.Panels.Panels[PanelLayout.Colors].Body);
         w.Close();
     }
 }

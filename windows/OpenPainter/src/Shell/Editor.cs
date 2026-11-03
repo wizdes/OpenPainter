@@ -13,6 +13,9 @@ public sealed record DocInfo(int Width, int Height, IReadOnlyList<LayerInfo> Lay
 {
     public static readonly DocInfo Empty = new(0, 0, [], 0, [], [], 0, false, 0);
 
+    public bool ProfileEmbedded { get; init; }
+    public string ProfileDescription { get; init; } = "";
+
     public static DocInfo Parse(byte[] json)
     {
         using var document = JsonDocument.Parse(json);
@@ -27,7 +30,27 @@ public sealed record DocInfo(int Width, int Height, IReadOnlyList<LayerInfo> Lay
             l.GetProperty("revision").GetInt64())).ToList();
         return new DocInfo(r.GetProperty("width").GetInt32(), r.GetProperty("height").GetInt32(), layers, r.GetProperty("active_layer").GetInt32(),
             Words(r.GetProperty("history_labels")), Words(r.GetProperty("history_commands")), r.GetProperty("history_index").GetInt32(),
-            r.GetProperty("dirty").GetBoolean(), r.GetProperty("revision").GetInt64());
+            r.GetProperty("dirty").GetBoolean(), r.GetProperty("revision").GetInt64())
+        {
+            ProfileEmbedded = r.GetProperty("profile_embedded").GetBoolean(),
+            ProfileDescription = r.GetProperty("profile_description").GetString() ?? "",
+        };
+    }
+}
+
+/// The profile's names for the status bar: ColorProfileNames in ColorProfile.swift.
+public static class ColorProfileNames
+{
+    public const string NoneTitle = "None, treated as sRGB";
+    const int ShortLimit = 18;   // The longest status bar name before it is cut with "…".
+
+    public static string Full(DocInfo info) => info.ProfileEmbedded ? info.ProfileDescription : NoneTitle;
+
+    public static string Short(DocInfo info)
+    {
+        if (!info.ProfileEmbedded) return "sRGB (none)";
+        var name = ColorText.TrimSpaces(info.ProfileDescription);
+        return name.Length <= ShortLimit ? name : ColorText.TrimSpaces(name[..(ShortLimit - 1)]) + "…";
     }
 }
 
@@ -39,6 +62,9 @@ public sealed class Editor : IDisposable
     public EngineClient Client { get; }
     public ulong Document { get; }
     public DocInfo Info { get; private set; } = DocInfo.Empty;
+
+    /// The document's pixels per inch: `doc.resolution`.
+    public double Dpi { get; private set; } = 96;
     public IReadOnlyDictionary<string, bool> Enabled { get; private set; } = new Dictionary<string, bool>();
 
     /// The last message for the status bar: the engine's errors.
@@ -71,6 +97,8 @@ public sealed class Editor : IDisposable
         try
         {
             Info = DocInfo.Parse(Client.Query(Document, "doc.info", EngineParams.None));
+            using (var resolution = JsonDocument.Parse(Client.Query(Document, "doc.resolution", EngineParams.None)))
+                Dpi = resolution.RootElement.GetProperty("dpi").GetDouble();
             using var list = JsonDocument.Parse(Client.Query(Document, "commands.list", EngineParams.None));
             var enabled = new Dictionary<string, bool>();
             foreach (var command in list.RootElement.EnumerateArray())

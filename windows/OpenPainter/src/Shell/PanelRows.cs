@@ -13,9 +13,21 @@ using UiLook;
 namespace OpenPainter.Shell;
 
 /// What the panels work on, and whether a dialog holds them off.
-public sealed class PanelContext
+public sealed class PanelContext(ToolState tools)
 {
+    public ToolState Tools { get; } = tools;
+
     public Editor? Editor { get; set; }
+
+    /// A line for the status bar: palette reports.
+    public Action<string>? Report { get; set; }
+
+    /// A field took bad input: NSSound.beep on the Mac.
+    public Action? Refused { get; set; }
+
+    /// Asks the user for a palette file to load. Null means no file was chosen. Tests set this,
+    /// because the system's file picker needs a real pointer.
+    public Func<TopLevel, Task<string?>>? PickPaletteFile { get; set; }
 
     /// Commands are off while a dialog is up on the document.
     public bool Busy { get; set; }
@@ -27,6 +39,8 @@ public sealed class PanelContext
 /// One list row: a 2 pixel edge and a diamond when current, and an optional detail line.
 public class PanelRow : Grid
 {
+    const double DetailFont = 11;
+
     protected readonly Palette Look;
     Point _downAt;
     bool _down;
@@ -63,7 +77,8 @@ public class PanelRow : Grid
         Children.Add(TitleLabel);
         if (detail is not null)
         {
-            DetailLabel = Ui.Label(detail, p.Muted, Tokens.FontSmall);
+            // PanelRow.detailLabel: a size smaller than the title, which is what fits it on the Mac.
+            DetailLabel = Ui.Label(detail, p.Muted, DetailFont);
             DetailLabel.Height = 16;
             DetailLabel.VerticalAlignment = VerticalAlignment.Top;
             DetailLabel.Margin = new Thickness(textLeft, height / 2 + 1, textRight, 0);

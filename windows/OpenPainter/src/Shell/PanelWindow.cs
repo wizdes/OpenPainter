@@ -1,7 +1,7 @@
 // The four floating panels as top-level tool windows owned by the main window, as the
 // Mac's are separate windows (PanelManager.swift). The native canvas cannot have Avalonia
-// controls drawn over it, and an owned window can sit over it. History and Layers have their
-// lists from W8. Each keeps the system frame, its shadow and its resize edges.
+// controls drawn over it, and an owned window can sit over it. Each keeps the system frame,
+// its shadow and its resize edges.
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Automation;
@@ -183,9 +183,10 @@ public sealed class PanelManager
     /// The screens' work areas in layout points. Tests set this, as the Mac's do.
     public Func<IReadOnlyList<Rect>> Screens { get; set; }
 
-    public PanelManager(Window owner, IReadOnlyList<CatalogPanel> panels, Palette palette, Func<Rect> stageOnScreen)
+    public PanelManager(Window owner, IReadOnlyList<CatalogPanel> panels, Palette palette, Func<Rect> stageOnScreen, ToolState tools)
     {
         _owner = owner;
+        Context = new PanelContext(tools);
         _stageOnScreen = stageOnScreen;
         Screens = OwnerScreens;
         foreach (var panel in panels)
@@ -194,6 +195,8 @@ public sealed class PanelManager
             {
                 PanelLayout.History => look => new HistoryPanel(look, Context),
                 PanelLayout.Layers => look => new LayersPanel(look, Context),
+                PanelLayout.Tools => look => new ToolsPanel(look, Context),
+                PanelLayout.Colors => look => new ColorsPanel(look, Context, ColorsMemory, SetColorsExpanded),
                 _ => null,
             };
             var window = new PanelWindow(panel, palette, body);
@@ -211,8 +214,28 @@ public sealed class PanelManager
 
     public IReadOnlyDictionary<string, PanelWindow> Panels => _panels;
 
-    /// What History and Layers work on. Set it, then call ReloadPanels.
-    public PanelContext Context { get; } = new();
+    /// What the panels work on. Set its Editor, then call ReloadPanels.
+    public PanelContext Context { get; }
+
+    /// What Colors keeps across a theme change, which rebuilds it.
+    public ColorsMemory ColorsMemory { get; } = new();
+    Rect? _toolsBeforeExpand;
+
+    /// PanelManager.setColorsExpanded with Workspace's memory: More and Less resize Colors and
+    /// Tools above it, and Less gives Tools back the frame it had.
+    public void SetColorsExpanded(bool on)
+    {
+        var before = FrameOf(_panels[PanelLayout.Tools]);
+        var colors = _panels[PanelLayout.Colors];
+        var (frame, tools) = PanelLayout.ColorsFrames(FrameOf(colors), IsShown(PanelLayout.Tools) ? before : null, on, _stageOnScreen(), on ? null : _toolsBeforeExpand);
+        SetFrame(colors, frame);
+        if (tools is { } t && IsShown(PanelLayout.Tools)) SetFrame(_panels[PanelLayout.Tools], t);
+        _toolsBeforeExpand = on ? before : null;
+        Changed?.Invoke();
+    }
+
+    public ToolsPanel Tools => (ToolsPanel)(_panels[PanelLayout.Tools].Body ?? throw new InvalidOperationException("PANEL: Tools has no body"));
+    public ColorsPanel Colors => (ColorsPanel)(_panels[PanelLayout.Colors].Body ?? throw new InvalidOperationException("PANEL: Colors has no body"));
     public HistoryPanel History => (HistoryPanel)(_panels[PanelLayout.History].Body ?? throw new InvalidOperationException("PANEL: History has no list"));
     public LayersPanel Layers => (LayersPanel)(_panels[PanelLayout.Layers].Body ?? throw new InvalidOperationException("PANEL: Layers has no list"));
 

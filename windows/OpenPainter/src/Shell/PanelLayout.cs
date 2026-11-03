@@ -50,6 +50,29 @@ public static class PanelLayout
         return frames;
     }
 
+    /// PanelLayout.colorsFrames: Colors and Tools frames for More (expanded) or Less. Colors keeps
+    /// its bottom edge and grows up to 470 points or the room left under Tools at its 94 point
+    /// minimum. Tools, when it sits above Colors, shortens to leave a 12 point gap. Less goes
+    /// back to 246 points and gives Tools `restoreTools`.
+    public static (Rect Colors, Rect? Tools) ColorsFrames(Rect colors, Rect? tools, bool expanded, Rect bounds, Rect? restoreTools = null)
+    {
+        var c = colors;
+        bool Stacked(Rect t) => t.Right > c.X && t.X < c.Right && t.Center.Y < c.Center.Y;
+        if (!expanded)
+        {
+            var height = DefaultSize(Colors).Height;
+            return (new Rect(c.X, c.Bottom - height, c.Width, height), restoreTools ?? tools);
+        }
+        var limit = bounds.Y + Clearance;
+        var toolsLeast = MinimumSize(Tools).Height;
+        if (tools is { } above && Stacked(above)) limit = Math.Max(limit, above.Y + toolsLeast + Clearance);
+        var h = Math.Max(MinimumSize(Colors).Height, Math.Min(Tokens.ColorsExpandedHeight, c.Bottom - limit));
+        var grown = new Rect(c.X, c.Bottom - h, c.Width, h);
+        if (tools is not { } t || !Stacked(t) || t.Bottom <= grown.Y - Clearance) return (grown, tools);
+        var toolsHeight = Math.Max(toolsLeast, grown.Y - Clearance - t.Y);
+        return (grown, new Rect(t.X, t.Y, t.Width, toolsHeight));
+    }
+
     /// PanelLayout.titleStrip: the top of a frame, which a pointer must be able to reach.
     const double TitleStrip = 24, LeastTitleWidth = 60, LeastTitleHeight = 20;
 

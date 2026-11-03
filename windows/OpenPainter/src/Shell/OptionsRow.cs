@@ -110,6 +110,11 @@ public sealed class OptionsRow : Grid
     readonly Border _leftCover, _rightCover;
     readonly StackPanel _moreContent = new() { Name = "MoreContent", Spacing = Tokens.OptionItemGap, Margin = new Thickness(12) };
     readonly List<(int Index, Control Group)> _moved = [];
+    readonly List<(string Name, Control Control)> _named = [];
+    readonly List<Action> _syncs = [];
+    bool _syncing;
+    SelectStyleChoice _shownStyle;
+    int _styleGroupAt = -1;
 
     public IReadOnlyDictionary<string, IconCommand> Commands { get; }
     public IconCommand MoreCommands { get; }
@@ -122,6 +127,11 @@ public sealed class OptionsRow : Grid
     public double LeftCover => _leftCover.Width;
     public IReadOnlyList<Control> Groups => _groups.Children.ToList();
     public Panel MoreGroups => _moreContent;
+
+    /// A control of the current row by its name, and the kind asked for.
+    public T Option<T>(string name) where T : Control =>
+        _named.Where(n => n.Name == name).Select(n => n.Control).OfType<T>().FirstOrDefault()
+        ?? throw new InvalidOperationException($"OPTIONS: this row has no {typeof(T).Name} named {name}");
 
     public OptionsRow(Palette palette, ToolState tools, IReadOnlyList<MenuEntry> menus, IReadOnlyList<CatalogPanel> panels, IReadOnlyDictionary<string, Action> actions)
     {
@@ -200,7 +210,12 @@ public sealed class OptionsRow : Grid
 
         ShowTool();
         tools.Changed += OnToolChanged;
-        DetachedFromVisualTree += (_, _) => tools.Changed -= OnToolChanged;
+        tools.ValuesChanged += OnValuesChanged;
+        DetachedFromVisualTree += (_, _) =>
+        {
+            tools.Changed -= OnToolChanged;
+            tools.ValuesChanged -= OnValuesChanged;
+        };
         Scroller.ScrollChanged += (_, _) => UpdateFit();
         SizeChanged += (_, _) => UpdateFit();
         _groups.SizeChanged += (_, _) => UpdateFit();
@@ -276,10 +291,46 @@ public sealed class OptionsRow : Grid
         // The picker stays in place, because its own selection change can land here.
         while (_groups.Children.Count > 1) _groups.Children.RemoveAt(1);
         if (_groups.Children.Count == 0) _groups.Children.Add(ToolPicker);
-        foreach (var group in OptionRows.For(_tools.Current, _tools.CurrentTool.Options))
-            _groups.Children.Add(BuildGroup(group));
+        _named.Clear();
+        _syncs.Clear();
+        var tool = _tools.CurrentTool;
+        var settings = _tools.Settings;
+        var fonts = tool.Options == "text" ? FontFamilies.ForChoice(settings.Text.Family) : null;
+        foreach (var group in OptionRows.For(tool.Id, tool.Options, settings, fonts)) _groups.Children.Add(BuildGroup(group));
+        _shownStyle = settings.SelectStyle;
+        // The Style's extra group goes after the Style's own, so it comes and goes alone.
+        _styleGroupAt = tool.Id is "rectangleSelect" or "ellipseSelect" ? 3 : -1;
         Scroller.Offset = default;
         if (Commands.TryGetValue("wand", out var wand)) wand.On = _tools.Current == ToolState.MagicWand;
+    }
+
+    void OnValuesChanged()
+    {
+        if (_styleGroupAt >= 0 && _shownStyle != _tools.Settings.SelectStyle) ShowStyleGroup();
+        Sync();
+    }
+
+    /// The Style changed. Its own control is mid event, so only the group after it changes.
+    void ShowStyleGroup()
+    {
+        CloseMore();
+        _shownStyle = _tools.Settings.SelectStyle;
+        if (_groups.Children.Count > _styleGroupAt) _groups.Children.RemoveAt(_styleGroupAt);
+        _named.RemoveAll(n => n.Name is OptionBinding.RatioWidth or OptionBinding.RatioHeight or OptionBinding.SizeWidth or OptionBinding.SizeHeight);
+        if (OptionRows.StyleGroup(_tools.Settings) is { } group) _groups.Children.Add(BuildGroup(group));
+    }
+
+    /// Copies the settings into the controls. A field being typed in keeps its text.
+    void Sync()
+    {
+        _syncing = true;
+        foreach (var sync in _syncs.ToList()) sync();
+        _syncing = false;
+    }
+
+    void Change(Func<ToolSettings, ToolSettings> edit)
+    {
+        if (!_syncing) _tools.Settings = edit(_tools.Settings);
     }
 
     Control BuildGroup(IEnumerable<OptionItem> items)
@@ -291,13 +342,12 @@ public sealed class OptionsRow : Grid
             row.Children.Add(item switch
             {
                 OptionLabel l => Ui.Label(l.Text, p.Muted),
-                OptionField f => Named(Ui.Field(p, f.Text, 52, Tokens.OptionHeight), f.Name),
+                OptionField f => BuildField(f),
                 OptionChoice c => BuildChoice(c),
                 OptionCheck c => BuildCheck(c),
-                // Not working until W8, so present and off.
-                OptionStep s => new IconCommand(p, s.Icon, s.Name, iconSize: Tokens.SmallIconSize, enabled: false),
-                OptionToggle t => new IconCommand(p, t.Icon, t.Name, on: t.On),
-                OptionSlide s => Named(Ui.Slide(p, s.Min, s.Max, s.Value, 96), s.Name),
+                OptionStep s => BuildStep(s),
+                OptionToggle t => BuildToggle(t),
+                OptionSlide s => BuildSlide(s),
                 OptionPush b => BuildPush(b),
                 _ => throw new InvalidOperationException($"OPTIONS: unknown row item {item}"),
             });
@@ -305,32 +355,173 @@ public sealed class OptionsRow : Grid
         return row;
     }
 
-    static T Named<T>(T control, string name) where T : Control
+    T Named<T>(T control, string name) where T : Control
     {
         AutomationProperties.SetName(control, name);
+        _named.Add((name, control));
         return control;
+    }
+
+    /// The Mac's own tips for the controls that have one.
+    static string? Tip(string name) => name switch
+    {
+        OptionBinding.ToleranceAlpha => "Premultiplied: transparent pixels match. Straight: they match only when their colors match.",
+        "Finish fill or selection" => "Finish (Enter): keep the result; Escape undoes the click",
+        "Finish text" => "Finish: commit the text to the layer",
+        _ => null,
+    };
+
+    Control BuildField(OptionField f)
+    {
+        var grid = Ui.Field(_palette, f.Text, f.Width, Tokens.OptionHeight);
+        var box = ((Grid)grid).Children.OfType<TextBox>().Single();
+        Named(box, f.Name);
+        AutomationProperties.SetName(grid, f.Name);
+        var shown = f.Text;
+        void Show()
+        {
+            shown = OptionBinding.FieldText(_tools.Settings, f.Name);
+            box.Text = shown;
+        }
+        void Commit()
+        {
+            // Ending an edit that changed nothing must not write the old text over a newer value.
+            if (box.Text != shown) _tools.Settings = OptionBinding.WithField(_tools.Settings, f.Name, box.Text ?? "");
+            // Shows the clamped value, or the old one after bad input.
+            Show();
+        }
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            Commit();
+            e.Handled = true;
+        };
+        box.LostFocus += (_, _) => Commit();
+        _syncs.Add(() => { if (!box.IsFocused) Show(); });
+        return grid;
     }
 
     Control BuildChoice(OptionChoice c)
     {
-        var box = Ui.Choice(_palette, c.Items[0], c.Width, c.Name == "Font size" ? Tokens.OptionHeight : Tokens.ChoiceHeight, c.Name == "Font size" ? 8 : 10);
+        var isSize = c.Name == OptionBinding.FontSize;
+        var box = Ui.Choice(_palette, c.Items[0], c.Width, isSize ? Tokens.OptionHeight : Tokens.ChoiceHeight, isSize ? 8 : 10);
         foreach (var item in c.Items.Skip(1)) box.Items.Add(item);
+        Named(box, c.Name);
+        if (Tip(c.Name) is { } tip) ToolTip.SetTip(box, tip);
+        if (isSize) return BuildFontSize(box);
         box.SelectedIndex = c.Selected;
-        if (c.Name == "Font size") box.Background = Ui.B(_palette.Field);
-        return Named(box, c.Name);
+        if (c.Name == OptionBinding.Font)
+        {
+            box.SelectionChanged += (_, _) =>
+            {
+                if (box.SelectedItem is string family) Change(s => s with { Text = s.Text with { Family = family } });
+            };
+            _syncs.Add(() => box.SelectedItem = c.Items[OptionRows.FontIndex(c.Items, _tools.Settings.Text.Family)]);
+            return box;
+        }
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex >= 0) Change(s => OptionBinding.WithChoice(s, _tools.Current, c.Name, box.SelectedIndex));
+        };
+        _syncs.Add(() => box.SelectedIndex = OptionBinding.Choice(_tools.Settings, _tools.Current, c.Name));
+        return box;
+    }
+
+    /// The Mac's size box takes a step from its list or a typed number.
+    Control BuildFontSize(ComboBox box)
+    {
+        box.Background = Ui.B(_palette.Field);
+        box.IsEditable = true;
+        // Fluent's text box sits high in a box this short.
+        box.TemplateApplied += (_, e) =>
+        {
+            var text = e.NameScope.Find<TextBox>("PART_EditableTextBox") ?? throw new InvalidOperationException("Fluent's ComboBox template has no PART_EditableTextBox");
+            text.MinHeight = 0;
+            text.Padding = new Thickness(0);
+            text.VerticalContentAlignment = VerticalAlignment.Center;
+            text.VerticalAlignment = VerticalAlignment.Center;
+        };
+        var shown = "";
+        void Show()
+        {
+            shown = OptionBinding.FieldText(_tools.Settings, OptionBinding.FontSize);
+            box.Text = shown;
+        }
+        void Commit()
+        {
+            if (box.Text != shown) _tools.Settings = OptionBinding.WithField(_tools.Settings, OptionBinding.FontSize, box.Text ?? "");
+            Show();
+        }
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedItem is string step) Change(s => OptionBinding.WithField(s, OptionBinding.FontSize, step));
+        };
+        // Tunnel, because the box takes Enter for its list first.
+        box.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            Commit();
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        box.LostFocus += (_, _) => Commit();
+        _syncs.Add(() => { if (!box.IsKeyboardFocusWithin) Show(); });
+        _syncing = true;
+        Show();
+        _syncing = false;
+        return box;
     }
 
     Control BuildCheck(OptionCheck c)
     {
         var check = Ui.Check(_palette, c.Text);
         check.IsChecked = c.On;
-        return Named(check, c.Name);
+        Named(check, c.Name);
+        check.IsCheckedChanged += (_, _) => Change(s => OptionBinding.WithCheck(s, c.Name, check.IsChecked == true));
+        _syncs.Add(() => check.IsChecked = OptionBinding.Check(_tools.Settings, c.Name));
+        return check;
+    }
+
+    /// Brush - and +: paint.net's steps, off at each end of the range.
+    Control BuildStep(OptionStep s)
+    {
+        var up = s.Icon == "opt-plus";
+        var step = new IconCommand(_palette, s.Icon, s.Name, iconSize: Tokens.SmallIconSize);
+        Named(step, s.Name);
+        step.Click += (_, _) => Change(v => v.StepWidth(up));
+        void Show() => step.IsEnabled = up ? _tools.Settings.BrushWidth < ToolSettings.MostWidth : _tools.Settings.BrushWidth > ToolSettings.LeastWidth;
+        _syncs.Add(Show);
+        Show();
+        return step;
+    }
+
+    Control BuildToggle(OptionToggle t)
+    {
+        var toggle = new IconCommand(_palette, t.Icon, t.Name, on: t.On);
+        Named(toggle, t.Name);
+        toggle.Click += (_, _) => Change(s => OptionBinding.Clicked(s, t.Name));
+        _syncs.Add(() => toggle.On = OptionBinding.Toggle(_tools.Settings, t.Name));
+        return toggle;
+    }
+
+    /// The tolerance slider: whole percents, as paint.net's shows them.
+    Control BuildSlide(OptionSlide s)
+    {
+        var slider = Ui.Slide(_palette, s.Min, s.Max, s.Value, 96);
+        Named(slider, s.Name);
+        slider.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty)
+                Change(v => v with { Tolerance = Math.Clamp(Math.Round(slider.Value, MidpointRounding.AwayFromZero), s.Min, s.Max) });
+        };
+        _syncs.Add(() => slider.Value = _tools.Settings.Tolerance);
+        return slider;
     }
 
     Control BuildPush(OptionPush b)
     {
         var push = Ui.Push(_palette, b.Text, b.Width);
-        push.IsEnabled = false;   // No session can be open until W8.
+        push.IsEnabled = false;   // No session can be open until W9 opens one.
+        if (Tip(b.Name) is { } tip) ToolTip.SetTip(push, tip);
         return Named(push, b.Name);
     }
 

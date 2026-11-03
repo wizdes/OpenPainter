@@ -65,6 +65,8 @@ public static partial class TestPanels
         if (!await Task.Run(() => session.WaitFrames(before + 1, NextFrameLimitMs))) throw new TimeoutException($"no frame in {NextFrameLimitMs} ms");
     }
 
+    static string Num(double value) => value.ToString(CultureInfo.InvariantCulture);
+
     /// Asks Windows what a point on the dialog is, as a real pointer would find out.
     static long HitTest(nint hwnd, PixelPoint at) =>
         (long)SendMessage(hwnd, WmNcHitTest, 0, (nint)(((long)(ushort)(short)at.Y << 16) | (ushort)(short)at.X));
@@ -87,11 +89,18 @@ public static partial class TestPanels
             editor.Run("selection.select_all");
             editor.Run("edit.undo");
             await Settled(editor);
+            window.Tools.Primary = window.Tools.Palette.Colors[12];
+            window.Tools.Secondary = new DocColor(0xAB, 0xCD, 0xEF);
             await Task.Delay(500);   // The layer pictures.
             var history = window.Panels.Panels[PanelLayout.History];
             var layers = window.Panels.Panels[PanelLayout.Layers];
+            var toolsPanel = window.Panels.Panels[PanelLayout.Tools];
+            var colorsPanel = window.Panels.Panels[PanelLayout.Colors];
+            var swatch = colorsPanel.PointToScreen(default);
+            var inSwatch = window.Panels.Colors.Swatches.PointToScreen(new Point(44, 44));
             var rows = string.Join(", ", window.Panels.Layers.LayerRows.Select(r => $"\"{r.TitleLabel.Text}\""));
             Ready(folder, 1, $"\"main_hwnd\": {Handle(window)}, \"canvas_hwnd\": {window.Native?.Hwnd}, \"history_hwnd\": {Handle(history)}, \"layers_hwnd\": {Handle(layers)}, " +
+                $"\"tools_hwnd\": {Handle(toolsPanel)}, \"colors_hwnd\": {Handle(colorsPanel)}, \"secondary_x\": {inSwatch.X - swatch.X}, \"secondary_y\": {inSwatch.Y - swatch.Y}, " +
                 $"\"history_rows\": {window.Panels.History.Rows.Count}, \"layer_rows\": [{rows}], \"thumbs\": {window.Panels.Layers.LayerRows.Count(r => r.Thumb.Image is not null)}");
             await WaitGo(folder, 1);
 
@@ -123,6 +132,23 @@ public static partial class TestPanels
             await FrameAfter(window, frames);
             Ready(folder, 4, $"\"steps_before\": {steps}, \"steps_after\": {editor.Info.HistoryLabels.Count}, \"copy_visible\": {(editor.Info.Layers[1].Visible ? "true" : "false")}, \"dialog_gone\": {(window.Dialog is null ? "true" : "false")}");
             await WaitGo(folder, 4);
+
+            // More resizes Colors and Tools. A Fixed Size row binds its fields.
+            window.Panels.Colors.SetExpanded(true);
+            window.Tools.Current = "rectangleSelect";
+            window.Tools.Settings = window.Tools.Settings with { SelectStyle = SelectStyleChoice.FixedSize, SizeWidth = 320, SizeHeight = 200 };
+            window.Unit = MeasurementUnit.Inches;
+            await Task.Delay(500);
+            Ready(folder, 5, $"\"colors_height\": {Num(colorsPanel.ClientSize.Height)}, \"tools_height\": {Num(toolsPanel.ClientSize.Height)}, \"cells\": {window.Panels.Colors.Swatchboard.Cells.Count}, \"size_text\": \"{window.Options.Option<Avalonia.Controls.TextBox>(OptionBinding.SizeWidth).Text}\", \"image_text\": \"{window.Status.ImageValue.Text}\"");
+            await WaitGo(folder, 5);
+
+            // Less brings both back. The Text row lists Windows' fonts.
+            window.Panels.Colors.SetExpanded(false);
+            window.Tools.Current = "text";
+            window.Unit = MeasurementUnit.Pixels;
+            await Task.Delay(500);
+            Ready(folder, 6, $"\"colors_height\": {Num(colorsPanel.ClientSize.Height)}, \"tools_height\": {Num(toolsPanel.ClientSize.Height)}, \"cells\": {window.Panels.Colors.Swatchboard.Cells.Count}, \"fonts\": {window.Options.Option<Avalonia.Controls.ComboBox>(OptionBinding.Font).ItemCount}, \"profile\": \"{window.Status.ProfileValue.Text}\"");
+            await WaitGo(folder, 6);
         }
         catch (Exception e)
         {

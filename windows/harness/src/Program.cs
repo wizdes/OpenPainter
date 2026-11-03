@@ -315,6 +315,11 @@ public static class Program
             if (first.GetProperty("thumbs").GetInt32() != 3) problems.Add($"{first.GetProperty("thumbs")} of 3 layer pictures came");
             Png.Write(Path.Combine(shots, $"panel-history-{theme}.png"), Win32.CaptureShown(Hwnd(first, "history_hwnd")));
             Png.Write(Path.Combine(shots, $"panel-layers-{theme}.png"), Win32.CaptureShown(Hwnd(first, "layers_hwnd")));
+            Png.Write(Path.Combine(shots, $"panel-tools-{theme}.png"), Win32.CaptureShown(Hwnd(first, "tools_hwnd")));
+            var colorsShot = Win32.CaptureShown(Hwnd(first, "colors_hwnd"));
+            Png.Write(Path.Combine(shots, $"panel-colors-{theme}.png"), colorsShot);
+            var secondary = colorsShot.At(first.GetProperty("secondary_x").GetInt32(), first.GetProperty("secondary_y").GetInt32());
+            if (secondary.Distance(new Rgb(0xAB, 0xCD, 0xEF)) != 0) problems.Add($"the secondary swatch shows {secondary}, not exactly ABCDEF");
             Png.Write(Path.Combine(shots, $"panels-main-{theme}.png"), Win32.CaptureApp(run.Pid));
             Go(1);
 
@@ -363,11 +368,33 @@ public static class Program
             var back = CanvasPixel();
             if (back.Distance(shown) > ColorTolerance) problems.Add($"Cancel did not bring the canvas back: {shown} before, {back} after");
             Go(4);
+
+            var fifth = Stage(5);
+            Win32.WaitForDisplay();
+            var (expanded, shortTools) = (fifth.GetProperty("colors_height").GetDouble(), fifth.GetProperty("tools_height").GetDouble());
+            if (expanded <= 246 || expanded > 470) problems.Add($"More made Colors {expanded} tall");
+            if (shortTools >= 292 || shortTools < 94) problems.Add($"More left Tools {shortTools} tall");
+            if (fifth.GetProperty("cells").GetInt32() != 96) problems.Add($"More shows {fifth.GetProperty("cells")} swatches, not 96");
+            if (fifth.GetProperty("size_text").GetString() != "320") problems.Add($"the Size field shows {fifth.GetProperty("size_text")}");
+            if (fifth.GetProperty("image_text").GetString()?.EndsWith(" in", StringComparison.Ordinal) != true) problems.Add($"Units in shows the image as {fifth.GetProperty("image_text")}");
+            Png.Write(Path.Combine(shots, $"panel-colors-expanded-{theme}.png"), Win32.CaptureShown(Hwnd(first, "colors_hwnd")));
+            Png.Write(Path.Combine(shots, $"panel-tools-short-{theme}.png"), Win32.CaptureShown(Hwnd(first, "tools_hwnd")));
+            Png.Write(Path.Combine(shots, $"options-select-{theme}.png"), Win32.CaptureApp(run.Pid));
+            Go(5);
+
+            var sixth = Stage(6);
+            Win32.WaitForDisplay();
+            if (sixth.GetProperty("colors_height").GetDouble() != 246) problems.Add($"Less left Colors {sixth.GetProperty("colors_height")} tall");
+            if (sixth.GetProperty("tools_height").GetDouble() != 292) problems.Add($"Less left Tools {sixth.GetProperty("tools_height")} tall");
+            if (sixth.GetProperty("fonts").GetInt32() < 10) problems.Add($"the Text row lists {sixth.GetProperty("fonts")} fonts");
+            if (sixth.GetProperty("profile").GetString() != "sRGB (none)") problems.Add($"the status bar's Profile says {sixth.GetProperty("profile")}");
+            Png.Write(Path.Combine(shots, $"options-text-{theme}.png"), Win32.CaptureApp(run.Pid));
+            Go(6);
             run.Close(frame.Main);
             if (run.ExitCode != 0) problems.Add($"the app exited {run.ExitCode}: {run.Output()}");
             CheckDataRootEmpty(run, name);
             Report(problems.Count == 0
-                ? PartResult.Pass(name, $"7 history rows; layers {layerWords}; owned, above the main window and the canvas; the title row drags; the canvas pixel went {shown} to {hidden} and back to {back}; root must look at the panel shots")
+                ? PartResult.Pass(name, $"7 history rows; layers {layerWords}; owned, above the main window and the canvas; the title row drags; the canvas pixel went {shown} to {hidden} and back to {back}; Colors {expanded} tall with More and Tools {shortTools}, both back with Less; {sixth.GetProperty("fonts")} fonts; root must look at the panel shots")
                 : PartResult.Fail(name, string.Join("; ", problems)));
         }
 

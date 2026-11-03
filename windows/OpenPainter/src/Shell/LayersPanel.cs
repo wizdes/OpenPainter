@@ -75,6 +75,10 @@ public sealed class LayerThumb : Control
 public sealed class LayerRow : PanelRow
 {
     const double DragStart = 3;
+
+    // LayerRow.layout gives text x 56 and 114 wide in a 226 pixel row. This row is 224, inside the
+    // window's outline, so its right side gives back those 2 pixels.
+    const double TextLeft = 56, TextRight = 54;
     readonly LayersPanel _owner;
 
     public LayerInfo Layer { get; }
@@ -83,7 +87,7 @@ public sealed class LayerRow : PanelRow
     public bool IsDragging { get; private set; }
 
     public LayerRow(Palette p, LayersPanel owner, int index, LayerInfo layer, Size pixels, bool current, bool busy)
-        : base(p, index, layer.Name, Detail(layer), Tokens.LayerRowHeight, current, false, 58, 56)
+        : base(p, index, layer.Name, Detail(layer), Tokens.LayerRowHeight, current, false, TextLeft, TextRight)
     {
         _owner = owner;
         Layer = layer;

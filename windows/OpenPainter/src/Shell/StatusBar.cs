@@ -12,6 +12,29 @@ using UiLook;
 
 namespace OpenPainter.Shell;
 
+/// The units for the status bar: MeasurementUnit in RulerScale.swift.
+public enum MeasurementUnit { Pixels, Inches, Centimeters }
+
+public static class Measurement
+{
+    public static readonly MeasurementUnit[] All = [MeasurementUnit.Pixels, MeasurementUnit.Inches, MeasurementUnit.Centimeters];
+
+    public static string Title(MeasurementUnit u) => u.ToString();
+    public static string Abbreviation(MeasurementUnit u) => u switch { MeasurementUnit.Pixels => "px", MeasurementUnit.Inches => "in", _ => "cm" };
+
+    /// Document pixels in one unit at `dpi` pixels per inch.
+    public static double PixelsPerUnit(MeasurementUnit u, double dpi) => u switch { MeasurementUnit.Pixels => 1, MeasurementUnit.Inches => dpi, _ => dpi / 2.54 };
+
+    /// Whole pixels, 2 decimals for inches and centimeters.
+    public static string Format(MeasurementUnit u, double pixels, double dpi)
+    {
+        var value = pixels / PixelsPerUnit(u, dpi);
+        return u == MeasurementUnit.Pixels
+            ? ((long)Math.Floor(value)).ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+    }
+}
+
 public sealed class StatusBar : Grid
 {
     /// The space StatusBarView.swift keeps before it hides the hint.
@@ -24,6 +47,11 @@ public sealed class StatusBar : Grid
     /// The field holds something other than what the view last showed there.
     bool Typing => ZoomField.Text != _shownText;
     double _zoom = 1;
+    MeasurementUnit _unit = MeasurementUnit.Pixels;
+    double _dpi = 96;
+    Size? _imageSize;
+    Rect? _selection;
+    Point? _cursor;
 
     public TextBlock Hint { get; }
     public TextBlock SelectionValue { get; }
@@ -41,6 +69,32 @@ public sealed class StatusBar : Grid
 
     /// The Fit button.
     public event Action? FitChosen;
+
+    /// The units list picked a unit.
+    public event Action<MeasurementUnit>? UnitChosen;
+
+    /// The units the values show in, and the document's pixels per inch.
+    public MeasurementUnit Unit
+    {
+        get => _unit;
+        set
+        {
+            _unit = value;
+            var at = Array.IndexOf(Measurement.All, value);
+            if (Units.SelectedIndex != at) Units.SelectedIndex = at;
+            ShowValues();
+        }
+    }
+
+    public double Dpi
+    {
+        get => _dpi;
+        set
+        {
+            _dpi = value > 0 && double.IsFinite(value) ? value : 96;
+            ShowValues();
+        }
+    }
 
     public StatusBar(Palette p)
     {
@@ -79,6 +133,11 @@ public sealed class StatusBar : Grid
         Units.Items.Add("in");
         Units.Items.Add("cm");
         AutomationProperties.SetName(Units, "Units");
+        ToolTip.SetTip(Units, "Units: pixels, inches or centimeters (View menu)");
+        Units.SelectionChanged += (_, _) =>
+        {
+            if (Units.SelectedIndex >= 0 && Measurement.All[Units.SelectedIndex] != _unit) UnitChosen?.Invoke(Measurement.All[Units.SelectedIndex]);
+        };
         units.Children.Add(Units);
         _right.Children.Add(units);
 
@@ -142,9 +201,43 @@ public sealed class StatusBar : Grid
         ZoomField.Text = text;
     }
 
-    /// The pointer's position in whole document pixels, or a dash when it is off the canvas.
-    public void ShowCursor(Point? at) =>
-        CursorValue.Text = at is { } p ? $"{(long)Math.Floor(p.X)}, {(long)Math.Floor(p.Y)}" : "–";
+    /// The pointer's position in document pixels, or null when it is off the canvas.
+    public void ShowCursor(Point? at)
+    {
+        _cursor = at;
+        ShowValues();
+    }
+
+    /// The image's size in document pixels, or null with no image.
+    public void ShowImage(Size? size)
+    {
+        _imageSize = size;
+        ShowValues();
+    }
+
+    /// The selection's bounds in document pixels, or null with no selection.
+    public void ShowSelection(Rect? bounds)
+    {
+        _selection = bounds;
+        ShowValues();
+    }
+
+    /// StatusBarView.update: every value, in the current unit.
+    void ShowValues()
+    {
+        string V(double pixels) => Measurement.Format(_unit, pixels, _dpi);
+        var abbreviation = Measurement.Abbreviation(_unit);
+        SelectionValue.Text = _selection is { } s ? $"{V(s.Width)} × {V(s.Height)} {abbreviation}" : "None";
+        CursorValue.Text = _cursor is { } c ? $"{V(c.X)}, {V(c.Y)}" : "–";
+        ImageValue.Text = _imageSize is { } i ? $"{V(i.Width)} × {V(i.Height)} {abbreviation}" : "–";
+    }
+
+    /// The document's profile: the short name, and the full one as a tip.
+    public void ShowProfile(string shortName, string full)
+    {
+        ProfileValue.Text = shortName;
+        ToolTip.SetTip(ProfileValue, full);
+    }
 
     void UpdateHint() => Hint.IsVisible = HintFits(_right.Bounds.Width + _right.Margin.Right, Bounds.Width);
 

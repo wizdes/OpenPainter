@@ -52,6 +52,8 @@ public sealed class MainWindow : Window
     StripImage _image;
     CanvasSession? _session;
     string _toolHint = "";
+    MeasurementUnit _unit = MeasurementUnit.Pixels;
+    Size? _imageSize;
 
     public TitleRow TitleBar { get; private set; } = null!;
     public OptionsRow Options { get; private set; } = null!;
@@ -76,6 +78,16 @@ public sealed class MainWindow : Window
     /// The focus stop for the canvas. In a real window it passes focus on to the native child.
     public Border CanvasInput { get; } = new() { Name = "CanvasInput", Focusable = true, Background = Brushes.Transparent };
 
+    /// How many times a field refused what was typed, for tests.
+    public int RefusedInputs { get; private set; }
+
+    /// The units for the status bar. Saving them comes with settings.
+    public MeasurementUnit Unit
+    {
+        get => _unit;
+        set => SetUnit(value);
+    }
+
     /// Runs on the UI thread once the first image is on screen in the view.
     public event Action? ImageReady;
 
@@ -94,8 +106,15 @@ public sealed class MainWindow : Window
         _documentName = options.TestPng is null ? "Untitled" : Path.GetFileName(options.TestPng);
         _image = new StripImage(_documentName, Modified: false, Active: true, Preview: null, 0, 0);
         _title = TitleRow.TitleFor(_documentName);
-        Panels = new PanelManager(this, _catalog.Panels, Palette, StageOnScreen);
+        Panels = new PanelManager(this, _catalog.Panels, Palette, StageOnScreen, Tools);
         Panels.Context.ShowLayerProperties = index => ShowLayerProperties(index);
+        Panels.Context.Report = ShowReport;
+        Panels.Context.Refused = () =>
+        {
+            RefusedInputs++;
+            // A test run stays quiet. A real window sounds as the Mac's does.
+            if (Native is not null) MessageBeep(0);
+        };
         _actions = BuildActions();
         _shortcuts = BuildShortcuts();
 
@@ -263,7 +282,7 @@ public sealed class MainWindow : Window
         return changed;
     }
 
-    /// The commands that work in W7. Every other menu item and button is present and off.
+    /// The commands that work so far. Every other menu item and button is present and off.
     Dictionary<string, Action> BuildActions()
     {
         var actions = new Dictionary<string, Action>
@@ -285,6 +304,11 @@ public sealed class MainWindow : Window
         {
             var zoom = value;
             actions[$"View > Zoom Presets > {ZoomPresets.Label(zoom)}"] = () => View.SetZoom(zoom);
+        }
+        foreach (var unit in Measurement.All)
+        {
+            var chosen = unit;
+            actions[$"View > {Measurement.Title(chosen)}"] = () => SetUnit(chosen);
         }
         return actions;
     }
@@ -372,10 +396,14 @@ public sealed class MainWindow : Window
         Grid.SetRow(Strip, 1);
         _canvasLayer.Children.Insert(1, Strip);
 
-        var image = Status?.ImageValue.Text;
+        var imageText = Status?.ImageValue.Text;
         if (Status is not null) _root.Children.Remove(Status);
         Status = new StatusBar(Palette);
-        if (image is not null) Status.ImageValue.Text = image;
+        Status.Unit = Unit;
+        if (_imageSize is not null) Status.ShowImage(_imageSize);
+        else if (imageText is not null) Status.ImageValue.Text = imageText;
+        Status.UnitChosen += SetUnit;
+        ShowDocumentValues();
         Grid.SetRow(Status, 2);
         _root.Children.Add(Status);
         Status.FitChosen += () => { View.Fit(); Native?.TakeFocus(); };
@@ -392,6 +420,7 @@ public sealed class MainWindow : Window
         }
         UpdateActive();
         UpdatePanelChecks();
+        UpdateUnitChecks();
         ApplyWindowState();
         SendBackground();
     }
@@ -414,7 +443,47 @@ public sealed class MainWindow : Window
     void OnEditorChanged()
     {
         Panels.ReloadPanels();
+        ShowDocumentValues();
         ShowHint();
+    }
+
+    /// The image size, resolution and profile the status bar shows for the document.
+    void ShowDocumentValues()
+    {
+        if (Editor is not { } e) return;
+        _imageSize = new Size(e.Info.Width, e.Info.Height);
+        Status.Dpi = e.Dpi;
+        Status.ShowImage(_imageSize);
+        Status.ShowProfile(ColorProfileNames.Short(e.Info), ColorProfileNames.Full(e.Info));
+    }
+
+    /// The status bar's list or the View menu: ViewMenu.chooseUnits.
+    public void SetUnit(MeasurementUnit unit)
+    {
+        _unit = unit;
+        Status.Unit = unit;
+        UpdateUnitChecks();
+    }
+
+    void UpdateUnitChecks()
+    {
+        var view = TitleBar.Menus.Items.OfType<MenuItem>().Single(m => (string?)m.Header == "View");
+        foreach (var item in view.Items.OfType<CatalogMenuItem>())
+        {
+            foreach (var unit in Measurement.All)
+            {
+                if (item.Entry.Path != $"View > {Measurement.Title(unit)}") continue;
+                item.ToggleType = MenuItemToggleType.CheckBox;
+                item.IsChecked = unit == Unit;
+            }
+        }
+    }
+
+    /// A panel's report, for the status bar.
+    void ShowReport(string text)
+    {
+        if (Editor is { } e) e.Report(text);
+        else Status.Hint.Text = text;
     }
 
     /// Opens Layer Properties for a layer: EditorWindowController.showLayerProperties. Null when
@@ -443,6 +512,7 @@ public sealed class MainWindow : Window
     }
 
     [DllImport("user32.dll")] static extern bool EnableWindow(nint hwnd, bool enable);
+    [DllImport("user32.dll")] static extern bool MessageBeep(uint type);
 
     /// EnableWindow's result says what the window was before, so it says nothing of a failure.
     void HoldOff(bool off)
@@ -528,7 +598,8 @@ public sealed class MainWindow : Window
         {
             if (Native is null || Native.Hwnd == 0) throw new InvalidOperationException("CANVAS_HWND: the native child is missing");
             _session.Attach(Native.Hwnd);
-            Status.ImageValue.Text = $"{width} × {height} px";
+            _imageSize = new Size(width, height);
+            Status.ShowImage(_imageSize);
             Bind(new Editor(_session.Client, _session.Document));
             SendBackground();
             View.SetDocumentSize(new Size(width, height));

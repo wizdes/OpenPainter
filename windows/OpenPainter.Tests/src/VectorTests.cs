@@ -5,6 +5,7 @@ using System.Globalization;
 using OpenPainter.Canvas;
 using OpenPainter.Catalog;
 using OpenPainter.Harness;
+using OpenPainter.Shell;
 using Xunit;
 
 namespace OpenPainter.Tests;
@@ -105,6 +106,46 @@ public sealed class VectorTests
     {
         foreach (var v in Recorded("shortcut-words.json").Vectors)
             Assert.True(WindowsKeys.FromMac(v.In[0]) == v.Out, $"{v.Name}: {v.In[0]} became {WindowsKeys.FromMac(v.In[0])}, expected {v.Out}");
+    }
+
+    static string Bytes(DocColor c) => $"{c.R} {c.G} {c.B} {c.A}";
+
+    [Fact]
+    public void ColorMathPassesOnTheWindowsCode()
+    {
+        var seen = new HashSet<string>();
+        foreach (var v in Recorded("color-math.json").Vectors)
+        {
+            seen.Add(v.Op);
+            switch (v.Op)
+            {
+                case "hex":
+                    Assert.True(DocColor.FromHex(v.In[0]) is { } hex && Bytes(hex) == v.Out, $"{v.Name}: {DocColor.FromHex(v.In[0])}, expected {v.Out}");
+                    break;
+                case "hexRejected":
+                    Assert.True(DocColor.FromHex(v.In[0]) is null, v.Name);
+                    break;
+                case "hexText":
+                    Assert.Equal(v.Out, new DocColor(byte.Parse(v.In[0]), byte.Parse(v.In[1]), byte.Parse(v.In[2]), byte.Parse(v.In[3])).Hex);
+                    break;
+                case "channel":
+                    Assert.True(ColorText.Channel(v.In[0], N(v.In[1]), N(v.In[2])) == N(v.Out), v.Name);
+                    break;
+                case "channelRejected":
+                    Assert.True(ColorText.Channel(v.In[0], N(v.In[1]), N(v.In[2])) is null, v.Name);
+                    break;
+                case "rgbToHsv":
+                    var hsv = Hsv.Of(new DocColor(byte.Parse(v.In[0]), byte.Parse(v.In[1]), byte.Parse(v.In[2])));
+                    Assert.True($"{hsv.H} {hsv.S} {hsv.V}" == v.Out, $"{v.Name}: {hsv}, expected {v.Out}");
+                    break;
+                case "hsvToRgb":
+                    Assert.True(Bytes(new Hsv(N(v.In[0]), N(v.In[1]), N(v.In[2])).Color(byte.Parse(v.In[3]))) == v.Out, v.Name);
+                    break;
+                default:
+                    throw new InvalidDataException($"color-math.json: no check for {v.Op}");
+            }
+        }
+        Assert.Equal(7, seen.Count);
     }
 
     [Fact]
