@@ -121,6 +121,7 @@ public sealed partial class TestReport
     public async Task<IReadOnlyList<string>> Write(string path)
     {
         var hwnd = _window.TryGetPlatformHandle()?.Handle ?? throw new InvalidOperationException("TEST_REPORT: the window has no handle");
+        WindowLimits.RaiseWithoutFocus(hwnd);
         var row = _window.TitleBar;
         var menu = row.Menus.Items.OfType<MenuItem>().First();
         var points = new Dictionary<string, PixelPoint>
@@ -185,6 +186,17 @@ public sealed partial class TestReport
         return problems;
     }
 
+    /// A missing view or frame is left for the checks to name.
+    static async Task WaitForFirstFrame(MainWindow window)
+    {
+        const int LimitMs = 60_000, StepMs = 50;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (window.Session is not { Attached: true } && clock.ElapsedMilliseconds < LimitMs) await Task.Delay(StepMs);
+        if (window.Session is not { Attached: true } session) return;
+        var left = (uint)Math.Max(1, LimitMs - clock.ElapsedMilliseconds);
+        await Task.Run(() => session.WaitFrames(1, left));
+    }
+
     /// Ends the run after `ms`, with a nonzero exit code when a check failed.
     public static void Arrange(MainWindow window, int ms, string? path, Action<int> setExitCode)
     {
@@ -192,6 +204,8 @@ public sealed partial class TestReport
         {
             if (path is not null)
             {
+                // The time alone is not enough on a busy PC: wait for the first frame, up to a limit.
+                await WaitForFirstFrame(window);
                 var problems = await new TestReport(window).Write(path);
                 foreach (var problem in problems) Console.Error.WriteLine($"TEST_REPORT: {problem}");
                 if (problems.Count != 0) setExitCode(1);

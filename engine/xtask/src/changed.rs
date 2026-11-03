@@ -72,12 +72,18 @@ pub const APP_TESTS: [CSharpProject; 1] = [CSharpProject {
     project: "windows/OpenPainter.Tests/OpenPainter.Tests.csproj",
     args: &[],
     // The app links W6's look files, embeds the catalog, and its bridge comes from
-    // the C header. The tests read the Mac source for words and sizes.
+    // the C header. The tests read the Mac source for words and sizes, the harness's
+    // judgement and the test values, and those values come from the Swift tests.
     inputs: &[
         "windows/OpenPainter/",
         "windows/OpenPainter.Tests/",
         "windows/tools/bridge-gen/",
         "windows/assets/",
+        "windows/harness/",
+        "windows/tests/",
+        "mac/Tests/OpenPainterKitTests/ZoomTests.swift",
+        "mac/Tests/OpenPainterKitTests/ColorsTests.swift",
+        "mac/Tests/OpenPainterKitTests/menu-skeleton.txt",
         "engine/op-ffi/include/openpainter.h",
         "tools/ui-look/app/src/Tokens.cs",
         "tools/ui-look/app/src/Icons.cs",
@@ -571,6 +577,26 @@ mod tests {
                 "{path}"
             );
             assert!(plan.no_test.is_empty(), "{path}");
+        }
+    }
+
+    #[test]
+    fn a_change_under_the_harness_or_the_vectors_runs_the_windows_app_tests() {
+        for path in [
+            "windows/harness/src/Logic.cs",
+            "windows/harness/OpenPainter.Harness.csproj",
+            "windows/harness/HeadlessAot/src/Runner.cs",
+            "windows/tests/vectors/zoom-steps.json",
+            "mac/Tests/OpenPainterKitTests/ZoomTests.swift",
+            "mac/Tests/OpenPainterKitTests/ColorsTests.swift",
+            "mac/Tests/OpenPainterKitTests/menu-skeleton.txt",
+        ] {
+            let plan = plan(&paths(&[path]), &members());
+            assert_eq!(plan.app.len(), 1, "{path}");
+            assert!(
+                plan.no_test.is_empty() && plan.swift_only.is_empty(),
+                "{path}"
+            );
         }
     }
 

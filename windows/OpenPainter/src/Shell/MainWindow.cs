@@ -33,6 +33,9 @@ public sealed class MainWindow : Window
     public const string AppName = "OpenPainter";
     const int PreviewWidth = 112, PreviewHeight = 80;   // Editor.updateThumbnail: 56 by 40 at 2x.
 
+    /// EditorWindowController.minimumSize.
+    public static readonly Size MinimumClient = new(1100, 792);
+
     readonly StartOptions _options;
     readonly MacCatalog _catalog;
     readonly IReadOnlyList<MenuEntry> _menus;
@@ -82,8 +85,8 @@ public sealed class MainWindow : Window
         Title = _title;
         Width = Tokens.WindowWidth;
         Height = Tokens.WindowHeight;
-        MinWidth = 1100;   // EditorWindowController.minimumSize.
-        MinHeight = 792;
+        MinWidth = MinimumClient.Width;
+        MinHeight = MinimumClient.Height;
         FontFamily = new FontFamily(Tokens.FontFamily);
         if (options.Theme is { } theme) RequestedThemeVariant = theme == "dark" ? ThemeVariant.Dark : ThemeVariant.Light;
 
@@ -125,7 +128,11 @@ public sealed class MainWindow : Window
         };
         Opened += (_, _) =>
         {
-            if (Native is not null) StartCanvas();
+            if (Native is not null)
+            {
+                Win32Properties.AddWndProcHookCallback(this, LimitSize);
+                StartCanvas();
+            }
             Panels.ShowAll();
         };
         PositionChanged += (_, _) => UpdateClearRect();
@@ -149,6 +156,11 @@ public sealed class MainWindow : Window
         foreach (var panel in Panels.Panels.Values)
             panel.PropertyChanged += (_, e) => { if (e.Property == IsActiveProperty) UpdateActive(); };
     }
+
+    /// Avalonia's MinHeight counts a title bar this window has turned off, so the window
+    /// stopped 31 pixels short of the Mac's minimum. Here the limit is the client size.
+    nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled) =>
+        WindowLimits.OnMessage(hwnd, message, l, ClientSize, RenderScaling, MinimumClient, null, null, ref handled);
 
     /// The commands that work in W7. Every other menu item and button is present and off.
     Dictionary<string, Action> BuildActions()

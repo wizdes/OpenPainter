@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- All headless UI tests of the Windows app, compiled by NativeAOT, so trimming or a missing
+       generic shows up here and not on a user's PC. It compiles the test project's source and
+       runs each test with no test framework, because the xunit runner needs dynamic code. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishAot>true</PublishAot>
+    <AssemblyName>OpenPainter.HeadlessAot</AssemblyName>
+    <RootNamespace>OpenPainter.HeadlessAot</RootNamespace>
+    <!-- Test source is not written for the trimmer: the runner finds tests by reflection on this assembly, which is kept whole. -->
+    <NoWarn>$(NoWarn);IL2026;IL2067;IL2070;IL2072;IL2075;IL3050;IL2104;IL3053</NoWarn>
+    <TrimmerSingleWarn>true</TrimmerSingleWarn>
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <TrimmerRootAssembly Include="OpenPainter.HeadlessAot" />
+    <TrimmerRootDescriptor Include="keep-for-tests.xml" />
+    <RdXmlFile Include="generics-for-tests.rd.xml" />
+    <Compile Include="../../OpenPainter.Tests/src/*.cs" Exclude="../../OpenPainter.Tests/src/HarnessTests.cs;../../OpenPainter.Tests/src/VectorTests.cs" Link="Tests/%(Filename)%(Extension)" />
+    <ProjectReference Include="../../OpenPainter/OpenPainter.csproj" />
+    <ProjectReference Include="../../tools/bridge-gen/BridgeGen.csproj" />
+    <PackageReference Include="Avalonia.Headless" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.4" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+  </ItemGroup>
+</Project>

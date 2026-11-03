@@ -77,6 +77,10 @@ enum OutputRule {
     DotnetTotal,
     /// The host exits 0 with `NOT RUN` lines, so those lines are read.
     HostScenarios,
+    /// `dotnet publish` with NativeAOT: the exit code, with the tool it needs on PATH.
+    AotPublish,
+    /// The real-window harness: any part that did not pass fails, by name.
+    Harness,
 }
 
 const HOST_MANIFEST: &str = "tools/win32-host/Cargo.toml";
@@ -457,11 +461,20 @@ const fn fails_level(name: &'static str, reason: &'static str) -> UnreachedPart 
 fn unreached_parts(tier: &str, windows: bool) -> Vec<UnreachedPart> {
     match (tier, windows) {
         ("milestone", true) => vec![
-            fails_level("headless UI on the AOT build", "W7 adds it"),
-            fails_level("9 to 12 critical flows", "W7 adds them"),
+            fails_level(
+                "headless UI on the AOT build",
+                "the run plan puts its steps here",
+            ),
+            fails_level(
+                "9 to 12 critical flows",
+                "no list of flows exists yet; a flow needs tools, files and undo, which come in W8 to W10",
+            ),
         ],
         ("checkpoint", true) => vec![
-            fails_level("all real-window flows", "W7 adds the first of them"),
+            fails_level(
+                "all real-window flows",
+                "--tier window runs the W7 checks; the flows need tools and files from W8 to W10",
+            ),
             fails_level(
                 "paint.net comparison",
                 "no level step yet; the capture kit runs by hand",
@@ -548,6 +561,11 @@ enum Part {
     /// One command for each file in `tests/scenarios`, listed when it runs.
     Scenarios,
     Script(&'static str),
+    /// A row that names something an earlier part already ran, and takes its result.
+    SameAs {
+        name: String,
+        part: &'static str,
+    },
 }
 
 impl Part {
@@ -563,9 +581,10 @@ impl Part {
         match self {
             Self::Command(step) => step.name.clone(),
             Self::CrateCommand(args) => format!("cargo {}", args.join(" ")),
-            Self::Skip { name, .. } | Self::Fail { name, .. } | Self::NotRun { name, .. } => {
-                name.clone()
-            }
+            Self::Skip { name, .. }
+            | Self::Fail { name, .. }
+            | Self::NotRun { name, .. }
+            | Self::SameAs { name, .. } => name.clone(),
             Self::Unreached(part) => part.name.to_owned(),
             Self::Scenarios => "opcli scenarios".to_owned(),
             Self::Script(name) => (*name).to_owned(),
@@ -666,6 +685,11 @@ fn fast_parts(os: Os, has_project: bool, plan: &Result<FastPlan, String>) -> Vec
     }
     if os != Os::Windows {
         parts.push(Part::skip("headless UI for the changed area", WINDOWS_ONLY));
+    } else if let Some(app) = plan.app.first() {
+        parts.push(Part::SameAs {
+            name: format!("headless UI for the changed area, inside {}", app.part),
+            part: app.part,
+        });
     }
     // Only the Swift build reads the rest of `mac/`, and only macOS has it.
     let mut no_test = plan.no_test.clone();
@@ -755,6 +779,149 @@ fn all_level_parts(
         .position(|part| matches!(part, Part::Command(step) if step.name.starts_with(last_tool)))
         .map_or(parts.len(), |at| at + 1);
     parts.splice(after..after, app.into_iter().map(Part::Command));
+    parts
+}
+
+const AOT_TESTS_PROJECT: &str = "windows/harness/HeadlessAot/HeadlessAot.csproj";
+const AOT_TESTS_FOLDER: &str = "windows/harness/HeadlessAot/bin/publish";
+const AOT_TESTS_PROGRAM: &str =
+    "windows/harness/HeadlessAot/bin/publish/OpenPainter.HeadlessAot.exe";
+const APP_PROJECT: &str = "windows/OpenPainter/OpenPainter.csproj";
+const APP_PUBLISH_FOLDER: &str = "windows/OpenPainter/bin/publish";
+const APP_PROGRAM: &str = "windows/OpenPainter/bin/publish/OpenPainter.exe";
+const HARNESS_PROJECT: &str = "windows/harness/OpenPainter.Harness.csproj";
+const HARNESS_OUT: &str = "windows/harness/bin/last-run";
+const DOTNET_ENV: [(&str, &str); 2] = [
+    ("AVALONIA_TELEMETRY_OPTOUT", "1"),
+    ("DOTNET_CLI_TELEMETRY_OPTOUT", "1"),
+];
+
+fn dotnet_in_repo(name: &str, args: &[&'static str], output: OutputRule) -> CommandStep {
+    CommandStep {
+        name: name.to_owned(),
+        program: "dotnet",
+        args: args.to_vec(),
+        env: DOTNET_ENV.to_vec(),
+        in_repo: true,
+        skip_if_missing: false,
+        output,
+        needs_gpu: false,
+    }
+}
+
+fn aot_publish_step(name: &str, project: &'static str, folder: &'static str) -> CommandStep {
+    dotnet_in_repo(
+        name,
+        &[
+            "publish",
+            project,
+            "-c",
+            "Release",
+            "-r",
+            "win-x64",
+            "-o",
+            folder,
+            "-v:q",
+            "-nr:false",
+            "-p:UseSharedCompilation=false",
+        ],
+        OutputRule::AotPublish,
+    )
+}
+
+/// The app's headless tests compiled by NativeAOT, then run with no test framework.
+/// The run prints a total in `dotnet test`'s words, so the same rule reads it.
+fn aot_headless_steps() -> Vec<CommandStep> {
+    vec![
+        aot_publish_step(
+            "publish the AOT headless tests: dotnet publish",
+            AOT_TESTS_PROJECT,
+            AOT_TESTS_FOLDER,
+        ),
+        CommandStep {
+            name: "headless UI on the AOT build: all the app's headless tests".to_owned(),
+            program: AOT_TESTS_PROGRAM,
+            args: Vec::new(),
+            env: DOTNET_ENV.to_vec(),
+            in_repo: true,
+            skip_if_missing: false,
+            output: OutputRule::DotnetTotal,
+            needs_gpu: false,
+        },
+    ]
+}
+
+/// The window level on Windows: the AOT app, then the real-window harness. No switch
+/// here lets a short or busy run pass, and the harness fails on any part that did not.
+fn window_parts() -> Vec<Part> {
+    let dll = app_steps("milestone", true).remove(0);
+    let steps = vec![
+        dll,
+        aot_publish_step(
+            "publish the AOT app: dotnet publish",
+            APP_PROJECT,
+            APP_PUBLISH_FOLDER,
+        ),
+        dotnet_in_repo(
+            "build the harness: dotnet build",
+            &[
+                "build",
+                HARNESS_PROJECT,
+                "-c",
+                "Release",
+                "-v:q",
+                "-nr:false",
+                "-p:UseSharedCompilation=false",
+            ],
+            OutputRule::ExitCode,
+        ),
+        dotnet_in_repo(
+            "real-window harness: pan trace, read-back, color, shots, hit test, panels, icons",
+            &[
+                "run",
+                "--no-build",
+                "-c",
+                "Release",
+                "--project",
+                HARNESS_PROJECT,
+                "--",
+                "--app",
+                APP_PROGRAM,
+                "--out",
+                HARNESS_OUT,
+            ],
+            OutputRule::Harness,
+        ),
+    ];
+    steps.into_iter().map(Part::Command).collect()
+}
+
+/// What a level really runs. `level_parts` and `all_level_parts` keep the rows the tests
+/// of earlier stages hold them to, and this puts the W7 steps in: the AOT tests take the
+/// place of the NOT RUN row on Windows, and the window level runs the harness.
+fn run_parts(tier: &str, os: Os, has_project: bool, plan: &Result<FastPlan, String>) -> Vec<Part> {
+    if tier == "window" && os == Os::Windows {
+        return window_parts();
+    }
+    let mut parts = all_level_parts(tier, os, has_project, plan);
+    if os == Os::Windows && matches!(tier, "milestone" | "checkpoint") {
+        let aot = aot_headless_steps().into_iter().map(Part::Command);
+        let row = parts.iter().position(|part| {
+            matches!(part, Part::Unreached(row) if row.name == "headless UI on the AOT build")
+        });
+        match row {
+            Some(row) => {
+                parts.splice(row..=row, aot);
+            }
+            None => {
+                let at = parts
+                    .iter()
+                    .position(|part| matches!(part, Part::Unreached(_)))
+                    .unwrap_or(parts.len());
+                parts.splice(at..at, aot);
+            }
+        }
+    }
     parts
 }
 
@@ -880,7 +1047,10 @@ fn run_step(steps: &mut Vec<Step>, step: &CommandStep, place: &RunPlace) {
             &step.env,
             step.skip_if_missing,
         ),
-        OutputRule::DotnetTotal | OutputRule::HostScenarios => {
+        OutputRule::DotnetTotal
+        | OutputRule::HostScenarios
+        | OutputRule::AotPublish
+        | OutputRule::Harness => {
             run_reading_output(steps, step, dir);
         }
     }
@@ -945,13 +1115,21 @@ fn stopped_by_shell(
 fn run_reading_output(steps: &mut Vec<Step>, step: &CommandStep, dir: &Path) {
     println!("Running {}", step.name);
     let start = Instant::now();
-    let mut command = Command::new(step.program);
+    let mut command = Command::new(program_path(step.program, dir));
     command
         .args(&step.args)
         .current_dir(dir)
         .stdout(Stdio::piped());
     for (key, value) in &step.env {
         command.env(key, value);
+    }
+    if step.output == OutputRule::AotPublish
+        && let Some(path) = path_with_vs_installer(
+            std::env::var_os("PATH").as_deref(),
+            std::env::var_os("ProgramFiles(x86)").as_deref(),
+        )
+    {
+        command.env("PATH", path);
     }
     let finished = command.spawn().and_then(|mut child| {
         let mut text = String::new();
@@ -975,7 +1153,8 @@ fn run_reading_output(steps: &mut Vec<Step>, step: &CommandStep, dir: &Path) {
                 let warp = step.env.contains(&("OP_GPU_ADAPTER", "warp"));
                 host_result(exit.success(), &text, warp)
             }
-            OutputRule::ExitCode => (exit_result(exit.success()), None),
+            OutputRule::Harness => (harness_result(exit.success(), &text), None),
+            OutputRule::ExitCode | OutputRule::AotPublish => (exit_result(exit.success()), None),
         },
         Err(error) => (Err(format!("could not run: {error}")), None),
     };
@@ -984,7 +1163,12 @@ fn run_reading_output(steps: &mut Vec<Step>, step: &CommandStep, dir: &Path) {
         Ok(()) => (Status::Pass, step.name.clone()),
         Err(reason) => {
             eprintln!("{}: {reason}", step.name);
-            (Status::Fail, format!("{}: {reason}", step.name))
+            let status = if reason.starts_with(HARNESS_NOT_RUN) {
+                Status::NotRun
+            } else {
+                Status::Fail
+            };
+            (status, format!("{}: {reason}", step.name))
         }
     };
     println!("{} {:.2}s {name}", status.label(), duration.as_secs_f64());
@@ -1006,6 +1190,86 @@ fn run_reading_output(steps: &mut Vec<Step>, step: &CommandStep, dir: &Path) {
 /// `OP_GPU_ADAPTER=warp`. Three call `RemoveDevice`, which `op-ffi` refuses
 /// elsewhere. The fourth forces a frame panic and checks that the device stays.
 const HOST_RTX_SKIP: &str = "the host runs these device recovery scenarios only on WARP: 3 remove the device, which it never does on the RTX, and 1 forces a frame panic";
+
+/// A program named with a folder is relative to the place the step runs. Windows would
+/// look for it from this process's folder instead.
+fn program_path(program: &str, dir: &Path) -> PathBuf {
+    if program.contains('/') {
+        dir.join(program)
+    } else {
+        PathBuf::from(program)
+    }
+}
+
+/// NativeAOT's build looks for `vswhere.exe` on PATH, and it lives in this folder. Returns
+/// the new PATH, or None when the folder is not there and PATH stays as it is.
+fn path_with_vs_installer(
+    path: Option<&std::ffi::OsStr>,
+    program_files_x86: Option<&std::ffi::OsStr>,
+) -> Option<std::ffi::OsString> {
+    let installer = Path::new(program_files_x86?)
+        .join("Microsoft Visual Studio")
+        .join("Installer");
+    if !installer.is_dir() {
+        return None;
+    }
+    let mut folders = vec![installer];
+    if let Some(path) = path {
+        folders.extend(std::env::split_paths(path));
+    }
+    std::env::join_paths(folders).ok()
+}
+
+const HARNESS_NOT_RUN: &str = "NOT RUN:";
+
+/// Each harness part prints one line, and the last line sums them up. A part that printed
+/// FAIL fails the row. If every part that did not pass printed NOT RUN, the row says NOT RUN.
+/// Both fail the level. A run with no last line did not finish.
+fn harness_result(success: bool, stdout: &str) -> Result<(), String> {
+    let part = |line: &str, word: &str| {
+        line.split_once(word)
+            .filter(|(name, _)| !name.starts_with(' ') && !name.is_empty() && *name != "HARNESS")
+            .map(|(name, _)| name.to_owned())
+    };
+    let failed: Vec<String> = stdout
+        .lines()
+        .filter_map(|line| part(line, ": FAIL"))
+        .collect();
+    let not_run: Vec<String> = stdout
+        .lines()
+        .filter_map(|line| part(line, ": NOT RUN"))
+        .collect();
+    if !failed.is_empty() {
+        return Err(format!(
+            "failed: {}; not run: {}",
+            failed.join(", "),
+            not_run.join(", ")
+        ));
+    }
+    if !not_run.is_empty() {
+        return Err(format!("{HARNESS_NOT_RUN} {}", not_run.join(", ")));
+    }
+    if !stdout.lines().any(|line| line.starts_with("HARNESS: PASS")) {
+        return Err("the harness did not print HARNESS: PASS".to_owned());
+    }
+    exit_result(success)
+}
+
+/// Takes the result of the earlier part whose row starts with `part`.
+fn same_as(steps: &mut Vec<Step>, name: &str, part: &str) {
+    match steps.iter().find(|step| step.name.starts_with(part)) {
+        Some(step) => {
+            let status = step.status;
+            println!("{} 0.00s {name}", status.label());
+            steps.push(Step {
+                name: name.to_owned(),
+                duration: Duration::ZERO,
+                status,
+            });
+        }
+        None => not_run(steps, name, "the part that runs it did not run"),
+    }
+}
 
 fn host_label(step: &CommandStep) -> &str {
     step.name.split(':').next().unwrap_or(&step.name)
@@ -1121,6 +1385,7 @@ fn run_part(steps: &mut Vec<Step>, part: &Part, place: &RunPlace) {
         Part::Unreached(unreached) => record_unreached(steps, *unreached),
         Part::Scenarios => run_scenarios(steps, place.engine, place.repo),
         Part::Script(script) => run_script(steps, script, place.repo, None),
+        Part::SameAs { name, part } => same_as(steps, name, part),
     }
 }
 
@@ -1224,7 +1489,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    if matches!(tier, "window" | "speed") {
+    if tier == "speed" || (tier == "window" && Os::current() != Os::Windows) {
         let mut steps = Vec::new();
         for part in pending_parts(tier) {
             not_run(&mut steps, part, "not implemented");
@@ -1268,7 +1533,7 @@ fn main() -> ExitCode {
         shell_env: &shell_env,
     };
     let has_project = repo.join("mac/project.yml").is_file();
-    for part in all_level_parts(tier, os, has_project, &plan) {
+    for part in run_parts(tier, os, has_project, &plan) {
         run_part(&mut steps, &part, &place);
     }
     println!("\nSummary");
@@ -1434,6 +1699,216 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+
+    fn run_part_names(tier: &str, os: Os) -> Vec<String> {
+        names(&run_parts(tier, os, true, &Ok(FastPlan::default())))
+    }
+
+    const AOT_RUN_PART: &str = "headless UI on the AOT build: all the app's headless tests";
+    const AOT_PUBLISH_PART: &str = "publish the AOT headless tests: dotnet publish";
+
+    #[test]
+    fn milestone_on_windows_runs_the_aot_tests_and_prints_no_not_run_row_for_them() {
+        let parts = run_parts("milestone", Os::Windows, true, &Ok(FastPlan::default()));
+        let all = names(&parts);
+        assert!(!all.iter().any(|n| n == "headless UI on the AOT build"));
+        let publish = all.iter().position(|n| n == AOT_PUBLISH_PART).unwrap();
+        assert_eq!(all[publish + 1], AOT_RUN_PART);
+        // The tests read the release DLL's export table, so the DLL comes first.
+        let dll = all.iter().position(|n| n == DLL_PART).unwrap();
+        assert!(dll < publish);
+        assert!(matches!(parts[publish], Part::Command(_)));
+        assert!(matches!(parts[publish + 1], Part::Command(_)));
+    }
+
+    #[test]
+    fn with_no_flow_list_the_critical_flows_row_stays_not_run_and_fails_the_milestone() {
+        let parts = run_parts("milestone", Os::Windows, true, &Ok(FastPlan::default()));
+        let row = parts
+            .iter()
+            .find(|part| part.name() == "9 to 12 critical flows")
+            .unwrap();
+        let Part::Unreached(row) = row else {
+            panic!("the flows must stay a NOT RUN row: {row:?}");
+        };
+        assert!(!row.owed);
+        assert!(row.reason.contains("W8 to W10"), "{}", row.reason);
+    }
+
+    #[test]
+    fn checkpoint_on_windows_runs_the_aot_tests_too() {
+        let all = run_part_names("checkpoint", Os::Windows);
+        let run = all.iter().position(|n| n == AOT_RUN_PART).unwrap();
+        let first_unreached = all
+            .iter()
+            .position(|n| n == "all real-window flows")
+            .unwrap();
+        assert!(run < first_unreached);
+    }
+
+    #[test]
+    fn the_aot_tests_are_not_on_mac_or_linux() {
+        for os in [Os::Macos, Os::Linux] {
+            let parts = run_parts("milestone", os, true, &Ok(FastPlan::default()));
+            let row = parts
+                .iter()
+                .find(|part| part.name() == "headless UI on the AOT build")
+                .unwrap();
+            assert!(matches!(row, Part::Skip { .. }), "{row:?}");
+            assert!(!names(&parts).iter().any(|n| n == AOT_RUN_PART));
+        }
+    }
+
+    #[test]
+    fn the_aot_run_counts_only_with_tests_in_its_total() {
+        let steps = aot_headless_steps();
+        assert_eq!(steps[0].output, OutputRule::AotPublish);
+        assert_eq!(steps[1].output, OutputRule::DotnetTotal);
+        assert_eq!(steps[1].program, AOT_TESTS_PROGRAM);
+        assert!(steps[0].args.contains(&AOT_TESTS_FOLDER));
+        assert!(
+            AOT_TESTS_PROGRAM.starts_with(AOT_TESTS_FOLDER),
+            "the program runs from the folder the publish fills"
+        );
+    }
+
+    #[test]
+    fn the_aot_runners_total_line_reads_as_a_dotnet_total() {
+        const LINE: &str =
+            "Failed: 0, Passed: 187, Skipped: 0, Total: 187, 143 test methods on the AOT build\n";
+        assert_eq!(dotnet_result(true, LINE), Ok(()));
+        assert!(dotnet_result(false, LINE).is_err());
+        assert!(
+            dotnet_result(
+                true,
+                "Failed: 0, Passed: 0, Skipped: 0, Total: 0, 0 test methods\n"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn a_program_with_a_folder_is_found_from_the_steps_place() {
+        let dir = Path::new("repo");
+        assert_eq!(program_path("dotnet", dir), PathBuf::from("dotnet"));
+        assert_eq!(program_path("a/b.exe", dir), dir.join("a/b.exe"));
+    }
+
+    #[test]
+    fn the_aot_publish_finds_the_visual_studio_installer_folder_only_when_it_exists() {
+        let root = std::env::temp_dir().join(format!("op-xtask-vs-{}", std::process::id()));
+        let installer = root.join("Microsoft Visual Studio").join("Installer");
+        fs::create_dir_all(&installer).unwrap();
+        let first = std::env::temp_dir();
+        let path = path_with_vs_installer(Some(first.as_os_str()), Some(root.as_os_str())).unwrap();
+        let folders: Vec<_> = std::env::split_paths(&path).collect();
+        assert_eq!(folders, [installer, first]);
+        fs::remove_dir_all(&root).unwrap();
+        assert!(path_with_vs_installer(None, Some(root.as_os_str())).is_none());
+        assert!(path_with_vs_installer(None, None).is_none());
+    }
+
+    #[test]
+    fn the_window_level_on_windows_builds_the_aot_app_and_runs_the_harness_last() {
+        let parts = run_parts("window", Os::Windows, true, &Ok(FastPlan::default()));
+        let all = names(&parts);
+        assert_eq!(all[0], DLL_PART);
+        assert_eq!(all[1], "publish the AOT app: dotnet publish");
+        assert_eq!(all[2], "build the harness: dotnet build");
+        assert!(all[3].starts_with("real-window harness"));
+        assert_eq!(all.len(), 4);
+        let Part::Command(harness) = &parts[3] else {
+            panic!("the harness must be a command");
+        };
+        assert_eq!(harness.output, OutputRule::Harness);
+        assert!(harness.args.contains(&APP_PROGRAM));
+        // A short or busy run must never count at this level.
+        for switch in ["--pan-seconds", "--allow-busy", "--ignore-disk", "--parts"] {
+            assert!(!harness.args.contains(&switch), "{switch}");
+        }
+    }
+
+    #[test]
+    fn harness_lines_decide_the_row() {
+        const GOOD: &str =
+            "UI TESTS: PASS\npan trace: PASS (average 60.0 fps)\nHARNESS: PASS (1 parts)\n";
+        assert_eq!(harness_result(true, GOOD), Ok(()));
+
+        let failed = harness_result(
+            false,
+            "UI TESTS: PASS\npan trace: FAIL (a stall)\npanels: NOT RUN (covered)\nHARNESS: FAIL (pan trace, panels)\n",
+        );
+        let reason = failed.unwrap_err();
+        assert!(!reason.starts_with(HARNESS_NOT_RUN), "{reason}");
+        assert!(
+            reason.contains("pan trace") && reason.contains("panels"),
+            "{reason}"
+        );
+
+        let locked = harness_result(
+            false,
+            "UI TESTS: NOT RUN (desktop is locked)\npan: NOT RUN (desktop is locked)\nHARNESS: FAIL (pan)\n",
+        );
+        assert!(locked.unwrap_err().starts_with(HARNESS_NOT_RUN));
+
+        // Exit 0 with no last line did not finish, and a bad exit is never a pass.
+        assert!(harness_result(true, "pan trace: PASS\n").is_err());
+        assert!(harness_result(false, GOOD).is_err());
+        // An indented note holding the word is not a part.
+        assert_eq!(
+            harness_result(true, &format!("  note: FAIL words\n{GOOD}")),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn a_harness_row_that_did_not_run_prints_not_run_and_fails_the_level() {
+        let mut steps = Vec::new();
+        let dir = dir_for_tests();
+        let step = echo_step("pan: NOT RUN (locked)", OutputRule::Harness, &[]);
+        run_step(&mut steps, &step, &test_place(&dir));
+        assert_eq!(steps[0].status.label(), "NOT RUN");
+        assert!(tier_failed(&steps));
+    }
+
+    #[test]
+    fn the_fast_level_names_the_headless_ui_row_inside_the_app_tests_on_windows() {
+        let plan = Ok(FastPlan {
+            app: changed::APP_TESTS.iter().collect(),
+            ..FastPlan::default()
+        });
+        let parts = fast_parts(Os::Windows, true, &plan);
+        let all = names(&parts);
+        let app = all.iter().position(|n| n == APP_TEST_PART).unwrap();
+        assert_eq!(
+            all[app + 1],
+            "headless UI for the changed area, inside Windows app tests"
+        );
+    }
+
+    #[test]
+    fn the_fast_row_takes_the_app_tests_result_and_is_not_run_without_them() {
+        let same = Part::SameAs {
+            name: "row".into(),
+            part: "Windows app tests",
+        };
+        let dir = dir_for_tests();
+        let place = test_place(&dir);
+
+        let mut none = Vec::new();
+        run_part(&mut none, &same, &place);
+        assert_eq!(none[0].status.label(), "NOT RUN");
+
+        for (status, label) in [(Status::Pass, "PASS"), (Status::Fail, "FAIL")] {
+            let mut steps = vec![Step {
+                name: "Windows app tests: dotnet test".into(),
+                duration: Duration::ZERO,
+                status,
+            }];
+            run_part(&mut steps, &same, &place);
+            assert_eq!(steps[1].status.label(), label);
+        }
+    }
 
     #[test]
     fn window_and_speed_parts_are_pending_and_fail_the_tier() {

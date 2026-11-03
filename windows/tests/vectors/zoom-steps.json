@@ -1,0 +1,177 @@
+{
+  "note": "Written by `OpenPainter.Harness --export-vectors` from the Swift tests. Do not edit by hand.",
+  "source": "mac/Tests/OpenPainterKitTests/ZoomTests.swift",
+  "functions": [
+    "testPresetListIsPaintNets",
+    "testStepsFromValuesBetweenPresetsFollowTheHalfPercentRule",
+    "testLabels"
+  ],
+  "vectors": [
+    {
+      "name": "presets",
+      "op": "presets",
+      "in": [],
+      "out": "0.01 0.02 0.03 0.04 0.05 0.06 0.08 0.12 0.16 0.25 0.33 0.5 0.66 1 2 3 4 5 6 7 8 12 16 24 32"
+    },
+    {
+      "name": "nextLarger(32)",
+      "op": "nextLarger",
+      "in": [
+        "32"
+      ],
+      "out": "32"
+    },
+    {
+      "name": "nextSmaller(0.01)",
+      "op": "nextSmaller",
+      "in": [
+        "0.01"
+      ],
+      "out": "0.01"
+    },
+    {
+      "name": "nextLarger(0.7)",
+      "op": "nextLarger",
+      "in": [
+        "0.7"
+      ],
+      "out": "1"
+    },
+    {
+      "name": "nextLarger(0.996)",
+      "op": "nextLarger",
+      "in": [
+        "0.996"
+      ],
+      "out": "2"
+    },
+    {
+      "name": "nextLarger(0.1475)",
+      "op": "nextLarger",
+      "in": [
+        "0.1475"
+      ],
+      "out": "0.16"
+    },
+    {
+      "name": "nextLarger(40)",
+      "op": "nextLarger",
+      "in": [
+        "40"
+      ],
+      "out": "32"
+    },
+    {
+      "name": "nextLarger(0.001)",
+      "op": "nextLarger",
+      "in": [
+        "0.001"
+      ],
+      "out": "0.01"
+    },
+    {
+      "name": "nextSmaller(0.7)",
+      "op": "nextSmaller",
+      "in": [
+        "0.7"
+      ],
+      "out": "0.66"
+    },
+    {
+      "name": "nextSmaller(1.004)",
+      "op": "nextSmaller",
+      "in": [
+        "1.004"
+      ],
+      "out": "0.66"
+    },
+    {
+      "name": "nextSmaller(1.006)",
+      "op": "nextSmaller",
+      "in": [
+        "1.006"
+      ],
+      "out": "1"
+    },
+    {
+      "name": "nextSmaller(0.1475)",
+      "op": "nextSmaller",
+      "in": [
+        "0.1475"
+      ],
+      "out": "0.12"
+    },
+    {
+      "name": "nextSmaller(32)",
+      "op": "nextSmaller",
+      "in": [
+        "32"
+      ],
+      "out": "24"
+    },
+    {
+      "name": "nextSmaller(100)",
+      "op": "nextSmaller",
+      "in": [
+        "100"
+      ],
+      "out": "0.01"
+    },
+    {
+      "name": "clamp(0)",
+      "op": "clamp",
+      "in": [
+        "0"
+      ],
+      "out": "0.01"
+    },
+    {
+      "name": "clamp(99)",
+      "op": "clamp",
+      "in": [
+        "99"
+      ],
+      "out": "32"
+    },
+    {
+      "name": "label(1)",
+      "op": "label",
+      "in": [
+        "1"
+      ],
+      "out": "100%"
+    },
+    {
+      "name": "label(0.33)",
+      "op": "label",
+      "in": [
+        "0.33"
+      ],
+      "out": "33%"
+    },
+    {
+      "name": "label(32)",
+      "op": "label",
+      "in": [
+        "32"
+      ],
+      "out": "3200%"
+    },
+    {
+      "name": "label(0.01)",
+      "op": "label",
+      "in": [
+        "0.01"
+      ],
+      "out": "1%"
+    },
+    {
+      "name": "label(0.015)",
+      "op": "label",
+      "in": [
+        "0.015"
+      ],
+      "out": "1.5%"
+    }
+  ]
+}

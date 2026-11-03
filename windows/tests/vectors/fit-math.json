@@ -1,0 +1,53 @@
+{
+  "note": "Written by `OpenPainter.Harness --export-vectors` from the Swift tests. Do not edit by hand.",
+  "source": "mac/Tests/OpenPainterKitTests/ZoomTests.swift",
+  "functions": [
+    "testFitIsTheSmallerAxisLessTenPointsAndNeverAboveActualSize"
+  ],
+  "vectors": [
+    {
+      "name": "fit(6000,4000,960,600)",
+      "op": "fit",
+      "in": [
+        "6000",
+        "4000",
+        "960",
+        "600"
+      ],
+      "out": "0.1475"
+    },
+    {
+      "name": "fit(100,50,960,600)",
+      "op": "fit",
+      "in": [
+        "100",
+        "50",
+        "960",
+        "600"
+      ],
+      "out": "1"
+    },
+    {
+      "name": "fit(1000000,10,960,600)",
+      "op": "fit",
+      "in": [
+        "1000000",
+        "10",
+        "960",
+        "600"
+      ],
+      "out": "0.01"
+    },
+    {
+      "name": "fit(1000,3000,1010,610)",
+      "op": "fit",
+      "in": [
+        "1000",
+        "3000",
+        "1010",
+        "610"
+      ],
+      "out": "0.2"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<!-- xunit's Assert makes these generic types at run time. They are internal to it, so C# cannot name them. -->
+<Directives>
+  <Application>
+    <Assembly Name="xunit.v3.assert">
+      <Type Name="Xunit.Sdk.AssertEqualityComparerAdapter`1[[System.Int32,System.Private.CoreLib]]" Dynamic="Required All" />
+      <Type Name="Xunit.Sdk.AssertEqualityComparer`1[[System.Int32,System.Private.CoreLib]]" Dynamic="Required All" />
+    </Assembly>
+  </Application>
+</Directives>

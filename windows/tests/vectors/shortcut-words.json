@@ -1,0 +1,527 @@
+{
+  "note": "Written by `OpenPainter.Harness --export-vectors` from the Swift tests. Do not edit by hand.",
+  "source": "mac/Tests/OpenPainterKitTests/menu-skeleton.txt",
+  "functions": [],
+  "vectors": [
+    {
+      "name": "OpenPainter > Settings…",
+      "op": "macKey",
+      "in": [
+        "⌘,"
+      ],
+      "out": "Ctrl+,"
+    },
+    {
+      "name": "OpenPainter > Hide OpenPainter",
+      "op": "macKey",
+      "in": [
+        "⌘H"
+      ],
+      "out": "Ctrl+H"
+    },
+    {
+      "name": "OpenPainter > Hide Others",
+      "op": "macKey",
+      "in": [
+        "⌥⌘H"
+      ],
+      "out": "Ctrl+Alt+H"
+    },
+    {
+      "name": "OpenPainter > Quit OpenPainter",
+      "op": "macKey",
+      "in": [
+        "⌘Q"
+      ],
+      "out": "Ctrl+Q"
+    },
+    {
+      "name": "File > New…",
+      "op": "macKey",
+      "in": [
+        "⌘N"
+      ],
+      "out": "Ctrl+N"
+    },
+    {
+      "name": "File > Open…",
+      "op": "macKey",
+      "in": [
+        "⌘O"
+      ],
+      "out": "Ctrl+O"
+    },
+    {
+      "name": "File > Save",
+      "op": "macKey",
+      "in": [
+        "⌘S"
+      ],
+      "out": "Ctrl+S"
+    },
+    {
+      "name": "File > Save As…",
+      "op": "macKey",
+      "in": [
+        "⇧⌘S"
+      ],
+      "out": "Ctrl+Shift+S"
+    },
+    {
+      "name": "File > Save All",
+      "op": "macKey",
+      "in": [
+        "⌥⌘S"
+      ],
+      "out": "Ctrl+Alt+S"
+    },
+    {
+      "name": "File > Close",
+      "op": "macKey",
+      "in": [
+        "⌘W"
+      ],
+      "out": "Ctrl+W"
+    },
+    {
+      "name": "Edit > Undo",
+      "op": "macKey",
+      "in": [
+        "⌘Z"
+      ],
+      "out": "Ctrl+Z"
+    },
+    {
+      "name": "Edit > Redo",
+      "op": "macKey",
+      "in": [
+        "⇧⌘Z"
+      ],
+      "out": "Ctrl+Shift+Z"
+    },
+    {
+      "name": "Edit > Cut",
+      "op": "macKey",
+      "in": [
+        "⌘X"
+      ],
+      "out": "Ctrl+X"
+    },
+    {
+      "name": "Edit > Copy",
+      "op": "macKey",
+      "in": [
+        "⌘C"
+      ],
+      "out": "Ctrl+C"
+    },
+    {
+      "name": "Edit > Copy Merged",
+      "op": "macKey",
+      "in": [
+        "⇧⌘C"
+      ],
+      "out": "Ctrl+Shift+C"
+    },
+    {
+      "name": "Edit > Paste",
+      "op": "macKey",
+      "in": [
+        "⌘V"
+      ],
+      "out": "Ctrl+V"
+    },
+    {
+      "name": "Edit > Paste into New Layer",
+      "op": "macKey",
+      "in": [
+        "⇧⌘V"
+      ],
+      "out": "Ctrl+Shift+V"
+    },
+    {
+      "name": "Edit > Paste into New Image",
+      "op": "macKey",
+      "in": [
+        "⌥⌘V"
+      ],
+      "out": "Ctrl+Alt+V"
+    },
+    {
+      "name": "Edit > Copy Selection",
+      "op": "macKey",
+      "in": [
+        "⌥⇧⌘C"
+      ],
+      "out": "Ctrl+Shift+Alt+C"
+    },
+    {
+      "name": "Edit > Paste Selection > Replace",
+      "op": "macKey",
+      "in": [
+        "⌥⇧⌘V"
+      ],
+      "out": "Ctrl+Shift+Alt+V"
+    },
+    {
+      "name": "Edit > Erase Selection",
+      "op": "macKey",
+      "in": [
+        "⌫"
+      ],
+      "out": "Delete"
+    },
+    {
+      "name": "Edit > Fill Selection",
+      "op": "macKey",
+      "in": [
+        "⇧⌫"
+      ],
+      "out": "Shift+Delete"
+    },
+    {
+      "name": "Edit > Invert Selection",
+      "op": "macKey",
+      "in": [
+        "⌘I"
+      ],
+      "out": "Ctrl+I"
+    },
+    {
+      "name": "Edit > Select All",
+      "op": "macKey",
+      "in": [
+        "⌘A"
+      ],
+      "out": "Ctrl+A"
+    },
+    {
+      "name": "Edit > Deselect",
+      "op": "macKey",
+      "in": [
+        "⌘D"
+      ],
+      "out": "Ctrl+D"
+    },
+    {
+      "name": "View > Zoom In",
+      "op": "macKey",
+      "in": [
+        "⌘="
+      ],
+      "out": "Ctrl++"
+    },
+    {
+      "name": "View > Zoom Out",
+      "op": "macKey",
+      "in": [
+        "⌘-"
+      ],
+      "out": "Ctrl+-"
+    },
+    {
+      "name": "View > Zoom to Window",
+      "op": "macKey",
+      "in": [
+        "⌘B"
+      ],
+      "out": "Ctrl+B"
+    },
+    {
+      "name": "View > Zoom to Selection",
+      "op": "macKey",
+      "in": [
+        "⇧⌘B"
+      ],
+      "out": "Ctrl+Shift+B"
+    },
+    {
+      "name": "View > Actual Size",
+      "op": "macKey",
+      "in": [
+        "⌘0"
+      ],
+      "out": "Ctrl+0"
+    },
+    {
+      "name": "View > Pixel Grid",
+      "op": "macKey",
+      "in": [
+        "⌘'"
+      ],
+      "out": "Ctrl+'"
+    },
+    {
+      "name": "View > Rulers",
+      "op": "macKey",
+      "in": [
+        "⌥⌘R"
+      ],
+      "out": "Ctrl+Alt+R"
+    },
+    {
+      "name": "Image > Crop to Selection",
+      "op": "macKey",
+      "in": [
+        "⇧⌘X"
+      ],
+      "out": "Ctrl+Shift+X"
+    },
+    {
+      "name": "Image > Resize…",
+      "op": "macKey",
+      "in": [
+        "⌘R"
+      ],
+      "out": "Ctrl+R"
+    },
+    {
+      "name": "Image > Canvas Size…",
+      "op": "macKey",
+      "in": [
+        "⇧⌘R"
+      ],
+      "out": "Ctrl+Shift+R"
+    },
+    {
+      "name": "Image > Rotate 90° Counter-Clockwise",
+      "op": "macKey",
+      "in": [
+        "⌘G"
+      ],
+      "out": "Ctrl+G"
+    },
+    {
+      "name": "Image > Rotate 180°",
+      "op": "macKey",
+      "in": [
+        "⌘J"
+      ],
+      "out": "Ctrl+J"
+    },
+    {
+      "name": "Image > Flatten",
+      "op": "macKey",
+      "in": [
+        "⇧⌘F"
+      ],
+      "out": "Ctrl+Shift+F"
+    },
+    {
+      "name": "Layers > Add New Layer",
+      "op": "macKey",
+      "in": [
+        "⇧⌘N"
+      ],
+      "out": "Ctrl+Shift+N"
+    },
+    {
+      "name": "Layers > Delete Layer",
+      "op": "macKey",
+      "in": [
+        "⇧⌘⌫"
+      ],
+      "out": "Ctrl+Shift+Delete"
+    },
+    {
+      "name": "Layers > Duplicate Layer",
+      "op": "macKey",
+      "in": [
+        "⇧⌘D"
+      ],
+      "out": "Ctrl+Shift+D"
+    },
+    {
+      "name": "Layers > Go to Top Layer",
+      "op": "macKey",
+      "in": [
+        "⌥⌘PageUp"
+      ],
+      "out": "Ctrl+Alt+PageUp"
+    },
+    {
+      "name": "Layers > Go to Layer Above",
+      "op": "macKey",
+      "in": [
+        "⌥PageUp"
+      ],
+      "out": "Alt+PageUp"
+    },
+    {
+      "name": "Layers > Go to Layer Below",
+      "op": "macKey",
+      "in": [
+        "⌥PageDown"
+      ],
+      "out": "Alt+PageDown"
+    },
+    {
+      "name": "Layers > Go to Bottom Layer",
+      "op": "macKey",
+      "in": [
+        "⌥⌘PageDown"
+      ],
+      "out": "Ctrl+Alt+PageDown"
+    },
+    {
+      "name": "Layers > Layer Properties…",
+      "op": "macKey",
+      "in": [
+        "F4"
+      ],
+      "out": "F4"
+    },
+    {
+      "name": "Adjustments > Auto-Level",
+      "op": "macKey",
+      "in": [
+        "⇧⌘L"
+      ],
+      "out": "Ctrl+Shift+L"
+    },
+    {
+      "name": "Adjustments > Black and White",
+      "op": "macKey",
+      "in": [
+        "⇧⌘G"
+      ],
+      "out": "Ctrl+Shift+G"
+    },
+    {
+      "name": "Adjustments > Brightness / Contrast",
+      "op": "macKey",
+      "in": [
+        "⇧⌘T"
+      ],
+      "out": "Ctrl+Shift+T"
+    },
+    {
+      "name": "Adjustments > Curves",
+      "op": "macKey",
+      "in": [
+        "⇧⌘M"
+      ],
+      "out": "Ctrl+Shift+M"
+    },
+    {
+      "name": "Adjustments > Hue / Saturation",
+      "op": "macKey",
+      "in": [
+        "⇧⌘U"
+      ],
+      "out": "Ctrl+Shift+U"
+    },
+    {
+      "name": "Adjustments > Invert Alpha",
+      "op": "macKey",
+      "in": [
+        "⌥⌘I"
+      ],
+      "out": "Ctrl+Alt+I"
+    },
+    {
+      "name": "Adjustments > Invert Colors",
+      "op": "macKey",
+      "in": [
+        "⇧⌘I"
+      ],
+      "out": "Ctrl+Shift+I"
+    },
+    {
+      "name": "Adjustments > Levels",
+      "op": "macKey",
+      "in": [
+        "⌘L"
+      ],
+      "out": "Ctrl+L"
+    },
+    {
+      "name": "Adjustments > Posterize",
+      "op": "macKey",
+      "in": [
+        "⇧⌘P"
+      ],
+      "out": "Ctrl+Shift+P"
+    },
+    {
+      "name": "Adjustments > Sepia",
+      "op": "macKey",
+      "in": [
+        "⇧⌘E"
+      ],
+      "out": "Ctrl+Shift+E"
+    },
+    {
+      "name": "Effects > Repeat Effect",
+      "op": "macKey",
+      "in": [
+        "⌘F"
+      ],
+      "out": "Ctrl+F"
+    },
+    {
+      "name": "Window > Tools",
+      "op": "macKey",
+      "in": [
+        "F5"
+      ],
+      "out": "F5"
+    },
+    {
+      "name": "Window > History",
+      "op": "macKey",
+      "in": [
+        "F6"
+      ],
+      "out": "F6"
+    },
+    {
+      "name": "Window > Layers",
+      "op": "macKey",
+      "in": [
+        "F7"
+      ],
+      "out": "F7"
+    },
+    {
+      "name": "Window > Colors",
+      "op": "macKey",
+      "in": [
+        "F8"
+      ],
+      "out": "F8"
+    },
+    {
+      "name": "Window > Next Panel",
+      "op": "macKey",
+      "in": [
+        "⌃`"
+      ],
+      "out": "Ctrl+`"
+    },
+    {
+      "name": "Window > Previous Panel",
+      "op": "macKey",
+      "in": [
+        "⌃⇧`"
+      ],
+      "out": "Ctrl+Shift+`"
+    },
+    {
+      "name": "Window > Minimize",
+      "op": "macKey",
+      "in": [
+        "⌘M"
+      ],
+      "out": "Ctrl+M"
+    },
+    {
+      "name": "Help > OpenPainter Help",
+      "op": "macKey",
+      "in": [
+        "⌘?"
+      ],
+      "out": "Ctrl+?"
+    }
+  ]
+}

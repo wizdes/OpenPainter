@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="../OpenPainter/OpenPainter.csproj" />
     <ProjectReference Include="../tools/bridge-gen/BridgeGen.csproj" />
+    <ProjectReference Include="../harness/OpenPainter.Harness.csproj" />
     <PackageReference Include="Avalonia.Headless" Version="12.1.4" />
     <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.4" />
     <PackageReference Include="Avalonia.Skia" Version="12.1.4" />

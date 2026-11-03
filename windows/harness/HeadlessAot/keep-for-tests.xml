@@ -1,0 +1,6 @@
+<!-- BridgeTests read the C# structs by reflection. Only the test needs this metadata. -->
+<linker>
+  <assembly fullname="OpenPainter">
+    <namespace fullname="OpenPainter.Bridge" />
+  </assembly>
+</linker>

@@ -20,15 +20,8 @@ public sealed partial class PanelWindow : Window
 {
     const int GwlExStyle = -20;
     const long WsExToolWindow = 0x80, WsExAppWindow = 0x40000;
-    const uint DwmCornerPreference = 33, WmGetMinMaxInfo = 0x0024;
+    const uint DwmCornerPreference = 33;
     const int DwmCornerRound = 2;
-
-    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
-    [StructLayout(LayoutKind.Sequential)] struct MinMaxInfo { public NativePoint Reserved, MaxSize, MaxPosition, MinTrack, MaxTrack; }
-    [StructLayout(LayoutKind.Sequential)] struct NativeRect { public int Left, Top, Right, Bottom; }
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetWindowRect(nint hwnd, out NativeRect rect);
 
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)] private static partial nint GetWindowLongPtr(nint hwnd, int index);
     [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)] private static partial nint SetWindowLongPtr(nint hwnd, int index, nint value);
@@ -121,22 +114,8 @@ public sealed partial class PanelWindow : Window
 
     /// Avalonia's MinHeight counts a title bar this window has turned off, so Colors could
     /// not be its 246 pixels. Here the limits are the client sizes the Mac names.
-    unsafe nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled)
-    {
-        if (message != WmGetMinMaxInfo) return 0;
-        if (!GetWindowRect(hwnd, out var rect)) throw new InvalidOperationException($"PANEL_SIZE: {Panel.Title}: {Marshal.GetLastPInvokeError()}");
-        var scale = RenderScaling;
-        // The system's invisible resize edges count in the window's size and not in the client's.
-        var frameX = rect.Right - rect.Left - (int)Math.Round(ClientSize.Width * scale);
-        var frameY = rect.Bottom - rect.Top - (int)Math.Round(ClientSize.Height * scale);
-        var info = (MinMaxInfo*)l;
-        info->MinTrack.X = (int)Math.Round(MinimumClient.Width * scale) + frameX;
-        info->MinTrack.Y = (int)Math.Round(MinimumClient.Height * scale) + frameY;
-        if (MaximumClientWidth is { } width) info->MaxTrack.X = (int)Math.Round(width * scale) + frameX;
-        if (MaximumClientHeight is { } height) info->MaxTrack.Y = (int)Math.Round(height * scale) + frameY;
-        handled = true;
-        return 0;
-    }
+    nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled) =>
+        WindowLimits.OnMessage(hwnd, message, l, ClientSize, RenderScaling, MinimumClient, MaximumClientWidth, MaximumClientHeight, ref handled);
 
     /// On a real window only. Headless windows have no handle of this kind.
     void MakeToolWindow()

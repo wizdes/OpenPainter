@@ -32,6 +32,7 @@ public sealed class App : Application
                 window.Opened += (_, _) => DispatcherTimer.RunOnce(() => window.TitleBar.Menus.Items.OfType<Avalonia.Controls.MenuItem>().Single(m => (string?)m.Header == menu).Open(), TimeSpan.FromMilliseconds(1000));
             if (Options.TestOpenMore) window.Opened += (_, _) => DispatcherTimer.RunOnce(window.Options.OpenMore, TimeSpan.FromMilliseconds(1000));
             if (Options.ExitAfterMs is { } ms) TestReport.Arrange(window, ms, Options.ReportPath, code => ExitCode = code);
+            TestProbe.Arrange(window, Options, code => ExitCode = code);
             desktop.MainWindow = window;
         }
         base.OnFrameworkInitializationCompleted();

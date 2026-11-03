@@ -1,0 +1,257 @@
+{
+  "note": "Written by `OpenPainter.Harness --export-vectors` from the Swift tests. Do not edit by hand.",
+  "source": "mac/Tests/OpenPainterKitTests/ColorsTests.swift",
+  "functions": [
+    "testHexFieldValidation",
+    "testHSVConversionRoundTripsEveryByteTriple"
+  ],
+  "vectors": [
+    {
+      "name": "hex(#CF684D)",
+      "op": "hex",
+      "in": [
+        "#CF684D"
+      ],
+      "out": "207 104 77 255"
+    },
+    {
+      "name": "hex(cf684d)",
+      "op": "hex",
+      "in": [
+        "cf684d"
+      ],
+      "out": "207 104 77 255"
+    },
+    {
+      "name": "hex( 00FF0080 )",
+      "op": "hex",
+      "in": [
+        " 00FF0080 "
+      ],
+      "out": "0 255 0 128"
+    },
+    {
+      "name": "hex(+12345)",
+      "op": "hexRejected",
+      "in": [
+        "+12345"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(+1234567)",
+      "op": "hexRejected",
+      "in": [
+        "+1234567"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(-12345)",
+      "op": "hexRejected",
+      "in": [
+        "-12345"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(12345)",
+      "op": "hexRejected",
+      "in": [
+        "12345"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(1234567)",
+      "op": "hexRejected",
+      "in": [
+        "1234567"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(GGGGGG)",
+      "op": "hexRejected",
+      "in": [
+        "GGGGGG"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(#12 456)",
+      "op": "hexRejected",
+      "in": [
+        "#12 456"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex()",
+      "op": "hexRejected",
+      "in": [
+        ""
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(#)",
+      "op": "hexRejected",
+      "in": [
+        "#"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(0x1234)",
+      "op": "hexRejected",
+      "in": [
+        "0x1234"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hex(１２３４５６)",
+      "op": "hexRejected",
+      "in": [
+        "１２３４５６"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "hexText(1 2 3 255)",
+      "op": "hexText",
+      "in": [
+        "1",
+        "2",
+        "3",
+        "255"
+      ],
+      "out": "#010203"
+    },
+    {
+      "name": "hexText(1 2 3 4)",
+      "op": "hexText",
+      "in": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "out": "#01020304"
+    },
+    {
+      "name": "channel( 255 ,0...255)",
+      "op": "channel",
+      "in": [
+        " 255 ",
+        "0",
+        "255"
+      ],
+      "out": "255"
+    },
+    {
+      "name": "channel(360,0...360)",
+      "op": "channel",
+      "in": [
+        "360",
+        "0",
+        "360"
+      ],
+      "out": "360"
+    },
+    {
+      "name": "channel(256,0...255)",
+      "op": "channelRejected",
+      "in": [
+        "256",
+        "0",
+        "255"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "channel(-1,0...255)",
+      "op": "channelRejected",
+      "in": [
+        "-1",
+        "0",
+        "255"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "channel(1.5,0...255)",
+      "op": "channelRejected",
+      "in": [
+        "1.5",
+        "0",
+        "255"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "channel(abc,0...360)",
+      "op": "channelRejected",
+      "in": [
+        "abc",
+        "0",
+        "360"
+      ],
+      "out": "nil"
+    },
+    {
+      "name": "rgbToHsv(255 0 0)",
+      "op": "rgbToHsv",
+      "in": [
+        "255",
+        "0",
+        "0"
+      ],
+      "out": "0 100 100"
+    },
+    {
+      "name": "rgbToHsv(0 0 255)",
+      "op": "rgbToHsv",
+      "in": [
+        "0",
+        "0",
+        "255"
+      ],
+      "out": "240 100 100"
+    },
+    {
+      "name": "hsvToRgb(120 100 100 255)",
+      "op": "hsvToRgb",
+      "in": [
+        "120",
+        "100",
+        "100",
+        "255"
+      ],
+      "out": "0 255 0 255"
+    },
+    {
+      "name": "hsvToRgb(360 100 100 255)",
+      "op": "hsvToRgb",
+      "in": [
+        "360",
+        "100",
+        "100",
+        "255"
+      ],
+      "out": "255 0 0 255"
+    },
+    {
+      "name": "hsvToRgb(30 0 50 9)",
+      "op": "hsvToRgb",
+      "in": [
+        "30",
+        "0",
+        "50",
+        "9"
+      ],
+      "out": "128 128 128 9"
+    }
+  ]
+}

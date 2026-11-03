@@ -378,11 +378,31 @@ public sealed partial class TestReport
         if (off.Count != 0) problems.Add($"icons: {off.Count} are not on whole pixels: {string.Join(" ", off.Take(5))}");
     }
 
+    /// Asks Windows for a far smaller window. The client must stop at the Mac's minimum:
+    /// a limit that counts a title bar this window has turned off stops too soon.
+    async Task CheckMinimumSize(nint main, List<string> problems, StringBuilder text)
+    {
+        const int TooSmall = 200;
+        if (!GetWindowRect(main, out var before)) throw new InvalidOperationException($"TEST_REPORT: GetWindowRect: {Marshal.GetLastPInvokeError()}");
+        const uint SwpNoMove = 2;
+        if (!SetWindowPos(main, 0, 0, 0, TooSmall, TooSmall, SwpNoMove | SwpNoZOrder | SwpNoActivate))
+            throw new InvalidOperationException($"TEST_REPORT: SetWindowPos: {Marshal.GetLastPInvokeError()}");
+        await Task.Delay(SettleMs);
+        var client = _window.ClientSize;
+        text.Append($"  \"minimum_client\": \"{client}\",\n");
+        if (client.Width != MainWindow.MinimumClient.Width || client.Height != MainWindow.MinimumClient.Height)
+            problems.Add($"window minimum: the client stops at {client}, not {MainWindow.MinimumClient}");
+        if (!SetWindowPos(main, 0, 0, 0, before.Right - before.Left, before.Bottom - before.Top, SwpNoMove | SwpNoZOrder | SwpNoActivate))
+            throw new InvalidOperationException($"TEST_REPORT: SetWindowPos: {Marshal.GetLastPInvokeError()}");
+        await Task.Delay(SettleMs);
+    }
+
     async Task CheckShell(nint main, List<string> problems, StringBuilder text)
     {
         await CheckPanels(main, problems, text);
         await CheckCanvas(problems, text);
         await CheckPopups(main, problems, text);
         CheckIcons(problems, text);
+        await CheckMinimumSize(main, problems, text);
     }
 }

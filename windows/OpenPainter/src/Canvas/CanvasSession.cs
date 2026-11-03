@@ -215,6 +215,35 @@ public sealed unsafe class CanvasSession : IDisposable
         return info;
     }
 
+    /// Waits on this thread until the engine has presented `frames` frames. False means
+    /// the time ran out. It is a test hook's wait, so it never runs on the UI thread.
+    public bool WaitFrames(ulong frames, uint timeoutMs)
+    {
+        if (_view == 0) throw new InvalidOperationException("VIEW_WAIT: no view yet");
+        var status = Native.op_view_wait_frames(_engine, _view, frames, timeoutMs, null);
+        if (status == OpStatus.OP_ERR_BUSY) return false;
+        Check(status, "VIEW_WAIT");
+        return true;
+    }
+
+    /// Moves the engine's frame times out of its log: milliseconds since attach, stamped on
+    /// the render thread when each present returns, so no UI callback is in the count.
+    public double[] TakeFrameTimes()
+    {
+        const int Room = 16384;   // FRAME_LOG_CAP in op-ffi's view.rs.
+        var times = new double[Room];
+        nuint count;
+        fixed (double* to = times) Check(Native.op_view_take_frame_times(_engine, _view, to, (nuint)Room, &count), "VIEW_FRAME_TIMES");
+        return times[..(int)count];
+    }
+
+    public OpViewCounters Counters()
+    {
+        OpViewCounters counters;
+        Check(Native.op_view_counters(_engine, &counters), "VIEW_COUNTERS");
+        return counters;
+    }
+
     public void Dispose()
     {
         _work.CompleteAdding();
