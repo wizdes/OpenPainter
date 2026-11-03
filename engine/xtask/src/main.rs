@@ -149,7 +149,9 @@ fn base_steps() -> Vec<CommandStep> {
             ],
             &[],
         ),
-        CommandStep::cargo(&["test", "--workspace"], &[]),
+        // Each cargo test step runs every test program, so one known failure
+        // cannot hide the programs after it.
+        CommandStep::cargo(&["test", "--workspace", "--no-fail-fast"], &[]),
     ]
 }
 
@@ -162,7 +164,7 @@ fn deep_steps(tier: &str) -> Vec<CommandStep> {
     };
     let mut steps = vec![
         CommandStep::cargo(
-            &["test", "--workspace", "--release"],
+            &["test", "--workspace", "--release", "--no-fail-fast"],
             &[("OP_PROPTEST_CASES", cases)],
         ),
         CommandStep {
@@ -1466,7 +1468,7 @@ mod tests {
             [
                 "cargo fmt --all --check",
                 "cargo clippy --workspace --all-targets -- -D warnings",
-                "cargo test --workspace",
+                "cargo test --workspace --no-fail-fast",
             ]
         );
     }
@@ -1476,11 +1478,14 @@ mod tests {
         let steps = deep_steps("milestone");
         assert_eq!(steps.len(), 2);
         assert_eq!(steps[0].program, "cargo");
-        assert_eq!(steps[0].args, ["test", "--workspace", "--release"]);
+        assert_eq!(
+            steps[0].args,
+            ["test", "--workspace", "--release", "--no-fail-fast"]
+        );
         assert_eq!(steps[0].env, [("OP_PROPTEST_CASES", "1024")]);
         assert_eq!(
             steps[0].name,
-            "OP_PROPTEST_CASES=1024 cargo test --workspace --release"
+            "OP_PROPTEST_CASES=1024 cargo test --workspace --release --no-fail-fast"
         );
         assert_eq!(steps[1].program, "python3");
         assert_eq!(
@@ -1539,7 +1544,10 @@ mod tests {
         let steps = deep_steps("checkpoint");
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[0].env, [("OP_PROPTEST_CASES", "10000")]);
-        assert_eq!(steps[0].args, ["test", "--workspace", "--release"]);
+        assert_eq!(
+            steps[0].args,
+            ["test", "--workspace", "--release", "--no-fail-fast"]
+        );
         assert_eq!(
             steps[1].args,
             ["-B", "tests/oracle/legacy336/test_oracle.py"]

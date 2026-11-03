@@ -319,10 +319,48 @@ pub fn older_than_file(m: &Manifest) -> Option<String> {
 }
 
 #[cfg(windows)]
+const CANNOT_CHECK: &str =
+    "The file this copy came from cannot be checked, so this copy may be older than the file.";
+
+/// How long one record's file check may hold up its caller.
+#[cfg(windows)]
+const FILE_CHECK_LIMIT: Duration = Duration::from_millis(500);
+
+#[cfg(windows)]
 fn older_than_file_windows(m: &Manifest) -> Option<String> {
-    const CANNOT_CHECK: &str =
-        "The file this copy came from cannot be checked, so this copy may be older than the file.";
-    let url = m.original_url.as_deref()?;
+    let url = m.original_url.clone()?;
+    let base = m.base_file;
+    check_within(FILE_CHECK_LIMIT, move || check_file_windows(&url, base))
+}
+
+/// Runs `check` on a helper thread and waits at most `limit` for its answer.
+/// A file on a network path can block for seconds, and there is no way to
+/// cancel that. Past the limit the helper keeps running with no lock and only
+/// its own data, and its late answer is dropped. The user sees `CANNOT_CHECK`,
+/// which is true: the file may be newer.
+#[cfg(windows)]
+fn check_within(
+    limit: Duration,
+    check: impl FnOnce() -> Option<String> + Send + 'static,
+) -> Option<String> {
+    let (answer, answered) = bounded(1);
+    let helper = std::thread::Builder::new()
+        .name("op-recovery-file-check".into())
+        .spawn(move || {
+            // The caller has gone if this send fails, so no one needs the answer.
+            let _ = answer.send(check());
+        });
+    if let Err(e) = helper {
+        eprintln!("op-engine: cannot start the file check: {e}");
+        return Some(CANNOT_CHECK.into());
+    }
+    answered
+        .recv_timeout(limit)
+        .unwrap_or_else(|_| Some(CANNOT_CHECK.into()))
+}
+
+#[cfg(windows)]
+fn check_file_windows(url: &str, base: Option<FileStamp>) -> Option<String> {
     let Some(path) = url_path(url) else {
         return Some(CANNOT_CHECK.into());
     };
@@ -340,7 +378,7 @@ fn older_than_file_windows(m: &Manifest) -> Option<String> {
         Err(_) => Some(CANNOT_CHECK.into()),
         Ok(_) => match stamp_of(Some(url)) {
             None => Some(CANNOT_CHECK.into()),
-            Some(now) if m.base_file == Some(now) => None,
+            Some(now) if base == Some(now) => None,
             Some(_) => Some(
                 "The file was saved after this copy was made, so this copy is older than the file."
                     .into(),
@@ -2318,6 +2356,61 @@ mod tests {
             let problem = older_than_file(&manifest_for("file:///Z:/gone/a.opaint")).unwrap();
             assert!(problem.contains("cannot be checked"), "{problem}");
         }
+    }
+
+    /// A network path can block for seconds (2,700 ms measured for an unknown
+    /// server), so this test makes the check slow itself and uses no network.
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_slow_file_check_gives_up_at_the_limit_and_ends_later() {
+        let (release, released) = bounded::<()>(1);
+        let (finished, ended) = bounded::<()>(1);
+        let start = Instant::now();
+        let answer = check_within(FILE_CHECK_LIMIT, move || {
+            let _ = released.recv_timeout(Duration::from_secs(5));
+            finished.send(()).unwrap();
+            Some("the slow check's own answer".into())
+        });
+        let waited = start.elapsed();
+        assert_eq!(answer.as_deref(), Some(CANNOT_CHECK));
+        assert!(waited >= FILE_CHECK_LIMIT, "{waited:?}");
+        assert!(waited < FILE_CHECK_LIMIT * 4, "{waited:?}");
+        // The caller has gone. The check still finishes without harm.
+        release.send(()).unwrap();
+        ended.recv_timeout(Duration::from_secs(10)).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_file_check_in_time_keeps_its_own_answer() {
+        assert_eq!(check_within(FILE_CHECK_LIMIT, || None), None);
+        let answer = check_within(FILE_CHECK_LIMIT, || {
+            std::thread::sleep(Duration::from_millis(50));
+            Some("its own answer".into())
+        });
+        assert_eq!(answer.as_deref(), Some("its own answer"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_file_check_that_ends_with_no_answer_cannot_check() {
+        let answer = check_within(FILE_CHECK_LIMIT, || panic!("the check stopped"));
+        assert_eq!(answer.as_deref(), Some(CANNOT_CHECK));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_a_local_file_keeps_its_older_or_matching_answer() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.opaint");
+        fs::write(&path, b"data").unwrap();
+        let url = format!("file:///{}", path.to_string_lossy().replace('\\', "/"));
+        let mut m = manifest_for(&url);
+        m.base_file = stamp_of(Some(&url));
+        assert_eq!(older_than_file(&m), None);
+        m.base_file = None;
+        let problem = older_than_file(&m).unwrap();
+        assert!(problem.contains("saved after"), "{problem}");
     }
 
     #[cfg(windows)]
