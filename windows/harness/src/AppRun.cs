@@ -26,6 +26,9 @@ public sealed class AppRun : IDisposable
     {
         Folder = folder;
         Directory.CreateDirectory(folder);
+        // An old signal file would pass for this run's, and hold a dead process's window handles.
+        var left = Directory.GetFileSystemEntries(folder);
+        if (left.Length != 0) throw new InvalidOperationException($"HARNESS: the run folder {folder} already holds {string.Join(", ", left.Select(Path.GetFileName))}");
         DataRoot = Path.Combine(folder, "data");
         Directory.CreateDirectory(DataRoot);
         FirstFramePath = Path.Combine(folder, "first-frame.json");

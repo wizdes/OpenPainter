@@ -490,6 +490,184 @@ public sealed class HarnessTests
         Assert.Contains("LM Studio is running, with 2 models loaded", BusyJudge.Before(1, 1, [BusyJudge.Program("LM Studio", true, 2, "models loaded").Busy!]));
     }
 
+    // ---- Before the trace the PC gets time to settle, and the limits stay the same.
+
+    static QuietRead Read(double others, double? gpu = 2, string[]? busy = null, ProgramUse[]? top = null) => new(others, gpu, busy ?? [], top ?? []);
+
+    /// Hands out the reads in order, each taking the 3 s the real one takes. The last repeats.
+    static SettleResult Settled(double mostWait, params QuietRead[] reads)
+    {
+        var (now, next) = (0.0, 0);
+        return Settle.Wait(() =>
+        {
+            now += 3;
+            return reads[Math.Min(next++, reads.Length - 1)];
+        }, () => now, mostWait);
+    }
+
+    [Fact]
+    public void AQuietPcIsReadTwiceAndGoesOn()
+    {
+        var result = Settled(60, Read(3), Read(4));
+        Assert.True(result.Quiet);
+        Assert.Empty(result.Reasons);
+        Assert.Equal(2, result.Reads.Count);
+        Assert.Equal(6, result.WaitedSeconds);
+        Assert.Contains("waited 6 s", result.Words);
+        Assert.Contains("3%, 4%", result.Words);
+    }
+
+    [Fact]
+    public void ThePcGetsTimeToSettleAfterTheHarnesssOwnLaunches()
+    {
+        var result = Settled(60, Read(24), Read(19), Read(8), Read(5));
+        Assert.True(result.Quiet);
+        Assert.Equal(12, result.WaitedSeconds);
+        Assert.Contains("24%, 19%, 8%, 5%", result.Words);
+    }
+
+    [Fact]
+    public void OneQuietReadBetweenBusyOnesDoesNotCount()
+    {
+        var result = Settled(60, Read(24), Read(5), Read(24), Read(5), Read(6));
+        Assert.True(result.Quiet);
+        Assert.Equal(5, result.Reads.Count);
+    }
+
+    [Fact]
+    public void APcStillBusyAfterTheWaitNamesTheTopPrograms()
+    {
+        var result = Settled(60, Read(40, top: [new("MsMpEng", 22), new("SearchIndexer", 9.6)]));
+        Assert.False(result.Quiet);
+        Assert.Equal(60, result.WaitedSeconds);
+        Assert.Contains("40% busy", result.Reasons.Single());
+        Assert.Contains("MsMpEng 22%", result.Words);
+        Assert.Contains("SearchIndexer 10%", result.Words);
+        Assert.Contains("waited 60 s", result.Words);
+    }
+
+    [Fact]
+    public void AQuietReadAtTheVeryEndOfTheWaitIsNotSettled()
+    {
+        var result = Settled(6, Read(24), Read(5));
+        Assert.False(result.Quiet);
+        Assert.Contains("one read", result.Reasons.Single());
+    }
+
+    [Fact]
+    public void TheSettleLimitsAreTheBusyLimits()
+    {
+        Assert.False(Settled(9, Read(BusyJudge.MostCpuPercent)).Quiet);
+        Assert.True(Settled(9, Read(BusyJudge.MostCpuPercent - .1)).Quiet);
+        Assert.False(Settled(9, Read(3, BusyJudge.MostGpuBeforePercent)).Quiet);
+        Assert.Contains("could not be read", Settled(9, Read(3, null)).Reasons.Single());
+        Assert.Contains("LM Studio", Settled(9, Read(3, busy: ["LM Studio is running, with 2 models loaded"])).Reasons.Single());
+        Assert.Equal(15, BusyJudge.MostCpuPercent);
+        Assert.Equal(15, BusyJudge.MostGpuBeforePercent);
+    }
+
+    [Fact]
+    public void AProofRunReadsOnceAndDoesNotWait()
+    {
+        var result = Settle.Wait(() => Read(40), () => 0, mostWaitSeconds: 0, readsNeeded: 1);
+        Assert.False(result.Quiet);
+        Assert.Single(result.Reads);
+        Assert.Contains("40% busy", result.Reasons.Single());
+    }
+
+    [Fact]
+    public void TopProgramsAddUpByNameAndLeaveOutTheIdleOnes()
+    {
+        Dictionary<int, (string, TimeSpan)> before = new()
+        {
+            [1] = ("MsMpEng", TimeSpan.FromSeconds(100)),
+            [2] = ("dotnet", TimeSpan.FromSeconds(5)),
+            [3] = ("idle-one", TimeSpan.FromSeconds(9)),
+            [4] = ("gone", TimeSpan.FromSeconds(9)),
+        };
+        Dictionary<int, (string, TimeSpan)> after = new()
+        {
+            [1] = ("MsMpEng", TimeSpan.FromSeconds(102)),
+            [2] = ("dotnet", TimeSpan.FromSeconds(6)),
+            [3] = ("idle-one", TimeSpan.FromSeconds(9)),
+            [5] = ("dotnet", TimeSpan.FromSeconds(1)), // Started during the read, so all of its time counts.
+        };
+        // 2 s of 10 cores is 20 core-seconds.
+        var top = ProgramUse.Top(before, after, 20);
+        Assert.Equal([new ProgramUse("MsMpEng", 10), new ProgramUse("dotnet", 10)], top.OrderBy(p => p.Name, StringComparer.Ordinal));
+        Assert.DoesNotContain(top, p => p.Name == "idle-one" || p.Name == "gone");
+    }
+
+    // ---- A signal file left by an earlier harness run must never pass for this run's.
+
+    static string TempFolder()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"op-harness-{Environment.ProcessId}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    [Fact]
+    public void AnEarlierRunsFoldersAreClearedAndNothingElse()
+    {
+        var runs = TempFolder();
+        try
+        {
+            var old = Path.Combine(runs, "03-pixels-run-1");
+            Directory.CreateDirectory(Path.Combine(old, "data"));
+            File.WriteAllText(Path.Combine(old, "first-frame.json"), "{}");
+            var pan = Path.Combine(runs, "27-pan");
+            Directory.CreateDirectory(pan);
+            File.WriteAllText(Path.Combine(pan, "pan.json"), "{}");
+            var other = Path.Combine(runs, "keep-me");
+            Directory.CreateDirectory(other);
+            var file = Path.Combine(runs, "01-a-file.txt");
+            File.WriteAllText(file, "");
+
+            RunFolders.Clear(runs);
+
+            Assert.False(Directory.Exists(old));
+            Assert.False(Directory.Exists(pan));
+            Assert.True(Directory.Exists(other));
+            Assert.True(File.Exists(file));
+        }
+        finally
+        {
+            Directory.Delete(runs, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ClearingANewOutputFolderIsFine() => RunFolders.Clear(Path.Combine(Path.GetTempPath(), $"op-harness-none-{Guid.NewGuid():N}"));
+
+    [Fact]
+    public void ARunRefusesAFolderThatHoldsAnOldSignal()
+    {
+        var folder = TempFolder();
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "first-frame.json"), "{}");
+            // The check comes before the launch, so no program starts here.
+            var e = Assert.Throws<InvalidOperationException>(() => new AppRun(Path.Combine(folder, "no-such-app.exe"), folder, []));
+            Assert.Contains("first-frame.json", e.Message);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ACanvasHandleThatChangesInARunIsAProblem()
+    {
+        Assert.Null(CanvasHandles.Problem("run 1", [7], signal: 7, now: 7));
+        Assert.Null(CanvasHandles.Problem("run 1", [], signal: 7, now: 7));
+        Assert.Contains("2 canvas handles", CanvasHandles.Problem("run 1", [6, 7], signal: 7, now: 7));
+        Assert.Contains("before the signal", CanvasHandles.Problem("run 1", [6], signal: 7, now: 7));
+        Assert.Contains("after the signal", CanvasHandles.Problem("run 1", [7], signal: 7, now: 8));
+        Assert.Contains("after the signal", CanvasHandles.Problem("run 1", [7], signal: 7, now: 0));
+    }
+
     [Fact]
     public void NvidiaSmisWordsAreRead()
     {

@@ -382,7 +382,7 @@ public static class BusyJudge
     public static List<string> Before(double cpu, double? gpu, IEnumerable<string> busyPrograms)
     {
         var reasons = new List<string>();
-        if (cpu >= MostCpuPercent) reasons.Add($"the PC was {cpu:F0}% busy before the trace");
+        if (cpu >= MostCpuPercent) reasons.Add($"other programs kept the PC {cpu:F0}% busy before the trace");
         if (gpu is null) reasons.Add("GPU use before the trace could not be read");
         else if (gpu >= MostGpuBeforePercent) reasons.Add($"the GPU was {gpu:F0}% busy before the trace");
         reasons.AddRange(busyPrograms);
@@ -409,6 +409,110 @@ public static class BusyJudge
         if (inUse is null) return ($"{name} is running", $"{name} is running, and its {unit} could not be read");
         if (inUse == 0) return ($"{name} is running, with no {unit}", null);
         return ($"{name} is running, with {inUse} {unit}", $"{name} is running, with {inUse} {unit}");
+    }
+}
+
+/// One program's share of the whole PC's CPU over one read, from 0 to 100.
+public readonly record struct ProgramUse(string Name, double Percent)
+{
+    /// Adds up CPU time by program name between two lists of running processes. A process
+    /// that started between them counts in full. One that ended between them is left out,
+    /// and only the whole-PC number sees it.
+    public static List<ProgramUse> Top(IReadOnlyDictionary<int, (string Name, TimeSpan Cpu)> before, IReadOnlyDictionary<int, (string Name, TimeSpan Cpu)> after, double coreSeconds, int count = 5, double leastPercent = .5)
+    {
+        var used = new Dictionary<string, double>();
+        foreach (var (pid, now) in after)
+        {
+            var then = before.TryGetValue(pid, out var old) && old.Name == now.Name ? old.Cpu : TimeSpan.Zero;
+            used[now.Name] = used.GetValueOrDefault(now.Name) + (now.Cpu - then).TotalSeconds;
+        }
+        return used.Select(u => new ProgramUse(u.Key, coreSeconds <= 0 ? 0 : 100 * u.Value / coreSeconds))
+            .Where(p => p.Percent >= leastPercent)
+            .OrderByDescending(p => p.Percent)
+            .Take(count)
+            .ToList();
+    }
+
+    public override string ToString() => $"{Name} {Percent:F0}%";
+}
+
+/// One read of how busy the PC is: other programs' share of the CPU, which is the whole PC
+/// less the harness. `Unread` counts programs that would not give their CPU time. The
+/// whole-PC number still holds their use, and only the names leave them out.
+public sealed record QuietRead(double OthersCpu, double? Gpu, IReadOnlyList<string> BusyPrograms, IReadOnlyList<ProgramUse> Top, int Unread = 0);
+
+public sealed record SettleResult(bool Quiet, double WaitedSeconds, IReadOnlyList<QuietRead> Reads, IReadOnlyList<string> Reasons)
+{
+    public string Words
+    {
+        get
+        {
+            var last = Reads[^1];
+            var top = last.Top.Count == 0 ? "no program at 1% or more" : string.Join(", ", last.Top);
+            var gpu = string.Join(", ", Reads.Select(r => r.Gpu is { } g ? $"{g:F0}%" : "not read"));
+            return $"waited {WaitedSeconds:F0} s for the PC to settle, {Reads.Count} reads; other programs' CPU {string.Join(", ", Reads.Select(r => $"{r.OthersCpu:F0}%"))}; GPU {gpu}; top programs at the last read: {top}{(last.Unread == 0 ? "" : $"; {last.Unread} programs could not be read")}";
+        }
+    }
+}
+
+/// The harness's own launches, build and shut-downs leave the PC busy for a while. So it reads
+/// the PC until the busy limits hold, and the limits do not change. Waiting gives a busy PC
+/// more than one chance, so it takes more than one quiet read in a row to go on.
+public static class Settle
+{
+    public const double MostWaitSeconds = 60;
+    public const int QuietReadsNeeded = 2;
+
+    public static SettleResult Wait(Func<QuietRead> read, Func<double> seconds, double mostWaitSeconds = MostWaitSeconds, int readsNeeded = QuietReadsNeeded)
+    {
+        var start = seconds();
+        var reads = new List<QuietRead>();
+        var quiet = 0;
+        while (true)
+        {
+            var now = read();
+            reads.Add(now);
+            var reasons = BusyJudge.Before(now.OthersCpu, now.Gpu, now.BusyPrograms);
+            quiet = reasons.Count == 0 ? quiet + 1 : 0;
+            var waited = seconds() - start;
+            if (quiet >= readsNeeded) return new SettleResult(true, waited, reads, []);
+            if (waited < mostWaitSeconds) continue;
+            if (reasons.Count == 0) reasons.Add($"the PC had only one read under the limits, at the end of the {mostWaitSeconds:F0} s wait");
+            return new SettleResult(false, waited, reads, reasons);
+        }
+    }
+}
+
+/// The canvas's window must stay the same one for the whole run, because the engine draws into
+/// it. A change here is a fault in the app, so it is named and never read past.
+public static class CanvasHandles
+{
+    /// `before` holds the handles seen before the first-frame signal. `now` is the one seen later.
+    public static string? Problem(string label, IReadOnlyCollection<nint> before, nint signal, nint now)
+    {
+        if (before.Count > 1) return $"{label}: {before.Count} canvas handles were seen before the signal, so the app replaced the window the engine draws into: {string.Join(", ", before)}";
+        if (before.Count == 1 && !before.Contains(signal)) return $"{label}: the canvas handle was {before.First()} before the signal, and the signal names {signal}";
+        if (now != signal) return $"{label}: the signal names canvas handle {signal}, and after the signal the window has {now}";
+        return null;
+    }
+}
+
+/// `first-frame.json`, `report.json` and `pan.json` are how the app tells the harness it is done.
+/// One left by an earlier harness run looks just like one from this run, so each harness
+/// run starts with none. The numbered folders are the harness's own, and nothing else goes.
+public static class RunFolders
+{
+    public static void Clear(string runs)
+    {
+        if (!Directory.Exists(runs)) return;
+        foreach (var folder in Directory.GetDirectories(runs))
+            if (IsRunFolder(Path.GetFileName(folder))) Directory.Delete(folder, recursive: true);
+    }
+
+    static bool IsRunFolder(string name)
+    {
+        var dash = name.IndexOf('-');
+        return dash >= 2 && name[..dash].All(char.IsAsciiDigit);
     }
 }
 

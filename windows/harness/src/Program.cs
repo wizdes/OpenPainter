@@ -115,7 +115,7 @@ public static class Program
         {
             Directory.CreateDirectory(options.Out);
             Win32.UsePhysicalPixels();
-            var block = PreflightBlock();
+            var block = PreflightBlock() ?? ClearEarlierRuns();
             if (block is not null)
             {
                 Console.WriteLine($"UI TESTS: NOT RUN ({block})");
@@ -169,6 +169,20 @@ public static class Program
             if (reason is null && output.Contains("under 40 GB free", StringComparison.Ordinal))
                 Console.WriteLine("Note: under 40 GB free on C:. --ignore-disk let this proof run go on, and the window level never passes that switch.");
             return reason is null ? null : reason + (error.Result.Length == 0 ? "" : $" {error.Result.Trim()}");
+        }
+
+        /// The output folder is used again from run to run, and a part's signal file must be its own.
+        string? ClearEarlierRuns()
+        {
+            try
+            {
+                RunFolders.Clear(Path.Combine(options.Out, "runs"));
+                return null;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return $"an earlier run's folders could not be cleared: {e.Message}";
+            }
         }
 
         /// A fingerprint of the folders a real run would use. PLAN 4.3: a test must not touch them.
@@ -296,6 +310,7 @@ public static class Program
                 Thread.Sleep(PollMs);
             }
             var frame = FirstFrame.Read(firstFramePath);
+            if (CanvasHandles.Problem(label, canvasHandles, frame.Canvas, Win32.CanvasOf(main)) is { } handleProblem) throw new InvalidOperationException(handleProblem);
             if (frame.FrameErrors != 0) problems.Add($"{label}: {frame.FrameErrors} frame errors, last {frame.LastError}");
             if (frame.ValidationErrors != 0) problems.Add($"{label}: {frame.ValidationErrors} validation errors");
             launches.Add(new LaunchRead(label, frame.Stage, frame.FirstFrameMs, pixels));
@@ -351,6 +366,7 @@ public static class Program
             var early = pixels.Count(p => p.Ms < frame.FirstFrameMs - LaunchPaint.FrameClockSlackMs);
             lines.Add($"{label}: window {windowMs:F0} ms, canvas window {firstCanvas?.ToString("F0") ?? "before the first poll"} ms, view attached {frame.AttachedMs:F0} ms, first frame {frame.FirstFrameMs:F0} ms, signal {frame.SignalMs:F0} ms; before the signal {pixels.Count} screen pixels, {early} before the first frame, {pixels.Count(p => p.Color.IsBlack)} black, {pixels.Count(p => p.Color.Distance(frame.Stage) <= 1)} the stage color; {canvasHandles.Count} canvas handles; screen after the signal: {screenWords}");
             if (failedAfterSignal != 0) problems.Add($"{label}: {failedAfterSignal} of {AfterSignalCaptures} captures after the signal failed: {firstProblem}");
+            if (CanvasHandles.Problem(label, canvasHandles, frame.Canvas, Win32.CanvasOf(main)) is { } handleLater) problems.Add(handleLater);
             run.Close(main);
             if (run.ExitCode != 0) problems.Add($"{label}: the app exited {run.ExitCode}: {run.Output()}");
             CheckDataRootEmpty(run, label);
@@ -474,15 +490,28 @@ public static class Program
             const int BusySampleMs = 3000, SpareMs = 180_000, WindowLimitMs = 60_000, SettleMs = 1000;
             const int ScreenEveryMs = 250, CpuEveryMs = 1000, GpuEveryMs = 5000, PollMs = 20;
             const string Name = "pan trace";
-            var cpuBefore = Win32.CpuBusyPercent(BusySampleMs);
-            var gpuBefore = ReadGpu();
-            var (programNotes, busyPrograms) = WatchedPrograms(gpuBefore);
-            var reasons = BusyJudge.Before(cpuBefore, gpuBefore.UsePercent, busyPrograms);
+            GpuFacts gpuBefore = new("not read", null, null);
+            List<string> programNotes = [];
+            QuietRead ReadQuiet()
+            {
+                var cpu = OtherProgramsCpu(BusySampleMs);
+                gpuBefore = ReadGpu();
+                (programNotes, var busy) = WatchedPrograms(gpuBefore);
+                return new QuietRead(cpu.Others, gpuBefore.UsePercent, busy, cpu.Top, cpu.Unread);
+            }
+            var settleClock = Stopwatch.StartNew();
+            // A proof run on a busy PC is asked for, so it does not wait for the PC.
+            var settle = options.AllowBusy
+                ? Settle.Wait(ReadQuiet, () => settleClock.Elapsed.TotalSeconds, mostWaitSeconds: 0, readsNeeded: 1)
+                : Settle.Wait(ReadQuiet, () => settleClock.Elapsed.TotalSeconds);
+            Console.WriteLine($"  pan settle: {settle.Words}");
+            var cpuBefore = settle.Reads[^1].OthersCpu;
+            var reasons = settle.Reasons;
             var proofReasons = new List<string>();
             if (Math.Abs(options.PanSeconds - Options.FullPanSeconds) > .001) proofReasons.Add($"{options.PanSeconds:0.#} s, not {Options.FullPanSeconds:0} s");
             if (reasons.Count != 0 && !options.AllowBusy)
             {
-                Report(PartResult.NotRun(Name, $"a busy run does not count (PLAN 4.3), and this PC is busy: {string.Join("; ", reasons)}; pass --allow-busy for a proof run"));
+                Report(PartResult.NotRun(Name, $"a busy run does not count (PLAN 4.3), and this PC is still busy: {string.Join("; ", reasons)}; {settle.Words}; pass --allow-busy for a proof run"));
                 return;
             }
             proofReasons.AddRange(reasons);
@@ -567,7 +596,7 @@ public static class Program
                 return new PanSample(v[0], (int)v[1], (int)v[2], v[3], v[4], (long)v[5]);
             }).ToList();
             var gpuRead = gpuDuring.Where(g => g is not null).Select(g => g!.Value).ToList();
-            var busyWords = $"PC {cpuBefore:F0}% busy before, others {(cpuOthers.Count == 0 ? "not read" : $"{cpuOthers.Average():F0}%")} during; GPU {gpuBefore} before, {(gpuRead.Count == 0 ? "not read" : $"{gpuRead.Average():F0}%")} during{(programNotes.Count == 0 ? "" : $"; {string.Join("; ", programNotes)}")}";
+            var busyWords = $"waited {settle.WaitedSeconds:F0} s for the PC to settle; others {cpuBefore:F0}% before, {(cpuOthers.Count == 0 ? "not read" : $"{cpuOthers.Average():F0}%")} during; GPU {gpuBefore} before, {(gpuRead.Count == 0 ? "not read" : $"{gpuRead.Average():F0}%")} during{(programNotes.Count == 0 ? "" : $"; {string.Join("; ", programNotes)}")}";
             var facts = $"{stats}, first frame {startGap:F1} ms after the start, last frame {endGap:F1} ms before the end; {moves} moves posted, {changes} view changes, {samples.Count} view samples, canvas {drawable} at zoom {zoom:0.###}, display {refresh} Hz; {busyWords}";
 
             // A fault in what the trace did is a fault on any PC, so these never become NOT RUN.
@@ -600,6 +629,51 @@ public static class Program
             else if (proofReasons.Count != 0) Report(PartResult.NotRun(Name, $"proof run only, these numbers do not count ({string.Join("; ", proofReasons)}): {speed ?? "met the limits"}; {facts}"));
             else if (speed is not null) Report(PartResult.Fail(Name, $"{speed}; {facts}"));
             else Report(PartResult.Pass(Name, facts));
+        }
+
+        /// Other programs' share of the CPU over a time, which is the whole PC less the
+        /// harness, and the programs that took the most of it.
+        static (double Others, List<ProgramUse> Top, int Unread) OtherProgramsCpu(int ms)
+        {
+            using var self = Process.GetCurrentProcess();
+            var cpuStart = Win32.CpuTimes();
+            var selfStart = self.TotalProcessorTime;
+            var before = ProgramTimes(self.Id, out _);
+            Thread.Sleep(ms);
+            var after = ProgramTimes(self.Id, out var unread);
+            self.Refresh();
+            var selfUsed = self.TotalProcessorTime - selfStart;
+            var cpuEnd = Win32.CpuTimes();
+            var coreSeconds = (cpuEnd.Total - cpuStart.Total) / (double)TimeSpan.TicksPerSecond;
+            if (coreSeconds <= 0) throw new InvalidOperationException($"HARNESS: GetSystemTimes did not move in {ms} ms");
+            var machine = 100.0 * (cpuEnd.Busy - cpuStart.Busy) / (cpuEnd.Total - cpuStart.Total);
+            var others = Math.Max(0, machine - 100.0 * selfUsed.TotalSeconds / coreSeconds);
+            return (others, ProgramUse.Top(before, after, coreSeconds), unread);
+        }
+
+        /// Each running program's CPU time so far, leaving out this one and the idle process.
+        static Dictionary<int, (string Name, TimeSpan Cpu)> ProgramTimes(int self, out int unread)
+        {
+            var times = new Dictionary<int, (string Name, TimeSpan Cpu)>();
+            unread = 0;
+            foreach (var process in Process.GetProcesses())
+            {
+                using (process)
+                {
+                    if (process.Id == 0 || process.Id == self) continue;
+                    try
+                    {
+                        times[process.Id] = (process.ProcessName, process.TotalProcessorTime);
+                    }
+                    catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+                    {
+                        // Protected programs refuse. The caller prints this count, and the
+                        // whole-PC number holds their use all the same.
+                        unread++;
+                    }
+                }
+            }
+            return times;
         }
 
         static GpuFacts ReadGpu()
