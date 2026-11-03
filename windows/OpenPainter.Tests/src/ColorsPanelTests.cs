@@ -565,6 +565,27 @@ public sealed class ColorsPanelTests
     }
 
     [AvaloniaFact]
+    public void TheArrowKeysMoveBetweenTheSwatches()
+    {
+        var (w, view, _) = Ready();
+        Settle(w);
+        var panel = TopLevel.GetTopLevel(view) as Window ?? throw new InvalidOperationException("the panel has no window");
+        var cells = view.Swatchboard.Cells;
+        void Arrow(Key key, int to)
+        {
+            panel.KeyPress(key, RawInputModifiers.None, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(cells[to].IsFocused, $"{key}: swatch {to} has no focus");
+        }
+        cells[9].Focus(NavigationMethod.Tab);
+        Arrow(Key.Left, 8);
+        Arrow(Key.Right, 9);
+        Arrow(Key.Down, 9 + PaletteGrid.Columns);
+        Arrow(Key.Up, 9);
+        w.Close();
+    }
+
+    [AvaloniaFact]
     public void PaletteClicksAddModeAndTheChosenMark()
     {
         var (w, view, tools) = Ready();

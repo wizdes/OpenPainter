@@ -62,6 +62,8 @@ public sealed class Editor : IDisposable
     bool _refreshQueued, _closed, _previewBusy;
     long _previewRevision = -1;
     Task _previewTask = Task.CompletedTask;
+    readonly object _commandsGate = new();
+    int _commandsRunning;
 
     public EngineClient Client { get; }
     public ulong Document { get; }
@@ -84,6 +86,16 @@ public sealed class Editor : IDisposable
 
     /// The last picture made, so a window bound later can show it.
     public (byte[] Rgba, int Width, int Height)? Preview { get; private set; }
+
+    /// Runs on the pool thread at each step of reading the strip's picture: "pixels" before the
+    /// read and "check" after it. A test uses this to change the document at the worst moment.
+    public Action<string>? PreviewStage { get; set; }
+
+    /// Where an unexpected failure of the picture goes. Null means the fatal path.
+    public Action<Exception>? PreviewFault { get; set; }
+
+    /// A picture is being made.
+    public bool PictureUnderWay => _previewBusy;
 
     public Editor(EngineClient client, ulong document)
     {
@@ -115,6 +127,11 @@ public sealed class Editor : IDisposable
                 enabled[command.GetProperty("id").GetString() ?? throw new JsonException("a command with no id")] = command.GetProperty("enabled").GetBoolean();
             Enabled = enabled;
         }
+        catch (EngineClosedException)
+        {
+            // The app is ending, and no one is left to tell.
+            return;
+        }
         catch (Exception e) when (e is EngineCallException or JsonException or KeyNotFoundException or InvalidOperationException)
         {
             Report($"Could not read the document: {e.Message}");
@@ -130,28 +147,55 @@ public sealed class Editor : IDisposable
     {
         if (_previewBusy || _closed || Info.Revision == _previewRevision || Info.Width <= 0) return;
         _previewBusy = true;
-        var revision = Info.Revision;
-        var (width, height) = (Info.Width, Info.Height);
-        _previewTask = Task.Run(() =>
+        _previewTask = Task.Run(ReadPreview);
+    }
+
+    /// The engine keeps no size with `doc.pixels`, and a crop, resize or rotate can land between two
+    /// queries. So the document's revision is read before and after: if they match, the size and
+    /// the pixels belong together. If not, the picture goes away and another starts.
+    void ReadPreview()
+    {
+        try
         {
-            try
+            var before = DocInfo.Parse(Client.Query(Document, "doc.info", EngineParams.None));
+            PreviewStage?.Invoke("pixels");
+            var pixels = Client.Query(Document, "doc.pixels", EngineParams.None);
+            PreviewStage?.Invoke("check");
+            var after = DocInfo.Parse(Client.Query(Document, "doc.info", EngineParams.None));
+            if (after.Revision != before.Revision)
             {
-                var (w, h, small) = Canvas.CanvasSession.Shrink(Client.Query(Document, "doc.pixels", EngineParams.None), width, height, PreviewWidth, PreviewHeight);
-                Dispatcher.UIThread.Post(() => Fatal.Guard("STRIP_PREVIEW", () => TakePreview(revision, small, w, h)));
-            }
-            catch (EngineClosedException)
-            {
-                // The app is ending and nothing can show this picture. No one is left to tell.
-            }
-            catch (EngineCallException e)
-            {
-                Dispatcher.UIThread.Post(() =>
+                Dispatcher.UIThread.Post(() => Fatal.Guard("STRIP_PREVIEW", () =>
                 {
                     _previewBusy = false;
-                    Report($"The image strip's picture failed: {e.Status}");
-                });
+                    UpdatePreview();
+                }));
+                return;
             }
-        });
+            var (w, h, small) = Canvas.CanvasSession.Shrink(pixels, before.Width, before.Height, PreviewWidth, PreviewHeight);
+            Dispatcher.UIThread.Post(() => Fatal.Guard("STRIP_PREVIEW", () => TakePreview(before.Revision, small, w, h)));
+        }
+        catch (EngineClosedException)
+        {
+            // The app is ending and nothing can show this picture. No one is left to tell, but a
+            // wait for this picture must still end.
+            Dispatcher.UIThread.Post(() => _previewBusy = false);
+        }
+        catch (Exception e) when (e is EngineCallException or JsonException or KeyNotFoundException or InvalidDataException)
+        {
+            var words = e is EngineCallException call ? call.Status.ToString() : e.Message;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _previewBusy = false;
+                if (!_closed) Report($"The image strip's picture failed: {words}");
+            });
+        }
+        catch (Exception e)
+        {
+            // A task's failure reaches nobody by itself, so this one is named here.
+            Dispatcher.UIThread.Post(() => _previewBusy = false);
+            if (PreviewFault is { } fault) fault(e);
+            else Fatal.Raise("STRIP_PREVIEW", e);
+        }
     }
 
     void TakePreview(long revision, byte[] rgba, int width, int height)
@@ -168,9 +212,11 @@ public sealed class Editor : IDisposable
     /// and it takes in the result. For scripted flows and tests.
     public void WaitForPreview()
     {
+        var end = Environment.TickCount64 + WaitMs;
         while (_previewBusy)
         {
-            _previewTask.Wait(WaitMs);
+            var left = (int)Math.Max(end - Environment.TickCount64, 0);
+            if (!_previewTask.Wait(left) || (left == 0 && _previewBusy)) throw new TimeoutException($"the strip's picture: no answer in {WaitMs} ms");
             Dispatcher.UIThread.RunJobs();
         }
     }
@@ -189,6 +235,9 @@ public sealed class Editor : IDisposable
 
     public bool IsEnabled(string command) => Enabled.GetValueOrDefault(command);
 
+    /// Asks the engine now, not the cached state, so it can run on any thread.
+    public bool HasLayer(long id) => DocInfo.Parse(Client.Query(Document, "doc.info", EngineParams.None)).Layers.Any(l => l.Id == id);
+
     /// Queues an engine command. A failure shows in the status bar.
     public ulong? Run(string command, byte[]? json = null)
     {
@@ -196,7 +245,16 @@ public sealed class Editor : IDisposable
         try
         {
             var ticket = Client.Dispatch(Document, command, json ?? EngineParams.None);
-            Client.WhenFinished(ticket, result => Dispatcher.UIThread.Post(() => OnFinished(command, result)));
+            lock (_commandsGate) _commandsRunning++;
+            Client.WhenFinished(ticket, result =>
+            {
+                Dispatcher.UIThread.Post(() => OnFinished(command, result));
+                lock (_commandsGate)
+                {
+                    _commandsRunning--;
+                    Monitor.PulseAll(_commandsGate);
+                }
+            });
             return ticket;
         }
         catch (EngineCallException e)
@@ -238,12 +296,23 @@ public sealed class Editor : IDisposable
     }
 
     /// Waits on this thread until the engine ran every queued command, then takes in the results
-    /// on the UI thread, which the caller must be on. For scripted flows and tests.
+    /// on the UI thread, which the caller must be on. `doc.sync` alone is not enough: a preview's
+    /// render runs on the engine's pool after its command, and only its own end says it is done.
+    /// For scripted flows and tests.
     public void Settle()
     {
         var ticket = Client.Dispatch(Document, "doc.sync", EngineParams.None);
         var result = Client.Wait(ticket, WaitMs) ?? throw new TimeoutException($"doc.sync: no answer in {WaitMs} ms");
         if (result.Status != "ok") throw new InvalidOperationException($"doc.sync: {result.Status}");
+        var end = Environment.TickCount64 + WaitMs;
+        lock (_commandsGate)
+        {
+            while (_commandsRunning > 0)
+            {
+                var left = (int)Math.Max(end - Environment.TickCount64, 0);
+                if (left == 0 || !Monitor.Wait(_commandsGate, left)) throw new TimeoutException($"{_commandsRunning} commands: no end in {WaitMs} ms");
+            }
+        }
         Dispatcher.UIThread.RunJobs();
         Refresh();
     }

@@ -175,6 +175,7 @@ public sealed unsafe class CanvasSession : IDisposable
     public static (int Width, int Height, byte[] Rgba) Shrink(ReadOnlySpan<byte> rgba, int width, int height, int maxWidth, int maxHeight)
     {
         const int Samples = 4;
+        if (rgba.Length != width * (long)height * 4) throw new InvalidDataException($"STRIP_PICTURE: {rgba.Length} bytes for {width} by {height}");
         var fit = Math.Min(1, Math.Min((double)maxWidth / width, (double)maxHeight / height));
         var w = Math.Max(1, (int)Math.Round(width * fit));
         var h = Math.Max(1, (int)Math.Round(height * fit));

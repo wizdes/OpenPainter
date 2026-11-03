@@ -27,6 +27,18 @@ Each flow runs headless on the AOT build, against the real engine. When the flow
 - `window` runs the harness parts the table names. No flow needs the user's pointer, because the harness posts its messages to the app's own windows.
 - A real pointer drag and real hover stay owed from W7.
 
+## What a headless flow cannot do
+
+Each flow gives the same input a person gives, through the app's windows, as far as a headless run can. These parts are NOT RUN by the flow tests. A real-window run must cover them.
+
+- Flows 2, 6 and 7 run a menu item with no key by raising its click. A real pointer on an open menu is NOT RUN.
+- Flows 3 and 4 post a press and release to the panel's window for the History row and the palette swatch. A real pointer on them is NOT RUN.
+- Flow 3 makes its one step that changes pixels with an engine command, because the Adjustments menu comes in W11. Making that step from the menu is NOT RUN.
+- Flows 4, 8 and 9 type by giving text input to the focused field. The system's input methods are NOT RUN.
+- Flow 8 sends Alt and F10 to the windows as key events. The native canvas's own path for them, `OnCanvasSystemKey`, needs a real window, so it is NOT RUN headless.
+- Flow 8 does not press Alt-Tab. `AltAndF10Tests` stands in by hiding and showing the window. A real Alt-Tab to another program is NOT RUN.
+- Flow 9 types the opacity, as its steps say. A real drag of its slider is NOT RUN.
+
 ## Changing this list
 
 Set "Runs now" to `yes` in the same change that adds the flow's test. Keep 9 to 12 rows, because the level fails by name outside that range.

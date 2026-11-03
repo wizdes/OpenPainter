@@ -86,6 +86,8 @@ public sealed class LayerRow : PanelRow
     public IconCommand Eye { get; }
     public bool IsDragging { get; private set; }
 
+    public override Control? InnerControl => Eye;
+
     public LayerRow(Palette p, LayersPanel owner, int index, LayerInfo layer, Size pixels, bool current, bool busy)
         : base(p, index, layer.Name, Detail(layer), Tokens.LayerRowHeight, current, false, TextLeft, TextRight)
     {
@@ -220,6 +222,7 @@ public sealed class LayersPanel : RowListPanel
             if (_watching is not null) _watching.Ready -= ThumbnailReady;
             _watching = e.Thumbnails;
             _watching.Ready += ThumbnailReady;
+            _watching.IsShown = image => LayerRows.Any(r => ReferenceEquals(r.Thumb.Image, image));
         }
         var layers = e.Info.Layers;
         var size = new Size(Math.Max(e.Info.Width, 1), Math.Max(e.Info.Height, 1));

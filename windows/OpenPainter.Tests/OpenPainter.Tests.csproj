@@ -11,6 +11,10 @@
     <PublishAot>false</PublishAot>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Tests run one at a time: see OneAtATimeTests. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../OpenPainter/OpenPainter.csproj" />
     <ProjectReference Include="../tools/bridge-gen/BridgeGen.csproj" />
     <ProjectReference Include="../harness/OpenPainter.Harness.csproj" />

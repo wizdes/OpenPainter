@@ -75,7 +75,7 @@ Each of these commands stays in its menu and stays off. Its key does nothing unt
 
 ## Canvas, panel and dialog keys
 
-These are the rows of `docs/shortcuts.md`, in its order, with the state on Windows. Space and the arrow keys are not menu words. Each row that works has a test in `ShortcutTableTests`, `FocusRuleTests` or `FlowTests`.
+These are the rows of `docs/shortcuts.md`, in its order, with the state on Windows. Space and the arrow keys are not menu words. Each row that works names its test in `RowTests` in `ShortcutTableTests`, which fails by name on a row with no real test. A row that says "off until" comes in that milestone, and `TheRowsThatAreOffStillDoNothing` presses its keys.
 
 | What it does | Mac key | Windows key | State |
 | --- | --- | --- | --- |
@@ -122,9 +122,9 @@ These are the rows of `docs/shortcuts.md`, in its order, with the state on Windo
 
 Alt does what a Windows user expects, and it never gets in the way of Alt as a modifier.
 
-1. **Alt tap.** Press and release Alt alone, on the canvas, in the main window or in a panel. The main window's menu bar takes the keyboard, on File. F10 does the same. Esc or another Alt tap closes it, and the keyboard goes back to where it was.
+1. **Alt tap.** Press and release Alt alone, on the canvas, in the main window or in a panel. The main window's menu bar takes the keyboard, on File. F10 does the same from each of those places, and with the bar open F10 closes it. Esc or another Alt tap closes it, and the keyboard goes back to where it was.
 2. **Access letters.** Alt with F, E, V, I, L, A, C, W or H opens that menu. The letter shows underlined while Alt is down. Effects takes C because Edit has E.
 3. **Inside a menu.** The arrow keys and Enter work. A letter moves to the next item that starts with it, because the items have no marked letters. Their words come from the Mac, and marking them would change the words a test holds.
-4. **Alt as a modifier.** A press of a key or a mouse button while Alt is down ends the tap, so the release does nothing. This covers Alt-click on the Colors wheel, which keeps the spoke, and Alt-click with the Zoom tool, which zooms out. Avalonia's own menu handler opens the menu on that release, so `TitleMenu.Open` refuses it.
-5. **Left with Windows.** Alt+F4 closes the window. Alt+Space opens its system menu. Alt+Tab switches apps.
+4. **Alt as a modifier.** A press of a key or a mouse button while Alt is down ends the tap, so the release does nothing. This covers Alt-click on the Colors wheel, which keeps the spoke, and Alt-click with the Zoom tool, which zooms out. Avalonia's own menu handler opens the menu on that release, so `TitleMenu.Open` refuses it, for that release only. F10 and Alt with a letter do not go through that refusal.
+5. **Left with Windows.** Alt+F4 closes the window. Alt+Space opens its system menu. Alt+Tab switches apps. A window that loses the keyboard with Alt down forgets that press and stops underlining the letters. If Alt is still down when the window comes back, its release is no tap.
 6. **AltGr.** Ctrl with Alt is AltGr on many keyboards, so it starts no tap. In a text field a Ctrl+Alt key that the menus use still runs the menu item, as on the Mac. A field with text from such a keyboard is the case to check at W17.

@@ -1543,7 +1543,14 @@ impl Actor {
             params
         };
         p.params = spec(p.command)?.params.validate(params).map_err(bad)?;
-        self.publish(None);
+        // A dialog's picture stays on screen until the new render replaces it. A publish with no
+        // preview made the canvas show the document for a frame, at each step of a slider drag.
+        // A tool's live preview keeps the old way: `tests/flood_session.rs` waits for a preview
+        // to come back after an update, to read the new selection.
+        let tool = p.command.starts_with("tool.");
+        if tool {
+            self.publish(None);
+        }
         self.render_preview(ticket);
         Ok(())
     }

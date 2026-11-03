@@ -85,6 +85,9 @@ enum OutputRule {
 
 const HOST_MANIFEST: &str = "tools/win32-host/Cargo.toml";
 
+/// What `dotnet test` prints: each failure with its message and stack.
+const DOTNET_TEST_LOGGER: &str = "console;verbosity=minimal";
+
 /// One command a tier runs, with any extra environment it needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CommandStep {
@@ -257,11 +260,16 @@ fn is_macos_only(step: &CommandStep) -> bool {
 /// `dotnet test` for one C# project. The two last switches stop the build from
 /// leaving MSBuild and compiler servers running after the level ends. The
 /// environment turns off the usage reports that .NET and Avalonia's build send.
+/// `-v:q` also quiets the test logger, which then prints only `[FAIL]` and the name, so the
+/// logger is named on its own: at `minimal` it prints each failure's message and stack, and
+/// no line for a test that passes.
 fn csharp_step(project: &CSharpProject) -> CommandStep {
     let mut args = vec![
         "test",
         project.project,
         "-v:q",
+        "--logger",
+        DOTNET_TEST_LOGGER,
         "-nr:false",
         "-p:UseSharedCompilation=false",
     ];
@@ -2824,6 +2832,45 @@ mod tests {
             on_linux[at(&on_linux).unwrap()],
             Part::Skip { .. }
         ));
+    }
+
+    /// Root's milestone run failed with only `[FAIL]` and a name, so nobody could read why.
+    #[test]
+    fn csharp_tests_print_each_failures_message_and_stack() {
+        let projects = changed::CSHARP_TESTS.iter().chain(&changed::APP_TESTS);
+        for project in projects {
+            let step = csharp_step(project);
+            let at = step
+                .args
+                .iter()
+                .position(|arg| *arg == "--logger")
+                .unwrap_or_else(|| panic!("{} names no test logger", project.project));
+            let logger = step.args[at + 1];
+            assert!(
+                logger.starts_with("console;verbosity=") && !logger.ends_with("=quiet"),
+                "{}: {logger} would hide the failure text",
+                project.project
+            );
+            // The switch that hid it stays, for the build's own noise, and it must not be the logger's word.
+            assert!(step.args.contains(&"-v:q"));
+        }
+    }
+
+    /// The level reads this line, so the logger must keep it and still fail on it.
+    #[test]
+    fn a_failed_test_run_at_this_logger_still_fails_the_part_by_its_summary() {
+        const RUN: &str = "  Failed OpenPainter.Tests.A.B [3 ms]
+  Error Message:
+   Assert.Equal() Failure
+  Stack Trace:
+     at A.B() in A.cs:line 1
+
+Failed!  - Failed:     1, Passed:   595, Skipped:     0, Total:   596, Duration: 38 s - A.dll (net10.0)
+";
+        assert!(dotnet_result(false, RUN).is_err());
+        const GOOD: &str = "Passed!  - Failed:     0, Passed:   596, Skipped:     0, Total:   596, Duration: 38 s - A.dll (net10.0)
+";
+        assert_eq!(dotnet_result(true, GOOD), Ok(()));
     }
 
     #[test]

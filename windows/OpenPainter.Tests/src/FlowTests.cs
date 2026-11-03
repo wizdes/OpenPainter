@@ -82,15 +82,24 @@ public sealed class FlowTests
         w.CanvasInput.Focus();
         f.Editor.WaitForPreview();
         Dispatcher.UIThread.RunJobs();
-        var plain = w.Strip.Items[0].Image.Preview;
+        var plain = f.Editor.Preview!.Value.Rgba;
+        var plainShown = w.Strip.Items[0].Image.Preview;
+        Assert.NotNull(plainShown);
         Assert.False(w.TitleBar.IsModifiedShown);
-        Press(w, Key.N, Ctrl | Shift);
-        f.Settle();
+        // The Adjustments menu comes in W11, so the one step that changes pixels is an engine command.
         f.Run("image.invert_colors");
         Press(w, Key.N, Ctrl | Shift);
         f.Settle();
+        Press(w, Key.N, Ctrl | Shift);
+        f.Settle();
+        f.Editor.WaitForPreview();
+        Dispatcher.UIThread.RunJobs();
         Assert.Equal(4, f.Editor.Info.HistoryLabels.Count);
         Assert.True(w.TitleBar.IsModifiedShown);
+        var inverted = f.Editor.Preview!.Value.Rgba;
+        var invertedShown = w.Strip.Items[0].Image.Preview;
+        Assert.NotEqual(plain, inverted);
+        Assert.NotSame(plainShown, invertedShown);
         Press(w, Key.Z, Ctrl);
         f.Settle();
         Assert.Equal(2, f.Editor.Info.HistoryIndex);
@@ -102,14 +111,17 @@ public sealed class FlowTests
         Press(w, Key.Z, Ctrl | Shift);
         f.Settle();
         Assert.Equal(3, f.Editor.Info.HistoryIndex);
-        f.History.Jump(0);
+        // A press and release on the first History row.
+        f.Press(f.History.HistoryRows[0]);
         f.Settle();
         Assert.Equal(0, f.Editor.Info.HistoryIndex);
         Assert.True(f.History.HistoryRows[3].Undone);
+        // The modified mark clears, and the strip shows the first picture again.
+        Assert.False(w.TitleBar.IsModifiedShown);
         f.Editor.WaitForPreview();
         Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(w.Strip.Items[0].Image.Preview);
-        Assert.NotNull(plain);
+        Assert.Equal(plain, f.Editor.Preview!.Value.Rgba);
+        Assert.NotSame(invertedShown, w.Strip.Items[0].Image.Preview);
     }
 
     [AvaloniaFact]
@@ -126,18 +138,23 @@ public sealed class FlowTests
         Press(w, Key.C);
         Assert.Equal(ColorSlot.Secondary, tools.ActiveSlot);
         Press(w, Key.C);
+        Assert.Equal(ColorSlot.Primary, tools.ActiveSlot);
         var colors = w.Panels.Panels[PanelLayout.Colors];
         var hex = w.Panels.Colors.HexField;
         hex.Focus();
-        hex.Text = "336699";
+        hex.SelectAll();
+        colors.KeyTextInput("336699");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("336699", hex.Text);
         Press(colors, Key.Enter);
         Assert.Equal(new DocColor(0x33, 0x66, 0x99), tools.Primary);
+        // The keys came back to the canvas: the same letter types no more and picks a tool.
         Assert.True(w.CanvasInput.IsFocused);
         Press(w, Key.E);
         Assert.Equal("eraser", tools.Current);
+        // A press and release on a palette swatch.
         Dispatcher.UIThread.RunJobs();
-        var view = w.Panels.Colors;
-        view.Swatchboard.Pick(3, false);
+        Gesture.Click(w.Panels.Colors.Swatchboard.Cells[3], new Point(12, 12));
         Assert.Equal(tools.Palette.Colors[3], tools.Primary);
     }
 
@@ -148,22 +165,31 @@ public sealed class FlowTests
         var w = f.Window;
         var tools = w.Tools;
         w.CanvasInput.Focus();
+        void OptionsRowFollows() => Assert.Equal(tools.CurrentTool, w.Options.ToolPicker.SelectedItem);
         Press(w, Key.P);
         Assert.Equal("pencil", tools.Current);
         Assert.StartsWith("Pencil", w.Status.Hint.Text);
+        OptionsRowFollows();
         Press(w, Key.B);
         Assert.Equal("paintbrush", tools.Current);
+        OptionsRowFollows();
         Press(w, Key.OemCloseBrackets);
         Press(w, Key.OemCloseBrackets, Ctrl);
         Assert.Equal(8, tools.Settings.BrushWidth);
         Assert.Equal("8", w.Options.Option<TextBox>(OptionBinding.BrushWidth).Text);
+        Press(w, Key.OemOpenBrackets);
+        Assert.Equal(7, tools.Settings.BrushWidth);
+        Assert.Equal("7", w.Options.Option<TextBox>(OptionBinding.BrushWidth).Text);
+        // Repeat presses walk the group, and Shift walks it the other way.
         Press(w, Key.S);
+        Assert.Equal("rectangleSelect", tools.Current);
+        OptionsRowFollows();
         Press(w, Key.S);
         Assert.Equal("lassoSelect", tools.Current);
+        OptionsRowFollows();
         Press(w, Key.S, Shift);
         Assert.Equal("rectangleSelect", tools.Current);
-        Assert.Same(tools.CurrentTool, tools.CurrentTool);
-        Assert.Equal(tools.CurrentTool, w.Options.ToolPicker.SelectedItem);
+        OptionsRowFollows();
     }
 
     [AvaloniaFact]
@@ -182,9 +208,11 @@ public sealed class FlowTests
         Assert.Equal(1, w.View.View.Zoom);
         Press(w, Key.B, Ctrl);
         Assert.NotEqual(1, w.View.View.Zoom);
-        w.Unit = MeasurementUnit.Inches;
+        Choose(w, "View > Inches");
         Assert.Equal(MeasurementUnit.Inches, w.Status.Unit);
-        w.Unit = MeasurementUnit.Pixels;
+        Assert.Equal(MeasurementUnit.Inches, w.Unit);
+        Choose(w, "View > Pixels");
+        Assert.Equal(MeasurementUnit.Pixels, w.Status.Unit);
     }
 
     [AvaloniaFact]
@@ -193,6 +221,7 @@ public sealed class FlowTests
         using var f = new Fixture();
         var w = f.Window;
         w.CanvasInput.Focus();
+        var frames = w.Panels.ShownFrames().ToList();
         foreach (var (key, id) in new[] { (Key.F5, PanelLayout.Tools), (Key.F6, PanelLayout.History), (Key.F7, PanelLayout.Layers), (Key.F8, PanelLayout.Colors) })
         {
             Press(w, key);
@@ -200,13 +229,17 @@ public sealed class FlowTests
             Press(w, key);
             Assert.True(w.Panels.IsShown(id), id);
         }
+        // Next Panel moves the keyboard to the Tools panel, and Previous Panel brings it back.
         Press(w, Key.OemTilde, Ctrl);
-        Assert.True(w.Panels.Panels[PanelLayout.Tools].IsKeyboardFocusWithin || w.Panels.Panels[PanelLayout.Tools].IsFocused);
-        var back = w.CyclePanels(forward: false);
-        Assert.Same(w, back);
-        w.Panels.SetShown(PanelLayout.Colors, false);
-        w.Panels.ResetLayout();
+        var tools = w.Panels.Panels[PanelLayout.Tools];
+        Assert.NotNull(tools.FocusManager?.GetFocusedElement());
+        Press(tools, Key.OemTilde, Ctrl | Shift);
+        Assert.True(w.CanvasInput.IsFocused);
+        Press(w, Key.F8);
+        Assert.False(w.Panels.IsShown(PanelLayout.Colors));
+        Choose(w, "Window > Reset Panel Layout");
         Assert.True(w.Panels.IsShown(PanelLayout.Colors));
+        Assert.True(frames.SequenceEqual(w.Panels.ShownFrames()), "Reset Panel Layout left a panel in another place");
     }
 
     [AvaloniaFact]
@@ -217,33 +250,62 @@ public sealed class FlowTests
         w.CanvasInput.Focus();
         Press(w, Key.N, Ctrl | Shift);
         f.Settle();
-        // Into the Layers rows through Next Panel, then pick the lower layer.
+        // Next Panel reaches the Layers panel, and Tab goes on to the lower row.
         Press(w, Key.OemTilde, Ctrl);
-        Press(w, Key.OemTilde, Ctrl);
-        Press(w, Key.OemTilde, Ctrl);
+        Press(w.Panels.Panels[PanelLayout.Tools], Key.OemTilde, Ctrl);
+        Press(w.Panels.Panels[PanelLayout.History], Key.OemTilde, Ctrl);
         var layers = w.Panels.Panels[PanelLayout.Layers];
         Assert.Same(f.Layers.LayerRows[0], layers.FocusManager?.GetFocusedElement());
+        var tabs = 0;
+        while (!ReferenceEquals(layers.FocusManager?.GetFocusedElement(), f.Layers.LayerRows[1]))
+        {
+            Assert.True(++tabs < 8, "Tab did not reach the lower row");
+            Press(layers, Key.Tab);
+        }
+        // The arrow keys move between the rows, and Enter picks one.
+        Press(layers, Key.Up);
+        Assert.Same(f.Layers.LayerRows[0], layers.FocusManager?.GetFocusedElement());
         Press(layers, Key.Down);
+        Assert.Same(f.Layers.LayerRows[1], layers.FocusManager?.GetFocusedElement());
         Press(layers, Key.Enter);
         f.Settle();
         Assert.Equal(0, f.Editor.Info.ActiveLayer);
-        // Alt and the menu's letter, an arrow, Enter: the first item that is on runs.
+        Assert.Same(f.Layers.LayerRows[1], layers.FocusManager?.GetFocusedElement());
+        // Alt with the menu's letter, as the keys really come: Alt down, the letter, Alt up.
+        layers.KeyPressQwerty(PhysicalKey.AltLeft, Alt);
         Press(layers, Key.L, Alt);
+        layers.KeyReleaseQwerty(PhysicalKey.AltLeft, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
         var menu = w.TitleBar.Menus.Items.OfType<MenuItem>().Single(m => (string?)m.Header == "Layers");
+        Assert.True(w.TitleBar.Menus.IsOpen);
         Assert.True(menu.IsSubMenuOpen);
-        Press(w, Key.A);
+        // An arrow moves to the first item that is on, and Enter runs it.
+        Press(w, Key.Down);
         var focused = w.FocusManager?.GetFocusedElement() as CatalogMenuItem;
         Assert.NotNull(focused);
         Assert.Equal("Add New Layer", focused.Header);
         Press(w, Key.Enter);
         f.Settle();
         Assert.Equal(3, f.Editor.Info.Layers.Count);
-        // Esc closes a menu, and the keys come back to the document.
-        w.OpenMenuByLetter('E', fromCanvas: false);
+        Assert.False(w.TitleBar.Menus.IsOpen);
+        // A letter moves too.
+        layers.KeyPressQwerty(PhysicalKey.AltLeft, Alt);
+        Press(layers, Key.L, Alt);
+        layers.KeyReleaseQwerty(PhysicalKey.AltLeft, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
+        Press(w, Key.D);
+        focused = w.FocusManager?.GetFocusedElement() as CatalogMenuItem;
+        Assert.NotNull(focused);
+        Assert.StartsWith("D", (string)focused.Header!);
+        // Esc closes the open menu, then the bar.
         Press(w, Key.Escape);
+        Assert.False(menu.IsSubMenuOpen);
         Press(w, Key.Escape);
-        Assert.False(w.TitleBar.Menus.Items.OfType<MenuItem>().Any(m => m.IsSubMenuOpen));
+        Assert.False(w.TitleBar.Menus.IsOpen);
+        // The keys came back: a row still has the keyboard, and a tool letter works from the panel.
+        Assert.IsType<LayerRow>(layers.FocusManager?.GetFocusedElement());
+        Press(layers, Key.P);
+        Assert.Equal("pencil", w.Tools.Current);
     }
 
     [AvaloniaFact]
@@ -252,13 +314,38 @@ public sealed class FlowTests
         using var f = new Fixture();
         var w = f.Window;
         w.CanvasInput.Focus();
+        var pixels = f.Pixels();
         Press(w, Key.F4);
         var d = w.Dialog ?? throw new InvalidOperationException("F4 opened no dialog");
         f.Settle();
         var steps = f.Editor.Info.HistoryLabels.Count;
-        d.Set(d.Current with { Name = "Sky", Opacity = 128, Blend = "multiply" });
+        // Everything by the keyboard: the name has focus with its text chosen, so typing replaces it.
+        Assert.True(d.NameField.IsFocused);
+        d.KeyTextInput("Sky");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Sky", d.NameField.Text);
+        void TabTo(Control control)
+        {
+            var tabs = 0;
+            while (!control.IsFocused)
+            {
+                Assert.True(++tabs < 10, "Tab did not reach the control");
+                Press(d, Key.Tab);
+            }
+        }
+        TabTo(d.BlendPopup);
+        Press(d, Key.Down);
+        Assert.Equal("multiply", d.Current.Blend);
+        TabTo(d.OpacityField);
+        d.OpacityField.SelectAll();
+        d.KeyTextInput("128");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(("Sky", 128, "multiply"), (d.Current.Name, d.Current.Opacity, d.Current.Blend));
         f.Settle();
-        d.Ok();
+        // Up to here the document holds nothing of this.
+        Assert.Equal("Background", f.Editor.Info.Layers[0].Name);
+        Assert.Equal(pixels, f.Pixels());
+        Press(d, Key.Enter);
         f.Settle();
         Assert.Null(w.Dialog);
         var layer = f.Editor.Info.Layers[0];
@@ -268,15 +355,31 @@ public sealed class FlowTests
         Press(w, Key.Z, Ctrl);
         f.Settle();
         Assert.Equal("Background", f.Editor.Info.Layers[0].Name);
-        // F4 then Cancel adds no step.
+        // F4, a change, then Esc adds no step and changes nothing.
         Press(w, Key.Y, Ctrl);
         f.Settle();
         var count = f.Editor.Info.HistoryLabels.Count;
+        var index = f.Editor.Info.HistoryIndex;
         Press(w, Key.F4);
         f.Settle();
-        w.Dialog!.Cancel();
+        d = w.Dialog ?? throw new InvalidOperationException("F4 opened no dialog");
+        d.KeyTextInput("Not kept");
+        Dispatcher.UIThread.RunJobs();
         f.Settle();
+        Assert.True(d.SessionStarted);
+        Press(d, Key.Escape);
+        f.Settle();
+        Assert.Null(w.Dialog);
         Assert.Equal(count, f.Editor.Info.HistoryLabels.Count);
+        Assert.Equal(index, f.Editor.Info.HistoryIndex);
+        Assert.Equal("Sky", f.Editor.Info.Layers[0].Name);
+    }
+
+    /// Runs a menu item as a click on it does. A real pointer on a menu stays owed from W7.
+    static void Choose(MainWindow w, string path)
+    {
+        Item(w, path).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
     }
 
     static CatalogMenuItem Item(MainWindow w, string path)

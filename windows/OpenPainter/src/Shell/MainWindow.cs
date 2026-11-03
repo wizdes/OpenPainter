@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Chrome;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -15,6 +16,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using OpenPainter.Canvas;
 using OpenPainter.Catalog;
@@ -49,6 +51,8 @@ public sealed class MainWindow : Window
     readonly AltGesture _alt = new();
     readonly SystemColors? _testContrast;
     bool _menuFromCanvas;
+    Window? _menuFromPanel;
+    IInputElement? _menuReturn;
     Window? _ringAt;
     readonly Grid _root = new() { Name = "Root", RowDefinitions = new RowDefinitions("Auto,*,Auto") };
     readonly Grid _canvasLayer = new() { Name = "CanvasLayer", RowDefinitions = new RowDefinitions("Auto,Auto,*") };
@@ -447,6 +451,10 @@ public sealed class MainWindow : Window
 
     const int VkShift = 0x10, VkControl = 0x11, VkAlt = 0x12, VkF10 = 0x79;
 
+    /// Whether Alt is down now, for a window that comes back. A test sets this, because a headless
+    /// run has no keyboard to ask.
+    public Func<bool> AltIsDown { get; set; } = () => GetKeyState(VkAlt) < 0;
+
     string? CanvasWords(int vk) => WindowsKeys.FromVirtualKey(vk, GetKeyState(VkControl) < 0, GetKeyState(VkShift) < 0, GetKeyState(VkAlt) < 0);
 
     bool OnCanvasKey(int vk, bool repeat)
@@ -470,7 +478,7 @@ public sealed class MainWindow : Window
         }
         if (vk == VkF10)
         {
-            if (!repeat && Dialog is null) OpenMenuBar(fromCanvas: true);
+            if (!repeat) PressF10(fromCanvas: true, null);
             return true;
         }
         _alt.Spoil();
@@ -544,44 +552,67 @@ public sealed class MainWindow : Window
         }, RoutingStrategies.Tunnel, handledEventsToo: true);
         window.AddHandler(KeyUpEvent, (_, e) =>
         {
-            if (e.Key is Key.LeftAlt or Key.RightAlt) AltUp(fromCanvas: false);
+            if (e.Key is Key.LeftAlt or Key.RightAlt) AltUp(fromCanvas: false, ReferenceEquals(window, this) ? null : window);
         }, RoutingStrategies.Tunnel, handledEventsToo: true);
         window.AddHandler(PointerPressedEvent, (_, _) => _alt.Spoil(), RoutingStrategies.Tunnel, handledEventsToo: true);
-        window.Deactivated += (_, _) => _alt.Forget();
+        window.Deactivated += (_, _) =>
+        {
+            _alt.Forget();
+            // The release may go to another program, so the underlines must not wait for it.
+            window.SetValue(AccessText.ShowAccessKeyProperty, false);
+        };
         window.Activated += (_, _) =>
         {
             if (!ReferenceEquals(window, _ringAt)) _ringAt = null;
+            if (!AltIsDown()) _alt.ReleaseHandled();
         };
     }
 
-    void AltUp(bool fromCanvas)
+    void AltUp(bool fromCanvas, Window? panel = null)
     {
-        if (_alt.Release() && Dialog is null) OpenMenuBar(fromCanvas);
+        if (_alt.Release() && Dialog is null) OpenMenuBar(fromCanvas, panel);
+        // Avalonia's handler may run after this one for the same release. A job runs after both.
+        Dispatcher.UIThread.Post(_alt.ReleaseHandled);
     }
 
-    /// A clean Alt tap or F10: the menu bar takes the keyboard, on the first menu.
-    public void OpenMenuBar(bool fromCanvas)
+    /// A clean Alt tap or F10: the menu bar takes the keyboard, on the first menu. `panel` is the
+    /// floating panel the key came from.
+    public void OpenMenuBar(bool fromCanvas, Window? panel = null)
     {
-        TakeKeyboardForMenus(fromCanvas);
-        TitleBar.Menus.Open();
+        TakeKeyboardForMenus(fromCanvas, panel);
+        TitleBar.Menus.OpenFromKeys();
         if (TitleBar.Menus.Items.OfType<MenuItem>().FirstOrDefault() is { } first) first.Focus(NavigationMethod.Directional);
     }
 
+    /// F10 does what an Alt tap does: shortcuts-windows.md. With the bar open it closes it.
+    bool PressF10(bool fromCanvas, Window? panel)
+    {
+        if (Dialog is not null) return false;
+        if (TitleBar.Menus.IsOpen) TitleBar.Menus.Close();
+        else OpenMenuBar(fromCanvas, panel);
+        return true;
+    }
+
     /// Alt with a menu's letter opens that menu.
-    public bool OpenMenuByLetter(char letter, bool fromCanvas)
+    public bool OpenMenuByLetter(char letter, bool fromCanvas, Window? panel = null)
     {
         if (Dialog is not null || MenuLetters.Title(letter) is not { } title) return false;
         var menu = TitleBar.Menus.Items.OfType<MenuItem>().Single(m => (string?)m.Header == title);
-        TakeKeyboardForMenus(fromCanvas);
-        TitleBar.Menus.Open();
+        TakeKeyboardForMenus(fromCanvas, panel);
+        TitleBar.Menus.OpenFromKeys();
         menu.Focus(NavigationMethod.Directional);
         menu.Open();
         return true;
     }
 
-    void TakeKeyboardForMenus(bool fromCanvas)
+    void TakeKeyboardForMenus(bool fromCanvas, Window? panel)
     {
-        _menuFromCanvas = fromCanvas;
+        if (!TitleBar.Menus.IsOpen)
+        {
+            _menuFromCanvas = fromCanvas;
+            _menuFromPanel = panel;
+            _menuReturn = (panel ?? (Window)this).FocusManager?.GetFocusedElement();
+        }
         if (Native is null) return;
         Activate();
         Native.GiveFocusToWindow();
@@ -608,12 +639,17 @@ public sealed class MainWindow : Window
     {
         if (e.Handled) return;
         var panel = (PanelWindow)sender!;
+        if (e.Key == Key.F10 && e.KeyModifiers == KeyModifiers.None && PressF10(fromCanvas: false, panel))
+        {
+            e.Handled = true;
+            return;
+        }
         if (Route(WindowsKeys.FromAvalonia(e.Key, e.KeyModifiers), false, KeySource.Panel, panel.FocusManager?.GetFocusedElement()))
         {
             e.Handled = true;
             return;
         }
-        if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z && OpenMenuByLetter((char)('A' + (e.Key - Key.A)), fromCanvas: false)) e.Handled = true;
+        if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z && OpenMenuByLetter((char)('A' + (e.Key - Key.A)), fromCanvas: false, panel)) e.Handled = true;
     }
 
     /// A letter on the canvas picks a tool, as MetalCanvasView.onToolKey does.
@@ -629,6 +665,11 @@ public sealed class MainWindow : Window
         if (e.Handled || Dialog is not null) return;
         var focused = FocusManager?.GetFocusedElement();
         var source = ReferenceEquals(focused, CanvasInput) ? KeySource.Canvas : KeySource.Window;
+        if (e.Key == Key.F10 && e.KeyModifiers == KeyModifiers.None && PressF10(source == KeySource.Canvas, null))
+        {
+            e.Handled = true;
+            return;
+        }
         if (Route(WindowsKeys.FromAvalonia(e.Key, e.KeyModifiers), false, source, focused))
         {
             e.Handled = true;
@@ -714,9 +755,14 @@ public sealed class MainWindow : Window
     /// The menu took the keyboard from the canvas, so it goes back there.
     void OnMenusClosed(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (!_menuFromCanvas) return;
-        _menuFromCanvas = false;
-        Native?.TakeFocus();
+        var (fromCanvas, panel, back) = (_menuFromCanvas, _menuFromPanel, _menuReturn);
+        (_menuFromCanvas, _menuFromPanel, _menuReturn) = (false, null, null);
+        // A click on another window closed it, or a menu item opened a dialog: the keyboard is
+        // where the person put it.
+        if (Dialog is not null || (Native is not null && !IsActive)) return;
+        if (panel is { IsVisible: true }) panel.Activate();
+        if (back is Visual visual && TopLevel.GetTopLevel(visual) is not null) back.Focus();
+        if (fromCanvas) Native?.TakeFocus();
     }
 
     void UpdateActive() => TitleBar.SetActive(IsActive || Panels.AnyActive || Dialog?.IsActive == true);
@@ -915,30 +961,35 @@ public sealed class MainWindow : Window
     void StartCanvas()
     {
         _session = new CanvasSession();
-        _session.Load(_options.TestPng, (width, height) =>
+        _session.Load(_options.TestPng, CanvasLoaded);
+    }
+
+    /// The engine has the image, on the UI thread.
+    public void CanvasLoaded(uint width, uint height)
+    {
+        // The window may have closed while this waited in the queue.
+        if (_session is null) return;
+        if (Native is null || Native.Hwnd == 0) throw new InvalidOperationException("CANVAS_HWND: the native child is missing");
+        _session.Attach(Native.Hwnd);
+        _imageSize = new Size(width, height);
+        Status.ShowImage(_imageSize);
+        Bind(new Editor(_session.Client, _session.Document));
+        SendBackground();
+        View.SetDocumentSize(new Size(width, height));
+        UpdateClearRect();
+        PushView();
+        _session.WhenFirstFrame(() =>
         {
-            if (Native is null || Native.Hwnd == 0) throw new InvalidOperationException("CANVAS_HWND: the native child is missing");
-            _session.Attach(Native.Hwnd);
-            _imageSize = new Size(width, height);
-            Status.ShowImage(_imageSize);
-            Bind(new Editor(_session.Client, _session.Document));
-            SendBackground();
-            View.SetDocumentSize(new Size(width, height));
-            UpdateClearRect();
+            // The window may have closed while this waited in the queue.
+            if (_session is null) return;
+            Native.ShowCanvas();
+            // The first frame may have gone to a window with nothing on screen.
             PushView();
-            _session.WhenFirstFrame(() =>
-            {
-                // The window may have closed while this waited in the queue.
-                if (_session is null) return;
-                Native.ShowCanvas();
-                // The first frame may have gone to a window with nothing on screen.
-                PushView();
-                _canvasShown.TrySetResult();
-            });
-            ImageReady?.Invoke();
-            _image = _image with { ImageWidth = width, ImageHeight = height };
-            Strip.Show([_image]);
+            _canvasShown.TrySetResult();
         });
+        ImageReady?.Invoke();
+        _image = _image with { ImageWidth = width, ImageHeight = height };
+        Strip.Show([_image]);
     }
 
     void ShowPreview(byte[] rgba, int width, int height)

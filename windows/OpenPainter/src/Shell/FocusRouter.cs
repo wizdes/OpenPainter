@@ -122,7 +122,9 @@ public sealed class AltGesture
 {
     bool _held, _armed;
 
-    /// True from a spoiled tap until the next Alt press.
+    /// True while this Alt press cannot be a tap, through its release. Avalonia's own menu
+    /// handler opens the menu on that release, and this is what refuses it. It ends with
+    /// `ReleaseHandled`, or a window that comes back with Alt up, so it can never outlive the press.
     public bool Spoiled { get; private set; }
 
     /// Alt went down. A held key repeats, and a repeat does not start a new tap.
@@ -151,11 +153,19 @@ public sealed class AltGesture
         return tap;
     }
 
-    /// The window lost the keyboard, so the release may never come here.
+    /// The window lost the keyboard, so the release may never come here. If it does come, with
+    /// Alt held through Alt-Tab and back, it is no tap.
     public void Forget()
     {
+        if (_held) Spoiled = true;
         _held = false;
         _armed = false;
+    }
+
+    /// Every handler has seen the release, or Alt is up and no release will come.
+    public void ReleaseHandled()
+    {
+        if (!_held) Spoiled = false;
     }
 }
 

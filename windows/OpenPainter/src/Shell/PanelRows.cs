@@ -66,6 +66,9 @@ public class PanelRow : Grid
     /// A press is under way on this row, so the list must not replace it yet.
     public bool Held => _down;
 
+    /// A control inside the row that can take the keyboard: the Layers row's eye.
+    public virtual Control? InnerControl => null;
+
     public PanelRow(Palette p, int index, string title, string? detail, double height, bool current, bool dimmed, double textLeft, double textRight)
     {
         Look = p;
@@ -230,8 +233,11 @@ public class RowListPanel : Grid
 
     protected void SetRows(IEnumerable<PanelRow> rows)
     {
-        // A new list replaces the rows, and the keyboard must stay at the same place in it.
-        var focused = _rows.Children.OfType<PanelRow>().ToList().FindIndex(r => r.IsFocused);
+        // A new list replaces the rows, and the keyboard must stay at the same place in it,
+        // on the row or on the control inside it.
+        var old = _rows.Children.OfType<PanelRow>().ToList();
+        var inner = old.FindIndex(r => r.InnerControl?.IsFocused == true);
+        var focused = inner >= 0 ? inner : old.FindIndex(r => r.IsFocused);
         _rows.Children.Clear();
         foreach (var row in rows)
         {
@@ -239,7 +245,10 @@ public class RowListPanel : Grid
             _rows.Children.Add(row);
         }
         if (focused >= 0 && _rows.Children.Count > 0)
-            _rows.Children[Math.Min(focused, _rows.Children.Count - 1)].Focus(NavigationMethod.Directional);
+        {
+            var row = (PanelRow)_rows.Children[Math.Min(focused, _rows.Children.Count - 1)];
+            if (inner < 0 || row.InnerControl?.Focus(NavigationMethod.Directional) != true) row.Focus(NavigationMethod.Directional);
+        }
     }
 
     /// True when a press is under way. A new list then waits for it, because the row under the

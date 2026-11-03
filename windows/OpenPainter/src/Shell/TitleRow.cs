@@ -127,7 +127,8 @@ public sealed class CatalogMenuItem : MenuItem
 }
 
 /// The menu bar. Avalonia opens a window's main menu when Alt comes up, even after an Alt-click,
-/// and `BlockOpen` is how the window's one answer about Alt stops that.
+/// and `BlockOpen` is how the window's one answer about Alt stops that. The window's own keys use
+/// `OpenFromKeys`, because F10 and Alt with a letter are never that release.
 public sealed class TitleMenu : Menu
 {
     protected override Type StyleKeyOverride => typeof(Menu);
@@ -139,6 +140,8 @@ public sealed class TitleMenu : Menu
         if (BlockOpen?.Invoke() == true) return;
         base.Open();
     }
+
+    public void OpenFromKeys() => base.Open();
 }
 
 /// Makes the real menu controls from the Windows menus.

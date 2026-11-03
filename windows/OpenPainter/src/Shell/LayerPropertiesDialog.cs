@@ -285,7 +285,13 @@ public sealed partial class LayerPropertiesDialog : Window
     void SliderMoved()
     {
         if (_showing) return;
-        Set(Current with { Opacity = (int)Math.Round(OpacitySlider.Value) });
+        var opacity = (int)Math.Round(OpacitySlider.Value);
+        // LayerProperties.swift writes the field here whatever has focus, because ShowValues leaves
+        // a focused field to the person typing in it.
+        _showing = true;
+        OpacityField.Text = opacity.ToString(CultureInfo.InvariantCulture);
+        _showing = false;
+        Set(Current with { Opacity = opacity });
     }
 
     void NameTyped()

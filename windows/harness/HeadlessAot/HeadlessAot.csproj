@@ -22,7 +22,7 @@
     <TrimmerRootAssembly Include="OpenPainter.HeadlessAot" />
     <TrimmerRootDescriptor Include="keep-for-tests.xml" />
     <RdXmlFile Include="generics-for-tests.rd.xml" />
-    <Compile Include="../../OpenPainter.Tests/src/*.cs" Exclude="../../OpenPainter.Tests/src/HarnessTests.cs;../../OpenPainter.Tests/src/VectorTests.cs" Link="Tests/%(Filename)%(Extension)" />
+    <Compile Include="../../OpenPainter.Tests/src/*.cs" Exclude="../../OpenPainter.Tests/src/HarnessTests.cs;../../OpenPainter.Tests/src/VectorTests.cs;../../OpenPainter.Tests/src/TestStart.cs" Link="Tests/%(Filename)%(Extension)" />
     <ProjectReference Include="../../OpenPainter/OpenPainter.csproj" />
     <ProjectReference Include="../../tools/bridge-gen/BridgeGen.csproj" />
     <PackageReference Include="Avalonia.Headless" Version="12.1.4" />

@@ -44,9 +44,14 @@ sealed class Fixture : IDisposable
         return rgba;
     }
 
-    public Fixture(string? theme = null)
+    public Fixture(string? theme = null) : this(theme, Width, Height) { }
+
+    /// A flat picture of this size. A big one makes the engine's renders take real time.
+    public Fixture(string? theme, uint width, uint height)
     {
-        Editor = new Editor(Client, Client.ImportPixels(Width, Height, Flat(200, 40, 10)));
+        var rgba = new byte[width * height * 4];
+        for (var i = 0; i < rgba.Length; i += 4) (rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]) = ((byte)200, (byte)40, (byte)10, (byte)255);
+        Editor = new Editor(Client, Client.ImportPixels(width, height, rgba));
         Window = Shells.Open(theme);
         Dispatcher.UIThread.RunJobs();
         Window.Bind(Editor);
@@ -737,6 +742,8 @@ public sealed class LayerPropertiesTests
         Assert.Equal(255, d.Current.Opacity);
     }
 
+    /// Each control reaches the engine's preview, and the document's own copy of that layer does
+    /// not change. Settle waits for the preview's render, so each pixel check reads the new one.
     [AvaloniaFact]
     public void EveryControlChangesThePreviewAndTheDocumentStaysAsItWas()
     {
@@ -744,29 +751,83 @@ public sealed class LayerPropertiesTests
         f.Run("layer.duplicate");
         var before = f.Pixels();
         var steps = f.Editor.Info.HistoryLabels.Count;
+        var edited = f.Editor.Info.Layers[1];
+        var below = f.Editor.Info.Layers[0];
+        void DocumentStaysAsItWas()
+        {
+            Assert.Equal(before, f.Pixels());
+            Assert.Equal(edited, f.Editor.Info.Layers[1]);
+            Assert.Equal(below, f.Editor.Info.Layers[0]);
+            Assert.Equal(steps, f.Editor.Info.HistoryLabels.Count);
+        }
         var d = Open(f, 1);
         Assert.False(d.SessionStarted);
-        d.BlendPopup.SelectedIndex = 8; // Difference over its copy is black.
+
+        // Blend: difference over its copy is black.
+        d.BlendPopup.SelectedIndex = 8;
         f.Settle();
         Assert.True(d.SessionStarted);
         Assert.Equal("difference", d.Current.Blend);
-        Assert.NotEqual(before, f.Pixels(preview: true));
-        Assert.Equal(before, f.Pixels());
+        var black = f.Pixels(preview: true);
+        Assert.Equal((0, 0, 0, 255), ((int)black[0], (int)black[1], (int)black[2], (int)black[3]));
+        DocumentStaysAsItWas();
+
+        // Visible: with the copy hidden, the preview is the layer below again.
         d.VisibleBox.IsChecked = false;
         f.Settle();
         Assert.False(d.Current.Visible);
         Assert.Equal(before, f.Pixels(preview: true));
+        DocumentStaysAsItWas();
+
+        // Opacity: half of the black over the red, so about half of each channel.
         d.VisibleBox.IsChecked = true;
         d.OpacitySlider.Value = 128;
+        f.Settle();
+        Assert.Equal(128, d.Current.Opacity);
+        var half = f.Pixels(preview: true);
+        Assert.InRange(half[0], 95, 105);
+        Assert.InRange(half[1], 15, 25);
+        Assert.InRange(half[2], 2, 8);
+        DocumentStaysAsItWas();
+
+        // Name: it changes no pixels, so the proof is that OK writes what the preview was given.
         d.NameField.Text = "Renamed";
         Dispatcher.UIThread.RunJobs();
         f.Settle();
         Assert.Equal("Renamed", d.Current.Name);
-        Assert.Equal(128, d.Current.Opacity);
-        Assert.Equal("Background", f.Editor.Info.Layers[0].Name);
-        Assert.Equal(steps, f.Editor.Info.HistoryLabels.Count);
-        d.Cancel();
+        Assert.Equal(half, f.Pixels(preview: true));
+        DocumentStaysAsItWas();
+        Assert.Null(f.Editor.Message);
+
+        Fixture.Click(d.OkButton);
         f.Settle();
+        var kept = f.Editor.Info.Layers[1];
+        Assert.Equal(("Renamed", true, "difference", 128), (kept.Name, kept.Visible, kept.Blend, kept.Opacity));
+        Assert.Equal(steps + 1, f.Editor.Info.HistoryLabels.Count);
+        Assert.Equal(below, f.Editor.Info.Layers[0]);
+        Assert.Equal(half, f.Pixels());
+    }
+
+    /// A change to the name alone starts a session that holds the name, with no pixels to show it.
+    [AvaloniaFact]
+    public void ANameAloneReachesTheEngineThroughThePreview()
+    {
+        using var f = new Fixture();
+        f.Run("layer.duplicate");
+        var before = f.Pixels();
+        var was = f.Editor.Info.Layers[1].Name;
+        var d = Open(f, 1);
+        d.NameField.Text = "Only the name";
+        Dispatcher.UIThread.RunJobs();
+        f.Settle();
+        Assert.True(d.SessionStarted);
+        Assert.Equal(was, f.Editor.Info.Layers[1].Name);
+        Assert.Equal(before, f.Pixels(preview: true));
+        Assert.Null(f.Editor.Message);
+        Fixture.Click(d.OkButton);
+        f.Settle();
+        Assert.Equal("Only the name", f.Editor.Info.Layers[1].Name);
+        Assert.Equal("Background", f.Editor.Info.Layers[0].Name);
     }
 
     [AvaloniaFact]
