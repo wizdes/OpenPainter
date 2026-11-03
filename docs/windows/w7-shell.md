@@ -109,7 +109,27 @@ Left out for now: `ZoomTests.swift`'s viewport cases, which `ViewTests.cs` ports
 
 ## Results
 
-Root writes the done-test results here.
+Root's results at `5eaf688`, 2026-11-03. W7 took about 5 agent hours of the 18 budgeted.
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | 24 MP pan, 59 fps, no stall over 50 ms | NOT RUN on a quiet PC. Another session's jobs kept the PC busy through 9 tries over 70 minutes. The last try had 17% other CPU: 59.9 fps, longest stall 58.0 ms, 1,801 frames. That run counts as neither a pass nor a fail. Other busy runs gave 60.0 fps and 26 to 33 ms |
+| 2 | Real pixels on the live canvas | PASS. 7 launches, every capture matched, 56 real screen points matched |
+| 3 | Color check on the live window | PASS, light and dark. 18 patches within 1 of 255 |
+| 4 | Menu order and words | PASS, in the app tests |
+| 5 | DLL exports against the bridge | PASS, in the app tests, with parameter and return types as well as names |
+| 6 | Layout against the W6 pictures | 100%: root looked at main, more and File menu shots from real runs, and they match apart from the differences listed under stage 2. 200%: NOT RUN, because this PC is at 100% and the harness does not change the display |
+| 7 | `--tier milestone` and `--tier window` | Both fail. Milestone: 3 known test failures (2 Mandelbrot, W14; 1 load-dependent timing test) and `9 to 12 critical flows` NOT RUN. It took 2,012 s against a 10-minute target. Window: the 200% row and the pan NOT RUN, and on the last run `panels (light)` and `menus and options (light)` NOT RUN, because another window covered them |
+| 8 | The 15 overlay hours in `w5-overlay.md` | They still fit. W7 used none of them and found nothing that changes the overlay route. Avalonia still cannot draw over the canvas, and owned panels sit over it as planned. Tool overlays are first exercised in W9, so this is a judgement, not a measurement |
+
+W7 closes under PLAN 4.2 on its headless checks, with these window checks NOT RUN. The phase cannot close until they run or the user waives them.
+
+Open at the close:
+
+- `launch paint` did not pass in 11 of 53 `pixels` runs before the last fix. The cause is not found. A window behind the app can read close to the dark stage color, and one run of 6 launches saw no stage color at all. W8 starts with this.
+- A real mouse drag, a real monitor going away, and real hover were not tried.
+- Test hooks ship in the app with no build gate. W19 must remove them or gate them.
+- The whole-workspace 10,000-case run at `6085a58`: 861 passed, 3 failed (the same 3), 7 ignored.
 
 ### Builder's proof runs, not done-test results
 
