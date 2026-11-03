@@ -37,6 +37,7 @@ public sealed class App : Application
             if (Options.TestOpenMore) window.Opened += (_, _) => DispatcherTimer.RunOnce(window.Options.OpenMore, TimeSpan.FromMilliseconds(1000));
             if (Options.ExitAfterMs is { } ms) TestReport.Arrange(window, ms, Options.ReportPath, code => ExitCode = code);
             TestProbe.Arrange(window, Options, code => ExitCode = code);
+            TestPanels.Arrange(window, Options, code => ExitCode = code);
             desktop.MainWindow = window;
         }
         base.OnFrameworkInitializationCompleted();

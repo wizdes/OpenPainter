@@ -36,7 +36,7 @@ Switches for a proof run. The window level passes none of them:
 
 | Switch | What it does |
 | --- | --- |
-| `--parts report,pixels,color,shots,pan,exit,fatal,small-screen` | Runs only these parts |
+| `--parts report,pixels,paint-fault,panels,color,shots,pan,exit,fatal,small-screen` | Runs only these parts |
 | `--pan-seconds <s>` | A shorter trace. The part then prints NOT RUN with its numbers |
 | `--allow-busy` | Runs the trace on a busy PC. The part then prints NOT RUN with its numbers |
 | `--first-frame-runs <n>` | How many launches `pixels` measures. The default is 3 |
@@ -63,9 +63,15 @@ These fail the part on a quiet PC and only make it NOT RUN on a busy one:
 
 **Pixel read-back.** The test image is flat colored cells from a formula, and no cell is near black. The harness knows what each document pixel must be. After the first-frame signal it captures the main window 5 times, and each capture's grid of up to 2,560 points must match within 1 of 255. It does this for 3 launches of a small image, a dark launch of it, 24 MP at 100%, 24 MP at Fit, and 24 MP in dark.
 
-**Screen pixels.** The same launches read the real screen at up to 8 points away from color edges, from the middle outward. A point another window covers does not count. A launch with no point judged prints NOT RUN by the launch's name, so this row cannot pass with nothing judged.
+**Screen pixels.** The same launches read the real screen at up to 8 points away from color edges, from the middle outward. A point another window covers, or comes within 64 pixels of, does not count. A launch with no point judged prints NOT RUN by the launch's name, so this row cannot pass with nothing judged.
 
-**Launch paint.** The same launches read the real screen in the canvas's area from launch. The window first shows what is behind it for a moment, until Avalonia paints, at most 250 ms. From then until the first frame every pixel must be the stage color, and none may be black.
+**Launch paint.** The same launches read the real screen in the canvas's area from launch. The window first shows what is behind it for a moment, until Avalonia paints. Windows says the window owns its pixels from the moment it exists, and what is behind can be any color, so a color cannot say that the app has painted. `--test-first-paint` writes a file when Avalonia's renderer has drawn the window, and the harness reads pixels against that file on its own clock. From there until the first frame every pixel must be the stage color, and none may be black. A read before the file that is not the stage color shows the window was still unpainted then, and that may be at most 250 ms after the window appeared. On a PC where other programs take 15% of the CPU or more during that launch, that time prints by name and is not judged (PLAN 4.3). The colors still are.
+
+A read counts only when the app's window holds the point and 64 pixels around it, before and after the read, because another window's shadow falls on the app with no hit test to show it. A read within 500 ms of another program holding that read point does not count either, because a closing window fades out over the app after Windows stops finding it there. The harness reads the first 3 of 15 points it holds in each round, and it keeps the app above other programs until the first frame.
+
+**Launch paint fault.** `--test-paint-fault` plants two faults in the app: a black canvas, which is the real W7 fault, and a wrong stage color. Each launch must fail `launch paint`, or this row fails. It runs in `--parts paint-fault`.
+
+**Panels.** `--parts panels` runs in light and dark. `--test-panels` builds a layer stack and steps through Layer Properties, and the harness looks at each stage from outside: 7 history rows, the layer names and pictures, the dialog owned by the main window and above it and the canvas, a title row that Windows says drags it, and a real canvas pixel that follows the preview and comes back on Cancel. It saves `shots/panel-history-<theme>.png`, `panel-layers-<theme>.png`, `panel-layer-properties-<theme>.png` and `panels-main-<theme>.png` for root to look at.
 
 **First-frame signal.** `--test-first-frame <file>` makes the app write the file once the engine has presented a frame at the asked zoom. The harness waits for that file, then calls `DwmFlush` twice. No part waits a fixed time for the first frame. Each harness run first deletes the numbered folders in `<out>/runs`, and a launch refuses a folder that is not empty. A file left by an earlier run would pass for this one's, with a dead process's window handles. The `pixels` part also fails, by name, if the canvas's window handle changes during a launch.
 

@@ -620,7 +620,8 @@ public sealed class LayoutTests
         Assert.Equal("History panel", Avalonia.Automation.AutomationProperties.GetName(panel));
         Assert.Equal(WindowDecorationsElementRole.TitleBar, WindowDecorationProperties.GetElementRole(panel.TitleRow));
         Assert.Equal(WindowDecorationsElementRole.User, WindowDecorationProperties.GetElementRole(panel.CloseButton));
-        Assert.Single(panel.GetVisualDescendants().OfType<IconView>());
+        // Close, and the Mac's Undo and Redo, which stay present and off with no document.
+        Assert.Equal(3, panel.GetVisualDescendants().OfType<IconView>().Count());
         w.Close();
     }
 

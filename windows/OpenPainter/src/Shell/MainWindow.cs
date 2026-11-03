@@ -51,6 +51,7 @@ public sealed class MainWindow : Window
     string _documentName;
     StripImage _image;
     CanvasSession? _session;
+    string _toolHint = "";
 
     public TitleRow TitleBar { get; private set; } = null!;
     public OptionsRow Options { get; private set; } = null!;
@@ -62,6 +63,12 @@ public sealed class MainWindow : Window
     public ViewController View { get; } = new();
     public ToolState Tools { get; }
     public PanelManager Panels { get; }
+
+    /// The open document as the panels see it. Null means no document.
+    public Editor? Editor { get; private set; }
+
+    /// The open Layer Properties dialog, if any: Workspace's sheet on the Mac.
+    public LayerPropertiesDialog? Dialog { get; private set; }
 
     /// The part of the window the canvas shows in. The panels float over it.
     public Grid Stage { get; } = new() { Name = "Stage" };
@@ -88,6 +95,7 @@ public sealed class MainWindow : Window
         _image = new StripImage(_documentName, Modified: false, Active: true, Preview: null, 0, 0);
         _title = TitleRow.TitleFor(_documentName);
         Panels = new PanelManager(this, _catalog.Panels, Palette, StageOnScreen);
+        Panels.Context.ShowLayerProperties = index => ShowLayerProperties(index);
         _actions = BuildActions();
         _shortcuts = BuildShortcuts();
 
@@ -119,7 +127,7 @@ public sealed class MainWindow : Window
         _canvasLayer.Children.Add(CanvasInput);
         if (!headless)
         {
-            Native = new CanvasHost { View = View };
+            Native = new CanvasHost { View = View, TestNoClip = options.TestPaintFault == StartOptions.BlackCanvasFault };
             Native.TabOut += LeaveCanvas;
             Native.Pressed += DismissPopups;
             Native.KeyPressed += OnCanvasKey;
@@ -310,6 +318,7 @@ public sealed class MainWindow : Window
 
     bool OnCanvasKey(int vk, bool repeat)
     {
+        if (Dialog is not null) return false;
         const int VkShift = 0x10, VkControl = 0x11, VkAlt = 0x12;
         bool ctrl = GetKeyState(VkControl) < 0, shift = GetKeyState(VkShift) < 0, alt = GetKeyState(VkAlt) < 0;
         if (RunShortcut(WindowsKeys.FromVirtualKey(vk, ctrl, shift, alt))) return true;
@@ -326,6 +335,7 @@ public sealed class MainWindow : Window
 
     void OnWindowKey(object? sender, KeyEventArgs e)
     {
+        if (Dialog is not null) return;
         if (!e.Handled && RunShortcut(WindowsKeys.FromAvalonia(e.Key, e.KeyModifiers))) e.Handled = true;
     }
 
@@ -334,9 +344,10 @@ public sealed class MainWindow : Window
     void BuildRows()
     {
         Palette = ActualThemeVariant == ThemeVariant.Dark ? Tokens.Dark : Tokens.Light;
-        Background = Ui.B(Palette.Stage);
-        _canvasLayer.Background = Ui.B(Palette.Stage);
-        Stage.Background = Ui.B(Palette.Stage);
+        var stageFill = _options.TestPaintFault == StartOptions.WrongStageFault ? Avalonia.Media.Colors.Red : Palette.Stage;
+        Background = Ui.B(stageFill);
+        _canvasLayer.Background = Ui.B(stageFill);
+        Stage.Background = Ui.B(stageFill);
 
         if (TitleBar is not null) _root.Children.Remove(TitleBar);
         TitleBar = new TitleRow(Palette, _menus, _actions);
@@ -369,17 +380,75 @@ public sealed class MainWindow : Window
         _root.Children.Add(Status);
         Status.FitChosen += () => { View.Fit(); Native?.TakeFocus(); };
         Status.ZoomChosen += zoom => { View.SetZoom(zoom); Native?.TakeFocus(); };
-        Status.Hint.Text = ToolState.Hint(Tools.CurrentTool);
+        _toolHint = ToolState.Hint(Tools.CurrentTool);
+        ShowHint();
         Status.ShowZoom(View.View.Zoom);
 
         Panels.ApplyLook(Palette, RequestedThemeVariant);
+        if (Dialog is { } dialog)
+        {
+            dialog.RequestedThemeVariant = RequestedThemeVariant;
+            dialog.ApplyLook(Palette);
+        }
         UpdateActive();
         UpdatePanelChecks();
         ApplyWindowState();
         SendBackground();
     }
 
-    void UpdateActive() => TitleBar.SetActive(IsActive || Panels.AnyActive);
+    void UpdateActive() => TitleBar.SetActive(IsActive || Panels.AnyActive || Dialog?.IsActive == true);
+
+    /// The engine's last error, or else the tool's hint.
+    void ShowHint() => Status.Hint.Text = Editor?.Message ?? _toolHint;
+
+    /// Gives the panels a document, or none. A later stage sets this as images open and close.
+    public void Bind(Editor? editor)
+    {
+        if (Editor is not null) Editor.Changed -= OnEditorChanged;
+        Editor = editor;
+        Panels.Context.Editor = editor;
+        if (editor is not null) editor.Changed += OnEditorChanged;
+        OnEditorChanged();
+    }
+
+    void OnEditorChanged()
+    {
+        Panels.ReloadPanels();
+        ShowHint();
+    }
+
+    /// Opens Layer Properties for a layer: EditorWindowController.showLayerProperties. Null when
+    /// there is no such layer, or a dialog is already up. Like a modal dialog, it holds off the
+    /// main window for its life. The panels stay open and turn their commands off.
+    public LayerPropertiesDialog? ShowLayerProperties(int index)
+    {
+        if (Dialog is not null || Editor is not { } editor || index < 0 || index >= editor.Info.Layers.Count) return null;
+        var dialog = new LayerPropertiesDialog(editor, index, Palette) { WorkAreas = () => Panels.Screens() };
+        if (RequestedThemeVariant is { } theme) dialog.RequestedThemeVariant = theme;
+        Dialog = dialog;
+        dialog.PropertyChanged += (_, e) => { if (e.Property == IsActiveProperty) UpdateActive(); };
+        dialog.Finished += _ =>
+        {
+            // Before the dialog goes, so Windows gives the main window the focus.
+            HoldOff(false);
+            Dialog = null;
+            Panels.Context.Busy = false;
+            Panels.ReloadPanels();
+        };
+        Panels.Context.Busy = true;
+        Panels.ReloadPanels();
+        HoldOff(true);
+        dialog.Show(this);
+        return dialog;
+    }
+
+    [DllImport("user32.dll")] static extern bool EnableWindow(nint hwnd, bool enable);
+
+    /// EnableWindow's result says what the window was before, so it says nothing of a failure.
+    void HoldOff(bool off)
+    {
+        if (TryGetPlatformHandle() is { HandleDescriptor: "HWND", Handle: var hwnd }) EnableWindow(hwnd, !off);
+    }
 
     void ApplyWindowState() => TitleBar.MaximizeButton.Maximized = WindowState == WindowState.Maximized;
 
@@ -388,7 +457,9 @@ public sealed class MainWindow : Window
     void OnToolChanged()
     {
         View.Tool = Tools.CanvasMode;
-        Status.Hint.Text = ToolState.Hint(Tools.CurrentTool);
+        _toolHint = ToolState.Hint(Tools.CurrentTool);
+        Editor?.ClearMessage();
+        ShowHint();
     }
 
     void OnPanelsChanged()
@@ -458,6 +529,7 @@ public sealed class MainWindow : Window
             if (Native is null || Native.Hwnd == 0) throw new InvalidOperationException("CANVAS_HWND: the native child is missing");
             _session.Attach(Native.Hwnd);
             Status.ImageValue.Text = $"{width} × {height} px";
+            Bind(new Editor(_session.Client, _session.Document));
             SendBackground();
             View.SetDocumentSize(new Size(width, height));
             UpdateClearRect();
@@ -513,6 +585,10 @@ public sealed class MainWindow : Window
 
     void StopCanvas()
     {
+        Dialog?.Cancel();
+        var editor = Editor;
+        Bind(null);
+        editor?.Dispose();
         _session?.Dispose();
         _session = null;
     }

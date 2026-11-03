@@ -1,6 +1,8 @@
 // Test hooks that the harness in windows/harness reads from outside the process. They run
 // only when an argument asks for them.
 //
+// --test-first-paint writes a file when Avalonia's renderer has drawn the main window, so the
+// harness knows the window no longer shows what is behind it. A color on screen cannot say so.
 // --test-first-frame writes a file at the moment the engine has presented a frame at the
 // asked zoom, so the harness can wait on that signal and not on a fixed time.
 // --test-pan-trace drags the Pan tool along a fixed path by posting mouse messages to the
@@ -33,8 +35,28 @@ public static partial class TestProbe
 
     public static void Arrange(MainWindow window, StartOptions options, Action<int> setExitCode)
     {
+        if (options.FirstPaintPath is { } paint) window.Opened += (_, _) => s_firstPaint = WriteFirstPaint(window, paint, setExitCode);
         if (options.TestZoom is null && options.FirstFramePath is null && options.PanTracePath is null) return;
         window.ImageReady += () => _ = Run(window, options, setExitCode);
+    }
+
+    static Task s_firstPaint = Task.CompletedTask;
+
+    /// Waits for the renderer to draw a batch that holds the window's first layout.
+    static async Task WriteFirstPaint(MainWindow window, string path, Action<int> setExitCode)
+    {
+        try
+        {
+            var visual = Avalonia.Rendering.Composition.ElementComposition.GetElementVisual(window) ?? throw new InvalidOperationException("the window has no visual");
+            await visual.Compositor.RequestCompositionBatchCommitAsync().Rendered;
+            WriteAtOnce(path, "{ \"painted\": true }\n");
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine($"TEST_PROBE: first paint: {e.Message}");
+            setExitCode(1);
+            window.Close();
+        }
     }
 
     static string Text(double value) => value.ToString("R", CultureInfo.InvariantCulture);
@@ -81,6 +103,8 @@ public static partial class TestProbe
                 throw new InvalidOperationException($"no frame in {FirstFrameLimitMs} ms: frame errors {session.Info().frame_errors}, last {session.Info().last_error}");
             var first = SinceStart();
             await window.CanvasShown;
+            // The harness reads the first-paint file before the first-frame one.
+            await s_firstPaint;
 
             if (options.TestZoom is { } zoom)
             {

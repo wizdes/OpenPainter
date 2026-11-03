@@ -90,4 +90,17 @@ public sealed class StartOptionsTests
         Assert.Equal(new Avalonia.PixelSize(1000, 620), o.TestWorkArea);
         Assert.Equal(Fatal.ClosedPlace, o.TestThrow);
     }
+
+    [Fact]
+    public void ThePanelsHookIsRead() => Assert.Equal("f", StartOptions.Parse(["--test-panels", "f"]).TestPanelsFolder);
+
+    [Fact]
+    public void TheFirstPaintAndPaintFaultHooksAreRead()
+    {
+        var o = StartOptions.Parse(["--test-first-paint", "p.json", "--test-paint-fault", "black-canvas"]);
+        Assert.Equal("p.json", o.FirstPaintPath);
+        Assert.Equal("black-canvas", o.TestPaintFault);
+        var e = Assert.Throws<ArgumentException>(() => StartOptions.Parse(["--test-paint-fault", "nope"]));
+        Assert.Contains("nope", e.Message);
+    }
 }

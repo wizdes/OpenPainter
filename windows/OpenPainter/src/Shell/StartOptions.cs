@@ -5,15 +5,20 @@ using System.Globalization;
 namespace OpenPainter.Shell;
 
 public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? ReportPath, string? Theme, string? TestTool = null, bool TestOpenMore = false, string? TestOpenMenu = null,
-    string? DataRoot = null, double? TestZoom = null, string? FirstFramePath = null, string? PanTracePath = null, double PanSeconds = 30, string? TestThrow = null, Avalonia.PixelSize? TestWorkArea = null)
+    string? DataRoot = null, double? TestZoom = null, string? FirstFramePath = null, string? PanTracePath = null, double PanSeconds = 30, string? TestThrow = null, Avalonia.PixelSize? TestWorkArea = null, string? FirstPaintPath = null, string? TestPaintFault = null, string? TestPanelsFolder = null)
 {
     public const double MostPanSeconds = 3600;
 
-    public const string Usage = "usage: OpenPainter [--data-root <folder>] [--test-load-png <file>] [--exit-after-ms <n>] [--test-report <file.json>] [--theme light|dark] [--test-tool <id>] [--test-open-more] [--test-open-menu <title>] [--test-zoom <ratio>] [--test-first-frame <file.json>] [--test-pan-trace <file.json>] [--test-pan-seconds <s>] [--test-throw <place>] [--test-work-area <width>x<height>]";
+    public const string BlackCanvasFault = "black-canvas", WrongStageFault = "wrong-stage";
+
+    /// What `--test-paint-fault` can plant, so the harness can prove `launch paint` still fails.
+    public static readonly string[] PaintFaults = [BlackCanvasFault, WrongStageFault];
+
+    public const string Usage = "usage: OpenPainter [--data-root <folder>] [--test-load-png <file>] [--exit-after-ms <n>] [--test-report <file.json>] [--theme light|dark] [--test-tool <id>] [--test-open-more] [--test-open-menu <title>] [--test-zoom <ratio>] [--test-first-frame <file.json>] [--test-pan-trace <file.json>] [--test-pan-seconds <s>] [--test-throw <place>] [--test-work-area <width>x<height>] [--test-first-paint <file.json>] [--test-paint-fault <kind>] [--test-panels <folder>]";
 
     public static StartOptions Parse(IReadOnlyList<string> args)
     {
-        string? png = null, report = null, theme = null, tool = null, menu = null, dataRoot = null, firstFrame = null, panTrace = null;
+        string? png = null, report = null, theme = null, tool = null, menu = null, dataRoot = null, firstFrame = null, panTrace = null, firstPaint = null, paintFault = null, panels = null;
         var openMore = false;
         int? exit = null;
         double? zoom = null;
@@ -62,6 +67,16 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
                 case "--test-first-frame":
                     firstFrame = Value();
                     break;
+                case "--test-panels":
+                    panels = Value();
+                    break;
+                case "--test-first-paint":
+                    firstPaint = Value();
+                    break;
+                case "--test-paint-fault":
+                    paintFault = Value();
+                    if (!PaintFaults.Contains(paintFault)) throw new ArgumentException($"ARGUMENTS: --test-paint-fault: {paintFault} is not one of {string.Join(", ", PaintFaults)}");
+                    break;
                 case "--test-pan-trace":
                     panTrace = Value();
                     break;
@@ -86,6 +101,6 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
             }
         }
         if (report is not null && exit is null) throw new ArgumentException("ARGUMENTS: --test-report needs --exit-after-ms, so the run ends by itself");
-        return new StartOptions(png, exit, report, theme, tool, openMore, menu, dataRoot, zoom, firstFrame, panTrace, panSeconds, testThrow, workArea);
+        return new StartOptions(png, exit, report, theme, tool, openMore, menu, dataRoot, zoom, firstFrame, panTrace, panSeconds, testThrow, workArea, firstPaint, paintFault, panels);
     }
 }

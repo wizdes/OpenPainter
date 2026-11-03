@@ -452,6 +452,136 @@ public sealed class HarnessTests
     public void NoPixelReadBeforeAFirstFrameIsNotRun() =>
         Assert.Equal(PartStatus.NotRun, LaunchPaint.Part([Launch((950, Stage))]).Status);
 
+    // ---- W8: the app says when it has painted. A color alone cannot, because a window behind
+    // the app can have any color, and Windows says the app owns the pixel before it paints.
+
+    static LaunchRead Signaled(double painted, params (double Ms, Rgb Color, int Point)[] pixels) =>
+        new("a", new Rgb(30, 30, 30), 1000, pixels.Select(p => new LaunchPixel(p.Ms, p.Color, p.Point)).ToList(), painted, 250);
+
+    /// The real read from a 24 MP dark launch: a window behind read #1F1F1F at one point and
+    /// #0C0C0C at the next. The old rule took the first for the stage and failed on the second.
+    [Fact]
+    public void AWindowBehindTheAppThatLooksLikeTheStageDoesNotCountAsPainted()
+    {
+        var behind = new Rgb(31, 31, 31);
+        var terminal = new Rgb(12, 12, 12);
+        var read = Signaled(330, (269, behind, 0), (285, terminal, 1), (301, Stage, 2), (318, behind, 0), (335, Stage, 1), (400, Stage, 2), (500, Stage, 0));
+        Assert.Equal(PartStatus.Fail, LaunchPaint.Part([read with { PaintedMs = null }]).Status);
+        var part = LaunchPaint.Part([read]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("3 real screen pixels", part.Detail);
+    }
+
+    [Fact]
+    public void NothingReadBeforeTheAppPaintedIsJudged()
+    {
+        var part = LaunchPaint.Part([Signaled(300, (280, new Rgb(0, 0, 0), 0), (290, new Rgb(200, 0, 0), 1), (350, Stage, 0))]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("1 real screen pixels", part.Detail);
+    }
+
+    [Fact]
+    public void BlackAfterTheAppPaintedFails()
+    {
+        var part = LaunchPaint.Part([Signaled(330, (400, Stage, 0), (500, new Rgb(0, 0, 0), 1), (600, Stage, 2))]);
+        Assert.Equal(PartStatus.Fail, part.Status);
+        Assert.Contains("1 of them black", part.Detail);
+    }
+
+    [Fact]
+    public void AWrongColorAfterTheAppPaintedFailsByItsColorAndTime()
+    {
+        var part = LaunchPaint.Part([Signaled(330, (400, Stage, 0), (500, new Rgb(200, 0, 0), 1))]);
+        Assert.Equal(PartStatus.Fail, part.Status);
+        Assert.Contains("#C80000 at 500 ms", part.Detail);
+    }
+
+    [Fact]
+    public void AnAppThatPaintsLateFailsByItsTime()
+    {
+        var part = LaunchPaint.Part([Signaled(620, (600, new Rgb(5, 5, 5), 0), (650, Stage, 0))]);
+        Assert.Equal(PartStatus.Fail, part.Status);
+        Assert.Contains("took 350 ms", part.Detail);
+    }
+
+    [Fact]
+    public void ALatePaintOnABusyPcIsNamedAndNotJudgedAndItsColorsStillAre()
+    {
+        var read = Signaled(620, (600, new Rgb(5, 5, 5), 0), (650, Stage, 0)) with { OthersCpu = 40 };
+        var part = LaunchPaint.Part([read]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("not judged on a busy PC: a took 350 ms with other programs at 40% of the CPU", part.Detail);
+        Assert.Equal(PartStatus.Fail, LaunchPaint.Part([read with { OthersCpu = 5 }]).Status);
+        Assert.Equal(PartStatus.Fail, LaunchPaint.Part([read with { Pixels = [new LaunchPixel(600, new Rgb(5, 5, 5)), new LaunchPixel(650, new Rgb(0, 0, 0))] }]).Status);
+    }
+
+    /// The signal is late by the UI thread's work and the harness's poll, and that is no fault.
+    [Fact]
+    public void ASignalThatComesAfterTheStageShowedDoesNotCountAsALatePaint()
+    {
+        var part = LaunchPaint.Part([Signaled(600, (260, new Rgb(5, 5, 5), 0), (300, Stage, 1), (400, Stage, 2), (650, Stage, 0))]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("at most 10 ms", part.Detail);
+    }
+
+    /// A busy app can hold the harness past its first reads, so they say nothing either way.
+    [Fact]
+    public void ALaunchWithNoReadBeforeTheSignalSaysNothingOfThePaintTime()
+    {
+        var part = LaunchPaint.Part([Signaled(600, (650, Stage, 0))]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("at most 0 ms", part.Detail);
+    }
+
+    [Fact]
+    public void ALaunchThatReachedItsFirstFrameBeforeAnyReadIsNotJudged()
+    {
+        var part = LaunchPaint.Part([Signaled(260, (280, Stage, 0)), new LaunchRead("quick", Stage, 400, [new LaunchPixel(300, new Rgb(5, 5, 5))], 280, 250)]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("1 of 2 launches", part.Detail);
+    }
+
+    [Fact]
+    public void NoPixelReadAfterThePaintIsNotRun() =>
+        Assert.Equal(PartStatus.NotRun, LaunchPaint.Part([Signaled(300, (280, new Rgb(5, 5, 5), 0))]).Status);
+
+    [Fact]
+    public void AReadJustAfterAnotherProgramsWindowSaysNothing()
+    {
+        Assert.False(LaunchPaint.TooSoonAfterCover(300, null));
+        Assert.True(LaunchPaint.TooSoonAfterCover(300 + LaunchPaint.AfterCoverMs - 1, 300));
+        Assert.False(LaunchPaint.TooSoonAfterCover(300 + LaunchPaint.AfterCoverMs, 300));
+    }
+
+    /// The left panels end near a fifth of the default width and the right ones begin near four
+    /// fifths, and the rows above the stage end near a sixth of its height.
+    [Fact]
+    public void TheReadPointsAreOnTheStageWhereverAPanelStartsOut()
+    {
+        Assert.True(LaunchPaint.ReadPoints.Length >= 15);
+        Assert.Equal(LaunchPaint.ReadPoints.Length, LaunchPaint.ReadPoints.Distinct().Count());
+        foreach (var (x, y) in LaunchPaint.ReadPoints)
+        {
+            Assert.InRange(x * 1296, 256 + 64, 1296 - 256 - 64);
+            Assert.InRange(y * 840, 170 + 64, 840 - 40 - 64);
+        }
+    }
+
+    [Fact]
+    public void TheFaultProofPassesOnlyWhenThePlantFails()
+    {
+        Assert.Equal(PartStatus.Pass, LaunchPaint.Proof("black canvas", LaunchPaint.Part([Signaled(330, (400, new Rgb(0, 0, 0), 0))])).Status);
+        Assert.Equal(PartStatus.Fail, LaunchPaint.Proof("black canvas", LaunchPaint.Part([Signaled(330, (400, Stage, 0))])).Status);
+        Assert.Equal(PartStatus.Fail, LaunchPaint.Proof("black canvas", LaunchPaint.Part([Signaled(300, (280, Stage, 0))])).Status);
+    }
+
+    [Fact]
+    public void TheFaultProofNamesBothPlantsAndAFullRunHoldsIt()
+    {
+        Assert.Equal(LaunchPaint.Plants, OpenPainter.Shell.StartOptions.PaintFaults);
+        Assert.Contains("paint-fault", OpenPainter.Harness.Program.AllParts);
+    }
+
     // ---- Busy runs are thrown out, and GPU use counts.
 
     [Fact]

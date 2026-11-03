@@ -20,8 +20,13 @@ public sealed unsafe class CanvasSession : IDisposable
 
     readonly BlockingCollection<Action> _work = [];
     readonly Thread _thread;
+    EngineClient? _client;
     OpEngine* _engine;
     ulong _doc, _view;
+
+    /// The engine and the open document, once Load has reached `ready`.
+    public EngineClient Client => _client ?? throw new InvalidOperationException("ENGINE: not started yet");
+    public ulong Document => _doc;
 
     public CanvasSession()
     {
@@ -56,19 +61,9 @@ public sealed unsafe class CanvasSession : IDisposable
     {
         _work.Add(() =>
         {
-            _engine = Native.op_engine_new(null, null, null);
-            if (_engine == null) throw new InvalidOperationException("ENGINE_NEW: returned null");
-            ulong doc;
-            if (png is null)
-            {
-                Check(Native.op_doc_new(_engine, BlankWidth, BlankHeight, BlankDpi, OpaqueWhite, &doc), "DOC_NEW");
-            }
-            else
-            {
-                var path = Encoding.UTF8.GetBytes(png);
-                fixed (byte* bytes = path) Check(Native.op_doc_open_png(_engine, bytes, (nuint)path.Length, &doc), $"DOC_OPEN_PNG {png}");
-            }
-            _doc = doc;
+            _client = new EngineClient();
+            _engine = _client.Handle;
+            _doc = png is null ? _client.NewDocument(BlankWidth, BlankHeight, BlankDpi, OpaqueWhite) : _client.OpenPng(png);
             var (width, height) = ImageSize();
             Dispatcher.UIThread.Post(() => ready(width, height));
         });
@@ -270,10 +265,8 @@ public sealed unsafe class CanvasSession : IDisposable
             Check(Native.op_view_detach(_engine, _view), "VIEW_DETACH");
             _view = 0;
         }
-        if (_engine != null)
-        {
-            Native.op_engine_free(_engine);
-            _engine = null;
-        }
+        _engine = null;
+        _client?.Dispose();
+        _client = null;
     }
 }

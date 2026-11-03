@@ -51,6 +51,8 @@ public static partial class Runner
     public static void KeepForTests()
     {
         _ = Xunit.Sdk.CollectionTrackerExtensions.AsTracker<double>(Array.Empty<double>());
+        _ = Xunit.Sdk.CollectionTrackerExtensions.AsTracker<bool>(Array.Empty<bool>());
+        _ = Xunit.Sdk.CollectionTrackerExtensions.AsTracker<(string, string)>(Array.Empty<(string, string)>());
         _ = Marshal.SizeOf<OpConfig>() + Marshal.SizeOf<OpEvent>() + Marshal.SizeOf<OpBuffer>() + Marshal.SizeOf<OpPixelBuffer>()
             + Marshal.SizeOf<OpPointerEvent>() + Marshal.SizeOf<OpPipelineCounts>() + Marshal.SizeOf<OpStrokeSample>() + Marshal.SizeOf<OpViewState>()
             + Marshal.SizeOf<OpOverlayPoint>() + Marshal.SizeOf<OpOverlayItem>() + Marshal.SizeOf<OpViewInfo>() + Marshal.SizeOf<OpViewCounters>() + Marshal.SizeOf<OpFrameStamp>();

@@ -267,11 +267,15 @@ public static class ScreenCheck
     }
 }
 
-/// A real screen pixel in the canvas's area before the first-frame signal.
-public readonly record struct LaunchPixel(double Ms, Rgb Color);
+/// A real screen pixel in the canvas's area before the first-frame signal, and which of the
+/// read points it came from.
+public readonly record struct LaunchPixel(double Ms, Rgb Color, int Point = 0);
 
-/// What the canvas's area showed while the image was loading.
-public sealed record LaunchRead(string Label, Rgb Stage, double FirstFrameMs, IReadOnlyList<LaunchPixel> Pixels);
+/// What the canvas's area showed while the image was loading. `PaintedMs` is when the harness
+/// saw the app's first-paint signal and the desktop had shown it. `WindowMs` is when the window
+/// first existed. Both are on the harness's own clock. `OthersCpu` is other programs' share of
+/// the CPU during the launch.
+public sealed record LaunchRead(string Label, Rgb Stage, double FirstFrameMs, IReadOnlyList<LaunchPixel> Pixels, double? PaintedMs = null, double? WindowMs = null, double? OthersCpu = null);
 
 public static class LaunchPaint
 {
@@ -281,21 +285,79 @@ public static class LaunchPaint
     /// How long a new window may show what is behind it before its first paint.
     public const double MostOpeningMs = 250;
 
-    /// The window first shows what is behind it, for a moment, until Avalonia paints. From
-    /// that paint until the first frame only the stage color may show, and black never may.
-    /// After the first frame the image shows, so only black means anything there.
+    /// The name of the row that proves the judge by planting faults in the app.
+    public const string ProofName = "launch paint fault";
+
+    /// Where to read in the window, as parts of its width and height. The stage holds all of them
+    /// whatever the panels do, and no other program covers all of them at once.
+    public static readonly (double X, double Y)[] ReadPoints =
+    [
+        (.375, .5), (.625, .5), (.5, .7), (.5, .3), (.375, .7), (.625, .7), (.375, .3), (.625, .3), (.25, .5), (.75, .5), (.5, .5), (.25, .7), (.75, .7), (.25, .3), (.75, .3),
+    ];
+
+    /// A closing window fades out over the app after Windows stops finding it at its pixels. A
+    /// real read on a white stage: #393939, #888888, #EAEAEA in 115 ms, where another program's
+    /// window had just been. So a read this soon after another program held that point says nothing.
+    public const double AfterCoverMs = 500;
+
+    public static bool TooSoonAfterCover(double now, double? lastCover) => lastCover is { } last && now - last < AfterCoverMs;
+
+    /// How many of those one round reads. A read waits for the desktop, so more means fewer rounds.
+    public const int ReadsPerRound = 3;
+
+    /// The faults the app can plant: StartOptions.PaintFaults, which a test holds to this list.
+    public static readonly string[] Plants = ["black-canvas", "wrong-stage"];
+
+    /// A planted fault must fail the judge. Passing, or judging nothing, means the check is blind.
+    public static PartResult Proof(string plant, PartResult judged) => judged.Status switch
+    {
+        PartStatus.Fail => PartResult.Pass(ProofName, $"{plant}: the planted fault failed the check: {judged.Detail}"),
+        PartStatus.Pass => PartResult.Fail(ProofName, $"{plant}: the planted fault passed the check: {judged.Detail}"),
+        _ => PartResult.Fail(ProofName, $"{plant}: the check judged nothing: {judged.Detail}"),
+    };
+
+    /// The window first shows what is behind it, for a moment, until Avalonia paints. Windows
+    /// says the window owns its pixels from the moment it exists, and what is behind can be any
+    /// color, so a color cannot say that the app has painted. The app's own signal says that.
+    /// From it until the first frame only the stage color may show, and black never may.
+    /// A read with no signal falls back on the first stage-colored pixel, which is what W7 did
+    /// and is why it was unreliable. The harness keeps it only to print what that rule says.
     public static PartResult Part(IReadOnlyList<LaunchRead> reads)
     {
         const string Name = "launch paint";
         const int Tolerance = 1;
         if (reads.Count == 0) return PartResult.NotRun(Name, "no launch was measured");
         var problems = new List<string>();
+        var busy = new List<string>();
         int judged = 0, launches = 0;
         double longestOpening = 0;
         foreach (var read in reads)
         {
             bool IsStage(LaunchPixel p) => p.Color.Distance(read.Stage) <= Tolerance;
             var early = read.Pixels.Where(p => p.Ms < read.FirstFrameMs - FrameClockSlackMs).ToList();
+            if (read.PaintedMs is { } paintedAt)
+            {
+                // The signal comes late: the UI thread may be busy, and the harness polls. So the
+                // signal's time says nothing of a slow paint. The last read before it that was
+                // not the stage color shows the window was still unpainted then. A color can only
+                // say this much, and only the time limit rests on it.
+                var unpainted = read.Pixels.Where(p => p.Ms < paintedAt && !IsStage(p)).Select(p => p.Ms).DefaultIfEmpty(read.WindowMs ?? paintedAt).Max();
+                var opened = unpainted - (read.WindowMs ?? paintedAt);
+                longestOpening = Math.Max(longestOpening, opened);
+                // A time on a busy PC does not count (PLAN 4.3), and the colors below still do.
+                if (opened > MostOpeningMs)
+                {
+                    if (read.OthersCpu >= BusyJudge.MostCpuPercent) busy.Add($"{read.Label} took {opened:F0} ms with other programs at {read.OthersCpu:F0}% of the CPU");
+                    else problems.Add($"{read.Label}: the app took {opened:F0} ms to paint, over {MostOpeningMs} ms");
+                }
+                var seen = early.Where(p => p.Ms >= paintedAt).ToList();
+                if (seen.Count == 0) continue;
+                launches++;
+                judged += seen.Count;
+                var off = seen.Where(p => !IsStage(p)).ToList();
+                if (off.Count != 0) problems.Add($"{read.Label}: {off.Count} of {seen.Count} pixels after the first paint were not the stage color {read.Stage}, {off.Count(p => p.Color.IsBlack)} of them black, first {off[0].Color} at {off[0].Ms:F0} ms at point {off[0].Point}");
+                continue;
+            }
             if (early.Count == 0) continue;
             launches++;
             var painted = early.FindIndex(IsStage);
@@ -315,7 +377,7 @@ public static class LaunchPaint
         }
         if (problems.Count != 0) return PartResult.Fail(Name, string.Join("; ", problems));
         if (judged == 0) return PartResult.NotRun(Name, $"no pixel was read before a first frame in any of {reads.Count} launches");
-        return PartResult.Pass(Name, $"{judged} real screen pixels before the first frame over {launches} of {reads.Count} launches, all the stage color, none black; the window showed what is behind it for at most {longestOpening:F0} ms");
+        return PartResult.Pass(Name, $"{judged} real screen pixels before the first frame over {launches} of {reads.Count} launches, all the stage color, none black; the window showed what is behind it for at most {longestOpening:F0} ms{(busy.Count == 0 ? "" : $"; paint time not judged on a busy PC: {string.Join(", ", busy)}")}");
     }
 }
 

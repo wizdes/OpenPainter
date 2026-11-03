@@ -13,8 +13,8 @@ namespace OpenPainter.Harness;
 
 public static class Program
 {
-    const string Usage = "usage: OpenPainter.Harness --app <OpenPainter.exe> --out <folder> [--parts report,pixels,color,shots,pan,exit,fatal,small-screen] [--pan-seconds <s>] [--first-frame-runs <n>] [--allow-busy] [--ignore-disk]\n       OpenPainter.Harness --export-vectors";
-    static readonly string[] AllParts = ["report", "pixels", "color", "shots", "pan", "exit", "fatal", "small-screen"];
+    const string Usage = "usage: OpenPainter.Harness --app <OpenPainter.exe> --out <folder> [--parts report,pixels,paint-fault,panels,color,shots,pan,exit,fatal,small-screen] [--pan-seconds <s>] [--first-frame-runs <n>] [--allow-busy] [--ignore-disk]\n       OpenPainter.Harness --export-vectors";
+    public static readonly string[] AllParts = ["report", "pixels", "paint-fault", "panels", "color", "shots", "pan", "exit", "fatal", "small-screen"];
 
     public static int Main(string[] args)
     {
@@ -133,6 +133,8 @@ public static class Program
                     {
                         case "report": ReportPart("light"); ReportPart("dark"); break;
                         case "pixels": PixelsPart(); break;
+                        case "paint-fault": PaintFaultPart(); break;
+                        case "panels": PanelsPart("light"); PanelsPart("dark"); break;
                         case "color": ColorPart("light"); ColorPart("dark"); break;
                         case "shots": ShotsPart(); break;
                         case "pan": PanPart(); break;
@@ -257,6 +259,116 @@ public static class Program
                 : PartResult.Fail("pixel read-back", string.Join("; ", problems)));
             Report(ScreenCheck.Part(screens));
             Report(LaunchPaint.Part(launches));
+            // What W7's color-only rule says of the same reads. It is not the verdict, and the
+            // log shows how often it would have been wrong.
+            Console.WriteLine($"  color-only rule, not the verdict: {LaunchPaint.Part(launches.Select(l => l with { PaintedMs = null, WindowMs = null }).ToList()).Line}");
+        }
+
+        // ---- A fault planted in the app must fail `launch paint`, or that check is blind.
+        void PaintFaultPart()
+        {
+            var big = Big24Mp();
+            foreach (var plant in LaunchPaint.Plants)
+            {
+                var problems = new List<string>();
+                var lines = new List<string>();
+                var launches = new List<LaunchRead>();
+                ReadBack($"plant {plant}", big, null, "light", problems, lines, [], launches, ["--test-paint-fault", plant]);
+                Report(LaunchPaint.Proof(plant, LaunchPaint.Part(launches)));
+            }
+        }
+
+        // ---- History, Layers and Layer Properties on a real window, one stage at a time.
+        void PanelsPart(string theme)
+        {
+            const int LimitMs = 60_000, HtCaption = 2, HtClient = 1, MoveBy = 40, ColorMoved = 8;
+            var name = $"panels on a real window ({theme})";
+            var png = Path.Combine(RepoRoot(), "tests", "fixtures", "plasma_alpha_512x384.png");
+            var folder = NextFolder($"panels-{theme}");
+            var hook = Path.Combine(folder, "hook");
+            using var run = new AppRun(options.App, folder, ["--test-load-png", png, "--theme", theme, "--test-zoom", "1", "--test-first-frame", Path.Combine(folder, "first-frame.json"), "--test-panels", hook]);
+            var frame = run.WaitFirstFrame(LimitMs);
+            var problems = new List<string>();
+            var shots = Path.Combine(options.Out, "shots");
+            Directory.CreateDirectory(shots);
+            JsonElement Stage(int stage)
+            {
+                var path = Path.Combine(hook, $"ready-{stage}.json");
+                var clock = Stopwatch.StartNew();
+                while (!File.Exists(path))
+                {
+                    if (run.Exited) throw new InvalidOperationException($"the app exited {run.ExitCode} before stage {stage}: {run.Output()}");
+                    if (clock.ElapsedMilliseconds > LimitMs) throw new TimeoutException($"no stage {stage} in {LimitMs} ms");
+                    Thread.Sleep(20);
+                }
+                using var file = JsonDocument.Parse(File.ReadAllText(path));
+                return file.RootElement.Clone();
+            }
+            void Go(int stage) => File.WriteAllText(Path.Combine(hook, $"go-{stage}"), "go");
+            nint Hwnd(JsonElement r, string key) => (nint)r.GetProperty(key).GetInt64();
+
+            var first = Stage(1);
+            Win32.WaitForDisplay();
+            if (first.GetProperty("history_rows").GetInt32() != 7) problems.Add($"History shows {first.GetProperty("history_rows")} rows, not 7");
+            var layerWords = string.Join(", ", first.GetProperty("layer_rows").EnumerateArray().Select(l => l.GetString()));
+            if (layerWords != "Sketch, Background copy, Background") problems.Add($"the Layers panel shows {layerWords}");
+            if (first.GetProperty("thumbs").GetInt32() != 3) problems.Add($"{first.GetProperty("thumbs")} of 3 layer pictures came");
+            Png.Write(Path.Combine(shots, $"panel-history-{theme}.png"), Win32.CaptureShown(Hwnd(first, "history_hwnd")));
+            Png.Write(Path.Combine(shots, $"panel-layers-{theme}.png"), Win32.CaptureShown(Hwnd(first, "layers_hwnd")));
+            Png.Write(Path.Combine(shots, $"panels-main-{theme}.png"), Win32.CaptureApp(run.Pid));
+            Go(1);
+
+            var second = Stage(2);
+            var dialog = Hwnd(second, "dialog_hwnd");
+            if (Hwnd(second, "owner_hwnd") != frame.Main) problems.Add("Layer Properties is not owned by the main window");
+            if (!Win32.IsAbove(dialog, frame.Main)) problems.Add("Layer Properties is below the main window");
+            if (second.GetProperty("title_hit").GetInt32() != HtCaption) problems.Add($"Windows says {second.GetProperty("title_hit")} on the dialog's title row, not {HtCaption}, so it does not drag");
+            if (second.GetProperty("close_hit").GetInt32() != HtClient) problems.Add($"Windows says {second.GetProperty("close_hit")} on the dialog's close button, not {HtClient}");
+            Win32.WaitForDisplay();
+            Png.Write(Path.Combine(shots, $"panel-layer-properties-{theme}.png"), Win32.CaptureShown(dialog));
+            if (!Win32.GetWindowRect(dialog, out var dialogRect)) throw new InvalidOperationException("the dialog has no rectangle");
+            var canvasRect = Win32.CanvasRect(frame.Main, frame.Canvas);
+            if (!Win32.GetWindowRect(frame.Canvas, out var canvasOnScreen)) throw new InvalidOperationException("the canvas has no rectangle");
+            var dialogMiddle = (X: (dialogRect.Left + dialogRect.Right) / 2, Y: (dialogRect.Top + dialogRect.Bottom) / 2);
+            if (dialogMiddle.X <= canvasOnScreen.Left || dialogMiddle.X >= canvasOnScreen.Right || dialogMiddle.Y <= canvasOnScreen.Top || dialogMiddle.Y >= canvasOnScreen.Bottom)
+                problems.Add("the dialog's middle is not over the canvas, so this run proves nothing about staying above it");
+            Win32.RaiseWithoutFocus(frame.Main);
+            Win32.RaiseWithoutFocus(dialog);
+            Win32.WaitForDisplay();
+            var over = Win32.WindowAt(dialogMiddle.X, dialogMiddle.Y);
+            if (over != dialog) problems.Add($"Windows finds class {Win32.ClassOf(over)} at the dialog's middle, not the dialog");
+            // A point of the image the dialog does not reach: the top left of what the canvas shows.
+            var (docX, docY) = (64.0, 64.0);
+            var (pointX, pointY) = frame.Map.DevicePoint(docX, docY);
+            var at = (X: canvasRect.X + (int)pointX, Y: canvasRect.Y + (int)pointY);
+            Rgb CanvasPixel() => Win32.Capture(frame.Main).At(at.X, at.Y);
+            var shown = CanvasPixel();
+            Win32.MoveBy(dialog, MoveBy);
+            Win32.WaitForDisplay();
+            Go(2);
+
+            var third = Stage(3);
+            if (third.GetProperty("moved_x").GetInt32() != second.GetProperty("position_x").GetInt32() + MoveBy) problems.Add($"the dialog did not follow the move: {third.GetProperty("moved_x")}, from {second.GetProperty("position_x")}");
+            if (!third.GetProperty("session_started").GetBoolean()) problems.Add("no preview session began");
+            Win32.WaitForDisplay();
+            var hidden = CanvasPixel();
+            if (hidden.Distance(shown) <= ColorMoved) problems.Add($"the live preview did not reach the canvas: {shown} before, {hidden} with the copy hidden");
+            Go(3);
+
+            var fourth = Stage(4);
+            if (fourth.GetProperty("steps_before").GetInt32() != fourth.GetProperty("steps_after").GetInt32()) problems.Add($"Cancel changed the history: {fourth.GetProperty("steps_before")} steps to {fourth.GetProperty("steps_after")}");
+            if (!fourth.GetProperty("copy_visible").GetBoolean()) problems.Add("Cancel left the layer hidden");
+            if (!fourth.GetProperty("dialog_gone").GetBoolean()) problems.Add("the dialog stayed after Cancel");
+            Win32.WaitForDisplay();
+            var back = CanvasPixel();
+            if (back.Distance(shown) > ColorTolerance) problems.Add($"Cancel did not bring the canvas back: {shown} before, {back} after");
+            Go(4);
+            run.Close(frame.Main);
+            if (run.ExitCode != 0) problems.Add($"the app exited {run.ExitCode}: {run.Output()}");
+            CheckDataRootEmpty(run, name);
+            Report(problems.Count == 0
+                ? PartResult.Pass(name, $"7 history rows; layers {layerWords}; owned, above the main window and the canvas; the title row drags; the canvas pixel went {shown} to {hidden} and back to {back}; root must look at the panel shots")
+                : PartResult.Fail(name, string.Join("; ", problems)));
         }
 
         string Big24Mp()
@@ -270,7 +382,7 @@ public static class Program
 
         /// Reads the real screen in the canvas's area from launch, so anything but the stage
         /// color before the first frame is measured. Any capture after the signal must show the image.
-        void ReadBack(string label, string png, string? zoom, string theme, List<string> problems, List<string> lines, List<ScreenRead> screens, List<LaunchRead> launches)
+        void ReadBack(string label, string png, string? zoom, string theme, List<string> problems, List<string> lines, List<ScreenRead> screens, List<LaunchRead> launches, IEnumerable<string>? extra = null)
         {
             const int PollMs = 4;
             const int AfterSignalCaptures = 5;
@@ -280,16 +392,35 @@ public static class Program
             var args = new List<string> { "--test-load-png", png, "--theme", theme };
             if (zoom is not null) args.AddRange(["--test-zoom", zoom]);
             var firstFramePath = Path.Combine(folder, "first-frame.json");
-            args.AddRange(["--test-first-frame", firstFramePath]);
+            var firstPaintPath = Path.Combine(folder, "first-paint.json");
+            args.AddRange(["--test-first-frame", firstFramePath, "--test-first-paint", firstPaintPath]);
+            if (extra is not null) args.AddRange(extra);
+            using var self = Process.GetCurrentProcess();
+            var cpuStart = Win32.CpuTimes();
+            var selfStart = self.TotalProcessorTime;
             using var run = new AppRun(options.App, folder, args);
             var main = run.WaitMainWindow(WindowLimitMs);
             var windowMs = run.MsSinceStart;
-            Win32.RaiseWithoutFocus(main);
-            double? firstCanvas = null;
+            // Other sessions' windows can cover the read points, so the app stays on top until
+            // its first frame. It changes no focus.
+            Win32.HoldOnTop(main, true);
+            double? firstCanvas = null, paintedMs = null;
+            // By point: a window that stays over one point says nothing of the others.
+            var lastCover = new double?[LaunchPaint.ReadPoints.Length];
             var canvasHandles = new HashSet<nint>();
             var pixels = new List<LaunchPixel>();
+            var log = new List<string>();
             while (!File.Exists(firstFramePath))
             {
+                // The app has painted, and two desktop frames later the screen shows it. This
+                // clock is the one the pixels use, so no two clocks need to agree.
+                if (paintedMs is null && File.Exists(firstPaintPath))
+                {
+                    Win32.WaitForDisplay();
+                    paintedMs = run.MsSinceStart;
+                    log.Add($"{paintedMs:F0} painted");
+                }
+
                 if (run.Exited) throw new InvalidOperationException($"{label}: the app exited {run.ExitCode} before its first frame: {run.Output()}");
                 if (run.MsSinceStart > StartLimitMs) throw new TimeoutException($"{label}: no first-frame signal in {StartLimitMs} ms");
                 var canvas = Win32.CanvasOf(main);
@@ -299,22 +430,52 @@ public static class Program
                     firstCanvas ??= run.MsSinceStart;
                 }
                 // Points the stage holds whatever the panels do, read from the window's own place.
+                // A read waits for the desktop, so each round reads only the first few the app holds.
                 if (Win32.GetWindowRect(main, out var mainRect))
                 {
-                    foreach (var (x, y) in new[] { (1, 2), (2, 2), (1, 3) })
+                    var read = 0;
+                    string? covering = null;
+                    for (var point = 0; point < LaunchPaint.ReadPoints.Length && read < LaunchPaint.ReadsPerRound; point++)
                     {
-                        if (Win32.ScreenPixelInApp(main, mainRect.Left + mainRect.Width * x / 3 + 40, mainRect.Top + mainRect.Height * y / 4, out _) is { } seen)
-                            pixels.Add(new LaunchPixel(run.MsSinceStart, seen));
+                        var (x, y) = LaunchPaint.ReadPoints[point];
+                        if (Win32.ScreenPixelInApp(main, mainRect.Left + (int)(mainRect.Width * x), mainRect.Top + (int)(mainRect.Height * y), out var cover, out var foreign) is { } seen)
+                        {
+                            read++;
+                            if (LaunchPaint.TooSoonAfterCover(run.MsSinceStart, lastCover[point])) log.Add($"{run.MsSinceStart:F0} point {point} {seen}, too soon after another program's window");
+                            else
+                            {
+                                pixels.Add(new LaunchPixel(run.MsSinceStart, seen, point));
+                                log.Add($"{run.MsSinceStart:F0} point {point} {seen}");
+                            }
+                        }
+                        else
+                        {
+                            covering = cover;
+                            if (foreign) lastCover[point] = run.MsSinceStart;
+                            log.Add($"{run.MsSinceStart:F0} point {point} covered by {cover}");
+                        }
                     }
+                    // Something came up over the app, so it goes back above that.
+                    if (covering is not null) Win32.HoldOnTop(main, true);
                 }
                 Thread.Sleep(PollMs);
             }
+            Win32.HoldOnTop(main, false);
+            // Both files can appear during one round of reads. The app writes this one first, so
+            // only a file still missing is a fault, and then no read follows the paint.
+            if (paintedMs is null && File.Exists(firstPaintPath)) paintedMs = run.MsSinceStart;
+            if (paintedMs is null) throw new InvalidOperationException($"{label}: the app gave its first-frame signal with no first-paint signal");
             var frame = FirstFrame.Read(firstFramePath);
             if (CanvasHandles.Problem(label, canvasHandles, frame.Canvas, Win32.CanvasOf(main)) is { } handleProblem) throw new InvalidOperationException(handleProblem);
             if (frame.FrameErrors != 0) problems.Add($"{label}: {frame.FrameErrors} frame errors, last {frame.LastError}");
             if (frame.ValidationErrors != 0) problems.Add($"{label}: {frame.ValidationErrors} validation errors");
-            launches.Add(new LaunchRead(label, frame.Stage, frame.FirstFrameMs, pixels));
-            File.WriteAllLines(Path.Combine(folder, "launch-pixels.txt"), pixels.Select(p => $"{p.Ms:F0} {p.Color}"));
+            var cpuEnd = Win32.CpuTimes();
+            self.Refresh();
+            var mine = (self.TotalProcessorTime - selfStart + run.CpuTime).Ticks;
+            var othersCpu = cpuEnd.Total <= cpuStart.Total ? 0 : Math.Max(0, 100.0 * (cpuEnd.Busy - cpuStart.Busy - mine) / (cpuEnd.Total - cpuStart.Total));
+            log.Add($"others' CPU {othersCpu:F0}%");
+            launches.Add(new LaunchRead(label, frame.Stage, frame.FirstFrameMs, pixels, paintedMs, windowMs, othersCpu));
+            File.WriteAllLines(Path.Combine(folder, "launch-pixels.txt"), log);
 
             Win32.WaitForDisplay();
             var margin = EdgeMarginDevicePixels / (frame.Map.Zoom * frame.Map.Scale);
@@ -364,7 +525,7 @@ public static class Program
             screens.Add(new ScreenRead(label, judged, matched, covered, miss));
             var screenWords = $"{judged} points judged of {candidates.Count} away from color edges, {matched} matched, {covered} covered{(coverName is null ? "" : $" by class {coverName}")}";
             var early = pixels.Count(p => p.Ms < frame.FirstFrameMs - LaunchPaint.FrameClockSlackMs);
-            lines.Add($"{label}: window {windowMs:F0} ms, canvas window {firstCanvas?.ToString("F0") ?? "before the first poll"} ms, view attached {frame.AttachedMs:F0} ms, first frame {frame.FirstFrameMs:F0} ms, signal {frame.SignalMs:F0} ms; before the signal {pixels.Count} screen pixels, {early} before the first frame, {pixels.Count(p => p.Color.IsBlack)} black, {pixels.Count(p => p.Color.Distance(frame.Stage) <= 1)} the stage color; {canvasHandles.Count} canvas handles; screen after the signal: {screenWords}");
+            lines.Add($"{label}: window {windowMs:F0} ms, painted {paintedMs:F0} ms, canvas window {firstCanvas?.ToString("F0") ?? "before the first poll"} ms, view attached {frame.AttachedMs:F0} ms, first frame {frame.FirstFrameMs:F0} ms, signal {frame.SignalMs:F0} ms; before the signal {pixels.Count} screen pixels, {early} before the first frame, {pixels.Count(p => p.Color.IsBlack)} black, {pixels.Count(p => p.Color.Distance(frame.Stage) <= 1)} the stage color; {canvasHandles.Count} canvas handles; screen after the signal: {screenWords}");
             if (failedAfterSignal != 0) problems.Add($"{label}: {failedAfterSignal} of {AfterSignalCaptures} captures after the signal failed: {firstProblem}");
             if (CanvasHandles.Problem(label, canvasHandles, frame.Canvas, Win32.CanvasOf(main)) is { } handleLater) problems.Add(handleLater);
             run.Close(main);

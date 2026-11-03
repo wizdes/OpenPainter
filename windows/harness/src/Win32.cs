@@ -65,6 +65,7 @@ public static unsafe partial class Win32
     [DllImport("gdi32.dll")] static extern uint GetPixel(nint dc, int x, int y);
     [DllImport("user32.dll")] static extern nint WindowFromPoint(NativePoint point);
     [DllImport("user32.dll")] static extern bool IsChild(nint parent, nint hwnd);
+    [DllImport("user32.dll")] static extern nint GetWindow(nint hwnd, uint command);
     [DllImport("user32.dll", SetLastError = true)] static extern bool SetWindowPos(nint hwnd, nint after, int x, int y, int cx, int cy, uint flags);
     [DllImport("gdi32.dll")] static extern nint CreateCompatibleDC(nint dc);
     [DllImport("gdi32.dll")] static extern bool DeleteDC(nint dc);
@@ -173,6 +174,30 @@ public static unsafe partial class Win32
         }
     }
 
+    /// One window as it shows, without its invisible resize edges, which print as black bars.
+    public static Picture CaptureShown(nint hwnd)
+    {
+        if (!GetWindowRect(hwnd, out var r)) throw new InvalidOperationException($"HARNESS: GetWindowRect: {Marshal.GetLastWin32Error()}");
+        var status = DwmGetWindowAttribute(hwnd, DwmExtendedFrameBounds, out var shown, sizeof(NativeRect));
+        if (status != 0) throw new InvalidOperationException($"HARNESS: DwmGetWindowAttribute: 0x{status:X}");
+        var shot = Capture(hwnd);
+        var picture = Picture.Filled(shown.Width, shown.Height, new Rgb(128, 128, 128));
+        for (var y = 0; y < shown.Height; y++)
+            Buffer.BlockCopy(shot.Bgra, ((y + shown.Top - r.Top) * shot.Width + shown.Left - r.Left) * 4, picture.Bgra, y * picture.Width * 4, shown.Width * 4);
+        return picture;
+    }
+
+    public static nint WindowAt(int x, int y) => WindowFromPoint(new NativePoint { X = x, Y = y });
+
+    /// True when `upper` is above `lower` in the window order.
+    public static bool IsAbove(nint upper, nint lower)
+    {
+        const uint Next = 2;
+        for (var at = GetWindow(upper, Next); at != 0; at = GetWindow(at, Next))
+            if (at == lower) return true;
+        return false;
+    }
+
     /// All of the app's visible windows, bottom first, painted over each other in the
     /// main window's frame: what the app shows, and nothing of any other program.
     public static Picture CaptureApp(int pid)
@@ -225,9 +250,12 @@ public static unsafe partial class Win32
     public static Rgb? ScreenPixelOf(nint window, int x, int y, out string coveredBy)
     {
         coveredBy = "";
-        var there = WindowFromPoint(new NativePoint { X = x, Y = y });
-        if (there != window)
+        // The space around the point too: a real run read #6A402C for #834F36 beside another
+        // program's window, whose shadow has no hit test to show it.
+        foreach (var (dx, dy) in Around)
         {
+            var there = WindowFromPoint(new NativePoint { X = x + dx, Y = y + dy });
+            if (there == window) continue;
             coveredBy = ClassOf(there);
             return null;
         }
@@ -238,22 +266,56 @@ public static unsafe partial class Win32
         return new Rgb((byte)value, (byte)(value >> 8), (byte)(value >> 16));
     }
 
-    /// One pixel from the screen, read only when the app's window or one of its children is at
-    /// that point. A canvas held back until its first frame is not there, and the stage is.
-    public static Rgb? ScreenPixelInApp(nint main, int x, int y, out string coveredBy)
+    /// How far from a point Windows must say the app's window is there too. Another window's
+    /// shadow falls on the app with no hit test to show it, and it reads as a wrong color. A
+    /// real read: #1D1D1D beside a Windows Terminal on the #1E1E1E stage.
+    const int ShadowReach = 64;
+
+    static readonly (int X, int Y)[] Around = [(0, 0), (-ShadowReach, 0), (ShadowReach, 0), (0, -ShadowReach), (0, ShadowReach)];
+
+    /// The app's window or one of its children is at this point and all around it. `foreign`
+    /// says that what is there belongs to another program.
+    static bool AppHolds(nint main, int x, int y, out string coveredBy, out bool foreign)
     {
         coveredBy = "";
-        var there = WindowFromPoint(new NativePoint { X = x, Y = y });
-        if (there != main && !IsChild(main, there))
+        foreign = false;
+        foreach (var (dx, dy) in Around)
         {
+            var there = WindowFromPoint(new NativePoint { X = x + dx, Y = y + dy });
+            if (there == main || IsChild(main, there)) continue;
             coveredBy = ClassOf(there);
-            return null;
+            GetWindowThreadProcessId(main, out var mine);
+            GetWindowThreadProcessId(there, out var theirs);
+            foreign = mine != theirs;
+            return false;
         }
+        return true;
+    }
+
+    /// One pixel from the screen, read only when the app holds that point and the space around
+    /// it, before and after the read, because the read itself waits for the desktop and another
+    /// window can arrive meanwhile. A canvas held back until its first frame is not there, and
+    /// the stage is. Holding a pixel does not mean the app has painted it.
+    public static Rgb? ScreenPixelInApp(nint main, int x, int y, out string coveredBy, out bool foreign)
+    {
+        if (!AppHolds(main, x, y, out coveredBy, out foreign)) return null;
         var screen = GetDC(0);
         if (screen == 0) throw new InvalidOperationException("HARNESS: GetDC");
         var value = GetPixel(screen, x, y);
         ReleaseDC(0, screen);
+        if (!AppHolds(main, x, y, out coveredBy, out foreign)) return null;
         return new Rgb((byte)value, (byte)(value >> 8), (byte)(value >> 16));
+    }
+
+    /// Holds a window above every other program, with no focus change, while the harness reads
+    /// its pixels. Other sessions' windows on this PC can otherwise cover every read point.
+    public static void HoldOnTop(nint hwnd, bool on)
+    {
+        const nint TopMost = -1, NotTopMost = -2;
+        // Async, so a busy app does not hold the harness past the reads of its first moments.
+        const uint NoSize = 1, NoMove = 2, NoActivate = 0x10, Async = 0x4000;
+        if (!SetWindowPos(hwnd, on ? TopMost : NotTopMost, 0, 0, 0, 0, NoSize | NoMove | NoActivate | Async))
+            throw new InvalidOperationException($"HARNESS: SetWindowPos: {Marshal.GetLastWin32Error()}");
     }
 
     /// Puts the app above other programs and leaves the focus where it is.

@@ -1,7 +1,7 @@
 // The four floating panels as top-level tool windows owned by the main window, as the
 // Mac's are separate windows (PanelManager.swift). The native canvas cannot have Avalonia
-// controls drawn over it, and an owned window can sit over it. The panels are empty until
-// W8 and W9. Each keeps the system frame, its shadow and its resize edges.
+// controls drawn over it, and an owned window can sit over it. History and Layers have their
+// lists from W8. Each keeps the system frame, its shadow and its resize edges.
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Automation;
@@ -40,6 +40,10 @@ public sealed partial class PanelWindow : Window
     public event Action<PanelWindow>? HideRequested;
 
     bool _ending;
+    readonly Func<Palette, Control?>? _makeBody;
+
+    /// What the panel shows under its title row, built again on a theme change.
+    public Control? Body { get; private set; }
 
     /// The app is ending: this close is real, even for a hidden panel.
     public void End()
@@ -48,9 +52,10 @@ public sealed partial class PanelWindow : Window
         Close();
     }
 
-    public PanelWindow(CatalogPanel panel, Palette palette)
+    public PanelWindow(CatalogPanel panel, Palette palette, Func<Palette, Control?>? makeBody = null)
     {
         Panel = panel;
+        _makeBody = makeBody;
         Name = "Panel" + panel.Title;
         Title = panel.Title;
         var size = PanelLayout.DefaultSize(panel.Id);
@@ -111,6 +116,14 @@ public sealed partial class PanelWindow : Window
 
         var root = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
         root.Children.Add(row);
+        Body = _makeBody?.Invoke(p);
+        if (Body is not null)
+        {
+            Grid.SetRow(Body, 1);
+            // The outline sits over the edge pixels.
+            Body.Margin = new Thickness(1, 0, 1, 1);
+            root.Children.Add(Body);
+        }
         Content = new Grid
         {
             Children =
@@ -177,7 +190,13 @@ public sealed class PanelManager
         Screens = OwnerScreens;
         foreach (var panel in panels)
         {
-            var window = new PanelWindow(panel, palette);
+            Func<Palette, Control?>? body = panel.Id switch
+            {
+                PanelLayout.History => look => new HistoryPanel(look, Context),
+                PanelLayout.Layers => look => new LayersPanel(look, Context),
+                _ => null,
+            };
+            var window = new PanelWindow(panel, palette, body);
             window.HideRequested += p => SetShown(p.Panel.Id, false);
             window.PositionChanged += (_, _) => Fatal.Guard("PANEL_MOVED", () =>
             {
@@ -191,6 +210,18 @@ public sealed class PanelManager
     }
 
     public IReadOnlyDictionary<string, PanelWindow> Panels => _panels;
+
+    /// What History and Layers work on. Set it, then call ReloadPanels.
+    public PanelContext Context { get; } = new();
+    public HistoryPanel History => (HistoryPanel)(_panels[PanelLayout.History].Body ?? throw new InvalidOperationException("PANEL: History has no list"));
+    public LayersPanel Layers => (LayersPanel)(_panels[PanelLayout.Layers].Body ?? throw new InvalidOperationException("PANEL: Layers has no list"));
+
+    public void ReloadPanels()
+    {
+        History.Reload();
+        Layers.Reload();
+    }
+
     public bool IsShown(string id) => _shown.Contains(id);
     public bool AnyActive => _panels.Values.Any(p => p.IsActive);
 

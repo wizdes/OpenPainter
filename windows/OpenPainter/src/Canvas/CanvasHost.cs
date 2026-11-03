@@ -91,6 +91,9 @@ public sealed unsafe class CanvasHost : NativeControlHost
     bool _leaveTracked;
     nint _holder;
 
+    /// A test plant: the window keeps its old fault and shows black until the first frame.
+    public bool TestNoClip { get; init; }
+
     /// Until the engine's first frame this window has nothing to show, so it shows black. A
     /// plain Win32 fill does not help: a real run still read black on the screen. Avalonia's
     /// main window has WS_EX_NOREDIRECTIONBITMAP, so it keeps no surface for GDI to reach. So
@@ -171,7 +174,7 @@ public sealed unsafe class CanvasHost : NativeControlHost
         Hwnd = CreateWindowExW(0, ClassName, "Canvas", WsChild | WsVisible | WsTabStop, 0, 0, 100, 100, parent.Handle, 0, instance, 0);
         if (Hwnd == 0) throw new InvalidOperationException($"CANVAS_HWND: {Marshal.GetLastWin32Error()}");
         _holder = parent.Handle;
-        ClipAway();
+        if (!TestNoClip) ClipAway();
         return new PlatformHandle(Hwnd, "HWND");
     }
 

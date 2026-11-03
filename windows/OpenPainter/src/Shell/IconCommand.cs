@@ -13,14 +13,16 @@ public sealed class IconCommand : Button
     readonly Palette _palette;
     readonly string _icon;
     readonly double _target, _iconSize;
+    readonly Color? _ink;
     bool _on;
 
     protected override Type StyleKeyOverride => typeof(Button);
 
     public IconCommand(Palette palette, string icon, string name, string? tooltip = null,
-        double target = Tokens.CommandTarget, double iconSize = Tokens.IconSize, bool on = false, bool enabled = true)
+        double target = Tokens.CommandTarget, double iconSize = Tokens.IconSize, bool on = false, bool enabled = true, Color? ink = null)
     {
         _palette = palette;
+        _ink = ink;
         _icon = icon;
         _target = target;
         _iconSize = iconSize;
@@ -61,5 +63,5 @@ public sealed class IconCommand : Button
         if (change.Property == IsEnabledProperty) Redraw();
     }
 
-    void Redraw() => Content = Ui.IconButton(_palette, _icon, IsEnabled ? _palette.Ink : _palette.Disabled, _target, _iconSize, _on);
+    void Redraw() => Content = Ui.IconButton(_palette, _icon, IsEnabled ? _ink ?? _palette.Ink : _palette.Disabled, _target, _iconSize, _on);
 }
