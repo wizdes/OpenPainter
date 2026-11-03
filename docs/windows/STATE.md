@@ -21,7 +21,8 @@ Branch `windows`, worktree `Projects/OpenPainter-windows`. Plan: `PLAN.md`.
 - [x] W5: UI stack test. Avalonia chosen, see `decisions.md`. The engine draws the Mac's overlay set at 60 fps. NOT RUN: Narrator heard by a person, a real dead key, a real pen.
 - [ ] W6: Windows look and icons. 12 renders, 240 icon rows, 42 tests pass. Built by a native Opus builder, because Sol reached its usage limit. Fresh Opus critique done and fixed. OPEN: the Astra critique, NOT RUN until the limit ends on 2026-11-04 21:32. NOT RUN: a real window, 100% scale. See `w6-look.md`.
 - [x] W7: app shell and canvas, closed 2026-11-03 on headless checks (PLAN 4.2). Built in 3 stages and 2 fix rounds by native Opus builders, because Sol reached its usage limit. One fresh Opus review; Astra NOT RUN. Results: `w7-shell.md`. Diagram: `../diagrams/w7-windows-app.html`. NOT RUN: the pan on a quiet PC, 200% scale, a real mouse. Open: `launch paint` is unreliable.
-- [ ] W8 to W20: see `PLAN.md`
+- [ ] W8: panels and shortcuts. PAUSED by the user on 2026-11-03, not closed. Stages 1 to 3 and the fix round are committed: 634 app tests pass, 508 AOT headless tests pass, 12 flows named, 16 shortcut differences written. Mac engine tests at `0b440b6`: 810 passed, 0 failed, 8 ignored. Owed: `--tier milestone` on the tip, `--tier window` on a quiet PC, root's look at each panel shot, results in `w8-panels.md`, diagram, report page, Astra review.
+- [ ] W9 to W20: see `PLAN.md`
 
 ## Open items
 
