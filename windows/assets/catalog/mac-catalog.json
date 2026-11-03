@@ -1,0 +1,2074 @@
+{
+  "menus": [
+    {
+      "items": [
+        {
+          "action": "selector:orderFrontStandardAboutPanel:",
+          "icon": "app-about",
+          "kind": "item",
+          "off": false,
+          "path": "OpenPainter > About OpenPainter",
+          "title": "About OpenPainter"
+        },
+        {
+          "kind": "separator",
+          "path": "OpenPainter > ---"
+        },
+        {
+          "action": "selector:showSettings:",
+          "icon": "app-settings",
+          "kind": "item",
+          "off": false,
+          "path": "OpenPainter > Settings…",
+          "shortcut": "⌘,",
+          "title": "Settings…"
+        },
+        {
+          "kind": "separator",
+          "path": "OpenPainter > ---"
+        },
+        {
+          "action": "selector:hide:",
+          "kind": "item",
+          "off": false,
+          "path": "OpenPainter > Hide OpenPainter",
+          "shortcut": "⌘H",
+          "title": "Hide OpenPainter"
+        },
+        {
+          "action": "selector:hideOtherApplications:",
+          "kind": "item",
+          "off": false,
+          "path": "OpenPainter > Hide Others",
+          "shortcut": "⌥⌘H",
+          "title": "Hide Others"
+        },
+        {
+          "action": "selector:unhideAllApplications:",
+          "kind": "item",
+          "off": false,
+          "path": "OpenPainter > Show All",
+          "title": "Show All"
+        },
+        {
+          "kind": "separator",
+          "path": "OpenPainter > ---"
+        },
+        {
+          "action": "selector:terminate:",
+          "icon": "app-exit",
+          "kind": "item",
+          "off": false,
+          "path": "OpenPainter > Quit OpenPainter",
+          "shortcut": "⌘Q",
+          "title": "Quit OpenPainter"
+        }
+      ],
+      "kind": "menu",
+      "path": "OpenPainter",
+      "title": "OpenPainter"
+    },
+    {
+      "items": [
+        {
+          "action": "selector:newDocument:",
+          "icon": "cmd-new",
+          "kind": "item",
+          "off": false,
+          "path": "File > New…",
+          "shortcut": "⌘N",
+          "title": "New…"
+        },
+        {
+          "action": "selector:openDocument:",
+          "icon": "cmd-open",
+          "kind": "item",
+          "off": false,
+          "path": "File > Open…",
+          "shortcut": "⌘O",
+          "title": "Open…"
+        },
+        {
+          "items": [
+            {
+              "action": "selector:clearRecentDocuments:",
+              "icon": "menu-clear",
+              "kind": "item",
+              "off": false,
+              "path": "File > Open Recent > Clear Menu",
+              "title": "Clear Menu"
+            }
+          ],
+          "kind": "menu",
+          "path": "File > Open Recent",
+          "title": "Open Recent"
+        },
+        {
+          "items": [
+            {
+              "action": "none",
+              "kind": "item",
+              "off": true,
+              "path": "File > Acquire > From Scanner or Camera…",
+              "title": "From Scanner or Camera…"
+            }
+          ],
+          "kind": "menu",
+          "path": "File > Acquire",
+          "title": "Acquire"
+        },
+        {
+          "kind": "separator",
+          "path": "File > ---"
+        },
+        {
+          "action": "selector:save:",
+          "icon": "cmd-save",
+          "kind": "item",
+          "off": false,
+          "path": "File > Save",
+          "shortcut": "⌘S",
+          "title": "Save"
+        },
+        {
+          "action": "selector:saveAs:",
+          "icon": "cmd-save-as",
+          "kind": "item",
+          "off": false,
+          "path": "File > Save As…",
+          "shortcut": "⇧⌘S",
+          "title": "Save As…"
+        },
+        {
+          "action": "selector:saveTo:",
+          "kind": "item",
+          "off": false,
+          "path": "File > Save a Copy…",
+          "title": "Save a Copy…"
+        },
+        {
+          "action": "selector:saveAllDocuments:",
+          "icon": "cmd-save-all",
+          "kind": "item",
+          "off": false,
+          "path": "File > Save All",
+          "shortcut": "⌥⌘S",
+          "title": "Save All"
+        },
+        {
+          "action": "selector:revertToSaved:",
+          "kind": "item",
+          "off": false,
+          "path": "File > Revert to Saved",
+          "title": "Revert to Saved"
+        },
+        {
+          "kind": "separator",
+          "path": "File > ---"
+        },
+        {
+          "action": "selector:performClose:",
+          "icon": "cmd-close-image",
+          "kind": "item",
+          "off": false,
+          "path": "File > Close",
+          "shortcut": "⌘W",
+          "title": "Close"
+        }
+      ],
+      "kind": "menu",
+      "path": "File",
+      "title": "File"
+    },
+    {
+      "items": [
+        {
+          "action": "selector:undo:",
+          "icon": "cmd-undo",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Undo",
+          "shortcut": "⌘Z",
+          "title": "Undo"
+        },
+        {
+          "action": "selector:redo:",
+          "icon": "cmd-redo",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Redo",
+          "shortcut": "⇧⌘Z",
+          "title": "Redo"
+        },
+        {
+          "kind": "separator",
+          "path": "Edit > ---"
+        },
+        {
+          "action": "selector:cut:",
+          "icon": "cmd-cut",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Cut",
+          "shortcut": "⌘X",
+          "title": "Cut"
+        },
+        {
+          "action": "selector:copy:",
+          "icon": "cmd-copy",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Copy",
+          "shortcut": "⌘C",
+          "title": "Copy"
+        },
+        {
+          "action": "selector:copyMerged:",
+          "icon": "edit-copy-merged",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Copy Merged",
+          "shortcut": "⇧⌘C",
+          "title": "Copy Merged"
+        },
+        {
+          "action": "selector:paste:",
+          "icon": "cmd-paste",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Paste",
+          "shortcut": "⌘V",
+          "title": "Paste"
+        },
+        {
+          "action": "selector:pasteIntoNewLayer:",
+          "icon": "edit-paste-new-layer",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Paste into New Layer",
+          "shortcut": "⇧⌘V",
+          "title": "Paste into New Layer"
+        },
+        {
+          "action": "selector:pasteIntoNewImage:",
+          "icon": "edit-paste-new-image",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Paste into New Image",
+          "shortcut": "⌥⌘V",
+          "title": "Paste into New Image"
+        },
+        {
+          "kind": "separator",
+          "path": "Edit > ---"
+        },
+        {
+          "action": "selector:copySelection:",
+          "icon": "edit-copy-selection",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Copy Selection",
+          "shortcut": "⌥⇧⌘C",
+          "title": "Copy Selection"
+        },
+        {
+          "items": [
+            {
+              "action": "selector:pasteSelection:",
+              "icon": "edit-paste-replace",
+              "kind": "item",
+              "off": false,
+              "path": "Edit > Paste Selection > Replace",
+              "shortcut": "⌥⇧⌘V",
+              "title": "Replace"
+            },
+            {
+              "action": "selector:pasteSelection:",
+              "icon": "edit-paste-add",
+              "kind": "item",
+              "off": false,
+              "path": "Edit > Paste Selection > Add (union)",
+              "title": "Add (union)"
+            },
+            {
+              "action": "selector:pasteSelection:",
+              "icon": "edit-paste-exclude",
+              "kind": "item",
+              "off": false,
+              "path": "Edit > Paste Selection > Exclude",
+              "title": "Exclude"
+            },
+            {
+              "action": "selector:pasteSelection:",
+              "icon": "edit-paste-intersect",
+              "kind": "item",
+              "off": false,
+              "path": "Edit > Paste Selection > Intersect",
+              "title": "Intersect"
+            },
+            {
+              "action": "selector:pasteSelection:",
+              "kind": "item",
+              "off": false,
+              "path": "Edit > Paste Selection > Invert (\"xor\")",
+              "title": "Invert (\"xor\")"
+            }
+          ],
+          "kind": "menu",
+          "path": "Edit > Paste Selection",
+          "title": "Paste Selection"
+        },
+        {
+          "kind": "separator",
+          "path": "Edit > ---"
+        },
+        {
+          "action": "selector:eraseSelection:",
+          "icon": "edit-erase-selection",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Erase Selection",
+          "shortcut": "⌫",
+          "title": "Erase Selection"
+        },
+        {
+          "action": "selector:fillSelection:",
+          "icon": "edit-fill",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Fill Selection",
+          "shortcut": "⇧⌫",
+          "title": "Fill Selection"
+        },
+        {
+          "action": "command:selection.invert",
+          "icon": "edit-invert-selection",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Invert Selection",
+          "shortcut": "⌘I",
+          "title": "Invert Selection"
+        },
+        {
+          "action": "selector:showExpandSelection:",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Expand Selection…",
+          "title": "Expand Selection…"
+        },
+        {
+          "action": "selector:selectAll:",
+          "icon": "edit-select-all",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Select All",
+          "shortcut": "⌘A",
+          "title": "Select All"
+        },
+        {
+          "action": "command:selection.deselect",
+          "icon": "cmd-deselect",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Deselect",
+          "shortcut": "⌘D",
+          "title": "Deselect"
+        },
+        {
+          "kind": "separator",
+          "path": "Edit > ---"
+        },
+        {
+          "action": "effect:effect.fill.content_aware",
+          "kind": "item",
+          "off": false,
+          "path": "Edit > Content-Aware Fill",
+          "title": "Content-Aware Fill"
+        }
+      ],
+      "kind": "menu",
+      "path": "Edit",
+      "title": "Edit"
+    },
+    {
+      "items": [
+        {
+          "action": "selector:zoomIn:",
+          "icon": "view-zoom-in",
+          "kind": "item",
+          "off": false,
+          "path": "View > Zoom In",
+          "shortcut": "⌘=",
+          "title": "Zoom In"
+        },
+        {
+          "action": "selector:zoomOut:",
+          "icon": "view-zoom-out",
+          "kind": "item",
+          "off": false,
+          "path": "View > Zoom Out",
+          "shortcut": "⌘-",
+          "title": "Zoom Out"
+        },
+        {
+          "action": "selector:zoomToWindow:",
+          "icon": "view-zoom-fit",
+          "kind": "item",
+          "off": false,
+          "path": "View > Zoom to Window",
+          "shortcut": "⌘B",
+          "title": "Zoom to Window"
+        },
+        {
+          "action": "selector:zoomToSelection:",
+          "icon": "view-zoom-selection",
+          "kind": "item",
+          "off": false,
+          "path": "View > Zoom to Selection",
+          "shortcut": "⇧⌘B",
+          "title": "Zoom to Selection"
+        },
+        {
+          "action": "selector:actualSize:",
+          "icon": "view-actual-size",
+          "kind": "item",
+          "off": false,
+          "path": "View > Actual Size",
+          "shortcut": "⌘0",
+          "title": "Actual Size"
+        },
+        {
+          "items": [
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 3200%",
+              "title": "3200%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 2400%",
+              "title": "2400%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 1600%",
+              "title": "1600%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 1200%",
+              "title": "1200%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 800%",
+              "title": "800%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 700%",
+              "title": "700%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 600%",
+              "title": "600%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 500%",
+              "title": "500%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 400%",
+              "title": "400%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 300%",
+              "title": "300%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 200%",
+              "title": "200%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 100%",
+              "title": "100%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 66%",
+              "title": "66%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 50%",
+              "title": "50%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 33%",
+              "title": "33%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 25%",
+              "title": "25%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 16%",
+              "title": "16%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 12%",
+              "title": "12%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 8%",
+              "title": "8%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 6%",
+              "title": "6%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 5%",
+              "title": "5%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 4%",
+              "title": "4%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 3%",
+              "title": "3%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 2%",
+              "title": "2%"
+            },
+            {
+              "action": "selector:zoomToPreset:",
+              "kind": "item",
+              "off": false,
+              "path": "View > Zoom Presets > 1%",
+              "title": "1%"
+            }
+          ],
+          "kind": "menu",
+          "path": "View > Zoom Presets",
+          "title": "Zoom Presets"
+        },
+        {
+          "kind": "separator",
+          "path": "View > ---"
+        },
+        {
+          "action": "selector:togglePixelGrid:",
+          "icon": "view-pixel-grid",
+          "kind": "item",
+          "off": false,
+          "path": "View > Pixel Grid",
+          "shortcut": "⌘'",
+          "title": "Pixel Grid"
+        },
+        {
+          "action": "selector:toggleRulers:",
+          "icon": "view-rulers",
+          "kind": "item",
+          "off": false,
+          "path": "View > Rulers",
+          "shortcut": "⌥⌘R",
+          "title": "Rulers"
+        },
+        {
+          "kind": "separator",
+          "path": "View > ---"
+        },
+        {
+          "action": "selector:setUnits:",
+          "kind": "item",
+          "off": false,
+          "path": "View > Pixels",
+          "title": "Pixels"
+        },
+        {
+          "action": "selector:setUnits:",
+          "kind": "item",
+          "off": false,
+          "path": "View > Inches",
+          "title": "Inches"
+        },
+        {
+          "action": "selector:setUnits:",
+          "kind": "item",
+          "off": false,
+          "path": "View > Centimeters",
+          "title": "Centimeters"
+        }
+      ],
+      "kind": "menu",
+      "path": "View",
+      "title": "View"
+    },
+    {
+      "items": [
+        {
+          "action": "command:image.crop_to_selection",
+          "icon": "cmd-crop",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Crop to Selection",
+          "shortcut": "⇧⌘X",
+          "title": "Crop to Selection"
+        },
+        {
+          "action": "selector:showCropTool:",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Crop Tool",
+          "title": "Crop Tool"
+        },
+        {
+          "action": "selector:showResizeImage:",
+          "icon": "image-resize",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Resize…",
+          "shortcut": "⌘R",
+          "title": "Resize…"
+        },
+        {
+          "action": "selector:showCanvasSize:",
+          "icon": "image-canvas-size",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Canvas Size…",
+          "shortcut": "⇧⌘R",
+          "title": "Canvas Size…"
+        },
+        {
+          "kind": "separator",
+          "path": "Image > ---"
+        },
+        {
+          "action": "command:image.flip_horizontal",
+          "icon": "image-flip-horizontal",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Flip Horizontal",
+          "title": "Flip Horizontal"
+        },
+        {
+          "action": "command:image.flip_vertical",
+          "icon": "image-flip-vertical",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Flip Vertical",
+          "title": "Flip Vertical"
+        },
+        {
+          "kind": "separator",
+          "path": "Image > ---"
+        },
+        {
+          "action": "command:image.rotate_90_cw",
+          "icon": "image-rotate-right",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Rotate 90° Clockwise",
+          "title": "Rotate 90° Clockwise"
+        },
+        {
+          "action": "command:image.rotate_90_ccw",
+          "icon": "image-rotate-left",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Rotate 90° Counter-Clockwise",
+          "shortcut": "⌘G",
+          "title": "Rotate 90° Counter-Clockwise"
+        },
+        {
+          "action": "command:image.rotate_180",
+          "icon": "image-rotate-180",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Rotate 180°",
+          "shortcut": "⌘J",
+          "title": "Rotate 180°"
+        },
+        {
+          "kind": "separator",
+          "path": "Image > ---"
+        },
+        {
+          "action": "selector:showColorProfile:",
+          "icon": "image-color-profile",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Color Profile…",
+          "title": "Color Profile…"
+        },
+        {
+          "kind": "separator",
+          "path": "Image > ---"
+        },
+        {
+          "action": "command:image.flatten",
+          "icon": "image-flatten",
+          "kind": "item",
+          "off": false,
+          "path": "Image > Flatten",
+          "shortcut": "⇧⌘F",
+          "title": "Flatten"
+        }
+      ],
+      "kind": "menu",
+      "path": "Image",
+      "title": "Image"
+    },
+    {
+      "items": [
+        {
+          "action": "selector:addLayer:",
+          "icon": "layer-add",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Add New Layer",
+          "shortcut": "⇧⌘N",
+          "title": "Add New Layer"
+        },
+        {
+          "action": "command:layer.delete",
+          "icon": "layer-delete",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Delete Layer",
+          "shortcut": "⇧⌘⌫",
+          "title": "Delete Layer"
+        },
+        {
+          "action": "command:layer.duplicate",
+          "icon": "layer-duplicate",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Duplicate Layer",
+          "shortcut": "⇧⌘D",
+          "title": "Duplicate Layer"
+        },
+        {
+          "action": "command:layer.merge_down",
+          "icon": "layer-merge-down",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Merge Layer Down",
+          "title": "Merge Layer Down"
+        },
+        {
+          "action": "selector:toggleLayerVisibility:",
+          "icon": "layer-visible",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Toggle Layer Visibility",
+          "title": "Toggle Layer Visibility"
+        },
+        {
+          "action": "selector:importLayerFromFile:",
+          "icon": "layer-import",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Import From File…",
+          "title": "Import From File…"
+        },
+        {
+          "kind": "separator",
+          "path": "Layers > ---"
+        },
+        {
+          "action": "command:layer.flip_horizontal",
+          "icon": "image-flip-horizontal",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Flip Horizontal",
+          "title": "Flip Horizontal"
+        },
+        {
+          "action": "command:layer.flip_vertical",
+          "icon": "image-flip-vertical",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Flip Vertical",
+          "title": "Flip Vertical"
+        },
+        {
+          "action": "command:layer.rotate_180",
+          "icon": "image-rotate-180",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Rotate 180°",
+          "title": "Rotate 180°"
+        },
+        {
+          "action": "effect:effect.layers.rotate_zoom",
+          "icon": "layer-rotate-zoom",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Rotate / Zoom…",
+          "title": "Rotate / Zoom…"
+        },
+        {
+          "items": [
+            {
+              "action": "selector:selectForeground:",
+              "kind": "item",
+              "off": false,
+              "path": "Layers > Remove Background > Select Foreground",
+              "title": "Select Foreground"
+            },
+            {
+              "action": "selector:removeBackground:",
+              "kind": "item",
+              "off": false,
+              "path": "Layers > Remove Background > Remove Background",
+              "title": "Remove Background"
+            }
+          ],
+          "kind": "menu",
+          "path": "Layers > Remove Background",
+          "title": "Remove Background"
+        },
+        {
+          "kind": "separator",
+          "path": "Layers > ---"
+        },
+        {
+          "action": "selector:goToLayer:",
+          "icon": "layer-go-top",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Go to Top Layer",
+          "shortcut": "⌥⌘PageUp",
+          "title": "Go to Top Layer"
+        },
+        {
+          "action": "selector:goToLayer:",
+          "icon": "arrow-up",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Go to Layer Above",
+          "shortcut": "⌥PageUp",
+          "title": "Go to Layer Above"
+        },
+        {
+          "action": "selector:goToLayer:",
+          "icon": "arrow-down",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Go to Layer Below",
+          "shortcut": "⌥PageDown",
+          "title": "Go to Layer Below"
+        },
+        {
+          "action": "selector:goToLayer:",
+          "icon": "layer-go-bottom",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Go to Bottom Layer",
+          "shortcut": "⌥⌘PageDown",
+          "title": "Go to Bottom Layer"
+        },
+        {
+          "kind": "separator",
+          "path": "Layers > ---"
+        },
+        {
+          "action": "selector:moveLayerToTop:",
+          "icon": "layer-move-top",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Move Layer to Top",
+          "title": "Move Layer to Top"
+        },
+        {
+          "action": "command:layer.move_up",
+          "icon": "layer-move-up",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Move Layer Up",
+          "title": "Move Layer Up"
+        },
+        {
+          "action": "command:layer.move_down",
+          "icon": "layer-move-down",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Move Layer Down",
+          "title": "Move Layer Down"
+        },
+        {
+          "action": "selector:moveLayerToBottom:",
+          "icon": "layer-move-bottom",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Move Layer to Bottom",
+          "title": "Move Layer to Bottom"
+        },
+        {
+          "kind": "separator",
+          "path": "Layers > ---"
+        },
+        {
+          "action": "selector:showLayerProperties:",
+          "icon": "layer-properties",
+          "kind": "item",
+          "off": false,
+          "path": "Layers > Layer Properties…",
+          "shortcut": "F4",
+          "title": "Layer Properties…"
+        }
+      ],
+      "kind": "menu",
+      "path": "Layers",
+      "title": "Layers"
+    },
+    {
+      "items": [
+        {
+          "action": "effect:effect.adjust.auto_level",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Auto-Level",
+          "shortcut": "⇧⌘L",
+          "title": "Auto-Level"
+        },
+        {
+          "action": "effect:effect.adjust.black_and_white",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Black and White",
+          "shortcut": "⇧⌘G",
+          "title": "Black and White"
+        },
+        {
+          "action": "effect:effect.adjust.brightness_contrast",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Brightness / Contrast",
+          "shortcut": "⇧⌘T",
+          "title": "Brightness / Contrast"
+        },
+        {
+          "action": "effect:effect.adjust.curves",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Curves",
+          "shortcut": "⇧⌘M",
+          "title": "Curves"
+        },
+        {
+          "action": "effect:effect.adjust.exposure",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Exposure",
+          "title": "Exposure"
+        },
+        {
+          "action": "effect:effect.adjust.highlights_shadows",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Highlights / Shadows",
+          "title": "Highlights / Shadows"
+        },
+        {
+          "action": "effect:effect.adjust.hue_saturation",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Hue / Saturation",
+          "shortcut": "⇧⌘U",
+          "title": "Hue / Saturation"
+        },
+        {
+          "action": "effect:effect.adjust.invert_alpha",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Invert Alpha",
+          "shortcut": "⌥⌘I",
+          "title": "Invert Alpha"
+        },
+        {
+          "action": "effect:effect.adjust.invert_colors",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Invert Colors",
+          "shortcut": "⇧⌘I",
+          "title": "Invert Colors"
+        },
+        {
+          "action": "effect:effect.adjust.levels",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Levels",
+          "shortcut": "⌘L",
+          "title": "Levels"
+        },
+        {
+          "action": "effect:effect.adjust.posterize",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Posterize",
+          "shortcut": "⇧⌘P",
+          "title": "Posterize"
+        },
+        {
+          "action": "effect:effect.adjust.sepia",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Sepia",
+          "shortcut": "⇧⌘E",
+          "title": "Sepia"
+        },
+        {
+          "action": "effect:effect.adjust.temperature_tint",
+          "kind": "item",
+          "off": false,
+          "path": "Adjustments > Temperature and Tint",
+          "title": "Temperature and Tint"
+        }
+      ],
+      "kind": "menu",
+      "path": "Adjustments",
+      "title": "Adjustments"
+    },
+    {
+      "items": [
+        {
+          "action": "selector:repeatEffect:",
+          "icon": "effect-repeat",
+          "kind": "item",
+          "off": false,
+          "path": "Effects > Repeat Effect",
+          "shortcut": "⌘F",
+          "title": "Repeat Effect"
+        },
+        {
+          "kind": "separator",
+          "path": "Effects > ---"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.artistic.ink_sketch",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Artistic > Ink Sketch",
+              "title": "Ink Sketch"
+            },
+            {
+              "action": "effect:effect.artistic.oil_painting",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Artistic > Oil Painting",
+              "title": "Oil Painting"
+            },
+            {
+              "action": "effect:effect.artistic.pencil_sketch",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Artistic > Pencil Sketch",
+              "title": "Pencil Sketch"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Artistic",
+          "title": "Artistic"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.blur.bokeh",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Bokeh Blur",
+              "title": "Bokeh Blur"
+            },
+            {
+              "action": "effect:effect.blur.fragment",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Fragment Blur",
+              "title": "Fragment Blur"
+            },
+            {
+              "action": "effect:effect.blur.gaussian",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Gaussian Blur",
+              "title": "Gaussian Blur"
+            },
+            {
+              "action": "effect:effect.blur.median",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Median Blur",
+              "title": "Median Blur"
+            },
+            {
+              "action": "effect:effect.blur.motion",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Motion Blur",
+              "title": "Motion Blur"
+            },
+            {
+              "action": "effect:effect.blur.radial",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Radial Blur",
+              "title": "Radial Blur"
+            },
+            {
+              "action": "effect:effect.blur.sketch",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Sketch Blur",
+              "title": "Sketch Blur"
+            },
+            {
+              "action": "effect:effect.blur.square",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Square Blur",
+              "title": "Square Blur"
+            },
+            {
+              "action": "effect:effect.blur.surface",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Surface Blur",
+              "title": "Surface Blur"
+            },
+            {
+              "action": "effect:effect.blur.unfocus",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Unfocus",
+              "title": "Unfocus"
+            },
+            {
+              "action": "effect:effect.blur.zoom",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Blurs > Zoom Blur",
+              "title": "Zoom Blur"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Blurs",
+          "title": "Blurs"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.color.quantize",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Color > Quantize",
+              "title": "Quantize"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Color",
+          "title": "Color"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.distort.bulge",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Bulge",
+              "title": "Bulge"
+            },
+            {
+              "action": "effect:effect.distort.crystalize",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Crystalize",
+              "title": "Crystalize"
+            },
+            {
+              "action": "effect:effect.distort.dents",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Dents",
+              "title": "Dents"
+            },
+            {
+              "action": "effect:effect.distort.frosted_glass",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Frosted Glass",
+              "title": "Frosted Glass"
+            },
+            {
+              "action": "effect:effect.distort.morphology",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Morphology",
+              "title": "Morphology"
+            },
+            {
+              "action": "effect:effect.distort.pixelate",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Pixelate",
+              "title": "Pixelate"
+            },
+            {
+              "action": "effect:effect.distort.polar_inversion",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Polar Inversion",
+              "title": "Polar Inversion"
+            },
+            {
+              "action": "effect:effect.distort.tile_reflection",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Tile Reflection",
+              "title": "Tile Reflection"
+            },
+            {
+              "action": "effect:effect.distort.twist",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Distort > Twist",
+              "title": "Twist"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Distort",
+          "title": "Distort"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.noise.add",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Noise > Add Noise",
+              "title": "Add Noise"
+            },
+            {
+              "action": "effect:effect.noise.reduce",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Noise > Reduce Noise",
+              "title": "Reduce Noise"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Noise",
+          "title": "Noise"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.object.drop_shadow",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Object > Drop Shadow",
+              "title": "Drop Shadow"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Object",
+          "title": "Object"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.photo.glow",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Photo > Glow",
+              "title": "Glow"
+            },
+            {
+              "action": "effect:effect.photo.red_eye_removal",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Photo > Red Eye Removal",
+              "title": "Red Eye Removal"
+            },
+            {
+              "action": "effect:effect.photo.sharpen",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Photo > Sharpen",
+              "title": "Sharpen"
+            },
+            {
+              "action": "effect:effect.photo.soften_portrait",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Photo > Soften Portrait",
+              "title": "Soften Portrait"
+            },
+            {
+              "action": "none",
+              "icon": "effect-straighten",
+              "kind": "item",
+              "off": true,
+              "path": "Effects > Photo > Straighten",
+              "title": "Straighten"
+            },
+            {
+              "action": "effect:effect.photo.vignette",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Photo > Vignette",
+              "title": "Vignette"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Photo",
+          "title": "Photo"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.render.clouds",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Render > Clouds",
+              "title": "Clouds"
+            },
+            {
+              "action": "effect:effect.render.julia_fractal",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Render > Julia Fractal",
+              "title": "Julia Fractal"
+            },
+            {
+              "action": "effect:effect.render.mandelbrot_fractal",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Render > Mandelbrot Fractal",
+              "title": "Mandelbrot Fractal"
+            },
+            {
+              "action": "effect:effect.render.turbulence",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Render > Turbulence",
+              "title": "Turbulence"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Render",
+          "title": "Render"
+        },
+        {
+          "items": [
+            {
+              "action": "effect:effect.stylize.edge_detect",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Stylize > Edge Detect",
+              "title": "Edge Detect"
+            },
+            {
+              "action": "effect:effect.stylize.emboss",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Stylize > Emboss",
+              "title": "Emboss"
+            },
+            {
+              "action": "effect:effect.stylize.outline",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Stylize > Outline",
+              "title": "Outline"
+            },
+            {
+              "action": "effect:effect.stylize.relief",
+              "kind": "item",
+              "off": false,
+              "path": "Effects > Stylize > Relief",
+              "title": "Relief"
+            }
+          ],
+          "kind": "menu",
+          "path": "Effects > Stylize",
+          "title": "Stylize"
+        }
+      ],
+      "kind": "menu",
+      "path": "Effects",
+      "title": "Effects"
+    },
+    {
+      "items": [
+        {
+          "action": "panel:tools",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Tools",
+          "shortcut": "F5",
+          "title": "Tools"
+        },
+        {
+          "action": "panel:history",
+          "kind": "item",
+          "off": false,
+          "path": "Window > History",
+          "shortcut": "F6",
+          "title": "History"
+        },
+        {
+          "action": "panel:layers",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Layers",
+          "shortcut": "F7",
+          "title": "Layers"
+        },
+        {
+          "action": "panel:colors",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Colors",
+          "shortcut": "F8",
+          "title": "Colors"
+        },
+        {
+          "kind": "separator",
+          "path": "Window > ---"
+        },
+        {
+          "action": "reset_panels",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Reset Panel Layout",
+          "title": "Reset Panel Layout"
+        },
+        {
+          "action": "selector:focusNextPanel:",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Next Panel",
+          "shortcut": "⌃`",
+          "title": "Next Panel"
+        },
+        {
+          "action": "selector:focusPreviousPanel:",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Previous Panel",
+          "shortcut": "⌃⇧`",
+          "title": "Previous Panel"
+        },
+        {
+          "kind": "separator",
+          "path": "Window > ---"
+        },
+        {
+          "action": "selector:performMiniaturize:",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Minimize",
+          "shortcut": "⌘M",
+          "title": "Minimize"
+        },
+        {
+          "action": "selector:performZoom:",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Zoom",
+          "title": "Zoom"
+        },
+        {
+          "kind": "separator",
+          "path": "Window > ---"
+        },
+        {
+          "action": "selector:arrangeInFront:",
+          "kind": "item",
+          "off": false,
+          "path": "Window > Bring All to Front",
+          "title": "Bring All to Front"
+        }
+      ],
+      "kind": "menu",
+      "path": "Window",
+      "title": "Window"
+    },
+    {
+      "items": [
+        {
+          "action": "none",
+          "icon": "help-contents",
+          "kind": "item",
+          "off": true,
+          "path": "Help > OpenPainter Help",
+          "shortcut": "⌘?",
+          "title": "OpenPainter Help"
+        },
+        {
+          "kind": "separator",
+          "path": "Help > ---"
+        },
+        {
+          "action": "selector:checkForUpdates:",
+          "kind": "item",
+          "off": false,
+          "path": "Help > Check for Updates…",
+          "title": "Check for Updates…"
+        },
+        {
+          "action": "none",
+          "icon": "help-feedback",
+          "kind": "item",
+          "off": true,
+          "path": "Help > Send Feedback…",
+          "title": "Send Feedback…"
+        }
+      ],
+      "kind": "menu",
+      "path": "Help",
+      "title": "Help"
+    }
+  ],
+  "note": "Written by `opcli dump-catalog` from the Mac app's Swift files. Do not edit by hand.",
+  "panels": [
+    {
+      "icon": "panel-tools",
+      "id": "tools",
+      "shortcut": "F5",
+      "title": "Tools"
+    },
+    {
+      "icon": "panel-history",
+      "id": "history",
+      "shortcut": "F6",
+      "title": "History"
+    },
+    {
+      "icon": "panel-layers",
+      "id": "layers",
+      "shortcut": "F7",
+      "title": "Layers"
+    },
+    {
+      "icon": "panel-colors",
+      "id": "colors",
+      "shortcut": "F8",
+      "title": "Colors"
+    }
+  ],
+  "schema": 1,
+  "shortcuts": [
+    {
+      "action": "Rectangle Select",
+      "mac": "S or ⇧S ×4",
+      "note": "Shared letter: each press picks the next tool",
+      "scope": "Canvas",
+      "win": "S or Shift+S x4"
+    },
+    {
+      "action": "Lasso Select",
+      "mac": "S ×2 or ⇧S ×3",
+      "note": "Shared letter: each press picks the next tool",
+      "scope": "Canvas",
+      "win": "S ×2 or Shift+S x3"
+    },
+    {
+      "action": "Ellipse Select",
+      "mac": "S ×3 or ⇧S ×2",
+      "note": "Shared letter: each press picks the next tool",
+      "scope": "Canvas",
+      "win": "S ×3 or Shift+S x2"
+    },
+    {
+      "action": "Magic Wand",
+      "mac": "S ×4 or ⇧S",
+      "note": "Shared letter: each press picks the next tool",
+      "scope": "Canvas",
+      "win": "S ×4 or Shift+S"
+    },
+    {
+      "action": "Move Selected Pixels",
+      "mac": "M or ⇧M ×2",
+      "note": "Shared letter: each press picks the next tool",
+      "scope": "Canvas",
+      "win": "M or Shift+M x2"
+    },
+    {
+      "action": "Move Selection",
+      "mac": "M ×2 or ⇧M",
+      "note": "Shared letter: each press picks the next tool",
+      "scope": "Canvas",
+      "win": "M ×2 or Shift+M"
+    },
+    {
+      "action": "Zoom",
+      "mac": "Z",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Z"
+    },
+    {
+      "action": "Pan",
+      "mac": "H",
+      "note": "",
+      "scope": "Canvas",
+      "win": "H"
+    },
+    {
+      "action": "Paint Bucket",
+      "mac": "F",
+      "note": "",
+      "scope": "Canvas",
+      "win": "F"
+    },
+    {
+      "action": "Gradient",
+      "mac": "G",
+      "note": "The tool is in the panel but not built yet",
+      "scope": "Canvas",
+      "win": "G"
+    },
+    {
+      "action": "Paintbrush",
+      "mac": "B",
+      "note": "",
+      "scope": "Canvas",
+      "win": "B"
+    },
+    {
+      "action": "Eraser",
+      "mac": "E",
+      "note": "",
+      "scope": "Canvas",
+      "win": "E"
+    },
+    {
+      "action": "Pencil",
+      "mac": "P",
+      "note": "",
+      "scope": "Canvas",
+      "win": "P"
+    },
+    {
+      "action": "Color Picker",
+      "mac": "K",
+      "note": "",
+      "scope": "Canvas",
+      "win": "K"
+    },
+    {
+      "action": "Clone Stamp",
+      "mac": "L",
+      "note": "The tool is in the panel but not built yet",
+      "scope": "Canvas",
+      "win": "L"
+    },
+    {
+      "action": "Recolor",
+      "mac": "R",
+      "note": "The tool is in the panel but not built yet",
+      "scope": "Canvas",
+      "win": "R"
+    },
+    {
+      "action": "Text",
+      "mac": "T",
+      "note": "",
+      "scope": "Canvas",
+      "win": "T"
+    },
+    {
+      "action": "Line / Curve",
+      "mac": "O or ⇧O ×2",
+      "note": "The tool is in the panel but not built yet",
+      "scope": "Canvas",
+      "win": "O or Shift+O x2"
+    },
+    {
+      "action": "Shapes",
+      "mac": "O ×2 or ⇧O",
+      "note": "The tool is in the panel but not built yet",
+      "scope": "Canvas",
+      "win": "O ×2 or Shift+O"
+    },
+    {
+      "action": "Brush width −1",
+      "mac": "[",
+      "note": "",
+      "scope": "Canvas",
+      "win": "["
+    },
+    {
+      "action": "Brush width +1",
+      "mac": "]",
+      "note": "",
+      "scope": "Canvas",
+      "win": "]"
+    },
+    {
+      "action": "Brush width −5",
+      "mac": "⌘[",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Ctrl+["
+    },
+    {
+      "action": "Brush width +5",
+      "mac": "⌘]",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Ctrl+]"
+    },
+    {
+      "action": "Swap primary and secondary colors",
+      "mac": "X",
+      "note": "",
+      "scope": "Canvas",
+      "win": "X"
+    },
+    {
+      "action": "Switch the active color (the notch)",
+      "mac": "C",
+      "note": "",
+      "scope": "Canvas",
+      "win": "C"
+    },
+    {
+      "action": "Pan while held",
+      "mac": "Space",
+      "note": "Hold and drag",
+      "scope": "Canvas",
+      "win": "Space"
+    },
+    {
+      "action": "Nudge the Move tools 1 px",
+      "mac": "Arrows",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Arrows"
+    },
+    {
+      "action": "Nudge the Move tools 10 px",
+      "mac": "⌘Arrows",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Ctrl+Arrows"
+    },
+    {
+      "action": "Cancel a drag, the crop, a move or a fill; finish text; else Deselect",
+      "mac": "Esc",
+      "note": "mac/README.md, Focus rules",
+      "scope": "Canvas",
+      "win": "Esc"
+    },
+    {
+      "action": "Finish the crop, a move or a fill; else Deselect",
+      "mac": "↩",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Enter"
+    },
+    {
+      "action": "Next image",
+      "mac": "⌃Tab",
+      "note": "⌘` also moves between image windows (macOS)",
+      "scope": "Canvas",
+      "win": "Ctrl+Tab or Ctrl+PgDn"
+    },
+    {
+      "action": "Previous image",
+      "mac": "⌃⇧Tab",
+      "note": "",
+      "scope": "Canvas",
+      "win": "Ctrl+Shift+Tab or Ctrl+PgUp"
+    },
+    {
+      "action": "Next or previous control",
+      "mac": "Tab, ⇧Tab",
+      "note": "Buttons and rows take focus when Keyboard navigation is on (System Settings > Keyboard)",
+      "scope": "Any window",
+      "win": "Tab, Shift+Tab"
+    },
+    {
+      "action": "Pick the focused row, swatch or button",
+      "mac": "Space or ↩",
+      "note": "",
+      "scope": "Panels",
+      "win": ""
+    },
+    {
+      "action": "Row above or below",
+      "mac": "↑ ↓",
+      "note": "",
+      "scope": "Layers and History rows",
+      "win": ""
+    },
+    {
+      "action": "Palette swatch to the left, right, above or below",
+      "mac": "← → ↑ ↓",
+      "note": "",
+      "scope": "Palette",
+      "win": ""
+    },
+    {
+      "action": "Hue −1° / +1° (⇧: 15°); saturation −1 / +1 (⇧: 10)",
+      "mac": "← → ↓ ↑",
+      "note": "",
+      "scope": "Color wheel",
+      "win": ""
+    },
+    {
+      "action": "Default button; Cancel",
+      "mac": "↩; Esc",
+      "note": "",
+      "scope": "Dialogs",
+      "win": "Enter; Esc"
+    }
+  ],
+  "tools": [
+    {
+      "functional": true,
+      "icon": "tool-rectangle-select",
+      "id": "rectangleSelect",
+      "key": "s",
+      "label": "Rectangle Select",
+      "options": "none",
+      "symbol": "rectangle.dashed"
+    },
+    {
+      "functional": true,
+      "icon": "tool-move-pixels",
+      "id": "moveSelectedPixels",
+      "key": "m",
+      "label": "Move Selected Pixels",
+      "options": "none",
+      "symbol": "arrow.up.and.down.and.arrow.left.and.right"
+    },
+    {
+      "functional": true,
+      "icon": "tool-lasso",
+      "id": "lassoSelect",
+      "key": "s",
+      "label": "Lasso Select",
+      "options": "none",
+      "symbol": "lasso"
+    },
+    {
+      "functional": true,
+      "icon": "tool-move-selection",
+      "id": "moveSelection",
+      "key": "m",
+      "label": "Move Selection",
+      "options": "none",
+      "symbol": "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+    },
+    {
+      "functional": true,
+      "icon": "tool-ellipse-select",
+      "id": "ellipseSelect",
+      "key": "s",
+      "label": "Ellipse Select",
+      "options": "none",
+      "symbol": "circle.dashed"
+    },
+    {
+      "functional": true,
+      "icon": "tool-zoom",
+      "id": "zoom",
+      "key": "z",
+      "label": "Zoom",
+      "options": "none",
+      "symbol": "magnifyingglass"
+    },
+    {
+      "functional": true,
+      "icon": "tool-magic-wand",
+      "id": "magicWand",
+      "key": "s",
+      "label": "Magic Wand",
+      "options": "flood",
+      "symbol": "wand.and.stars"
+    },
+    {
+      "functional": true,
+      "icon": "tool-pan",
+      "id": "pan",
+      "key": "h",
+      "label": "Pan",
+      "options": "none",
+      "symbol": "hand.raised"
+    },
+    {
+      "functional": true,
+      "icon": "tool-paint-bucket",
+      "id": "paintBucket",
+      "key": "f",
+      "label": "Paint Bucket",
+      "options": "flood",
+      "symbol": "drop"
+    },
+    {
+      "functional": false,
+      "icon": "tool-gradient",
+      "id": "gradient",
+      "key": "g",
+      "label": "Gradient",
+      "options": "none",
+      "symbol": "square.bottomhalf.filled"
+    },
+    {
+      "functional": true,
+      "icon": "tool-paintbrush",
+      "id": "paintbrush",
+      "key": "b",
+      "label": "Paintbrush",
+      "options": "brush",
+      "symbol": "paintbrush.pointed"
+    },
+    {
+      "functional": true,
+      "icon": "tool-eraser",
+      "id": "eraser",
+      "key": "e",
+      "label": "Eraser",
+      "options": "eraser",
+      "symbol": "eraser"
+    },
+    {
+      "functional": true,
+      "icon": "tool-pencil",
+      "id": "pencil",
+      "key": "p",
+      "label": "Pencil",
+      "options": "pencil",
+      "symbol": "pencil"
+    },
+    {
+      "functional": true,
+      "icon": "tool-color-picker",
+      "id": "colorPicker",
+      "key": "k",
+      "label": "Color Picker",
+      "options": "picker",
+      "symbol": "eyedropper"
+    },
+    {
+      "functional": false,
+      "icon": "tool-clone-stamp",
+      "id": "cloneStamp",
+      "key": "l",
+      "label": "Clone Stamp",
+      "options": "none",
+      "symbol": "square.on.square.dashed"
+    },
+    {
+      "functional": false,
+      "icon": "tool-recolor",
+      "id": "recolor",
+      "key": "r",
+      "label": "Recolor",
+      "options": "none",
+      "symbol": "paintbrush"
+    },
+    {
+      "functional": true,
+      "icon": "tool-text",
+      "id": "text",
+      "key": "t",
+      "label": "Text",
+      "options": "text",
+      "symbol": "textformat"
+    },
+    {
+      "functional": false,
+      "icon": "tool-line",
+      "id": "lineCurve",
+      "key": "o",
+      "label": "Line / Curve",
+      "options": "none",
+      "symbol": "line.diagonal"
+    },
+    {
+      "functional": false,
+      "icon": "tool-shapes",
+      "id": "shapes",
+      "key": "o",
+      "label": "Shapes",
+      "options": "none",
+      "symbol": "square.on.circle"
+    }
+  ]
+}

@@ -284,6 +284,26 @@ fn csharp_steps(tier: &str, windows: bool) -> Vec<CommandStep> {
     changed::CSHARP_TESTS.iter().map(csharp_step).collect()
 }
 
+/// The Windows app's parts of the milestone and checkpoint tiers. Its tests read
+/// the export table of the release DLL, so the DLL is built first.
+fn app_steps(tier: &str, windows: bool) -> Vec<CommandStep> {
+    if !windows || !matches!(tier, "milestone" | "checkpoint") {
+        return Vec::new();
+    }
+    let mut steps = vec![CommandStep {
+        name: "release op_ffi.dll: cargo build -p op-ffi --release".into(),
+        program: "cargo",
+        args: vec!["build", "-p", "op-ffi", "--release", "-j", "8"],
+        env: Vec::new(),
+        in_repo: false,
+        skip_if_missing: false,
+        output: OutputRule::ExitCode,
+        needs_gpu: false,
+    }];
+    steps.extend(changed::APP_TESTS.iter().map(csharp_step));
+    steps
+}
+
 /// The checkpoint tier's GPU parts on Windows, on each adapter: the suites of
 /// `docs/windows/test-counts.md`, then the Win32 test host. The host needs a
 /// signed-in desktop session and fails by name without one.
@@ -634,7 +654,7 @@ fn fast_parts(os: Os, has_project: bool, plan: &Result<FastPlan, String>) -> Vec
             parts.push(Part::skip("Win32 test host", WINDOWS_ONLY));
         }
     }
-    for project in &plan.csharp {
+    for project in plan.csharp.iter().chain(&plan.app) {
         let step = csharp_step(project);
         if os == Os::Windows {
             parts.push(Part::Command(step));
@@ -714,6 +734,28 @@ fn level_parts(
     parts
 }
 
+/// All of a level's parts: `level_parts`, with the Windows app's parts after the
+/// C# tool projects.
+fn all_level_parts(
+    tier: &str,
+    os: Os,
+    has_project: bool,
+    plan: &Result<FastPlan, String>,
+) -> Vec<Part> {
+    let mut parts = level_parts(tier, os, has_project, plan);
+    let app = app_steps(tier, os == Os::Windows);
+    if app.is_empty() {
+        return parts;
+    }
+    let last_tool = changed::CSHARP_TESTS[changed::CSHARP_TESTS.len() - 1].part;
+    let after = parts
+        .iter()
+        .position(|part| matches!(part, Part::Command(step) if step.name.starts_with(last_tool)))
+        .map_or(parts.len(), |at| at + 1);
+    parts.splice(after..after, app.into_iter().map(Part::Command));
+    parts
+}
+
 /// `cargo clippy` and `cargo test` for the crates a change reaches. Clippy's
 /// `--no-deps` keeps it from linting crates the change did not reach.
 fn fast_crate_commands(crates: &[String]) -> Vec<Vec<String>> {
@@ -774,13 +816,13 @@ fn print_path_list(heading: &str, paths: &[String]) {
 }
 
 fn print_fast_plan(plan: &FastPlan) {
-    if plan.crates.is_empty() && plan.csharp.is_empty() && !plan.host {
+    if plan.crates.is_empty() && plan.csharp.is_empty() && plan.app.is_empty() && !plan.host {
         println!("Nothing maps to a crate, a C# test project or the host.");
     }
     if !plan.crates.is_empty() {
         println!("Changed crates and dependents: {}", plan.crates.join(", "));
     }
-    for project in &plan.csharp {
+    for project in plan.csharp.iter().chain(&plan.app) {
         println!("Changed C# test project: {}", project.project);
     }
     if plan.host {
@@ -1224,7 +1266,7 @@ fn main() -> ExitCode {
         shell_env: &shell_env,
     };
     let has_project = repo.join("mac/project.yml").is_file();
-    for part in level_parts(tier, os, has_project, &plan) {
+    for part in all_level_parts(tier, os, has_project, &plan) {
         run_part(&mut steps, &part, &place);
     }
     println!("\nSummary");
@@ -1965,6 +2007,97 @@ mod tests {
             assert!(csharp_steps(tier, false).is_empty());
         }
         assert!(csharp_steps("fast", true).is_empty());
+    }
+
+    fn all_names(tier: &str, os: Os) -> Vec<String> {
+        names(&all_level_parts(tier, os, true, &Ok(FastPlan::default())))
+    }
+
+    const APP_TEST_PART: &str =
+        "Windows app tests: dotnet test windows/OpenPainter.Tests/OpenPainter.Tests.csproj";
+    const DLL_PART: &str = "release op_ffi.dll: cargo build -p op-ffi --release";
+
+    #[test]
+    fn milestone_and_checkpoint_run_the_windows_app_tests_after_the_tool_projects() {
+        for tier in ["milestone", "checkpoint"] {
+            let names = all_names(tier, Os::Windows);
+            let look = names
+                .iter()
+                .position(|n| n.starts_with("ui-look tests"))
+                .unwrap();
+            assert_eq!(names[look + 1], DLL_PART, "{tier}");
+            assert_eq!(names[look + 2], APP_TEST_PART, "{tier}");
+        }
+    }
+
+    #[test]
+    fn the_windows_app_parts_add_to_the_level_and_change_nothing_else() {
+        for tier in ["milestone", "checkpoint"] {
+            let mut all = all_names(tier, Os::Windows);
+            all.retain(|n| n != DLL_PART && n != APP_TEST_PART);
+            let before = level_parts(tier, Os::Windows, true, &Ok(FastPlan::default()));
+            assert_eq!(all, names(&before), "{tier}");
+        }
+    }
+
+    #[test]
+    fn the_windows_app_tests_count_only_with_tests_in_their_total() {
+        let steps = app_steps("milestone", true);
+        assert_eq!(steps.len(), 2);
+        assert!(steps[1].output == OutputRule::DotnetTotal);
+        assert!(!steps[1].skip_if_missing);
+        assert!(steps[1].env.contains(&("AVALONIA_TELEMETRY_OPTOUT", "1")));
+    }
+
+    #[test]
+    fn the_windows_app_parts_are_only_on_windows_and_only_at_the_two_levels() {
+        assert!(app_steps("milestone", false).is_empty());
+        assert!(app_steps("checkpoint", false).is_empty());
+        assert!(app_steps("fast", true).is_empty());
+        for os in [Os::Macos, Os::Linux] {
+            let all = all_names("milestone", os);
+            assert!(!all.iter().any(|n| n == APP_TEST_PART));
+            assert!(all.iter().any(|n| n == "C# tests"));
+        }
+    }
+
+    #[test]
+    fn parts_the_level_does_not_reach_still_print_not_run_and_fail() {
+        for (tier, name) in [
+            ("milestone", "headless UI on the AOT build"),
+            ("milestone", "9 to 12 critical flows"),
+            ("checkpoint", "all real-window flows"),
+        ] {
+            let all = all_names(tier, Os::Windows);
+            assert!(all.iter().any(|n| n == name), "{tier}: {name}");
+            let unreached = all_level_parts(tier, Os::Windows, true, &Ok(FastPlan::default()))
+                .into_iter()
+                .filter(|part| matches!(part, Part::Unreached(_)))
+                .count();
+            assert!(unreached >= 2, "{tier}");
+        }
+    }
+
+    #[test]
+    fn a_fast_plan_that_reaches_the_app_runs_its_tests_on_windows_and_skips_elsewhere() {
+        let plan = || {
+            Ok(FastPlan {
+                app: changed::APP_TESTS.iter().collect(),
+                ..FastPlan::default()
+            })
+        };
+        let on_windows = fast_parts(Os::Windows, true, &plan());
+        assert!(names(&on_windows).iter().any(|n| n == APP_TEST_PART));
+        let at = |parts: &[Part]| names(parts).iter().position(|n| n == APP_TEST_PART);
+        let on_linux = fast_parts(Os::Linux, true, &plan());
+        assert!(matches!(
+            on_windows[at(&on_windows).unwrap()],
+            Part::Command(_)
+        ));
+        assert!(matches!(
+            on_linux[at(&on_linux).unwrap()],
+            Part::Skip { .. }
+        ));
     }
 
     #[test]

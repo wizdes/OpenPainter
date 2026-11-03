@@ -1,5 +1,6 @@
 //! Run one engine command on a PNG, or a scenario script (M28), without the
 //! Mac app.
+mod catalog;
 mod scenario;
 use op_engine::Engine;
 use op_formats::png::{DecodedImage, decode_png, encode_png};
@@ -10,6 +11,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
         println!("Usage: opcli run <png> <command-id> [json] -o <out.png>");
         println!("       opcli scenario <script.json> -o <out-dir>");
+        println!("       opcli dump-catalog [-o <out.json>]");
         return Ok(());
     }
     if args[0] == "--version" || args[0] == "-V" {
@@ -22,6 +24,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         let summary = scenario::run(args[1].as_ref(), args[3].as_ref())?;
         println!("{summary}");
+        return Ok(());
+    }
+    if args[0] == "dump-catalog" {
+        let text = catalog::render(&catalog::Sources::embedded(), &catalog::engine_effects()?)?;
+        match args[1..].iter().map(String::as_str).collect::<Vec<_>>()[..] {
+            [] => print!("{text}"),
+            ["-o", path] => std::fs::write(path, text)?,
+            _ => return Err("usage: opcli dump-catalog [-o <out.json>]".into()),
+        }
         return Ok(());
     }
     if args[0] == "recovery-quit" {

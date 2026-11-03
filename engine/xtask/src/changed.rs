@@ -65,6 +65,28 @@ pub const CSHARP_TESTS: [CSharpProject; 3] = [
     },
 ];
 
+/// The Windows app's test project. It stays apart from `CSHARP_TESTS`, the tool
+/// projects, so each list keeps its own place in a level.
+pub const APP_TESTS: [CSharpProject; 1] = [CSharpProject {
+    part: "Windows app tests",
+    project: "windows/OpenPainter.Tests/OpenPainter.Tests.csproj",
+    args: &[],
+    // The app links W6's look files, embeds the catalog, and its bridge comes from
+    // the C header. The tests read the Mac source for words and sizes.
+    inputs: &[
+        "windows/OpenPainter/",
+        "windows/OpenPainter.Tests/",
+        "windows/tools/bridge-gen/",
+        "windows/assets/",
+        "engine/op-ffi/include/openpainter.h",
+        "tools/ui-look/app/src/Tokens.cs",
+        "tools/ui-look/app/src/Icons.cs",
+        "tools/ui-look/app/src/Ui.cs",
+        "mac/OpenPainterKit/Sources/Shell/StatusBarView.swift",
+        "mac/OpenPainterKit/Sources/Shell/EditorWindowController.swift",
+    ],
+}];
+
 impl CSharpProject {
     fn reads(&self, path: &str) -> bool {
         // A README in a tool folder changes no test. Under windows/assets/icons
@@ -88,7 +110,33 @@ pub const HOST_CRATES: [&str; 2] = ["op-ffi", "op-color"];
 const NO_TEST_FILES: [&str; 3] = [".gitignore", ".gitattributes", "LICENSE"];
 
 /// Files outside a crate folder that one crate's tests read.
-const CRATE_INPUTS: [(&str, &str); 1] = [("docs/reports/parity-matrix.md", "op-engine")];
+const CRATE_INPUTS: [(&str, &str); 11] = [
+    ("docs/reports/parity-matrix.md", "op-engine"),
+    // `opcli dump-catalog` builds these into itself, and its tests hold it to
+    // the Mac's own records and the checked-in copy.
+    (
+        "mac/OpenPainterKit/Sources/Shell/MenuSkeleton.swift",
+        "op-cli",
+    ),
+    ("mac/OpenPainterKit/Sources/Shell/ToolState.swift", "op-cli"),
+    (
+        "mac/OpenPainterKit/Sources/Shell/PanelLayout.swift",
+        "op-cli",
+    ),
+    ("mac/OpenPainterKit/Sources/ZoomPresets.swift", "op-cli"),
+    (
+        "mac/OpenPainterKit/Sources/Shell/SelectionEditActions.swift",
+        "op-cli",
+    ),
+    (
+        "mac/OpenPainterKit/Sources/Shell/KeyboardShortcuts.swift",
+        "op-cli",
+    ),
+    ("docs/windows/icons.toml", "op-cli"),
+    ("mac/Tests/OpenPainterKitTests/menu-skeleton.txt", "op-cli"),
+    ("docs/shortcuts.md", "op-cli"),
+    ("windows/assets/catalog/mac-catalog.json", "op-cli"),
+];
 
 /// The crate whose tests run the shell scripts in `scripts/`. Those tests exist
 /// only on Unix, so on Windows a changed script has no test.
@@ -100,6 +148,8 @@ pub struct FastPlan {
     /// Changed crates and their dependents, sorted by name.
     pub crates: Vec<String>,
     pub csharp: Vec<&'static CSharpProject>,
+    /// The Windows app's test project, when the change reaches it.
+    pub app: Vec<&'static CSharpProject>,
     /// The Win32 test host's folder or a crate it depends on changed.
     pub host: bool,
     /// Changed paths that reach nothing and need no test.
@@ -144,6 +194,7 @@ fn reaches_every_crate(path: &str) -> bool {
 pub fn plan(paths: &[String], members: &[Member], script_tests_run: bool) -> FastPlan {
     let mut reached = BTreeSet::new();
     let mut csharp = BTreeSet::new();
+    let mut app = BTreeSet::new();
     let mut host = false;
     let mut no_test_needed = Vec::new();
     let mut no_test = Vec::new();
@@ -170,6 +221,12 @@ pub fn plan(paths: &[String], members: &[Member], script_tests_run: bool) -> Fas
         for (index, project) in CSHARP_TESTS.iter().enumerate() {
             if project.reads(path) {
                 csharp.insert(index);
+                mapped = true;
+            }
+        }
+        for (index, project) in APP_TESTS.iter().enumerate() {
+            if project.reads(path) {
+                app.insert(index);
                 mapped = true;
             }
         }
@@ -200,6 +257,7 @@ pub fn plan(paths: &[String], members: &[Member], script_tests_run: bool) -> Fas
     FastPlan {
         crates: reached.into_iter().map(str::to_owned).collect(),
         csharp: csharp.into_iter().map(|i| &CSHARP_TESTS[i]).collect(),
+        app: app.into_iter().map(|i| &APP_TESTS[i]).collect(),
         host,
         no_test_needed,
         no_test,
@@ -215,6 +273,7 @@ pub fn plan_everything(members: &[Member]) -> FastPlan {
     FastPlan {
         crates,
         csharp: CSHARP_TESTS.iter().collect(),
+        app: APP_TESTS.iter().collect(),
         host: true,
         ..FastPlan::default()
     }
@@ -490,6 +549,66 @@ mod tests {
             let plan = plan(&paths(&[path]), &members());
             assert_eq!(parts(&plan), ["ui-look tests"], "{path}");
         }
+    }
+
+    #[test]
+    fn a_change_under_the_windows_app_runs_its_tests() {
+        for path in [
+            "windows/OpenPainter/src/Program.cs",
+            "windows/OpenPainter/OpenPainter.csproj",
+            "windows/OpenPainter.Tests/src/ShellTests.cs",
+            "windows/tools/bridge-gen/src/Header.cs",
+            "windows/assets/icons/cmd-save.svg",
+            "windows/assets/catalog/mac-catalog.json",
+            "engine/op-ffi/include/openpainter.h",
+            "tools/ui-look/app/src/Tokens.cs",
+        ] {
+            let plan = plan(&paths(&[path]), &members());
+            let projects: Vec<_> = plan.app.iter().map(|project| project.project).collect();
+            assert_eq!(
+                projects,
+                ["windows/OpenPainter.Tests/OpenPainter.Tests.csproj"],
+                "{path}"
+            );
+            assert!(plan.no_test.is_empty(), "{path}");
+        }
+    }
+
+    #[test]
+    fn other_changes_do_not_run_the_windows_app_tests() {
+        for path in [
+            "tools/ui-look/app/src/Panels.cs",
+            "windows/probes/a.cs",
+            "engine/op-core/src/lib.rs",
+            "docs/windows/PLAN.md",
+        ] {
+            let plan = plan(&paths(&[path]), &members());
+            assert!(plan.app.is_empty(), "{path}");
+        }
+    }
+
+    #[test]
+    fn files_dump_catalog_reads_reach_op_cli() {
+        for path in [
+            "mac/OpenPainterKit/Sources/Shell/MenuSkeleton.swift",
+            "mac/OpenPainterKit/Sources/Shell/ToolState.swift",
+            "mac/OpenPainterKit/Sources/Shell/PanelLayout.swift",
+            "mac/OpenPainterKit/Sources/ZoomPresets.swift",
+            "mac/OpenPainterKit/Sources/Shell/SelectionEditActions.swift",
+            "mac/OpenPainterKit/Sources/Shell/KeyboardShortcuts.swift",
+            "docs/windows/icons.toml",
+            "docs/shortcuts.md",
+            "mac/Tests/OpenPainterKitTests/menu-skeleton.txt",
+            "windows/assets/catalog/mac-catalog.json",
+        ] {
+            let plan = plan(&paths(&[path]), &members());
+            assert!(plan.crates.contains(&"op-cli".to_owned()), "{path}");
+        }
+    }
+
+    #[test]
+    fn the_whole_tree_plan_has_the_windows_app_tests() {
+        assert_eq!(plan_everything(&members()).app.len(), APP_TESTS.len());
     }
 
     #[test]
