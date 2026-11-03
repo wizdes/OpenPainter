@@ -10,6 +10,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Chrome;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -32,7 +33,6 @@ public sealed class MainWindow : Window
 {
     public const string AppName = "OpenPainter";
     const uint WmDisplayChange = 0x007E;
-    const int PreviewWidth = 112, PreviewHeight = 80;   // Editor.updateThumbnail: 56 by 40 at 2x.
 
     /// EditorWindowController.minimumSize.
     public static readonly Size MinimumClient = new(1100, 792);
@@ -43,8 +43,13 @@ public sealed class MainWindow : Window
     readonly StartOptions _options;
     readonly MacCatalog _catalog;
     readonly IReadOnlyList<MenuEntry> _menus;
+    readonly Dictionary<string, Func<bool>> _states = [];
     readonly Dictionary<string, Action> _actions;
     readonly Dictionary<string, Action> _shortcuts;
+    readonly AltGesture _alt = new();
+    readonly SystemColors? _testContrast;
+    bool _menuFromCanvas;
+    Window? _ringAt;
     readonly Grid _root = new() { Name = "Root", RowDefinitions = new RowDefinitions("Auto,*,Auto") };
     readonly Grid _canvasLayer = new() { Name = "CanvasLayer", RowDefinitions = new RowDefinitions("Auto,Auto,*") };
     string _title;
@@ -78,6 +83,10 @@ public sealed class MainWindow : Window
     /// The focus stop for the canvas. In a real window it passes focus on to the native child.
     public Border CanvasInput { get; } = new() { Name = "CanvasInput", Focusable = true, Background = Brushes.Transparent };
 
+    /// The keys that work right now, in the catalog's words: a menu key whose item works, and each
+    /// key Windows adds. docs/windows/shortcuts-windows.md and a test hold this list.
+    public IReadOnlyCollection<string> WorkingKeys => _shortcuts.Keys;
+
     /// How many times a field refused what was typed, for tests.
     public int RefusedInputs { get; private set; }
 
@@ -109,6 +118,8 @@ public sealed class MainWindow : Window
         Panels = new PanelManager(this, _catalog.Panels, Palette, StageOnScreen, Tools);
         Panels.Context.ShowLayerProperties = index => ShowLayerProperties(index);
         Panels.Context.Report = ShowReport;
+        Panels.Context.GiveKeyboardBack = GiveKeyboardToCanvas;
+        if (options.TestContrastTheme is { } file) _testContrast = HighContrast.FromThemeText(File.ReadAllText(file), Path.GetFileName(file));
         Panels.Context.Refused = () =>
         {
             RefusedInputs++;
@@ -125,6 +136,9 @@ public sealed class MainWindow : Window
         MinHeight = MinimumClient.Height;
         FontFamily = new FontFamily(Tokens.FontFamily);
         if (options.Theme is { } theme) RequestedThemeVariant = theme == "dark" ? ThemeVariant.Dark : ThemeVariant.Light;
+        // Fluent's own colors for what the palette does not name follow the system's window color.
+        if (_testContrast is not null || (!headless && HighContrast.IsOn()))
+            RequestedThemeVariant = HighContrast.IsDark(_testContrast ?? HighContrast.FromSystem()) ? ThemeVariant.Dark : ThemeVariant.Light;
 
         // The window draws its own title row. An empty decorations template turns off
         // Avalonia's drawn title bar and keeps the system's frame, shadow and resize edges.
@@ -149,7 +163,10 @@ public sealed class MainWindow : Window
             Native = new CanvasHost { View = View, TestNoClip = options.TestPaintFault == StartOptions.BlackCanvasFault };
             Native.TabOut += LeaveCanvas;
             Native.Pressed += DismissPopups;
+            Native.Pressed += _alt.Spoil;
             Native.KeyPressed += OnCanvasKey;
+            Native.SystemKeyPressed += OnCanvasSystemKey;
+            Native.AltReleased += () => AltUp(fromCanvas: true);
             Stage.Children.Add(Native);
             CanvasInput.GotFocus += (_, e) =>
             {
@@ -176,6 +193,8 @@ public sealed class MainWindow : Window
                 FitToScreen(shrink: true);
                 StartCanvas();
                 if (Screens is { } screens) screens.Changed += OnScreensChanged;
+                // Windows' high-contrast switch can change while the app is open.
+                if (Application.Current?.PlatformSettings is { } settings) settings.ColorValuesChanged += (_, _) => Fatal.Guard("CONTRAST_CHANGED", BuildRows);
             }
             Panels.ShowAll();
         };
@@ -197,6 +216,13 @@ public sealed class MainWindow : Window
         View.ZoomRectangle += OnZoomRectangle;
         View.PointerAt += p => Status.ShowCursor(p);
         KeyDown += OnWindowKey;
+        AddHandler(KeyDownEvent, OnMenuLetter, RoutingStrategies.Tunnel);
+        WatchAlt(this);
+        foreach (var panel in Panels.Panels.Values)
+        {
+            WatchAlt(panel);
+            panel.KeyDown += OnPanelKey;
+        }
         Content = _root;
 
         BuildRows();
@@ -300,6 +326,10 @@ public sealed class MainWindow : Window
             var id = panel.Id;
             actions[MenuBuilder.PanelActionPrefix + id] = () => Panels.Toggle(id);
         }
+        AddDocumentCommands(actions);
+        actions["Window > Next Panel"] = () => CyclePanels(forward: true);
+        actions["Window > Previous Panel"] = () => CyclePanels(forward: false);
+        _states["Window > Next Panel"] = _states["Window > Previous Panel"] = () => Panels.Panels.Keys.Any(Panels.IsShown);
         foreach (var value in ZoomPresets.Values)
         {
             var zoom = value;
@@ -311,6 +341,73 @@ public sealed class MainWindow : Window
             actions[$"View > {Measurement.Title(chosen)}"] = () => SetUnit(chosen);
         }
         return actions;
+    }
+
+    /// The Edit and Layers items that work on the open document, with the rule for when each is
+    /// on: EditorWindowController and MenuStates.swift. Each runs what its panel button runs.
+    void AddDocumentCommands(Dictionary<string, Action> actions)
+    {
+        void Doc(string path, Func<Editor, bool> on, Action<Editor> run)
+        {
+            _states[path] = () => !Panels.Context.Busy && Editor is { } e && on(e);
+            actions[path] = () =>
+            {
+                if (_states[path]() && Editor is { } e) run(e);
+            };
+        }
+        void Layer(string path, string id) => Doc(path, e => e.IsEnabled(id), _ => Panels.Layers.Act(id));
+        void Plain(string path, string id) => Doc(path, e => e.IsEnabled(id), e => e.Run(id));
+        Doc("Edit > Undo", e => e.Info.HistoryIndex > 0, _ => Panels.History.Undo());
+        Doc("Edit > Redo", e => e.Info.HistoryIndex + 1 < e.Info.HistoryLabels.Count, _ => Panels.History.Redo());
+        Layer("Layers > Add New Layer", "layer.add");
+        Layer("Layers > Delete Layer", "layer.delete");
+        Layer("Layers > Duplicate Layer", "layer.duplicate");
+        Layer("Layers > Merge Layer Down", "layer.merge_down");
+        Layer("Layers > Move Layer Up", "layer.move_up");
+        Layer("Layers > Move Layer Down", "layer.move_down");
+        Plain("Layers > Flip Horizontal", "layer.flip_horizontal");
+        Plain("Layers > Flip Vertical", "layer.flip_vertical");
+        Plain("Layers > Rotate 180°", "layer.rotate_180");
+        static bool Any(Editor e) => e.Info.Layers.Count > 0;
+        static bool Above(Editor e) => e.Info.ActiveLayer < e.Info.Layers.Count - 1;
+        static bool Below(Editor e) => e.Info.ActiveLayer > 0;
+        Doc("Layers > Toggle Layer Visibility", Any, e => Panels.Layers.ToggleVisible(e.Info.ActiveLayer));
+        Doc("Layers > Layer Properties…", Any, e => ShowLayerProperties(e.Info.ActiveLayer));
+        Doc("Layers > Go to Top Layer", Above, e => Panels.Layers.Select(e.Info.Layers.Count - 1));
+        Doc("Layers > Go to Layer Above", Above, e => Panels.Layers.Select(e.Info.ActiveLayer + 1));
+        Doc("Layers > Go to Layer Below", Below, e => Panels.Layers.Select(e.Info.ActiveLayer - 1));
+        Doc("Layers > Go to Bottom Layer", Below, e => Panels.Layers.Select(0));
+        Doc("Layers > Move Layer to Top", Above, e => e.Run("layer.move", Bridge.EngineParams.Of(("from", e.Info.ActiveLayer), ("to", e.Info.Layers.Count - 1))));
+        Doc("Layers > Move Layer to Bottom", Below, e => e.Run("layer.move", Bridge.EngineParams.Of(("from", e.Info.ActiveLayer), ("to", 0))));
+        // The options row's Undo and Redo find their work by the menu item's action.
+        foreach (var path in new[] { "Edit > Undo", "Edit > Redo" })
+            actions[Find(_menus, path).Action] = actions[path];
+    }
+
+    static MenuEntry Find(IEnumerable<MenuEntry> entries, string path)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.Path == path) return entry;
+            if (entry.Items.Count != 0 && path.StartsWith(entry.Path, StringComparison.Ordinal)) return Find(entry.Items, path);
+        }
+        throw new InvalidDataException($"CATALOG: no menu item {path}");
+    }
+
+    /// Turns each document command on or off for the state of the document.
+    void UpdateMenuStates()
+    {
+        void Walk(IEnumerable<object?> items)
+        {
+            foreach (var item in items.OfType<CatalogMenuItem>())
+            {
+                if (_states.TryGetValue(item.Entry.Path, out var on)) item.IsEnabled = on();
+                else if (item.Entry.Kind == EntryKind.Menu) Walk(item.Items);
+            }
+        }
+        foreach (var top in TitleBar.Menus.Items.OfType<MenuItem>()) Walk(top.Items);
+        Options.Commands["undo"].IsEnabled = _states["Edit > Undo"]();
+        Options.Commands["redo"].IsEnabled = _states["Edit > Redo"]();
     }
 
     /// Menu shortcuts that work. A native child gets its keys before Avalonia does, so the
@@ -328,8 +425,16 @@ public sealed class MainWindow : Window
             }
         }
         Walk(_menus);
+        // Windows users expect Ctrl+Y beside the Mac's key: docs/windows/shortcuts-windows.md.
+        shortcuts[RedoBeside] = _actions["Edit > Redo"];
+        // MenuSkeleton.swift's hidden twins of the panel toggles: Option-Command-digit.
+        var digit = 1;
+        foreach (var panel in _catalog.Panels)
+            shortcuts[$"Ctrl+Alt+{digit++}"] = _actions[MenuBuilder.PanelActionPrefix + panel.Id];
         return shortcuts;
     }
+
+    public const string RedoBeside = "Ctrl+Y";
 
     bool RunShortcut(string? words)
     {
@@ -340,13 +445,175 @@ public sealed class MainWindow : Window
 
     [DllImport("user32.dll")] static extern short GetKeyState(int key);
 
+    const int VkShift = 0x10, VkControl = 0x11, VkAlt = 0x12, VkF10 = 0x79;
+
+    string? CanvasWords(int vk) => WindowsKeys.FromVirtualKey(vk, GetKeyState(VkControl) < 0, GetKeyState(VkShift) < 0, GetKeyState(VkAlt) < 0);
+
     bool OnCanvasKey(int vk, bool repeat)
     {
-        if (Dialog is not null) return false;
-        const int VkShift = 0x10, VkControl = 0x11, VkAlt = 0x12;
-        bool ctrl = GetKeyState(VkControl) < 0, shift = GetKeyState(VkShift) < 0, alt = GetKeyState(VkAlt) < 0;
-        if (RunShortcut(WindowsKeys.FromVirtualKey(vk, ctrl, shift, alt))) return true;
-        return !ctrl && !alt && !shift && !repeat && vk is >= 'A' and <= 'Z' && UseToolKey((char)vk);
+        if (vk == VkAlt)
+        {
+            _alt.Press(GetKeyState(VkControl) < 0);
+            return true;
+        }
+        _alt.Spoil();
+        return Route(CanvasWords(vk), repeat, KeySource.Canvas, null);
+    }
+
+    /// Windows sends Alt, an Alt combination and F10 to the canvas as system keys.
+    bool OnCanvasSystemKey(int vk, bool repeat)
+    {
+        if (vk == VkAlt)
+        {
+            _alt.Press(GetKeyState(VkControl) < 0);
+            return true;
+        }
+        if (vk == VkF10)
+        {
+            if (!repeat && Dialog is null) OpenMenuBar(fromCanvas: true);
+            return true;
+        }
+        _alt.Spoil();
+        if (Route(CanvasWords(vk), repeat, KeySource.Canvas, null)) return true;
+        return !repeat && GetKeyState(VkAlt) < 0 && GetKeyState(VkControl) >= 0 && vk is >= 'A' and <= 'Z' && OpenMenuByLetter((char)vk, fromCanvas: true);
+    }
+
+    /// One key, from anywhere: FocusRouter says who may have it. True means it was used.
+    public bool Route(string? words, bool repeat, KeySource source, object? focused)
+    {
+        if (words is null) return false;
+        var target = FocusRouter.Target(Dialog is not null, focused);
+        if (!FocusRouter.DocumentGets(target, words)) return false;
+        if (RunShortcut(words)) return true;
+        return FocusRouter.CanvasKeysRun(target, source) && CanvasKeys.Run(Tools, Editor, words, repeat);
+    }
+
+    /// Window > Next Panel and Previous Panel: PanelFocusCycler in KeyboardShortcuts.swift. The
+    /// keyboard moves from the image through the shown panels in the catalog's order and back.
+    /// It returns the window that has it, or null when no panel is shown.
+    public Window? CyclePanels(bool forward)
+    {
+        if (Dialog is not null) return null;
+        var ring = new List<Window> { this };
+        ring.AddRange(Panels.Panels.Values.Where(p => Panels.IsShown(p.Panel.Id) && p.IsVisible));
+        if (ring.Count < 2) return null;
+        // The last step counts until the user picks a window, and then the active one does.
+        var current = _ringAt ?? ring.FirstOrDefault(w => w.IsActive) ?? this;
+        var at = ring.IndexOf(current);
+        var next = ring[at < 0 ? 0 : (at + (forward ? 1 : ring.Count - 1)) % ring.Count];
+        if (next == this)
+        {
+            GiveKeyboardToCanvas();
+            _ringAt = next;
+            return next;
+        }
+        next.Activate();
+        _ringAt = next;
+        var manager = next.FocusManager ?? throw new InvalidOperationException("PANEL_FOCUS: the panel has no focus manager");
+        // The first control that takes focus, or else the panel itself.
+        var first = manager.FindNextElement(NavigationDirection.Next, new FindNextElementOptions { SearchRoot = next, FocusedElement = next });
+        if (first is null || !first.Focus(NavigationMethod.Tab)) next.Focus();
+        return next;
+    }
+
+    /// Back to the canvas with no click, as after Enter in a color field.
+    public void GiveKeyboardToCanvas()
+    {
+        if (Dialog is not null) return;
+        if (Native is null)
+        {
+            CanvasInput.Focus(NavigationMethod.Unspecified);
+            return;
+        }
+        Activate();
+        Native.TakeFocus();
+    }
+
+    /// Listens for Alt on one window, ahead of its controls. A press anywhere in it spoils the tap.
+    void WatchAlt(Window window)
+    {
+        window.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key is Key.LeftAlt or Key.RightAlt)
+            {
+                _alt.Press(e.KeyModifiers.HasFlag(KeyModifiers.Control));
+                // Alt with a menu open closes it, and its release must not open it again.
+                if (TitleBar.Menus.IsOpen) _alt.Spoil();
+            }
+            else if (e.Key is not (Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift)) _alt.Spoil();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        window.AddHandler(KeyUpEvent, (_, e) =>
+        {
+            if (e.Key is Key.LeftAlt or Key.RightAlt) AltUp(fromCanvas: false);
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        window.AddHandler(PointerPressedEvent, (_, _) => _alt.Spoil(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        window.Deactivated += (_, _) => _alt.Forget();
+        window.Activated += (_, _) =>
+        {
+            if (!ReferenceEquals(window, _ringAt)) _ringAt = null;
+        };
+    }
+
+    void AltUp(bool fromCanvas)
+    {
+        if (_alt.Release() && Dialog is null) OpenMenuBar(fromCanvas);
+    }
+
+    /// A clean Alt tap or F10: the menu bar takes the keyboard, on the first menu.
+    public void OpenMenuBar(bool fromCanvas)
+    {
+        TakeKeyboardForMenus(fromCanvas);
+        TitleBar.Menus.Open();
+        if (TitleBar.Menus.Items.OfType<MenuItem>().FirstOrDefault() is { } first) first.Focus(NavigationMethod.Directional);
+    }
+
+    /// Alt with a menu's letter opens that menu.
+    public bool OpenMenuByLetter(char letter, bool fromCanvas)
+    {
+        if (Dialog is not null || MenuLetters.Title(letter) is not { } title) return false;
+        var menu = TitleBar.Menus.Items.OfType<MenuItem>().Single(m => (string?)m.Header == title);
+        TakeKeyboardForMenus(fromCanvas);
+        TitleBar.Menus.Open();
+        menu.Focus(NavigationMethod.Directional);
+        menu.Open();
+        return true;
+    }
+
+    void TakeKeyboardForMenus(bool fromCanvas)
+    {
+        _menuFromCanvas = fromCanvas;
+        if (Native is null) return;
+        Activate();
+        Native.GiveFocusToWindow();
+    }
+
+    /// With a menu open, a letter moves to the next item that starts with it, as a Windows menu
+    /// with no marked letters does, and Enter then runs it.
+    void OnMenuLetter(object? sender, KeyEventArgs e)
+    {
+        if (!TitleBar.Menus.IsOpen || e.KeyModifiers != KeyModifiers.None || e.Key is < Key.A or > Key.Z) return;
+        if (TitleBar.Menus.Items.OfType<MenuItem>().FirstOrDefault(m => m.IsSubMenuOpen) is not { } open) return;
+        var deepest = open;
+        while (deepest.Items.OfType<MenuItem>().FirstOrDefault(m => m.IsSubMenuOpen) is { } inner) deepest = inner;
+        var items = deepest.Items.OfType<MenuItem>().Where(i => i.IsEnabled).ToList();
+        var letter = (char)('A' + (e.Key - Key.A));
+        var matches = items.Where(i => i.Header is string text && text.StartsWith(letter.ToString(), StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0) return;
+        var at = matches.FindIndex(i => i.IsFocused);
+        matches[(at + 1) % matches.Count].Focus(NavigationMethod.Directional);
+        e.Handled = true;
+    }
+
+    void OnPanelKey(object? sender, KeyEventArgs e)
+    {
+        if (e.Handled) return;
+        var panel = (PanelWindow)sender!;
+        if (Route(WindowsKeys.FromAvalonia(e.Key, e.KeyModifiers), false, KeySource.Panel, panel.FocusManager?.GetFocusedElement()))
+        {
+            e.Handled = true;
+            return;
+        }
+        if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z && OpenMenuByLetter((char)('A' + (e.Key - Key.A)), fromCanvas: false)) e.Handled = true;
     }
 
     /// A letter on the canvas picks a tool, as MetalCanvasView.onToolKey does.
@@ -359,15 +626,23 @@ public sealed class MainWindow : Window
 
     void OnWindowKey(object? sender, KeyEventArgs e)
     {
-        if (Dialog is not null) return;
-        if (!e.Handled && RunShortcut(WindowsKeys.FromAvalonia(e.Key, e.KeyModifiers))) e.Handled = true;
+        if (e.Handled || Dialog is not null) return;
+        var focused = FocusManager?.GetFocusedElement();
+        var source = ReferenceEquals(focused, CanvasInput) ? KeySource.Canvas : KeySource.Window;
+        if (Route(WindowsKeys.FromAvalonia(e.Key, e.KeyModifiers), false, source, focused))
+        {
+            e.Handled = true;
+            return;
+        }
+        if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.A and <= Key.Z && OpenMenuByLetter((char)('A' + (e.Key - Key.A)), source == KeySource.Canvas)) e.Handled = true;
     }
 
     /// Light and dark differ only by the palette, so a theme change rebuilds the rows. The
     /// stage stays where it is, because the native canvas must not be parented again.
     void BuildRows()
     {
-        Palette = ActualThemeVariant == ThemeVariant.Dark ? Tokens.Dark : Tokens.Light;
+        Palette = LookNow();
+        ControlStates.Apply(Resources, Palette);
         var stageFill = _options.TestPaintFault == StartOptions.WrongStageFault ? Avalonia.Media.Colors.Red : Palette.Stage;
         Background = Ui.B(stageFill);
         _canvasLayer.Background = Ui.B(stageFill);
@@ -375,7 +650,9 @@ public sealed class MainWindow : Window
 
         if (TitleBar is not null) _root.Children.Remove(TitleBar);
         TitleBar = new TitleRow(Palette, _menus, _actions);
-        TitleBar.SetTitle(_title, dirty: false);
+        TitleBar.SetTitle(_title, Editor?.Info.Dirty ?? false);
+        TitleBar.Menus.BlockOpen = () => _alt.Spoiled;
+        TitleBar.Menus.Closed += OnMenusClosed;
         TitleBar.MinimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
         TitleBar.MaximizeButton.Click += (_, _) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         TitleBar.CloseButton.Click += (_, _) => Close();
@@ -421,8 +698,25 @@ public sealed class MainWindow : Window
         UpdateActive();
         UpdatePanelChecks();
         UpdateUnitChecks();
+        UpdateMenuStates();
         ApplyWindowState();
         SendBackground();
+    }
+
+    /// The palette for this moment: a high-contrast session's system colors, or else the theme's.
+    Palette LookNow()
+    {
+        if (_testContrast is { } test) return HighContrast.Palette(test);
+        if (Native is not null && HighContrast.IsOn()) return HighContrast.Palette(HighContrast.FromSystem());
+        return ActualThemeVariant == ThemeVariant.Dark ? Tokens.Dark : Tokens.Light;
+    }
+
+    /// The menu took the keyboard from the canvas, so it goes back there.
+    void OnMenusClosed(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_menuFromCanvas) return;
+        _menuFromCanvas = false;
+        Native?.TakeFocus();
     }
 
     void UpdateActive() => TitleBar.SetActive(IsActive || Panels.AnyActive || Dialog?.IsActive == true);
@@ -433,10 +727,19 @@ public sealed class MainWindow : Window
     /// Gives the panels a document, or none. A later stage sets this as images open and close.
     public void Bind(Editor? editor)
     {
-        if (Editor is not null) Editor.Changed -= OnEditorChanged;
+        if (Editor is not null)
+        {
+            Editor.Changed -= OnEditorChanged;
+            Editor.PreviewReady -= ShowPreview;
+        }
         Editor = editor;
         Panels.Context.Editor = editor;
-        if (editor is not null) editor.Changed += OnEditorChanged;
+        if (editor is not null)
+        {
+            editor.Changed += OnEditorChanged;
+            editor.PreviewReady += ShowPreview;
+            if (editor.Preview is var (rgba, width, height)) ShowPreview(rgba, width, height);
+        }
         OnEditorChanged();
     }
 
@@ -445,6 +748,22 @@ public sealed class MainWindow : Window
         Panels.ReloadPanels();
         ShowDocumentValues();
         ShowHint();
+        ShowModified();
+        UpdateMenuStates();
+    }
+
+    /// The title's dot and the strip's asterisk: Editor.dirty on the Mac. The strip rebuilds only
+    /// when its picture or words change, so a focused item keeps the keyboard.
+    void ShowModified()
+    {
+        var dirty = Editor?.Info.Dirty ?? false;
+        TitleBar.SetTitle(_title, dirty);
+        var image = Editor is { Info: { Width: > 0 } info }
+            ? _image with { Modified = dirty, ImageWidth = info.Width, ImageHeight = info.Height }
+            : _image with { Modified = dirty };
+        if (image == _image) return;
+        _image = image;
+        Strip.Show([_image]);
     }
 
     /// The image size, resolution and profile the status bar shows for the document.
@@ -503,9 +822,11 @@ public sealed class MainWindow : Window
             Dialog = null;
             Panels.Context.Busy = false;
             Panels.ReloadPanels();
+            UpdateMenuStates();
         };
         Panels.Context.Busy = true;
         Panels.ReloadPanels();
+        UpdateMenuStates();
         HoldOff(true);
         dialog.Show(this);
         return dialog;
@@ -617,7 +938,6 @@ public sealed class MainWindow : Window
             ImageReady?.Invoke();
             _image = _image with { ImageWidth = width, ImageHeight = height };
             Strip.Show([_image]);
-            _session.LoadPreview(PreviewWidth, PreviewHeight, ShowPreview);
         });
     }
 

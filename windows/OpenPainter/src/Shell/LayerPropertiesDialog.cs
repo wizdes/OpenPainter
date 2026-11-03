@@ -192,6 +192,13 @@ public sealed partial class LayerPropertiesDialog : Window
 
         // OK comes before Cancel, as W6's dialogs have it for Windows.
         OkButton = Ui.Push(p, "OK", 80, Tokens.DialogButtonHeight, accent: true);
+        // OK keeps its accent fill and its own text color in hover and press.
+        OkButton.Resources["ButtonBackgroundPointerOver"] = Ui.B(ControlStates.Blend(p.Accent, p.OnAccent, .15));
+        OkButton.Resources["ButtonBackgroundPressed"] = Ui.B(ControlStates.Blend(p.Accent, p.OnAccent, .28));
+        OkButton.Resources["ButtonBorderBrushPointerOver"] = Ui.B(p.Accent);
+        OkButton.Resources["ButtonBorderBrushPressed"] = Ui.B(p.Accent);
+        OkButton.Resources["ButtonForegroundPointerOver"] = Ui.B(p.OnAccent);
+        OkButton.Resources["ButtonForegroundPressed"] = Ui.B(p.OnAccent);
         OkButton.IsDefault = true;
         OkButton.Click += (_, _) => Ok();
         Ui.At(body, OkButton, 160, 170);

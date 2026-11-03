@@ -8,6 +8,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Chrome;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -22,11 +23,12 @@ public sealed class TitleRow : Grid
     readonly TextBlock _title;
     readonly Border _dirtyDot;
 
-    public Menu Menus { get; }
+    public TitleMenu Menus { get; }
     public CaptionButton MinimizeButton { get; }
     public CaptionButton MaximizeButton { get; }
     public CaptionButton CloseButton { get; }
     public string TitleText => _title.Text ?? "";
+    public bool IsModifiedShown => _dirtyDot.IsVisible;
     public IBrush? TitleBrush => _title.Foreground;
 
     public TitleRow(Palette palette, IReadOnlyList<MenuEntry> menus, IReadOnlyDictionary<string, Action> actions)
@@ -38,7 +40,7 @@ public sealed class TitleRow : Grid
         ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto");
         WindowDecorationProperties.SetElementRole(this, WindowDecorationsElementRole.TitleBar);
 
-        Menus = MenuBuilder.Build(menus, palette, actions);
+        Menus = (TitleMenu)MenuBuilder.Build(menus, palette, actions);
         Menus.VerticalAlignment = VerticalAlignment.Center;
         Menus.Margin = new Thickness(6, 0, 0, 0);
         Children.Add(Menus);
@@ -124,14 +126,29 @@ public sealed class CatalogMenuItem : MenuItem
     }
 }
 
+/// The menu bar. Avalonia opens a window's main menu when Alt comes up, even after an Alt-click,
+/// and `BlockOpen` is how the window's one answer about Alt stops that.
+public sealed class TitleMenu : Menu
+{
+    protected override Type StyleKeyOverride => typeof(Menu);
+
+    public Func<bool>? BlockOpen { get; set; }
+
+    public override void Open()
+    {
+        if (BlockOpen?.Invoke() == true) return;
+        base.Open();
+    }
+}
+
 /// Makes the real menu controls from the Windows menus.
 public static class MenuBuilder
 {
     /// Items with an entry in `actions` work. All others are present and off.
     public static Menu Build(IReadOnlyList<MenuEntry> menus, Palette palette, IReadOnlyDictionary<string, Action> actions)
     {
-        var bar = new Menu { Name = "Menus", Background = Brushes.Transparent };
-        // Windows reaches a menu bar with Alt, not Tab. W8 settles Alt and the access keys.
+        var bar = new TitleMenu { Name = "Menus", Background = Brushes.Transparent };
+        // Windows reaches a menu bar with Alt or F10, not Tab: docs/windows/shortcuts-windows.md.
         KeyboardNavigation.SetIsTabStop(bar, false);
         foreach (var menu in menus)
         {
@@ -143,6 +160,8 @@ public static class MenuBuilder
                 Foreground = Ui.B(palette.Ink),
                 Padding = new Thickness(8, 5),
                 MinHeight = 0,
+                // AccessText underlines the letter while Alt is down. Header stays the plain word.
+                HeaderTemplate = new FuncDataTemplate<string>((title, _) => new AccessText { Text = MenuLetters.Marked(title) }),
             };
             WindowDecorationProperties.SetElementRole(top, WindowDecorationsElementRole.User);
             KeyboardNavigation.SetIsTabStop(top, false);
@@ -189,6 +208,12 @@ public static class MenuBuilder
             else if (TryAction(entry, actions, out var action))
             {
                 item.Click += (_, _) => action();
+                item.PropertyChanged += (_, e) =>
+                {
+                    // An icon loaded while the item was on must not stay dark when it goes off.
+                    if (e.Property == InputElement.IsEnabledProperty && item is { Entry.Icon: { } icon, Icon: not null })
+                        item.Icon = new IconView(icon, item.IsEnabled ? palette.Ink : palette.Disabled);
+                };
                 if (entry.Action.StartsWith(PanelActionPrefix, StringComparison.Ordinal)) item.ToggleType = MenuItemToggleType.CheckBox;
             }
             else

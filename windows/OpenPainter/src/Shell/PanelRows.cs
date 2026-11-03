@@ -1,6 +1,6 @@
 // Rows for History and Layers, and the list above an action row: PanelRow and
 // RowListPanelView in mac/OpenPainterKit/Sources/Shell/PanelViews.swift, drawn as W6's
-// Panels.ListRow draws them. Keyboard access to the rows comes with W8's focus rules.
+// Panels.ListRow draws them. Tab reaches each row, Space or Enter picks it, and arrows move.
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -34,6 +34,10 @@ public sealed class PanelContext(ToolState tools)
 
     /// Opens Layer Properties for the layer at this index.
     public Action<int>? ShowLayerProperties { get; set; }
+
+    /// A field finished with Enter, so the keyboard goes back to the canvas: ColorsPanel.swift's
+    /// "Give the keyboard back to the document window".
+    public Action? GiveKeyboardBack { get; set; }
 }
 
 /// One list row: a 2 pixel edge and a diamond when current, and an optional detail line.
@@ -42,6 +46,8 @@ public class PanelRow : Grid
     const double DetailFont = 11;
 
     protected readonly Palette Look;
+    readonly Color _surface;
+    readonly bool _current;
     Point _downAt;
     bool _down;
 
@@ -67,6 +73,9 @@ public class PanelRow : Grid
         IsCurrent = current;
         Dimmed = dimmed;
         Height = height;
+        _current = current;
+        _surface = current ? p.Wash : p.Panel;
+        Focusable = true;
         Background = current ? Ui.B(p.Wash) : Brushes.Transparent;
         ClipToBounds = true;
         TitleLabel = Ui.Label(title, dimmed ? p.Muted : p.Ink, weight: current ? Tokens.StrongWeight : FontWeight.Normal);
@@ -103,6 +112,7 @@ public class PanelRow : Grid
         {
             if (!_down) return;
             _down = false;
+            ShowState();
             CaptureLost();
             HoldEnded?.Invoke();
         };
@@ -116,7 +126,45 @@ public class PanelRow : Grid
         _down = true;
         _clicks = e.ClickCount;
         _downAt = e.GetPosition(this);
+        ShowState();
         Pressed(e);
+    }
+
+    /// The row's fill in hover and press, over its usual fill.
+    void ShowState()
+    {
+        if (_down) Background = Ui.B(ControlStates.Pressed(Look, _surface));
+        else if (IsPointerOver) Background = Ui.B(ControlStates.Hover(Look, _surface));
+        else Background = _current ? Ui.B(Look.Wash) : Brushes.Transparent;
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsPointerOverProperty) ShowState();
+    }
+
+    /// KeyboardAccess in KeyboardShortcuts.swift: Space or Enter picks the row, and the up and down
+    /// arrows move to the row above or below.
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0) return;
+        switch (e.Key)
+        {
+            case Key.Space or Key.Enter:
+                Clicked?.Invoke(Index, 1);
+                e.Handled = true;
+                break;
+            case Key.Up or Key.Down when Parent is Avalonia.Controls.Panel list:
+                var rows = list.Children.OfType<PanelRow>().ToList();
+                var at = rows.IndexOf(this) + (e.Key == Key.Up ? -1 : 1);
+                if (at < 0 || at >= rows.Count) return;
+                rows[at].Focus(NavigationMethod.Directional);
+                rows[at].BringIntoView();
+                e.Handled = true;
+                break;
+        }
     }
 
     void OnMoved(object? sender, PointerEventArgs e)
@@ -128,7 +176,10 @@ public class PanelRow : Grid
     {
         if (!_down) return;
         _down = false;
-        if (!Released(e)) Clicked?.Invoke(Index, _clicks);
+        ShowState();
+        // A release off the row is no click, as with any Windows button.
+        var over = new Rect(Bounds.Size).Contains(e.GetPosition(this));
+        if (!Released(e) && over) Clicked?.Invoke(Index, _clicks);
         HoldEnded?.Invoke();
     }
 
@@ -179,12 +230,16 @@ public class RowListPanel : Grid
 
     protected void SetRows(IEnumerable<PanelRow> rows)
     {
+        // A new list replaces the rows, and the keyboard must stay at the same place in it.
+        var focused = _rows.Children.OfType<PanelRow>().ToList().FindIndex(r => r.IsFocused);
         _rows.Children.Clear();
         foreach (var row in rows)
         {
             row.HoldEnded += OnHoldEnded;
             _rows.Children.Add(row);
         }
+        if (focused >= 0 && _rows.Children.Count > 0)
+            _rows.Children[Math.Min(focused, _rows.Children.Count - 1)].Focus(NavigationMethod.Directional);
     }
 
     /// True when a press is under way. A new list then waits for it, because the row under the

@@ -170,13 +170,15 @@ public sealed class ToolState
     /// What the canvas does with a drag for this tool. Only Zoom and Pan act until W9.
     public CanvasTool CanvasMode => _current switch { Zoom => CanvasTool.Zoom, Pan => CanvasTool.Pan, _ => CanvasTool.Inactive };
 
-    /// PaintTool.tool(forKey:): the next tool for a key press, cycling among tools that share the key.
-    public string? ToolForKey(char key)
+    /// PaintTool.tool(forKey:): the next tool for a key press, cycling among tools that share the
+    /// key. With `reverse` (Shift) it goes backwards, and from outside the group to the last.
+    public string? ToolForKey(char key, bool reverse = false)
     {
         var letter = char.ToLowerInvariant(key).ToString();
         var matches = Tools.Where(t => t.Key == letter).ToList();
         if (matches.Count == 0) return null;
         var at = matches.FindIndex(t => t.Id == _current);
+        if (reverse) return at >= 0 ? matches[(at + matches.Count - 1) % matches.Count].Id : matches[^1].Id;
         return at >= 0 ? matches[(at + 1) % matches.Count].Id : matches[0].Id;
     }
 

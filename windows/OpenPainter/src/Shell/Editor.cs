@@ -57,7 +57,11 @@ public static class ColorProfileNames
 public sealed class Editor : IDisposable
 {
     const int WaitMs = 120_000;   // Editor.runAndWait's limit.
-    bool _refreshQueued, _closed;
+    /// Editor.updateThumbnail: 56 by 40 at 2x.
+    public const int PreviewWidth = 112, PreviewHeight = 80;
+    bool _refreshQueued, _closed, _previewBusy;
+    long _previewRevision = -1;
+    Task _previewTask = Task.CompletedTask;
 
     public EngineClient Client { get; }
     public ulong Document { get; }
@@ -74,6 +78,12 @@ public sealed class Editor : IDisposable
 
     /// The state changed. It runs on the UI thread.
     public event Action? Changed;
+
+    /// The strip's picture of the whole image, straight RGBA, on the UI thread.
+    public event Action<byte[], int, int>? PreviewReady;
+
+    /// The last picture made, so a window bound later can show it.
+    public (byte[] Rgba, int Width, int Height)? Preview { get; private set; }
 
     public Editor(EngineClient client, ulong document)
     {
@@ -110,7 +120,59 @@ public sealed class Editor : IDisposable
             Report($"Could not read the document: {e.Message}");
             return;
         }
+        UpdatePreview();
         Changed?.Invoke();
+    }
+
+    /// Editor.updateThumbnail: at most one picture at a time, and when it ends, another if the
+    /// document has moved on. It runs on a pool thread, so a big image never holds up the UI.
+    void UpdatePreview()
+    {
+        if (_previewBusy || _closed || Info.Revision == _previewRevision || Info.Width <= 0) return;
+        _previewBusy = true;
+        var revision = Info.Revision;
+        var (width, height) = (Info.Width, Info.Height);
+        _previewTask = Task.Run(() =>
+        {
+            try
+            {
+                var (w, h, small) = Canvas.CanvasSession.Shrink(Client.Query(Document, "doc.pixels", EngineParams.None), width, height, PreviewWidth, PreviewHeight);
+                Dispatcher.UIThread.Post(() => Fatal.Guard("STRIP_PREVIEW", () => TakePreview(revision, small, w, h)));
+            }
+            catch (EngineClosedException)
+            {
+                // The app is ending and nothing can show this picture. No one is left to tell.
+            }
+            catch (EngineCallException e)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _previewBusy = false;
+                    Report($"The image strip's picture failed: {e.Status}");
+                });
+            }
+        });
+    }
+
+    void TakePreview(long revision, byte[] rgba, int width, int height)
+    {
+        _previewBusy = false;
+        _previewRevision = revision;
+        if (_closed) return;
+        Preview = (rgba, width, height);
+        PreviewReady?.Invoke(rgba, width, height);
+        UpdatePreview();
+    }
+
+    /// Waits for the picture under way and any that follows. The caller must be on the UI thread,
+    /// and it takes in the result. For scripted flows and tests.
+    public void WaitForPreview()
+    {
+        while (_previewBusy)
+        {
+            _previewTask.Wait(WaitMs);
+            Dispatcher.UIThread.RunJobs();
+        }
     }
 
     /// Joins engine events into one refresh on the next turn of the UI thread.

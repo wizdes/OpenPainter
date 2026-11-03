@@ -5,7 +5,7 @@ using System.Globalization;
 namespace OpenPainter.Shell;
 
 public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? ReportPath, string? Theme, string? TestTool = null, bool TestOpenMore = false, string? TestOpenMenu = null,
-    string? DataRoot = null, double? TestZoom = null, string? FirstFramePath = null, string? PanTracePath = null, double PanSeconds = 30, string? TestThrow = null, Avalonia.PixelSize? TestWorkArea = null, string? FirstPaintPath = null, string? TestPaintFault = null, string? TestPanelsFolder = null)
+    string? DataRoot = null, double? TestZoom = null, string? FirstFramePath = null, string? PanTracePath = null, double PanSeconds = 30, string? TestThrow = null, Avalonia.PixelSize? TestWorkArea = null, string? FirstPaintPath = null, string? TestPaintFault = null, string? TestPanelsFolder = null, string? TestContrastTheme = null, string? TestStatesFolder = null)
 {
     public const double MostPanSeconds = 3600;
 
@@ -14,11 +14,11 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
     /// What `--test-paint-fault` can plant, so the harness can prove `launch paint` still fails.
     public static readonly string[] PaintFaults = [BlackCanvasFault, WrongStageFault];
 
-    public const string Usage = "usage: OpenPainter [--data-root <folder>] [--test-load-png <file>] [--exit-after-ms <n>] [--test-report <file.json>] [--theme light|dark] [--test-tool <id>] [--test-open-more] [--test-open-menu <title>] [--test-zoom <ratio>] [--test-first-frame <file.json>] [--test-pan-trace <file.json>] [--test-pan-seconds <s>] [--test-throw <place>] [--test-work-area <width>x<height>] [--test-first-paint <file.json>] [--test-paint-fault <kind>] [--test-panels <folder>]";
+    public const string Usage = "usage: OpenPainter [--data-root <folder>] [--test-load-png <file>] [--exit-after-ms <n>] [--test-report <file.json>] [--theme light|dark] [--test-tool <id>] [--test-open-more] [--test-open-menu <title>] [--test-zoom <ratio>] [--test-first-frame <file.json>] [--test-pan-trace <file.json>] [--test-pan-seconds <s>] [--test-throw <place>] [--test-work-area <width>x<height>] [--test-first-paint <file.json>] [--test-paint-fault <kind>] [--test-panels <folder>] [--test-contrast-theme <file.theme>] [--test-states <folder>]";
 
     public static StartOptions Parse(IReadOnlyList<string> args)
     {
-        string? png = null, report = null, theme = null, tool = null, menu = null, dataRoot = null, firstFrame = null, panTrace = null, firstPaint = null, paintFault = null, panels = null;
+        string? png = null, report = null, theme = null, tool = null, menu = null, dataRoot = null, firstFrame = null, panTrace = null, firstPaint = null, paintFault = null, panels = null, contrastTheme = null, states = null;
         var openMore = false;
         int? exit = null;
         double? zoom = null;
@@ -70,6 +70,13 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
                 case "--test-panels":
                     panels = Value();
                     break;
+                case "--test-contrast-theme":
+                    contrastTheme = Value();
+                    if (!File.Exists(contrastTheme)) throw new ArgumentException($"ARGUMENTS: --test-contrast-theme: no file at {contrastTheme}");
+                    break;
+                case "--test-states":
+                    states = Value();
+                    break;
                 case "--test-first-paint":
                     firstPaint = Value();
                     break;
@@ -101,6 +108,6 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
             }
         }
         if (report is not null && exit is null) throw new ArgumentException("ARGUMENTS: --test-report needs --exit-after-ms, so the run ends by itself");
-        return new StartOptions(png, exit, report, theme, tool, openMore, menu, dataRoot, zoom, firstFrame, panTrace, panSeconds, testThrow, workArea, firstPaint, paintFault, panels);
+        return new StartOptions(png, exit, report, theme, tool, openMore, menu, dataRoot, zoom, firstFrame, panTrace, panSeconds, testThrow, workArea, firstPaint, paintFault, panels, contrastTheme, states);
     }
 }

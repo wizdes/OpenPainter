@@ -12,7 +12,11 @@ public sealed class App : Application
     public static StartOptions Options { get; set; } = new(null, null, null, null);
     public static int ExitCode { get; set; }
 
-    public override void Initialize() => Styles.Add(new FluentTheme());
+    public override void Initialize()
+    {
+        Styles.Add(new FluentTheme());
+        Styles.AddRange(ControlStates.FocusStyles());
+    }
 
     /// The app ends when its main window closes. Avalonia's default waits for every window,
     /// and a hidden panel is one that nothing would ever close.
@@ -38,6 +42,7 @@ public sealed class App : Application
             if (Options.ExitAfterMs is { } ms) TestReport.Arrange(window, ms, Options.ReportPath, code => ExitCode = code);
             TestProbe.Arrange(window, Options, code => ExitCode = code);
             TestPanels.Arrange(window, Options, code => ExitCode = code);
+            TestStates.Arrange(window, Options, code => ExitCode = code);
             desktop.MainWindow = window;
         }
         base.OnFrameworkInitializationCompleted();

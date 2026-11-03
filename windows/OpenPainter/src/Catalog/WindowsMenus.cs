@@ -156,6 +156,7 @@ public static class WindowsKeys
     {
         const int F1 = 0x70, F24 = 0x87, Add = 0x6B, Subtract = 0x6D, Delete = 0x2E, PageUp = 0x21, PageDown = 0x22;
         const int OemPlus = 0xBB, OemComma = 0xBC, OemMinus = 0xBD, OemQuestion = 0xBF, OemTilde = 0xC0, OemQuotes = 0xDE;
+        const int OemOpen = 0xDB, OemClose = 0xDD, Back = 0x08, Tab = 0x09, Return = 0x0D, Escape = 0x1B;
         string? key = vk switch
         {
             >= 'A' and <= 'Z' or >= '0' and <= '9' => ((char)vk).ToString(),
@@ -169,6 +170,12 @@ public static class WindowsKeys
             OemComma => ",",
             OemTilde => "`",
             OemQuestion => "?",
+            OemOpen => "[",
+            OemClose => "]",
+            Back => "Backspace",
+            Tab => "Tab",
+            Return => "Enter",
+            Escape => "Esc",
             _ => null,
         };
         return key is null ? null : Words(key, ctrl, shift, alt);
@@ -191,13 +198,21 @@ public static class WindowsKeys
             Key.OemComma => ",",
             Key.OemTilde => "`",
             Key.OemQuestion => "?",
+            Key.OemOpenBrackets => "[",
+            Key.OemCloseBrackets => "]",
+            Key.Back => "Backspace",
+            Key.Tab => "Tab",
+            Key.Enter => "Enter",
+            Key.Escape => "Esc",
             _ => null,
         };
         return name is null ? null : Words(name, modifiers.HasFlag(KeyModifiers.Control), modifiers.HasFlag(KeyModifiers.Shift), modifiers.HasFlag(KeyModifiers.Alt));
     }
 
+    /// On a US keyboard + and ? take Shift, and the catalog's words for them have none: paint.net's
+    /// Ctrl++ and the Mac's Cmd+? both mean the key with whatever Shift it needs.
     static string Words(string key, bool ctrl, bool shift, bool alt) =>
-        (ctrl ? "Ctrl+" : "") + (shift ? "Shift+" : "") + (alt ? "Alt+" : "") + key;
+        (ctrl ? "Ctrl+" : "") + (shift && key is not ("+" or "?") ? "Shift+" : "") + (alt ? "Alt+" : "") + key;
 
     /// The gesture a menu shows, from the Windows words.
     public static KeyGesture Gesture(string text)

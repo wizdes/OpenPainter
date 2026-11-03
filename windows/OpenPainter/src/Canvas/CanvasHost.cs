@@ -16,10 +16,10 @@ public sealed unsafe class CanvasHost : NativeControlHost
 {
     const string ClassName = "OpenPainterCanvas";
     const uint WsChild = 0x40000000, WsVisible = 0x10000000, WsTabStop = 0x00010000;
-    const uint WmSetFocus = 0x0007, WmKillFocus = 0x0008, WmEraseBackground = 0x0014, WmSetCursor = 0x0020, WmKeyDown = 0x0100, WmKeyUp = 0x0101, WmChar = 0x0102,
+    const uint WmSetFocus = 0x0007, WmKillFocus = 0x0008, WmEraseBackground = 0x0014, WmSetCursor = 0x0020, WmKeyDown = 0x0100, WmKeyUp = 0x0101, WmChar = 0x0102, WmSysKeyDown = 0x0104, WmSysKeyUp = 0x0105, WmSysChar = 0x0106,
         WmMouseMove = 0x0200, WmLeftDown = 0x0201, WmLeftUp = 0x0202, WmRightDown = 0x0204, WmRightUp = 0x0205, WmMouseWheel = 0x020A, WmMouseHWheel = 0x020E,
         WmCaptureChanged = 0x0215, WmPointerUpdate = 0x0245, WmPointerDown = 0x0246, WmPointerUp = 0x0247, WmMouseLeave = 0x02A3;
-    const int VkTab = 9, VkShift = 0x10, VkAlt = 0x12, VkSpace = 0x20, PointerTypePen = 3;
+    const int VkTab = 9, VkShift = 0x10, VkControl = 0x11, VkAlt = 0x12, VkSpace = 0x20, VkF4 = 0x73, VkF10 = 0x79, PointerTypePen = 3;
     const int MkShift = 4, MkControl = 8, WheelDelta = 120, HtClient = 1;
     const uint WheelScrollLines = 0x68, WheelPageScroll = uint.MaxValue, TrackLeave = 2;
     const int CursorArrow = 32512, CursorCross = 32515, CursorMove = 32646;
@@ -87,6 +87,18 @@ public sealed unsafe class CanvasHost : NativeControlHost
 
     /// A key other than Tab and space, with whether it repeats. True means it was used.
     public event Func<int, bool, bool>? KeyPressed;
+
+    /// A key other than F4 and space with Alt down, or F10, with whether it repeats. True means it was used.
+    public event Func<int, bool, bool>? SystemKeyPressed;
+
+    /// Alt came up on the canvas.
+    public event Action? AltReleased;
+
+    /// Gives the keyboard to the main window, so a menu or a control can take it.
+    public void GiveFocusToWindow()
+    {
+        if (Hwnd != 0) SetFocus(GetAncestor(Hwnd, RootAncestor));
+    }
 
     bool _leaveTracked;
     nint _holder;
@@ -287,7 +299,8 @@ public sealed unsafe class CanvasHost : NativeControlHost
             case WmPointerUp: LogPen("up", w); break;
             case WmKeyDown:
                 input?.Invoke($"key:{w}");
-                if ((int)w == VkTab)
+                // Ctrl+Tab moves between images, and only plain Tab leaves the canvas.
+                if ((int)w == VkTab && GetKeyState(VkControl) >= 0)
                 {
                     SetFocus(GetAncestor(hwnd, RootAncestor));
                     host?.TabOut?.Invoke(GetKeyState(VkShift) < 0);
@@ -311,6 +324,24 @@ public sealed unsafe class CanvasHost : NativeControlHost
                 break;
             case WmChar:
                 if ((int)w != VkTab) input?.Invoke($"text:{(char)w}");
+                return 0;
+            // Windows sends Alt and F10 here. Alt+F4 and Alt+Space stay with Windows.
+            case WmSysKeyDown:
+                input?.Invoke($"syskey:{w}");
+                if ((int)w == VkF4 || (int)w == VkSpace) break;
+                if (host?.SystemKeyPressed?.Invoke((int)w, ((l >> 30) & 1) != 0) == true) return 0;
+                if ((int)w == VkAlt || (int)w == VkF10) return 0;
+                break;
+            case WmSysKeyUp:
+                if ((int)w == VkAlt)
+                {
+                    host?.AltReleased?.Invoke();
+                    return 0;
+                }
+                if ((int)w == VkF10) return 0;
+                break;
+            // A used Alt key must not ring the bell that Windows rings for an unknown menu letter.
+            case WmSysChar when GetKeyState(VkControl) >= 0 && (char)w != ' ':
                 return 0;
             case WmSetFocus: input?.Invoke("focus:canvas"); break;
             case WmKillFocus:

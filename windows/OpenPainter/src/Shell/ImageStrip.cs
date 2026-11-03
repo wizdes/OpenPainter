@@ -112,8 +112,20 @@ public sealed class ImageStripItem : Grid
         };
         Children.Add(CloseButton);
 
-        PointerEntered += (_, _) => UpdateClose();
-        PointerExited += (_, _) => UpdateClose();
+        var surface = image.Active ? p.Wash : p.Chrome;
+        void Fill(bool down) => Background = down ? Ui.B(ControlStates.Pressed(p, surface)) : IsPointerOver ? Ui.B(ControlStates.Hover(p, surface)) : Brushes.Transparent;
+        PointerEntered += (_, _) =>
+        {
+            UpdateClose();
+            Fill(false);
+        };
+        PointerExited += (_, _) =>
+        {
+            UpdateClose();
+            Fill(false);
+        };
+        PointerPressed += (_, _) => Fill(true);
+        PointerReleased += (_, _) => Fill(false);
         GotFocus += (_, _) => UpdateClose();
         LostFocus += (_, _) => UpdateClose();
     }

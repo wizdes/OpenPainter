@@ -65,12 +65,26 @@ static class ColorDrawing
     }
 }
 
+/// Hover and press on the drawn controls that have no fill of their own: an outline, in Ink and
+/// then in the accent. A swatch's own color must not change, because it is document color.
+static class DrawnStates
+{
+    public static void Outline(DrawingContext context, Palette p, Rect bounds, bool hover, bool pressed)
+    {
+        if (!hover && !pressed) return;
+        context.DrawRectangle(new Pen(Ui.B(pressed ? p.Accent : p.Ink), 1.5), bounds.Deflate(.75));
+    }
+}
+
 /// The primary (top left) and secondary (bottom right) swatches. The notch marks the active slot.
 public sealed class SwatchPair : Control
 {
     public static readonly Rect PrimaryRect = new(0, 0, 32, 32), SecondaryRect = new(22, 22, 32, 32);
+
+    static SwatchPair() => AffectsRender<SwatchPair>(IsPointerOverProperty);
     readonly Palette _palette;
     readonly ToolState _tools;
+    bool _pressed;
 
     public event Action<ColorSlot>? Picked;
 
@@ -104,14 +118,31 @@ public sealed class SwatchPair : Control
             if (slot != _tools.ActiveSlot) continue;
             context.DrawGeometry(Ui.B(_palette.Ink), null, new PolylineGeometry(new[] { r.TopLeft, r.TopLeft + new Point(9, 0), r.TopLeft + new Point(0, 9) }, true));
         }
+        DrawnStates.Outline(context, _palette, new Rect(Bounds.Size), IsPointerOver, _pressed);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        _pressed = true;
+        InvalidateVisual();
         if (Slot(e.GetPosition(this)) is { } slot) Picked?.Invoke(slot);
         e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        _pressed = false;
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _pressed = false;
+        InvalidateVisual();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -128,6 +159,8 @@ public sealed class SwatchPair : Control
 public sealed class ColorWheel : Control
 {
     public const double Diameter = 52;
+
+    static ColorWheel() => AffectsRender<ColorWheel>(IsPointerOverProperty);
     static readonly Dictionary<int, WriteableBitmap> Images = [];
     readonly Palette _palette;
     bool _rightDrag, _down;
@@ -208,6 +241,8 @@ public sealed class ColorWheel : Control
         var c = new Point(r + mx * r, r - my * r);
         context.DrawEllipse(null, new Pen(Brushes.White, 2), c, 5, 5);
         context.DrawEllipse(null, new Pen(Brushes.Black, 2), c, 3.2, 3.2);
+        // Hover and press: the rim grows stronger, over the disc's edge.
+        if (IsPointerOver || _down) context.DrawEllipse(null, new Pen(Ui.B(_down ? _palette.Accent : _palette.Ink), 2), bounds.Center, r - 1, r - 1);
     }
 
     /// Windows keys to the paint.net wheel modifiers.
@@ -233,6 +268,7 @@ public sealed class ColorWheel : Control
         if (!point.IsLeftButtonPressed && !point.IsRightButtonPressed) return;
         _rightDrag = point.IsRightButtonPressed;
         _down = true;
+        InvalidateVisual();
         e.Pointer.Capture(this);
         Pick(e.GetPosition(this), e.KeyModifiers);
         e.Handled = true;
@@ -248,6 +284,7 @@ public sealed class ColorWheel : Control
     {
         base.OnPointerReleased(e);
         _down = false;
+        InvalidateVisual();
         e.Pointer.Capture(null);
     }
 
@@ -255,6 +292,7 @@ public sealed class ColorWheel : Control
     {
         base.OnPointerCaptureLost(e);
         _down = false;
+        InvalidateVisual();
     }
 
     /// Left and right turn the hue by 1 degree (Shift: 15). Up and down change the saturation by
@@ -285,6 +323,8 @@ public sealed class ColorWheel : Control
 /// or click sets the value, and arrow keys step by one.
 public sealed class GradientSlider : Control
 {
+    static GradientSlider() => AffectsRender<GradientSlider>(IsPointerOverProperty);
+
     readonly Palette _palette;
     bool _down;
     double _value;
@@ -344,7 +384,7 @@ public sealed class GradientSlider : Control
         var f = Math.Clamp((_value - Minimum) / (Maximum - Minimum), 0, 1);
         var center = new Point(t.X + f * t.Width, Bounds.Height / 2);
         context.DrawEllipse(null, new Pen(Brushes.White, 2), center, 5, 5);
-        context.DrawEllipse(null, new Pen(Ui.B(_palette.Ink)), center, 6.5, 6.5);
+        context.DrawEllipse(null, new Pen(Ui.B(_down ? _palette.Accent : _palette.Ink), IsPointerOver || _down ? 2 : 1), center, 6.5, 6.5);
     }
 
     public double ValueAt(double x)
@@ -364,6 +404,7 @@ public sealed class GradientSlider : Control
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         _down = true;
+        InvalidateVisual();
         e.Pointer.Capture(this);
         Drag(e);
         e.Handled = true;
@@ -379,6 +420,7 @@ public sealed class GradientSlider : Control
     {
         base.OnPointerReleased(e);
         _down = false;
+        InvalidateVisual();
         e.Pointer.Capture(null);
     }
 
@@ -386,6 +428,7 @@ public sealed class GradientSlider : Control
     {
         base.OnPointerCaptureLost(e);
         _down = false;
+        InvalidateVisual();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -413,6 +456,9 @@ public sealed class ChannelRow : Avalonia.Controls.Canvas
     public TextBox Field { get; }
     public event Action<double>? Changed;
 
+    /// Enter finished the field: GradientSliderRow's makeFirstResponder(nil) on the Mac.
+    public event Action? Entered;
+
     public static string Label(ColorChannel c) => "RGBHSVA"[(int)c].ToString();
     public static string Title(ColorChannel c) => c.ToString();
     public static double Maximum(ColorChannel c) => c switch { ColorChannel.Hue => 360, ColorChannel.Saturation or ColorChannel.Value => 100, _ => 255 };
@@ -438,6 +484,7 @@ public sealed class ChannelRow : Avalonia.Controls.Canvas
         {
             if (e.Key != Key.Enter) return;
             Commit();
+            Entered?.Invoke();
             e.Handled = true;
         };
         Field.LostFocus += (_, _) => Commit();
@@ -472,8 +519,11 @@ public sealed class ChannelRow : Avalonia.Controls.Canvas
 /// One palette swatch. A click sets the active color, and a right-click or Shift-click the other.
 public sealed class PaletteCell : Control
 {
+    static PaletteCell() => AffectsRender<PaletteCell>(IsPointerOverProperty);
+
     readonly Palette _palette;
     readonly PaletteGrid _owner;
+    bool _pressed;
     public int Index { get; }
 
     public PaletteCell(Palette p, PaletteGrid owner, int index)
@@ -502,6 +552,7 @@ public sealed class PaletteCell : Control
         var r = bounds.Deflate(2);
         ColorDrawing.Swatch(context, Color, r);
         context.DrawRectangle(new Pen(Ui.B(_palette.Line)), r.Deflate(.5));
+        DrawnStates.Outline(context, _palette, bounds, IsPointerOver, _pressed);
         if (!IsChosen) return;
         context.DrawRectangle(new Pen(Ui.B(_palette.Accent), 2), bounds.Deflate(1));
         // The check mark, white over a dark edge so it shows on any color.
@@ -515,10 +566,25 @@ public sealed class PaletteCell : Control
     {
         base.OnPointerPressed(e);
         var point = e.GetCurrentPoint(this).Properties;
-        if (point.IsRightButtonPressed) _owner.Pick(Index, true);
-        else if (point.IsLeftButtonPressed) _owner.Pick(Index, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-        else return;
+        if (!point.IsRightButtonPressed && !point.IsLeftButtonPressed) return;
+        _pressed = true;
+        InvalidateVisual();
+        _owner.Pick(Index, point.IsRightButtonPressed || e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        _pressed = false;
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _pressed = false;
+        InvalidateVisual();
     }
 
     /// Space or Enter sets the active color, Shift-Space the other. The arrows move in the grid.
@@ -683,8 +749,8 @@ public sealed class ColorsPanel : Avalonia.Controls.Canvas
         {
             if (e.Key != Key.Enter) return;
             HexEntered();
-            // The field lets go of the keyboard, as on the Mac. Stage 3's focus rules say where it goes.
-            Focus();
+            // ColorsPanel.swift: "Give the keyboard back to the document window".
+            GiveBack();
             e.Handled = true;
         };
         HexField.LostFocus += (_, _) => HexEntered();
@@ -721,6 +787,7 @@ public sealed class ColorsPanel : Avalonia.Controls.Canvas
         {
             var row = Put(new ChannelRow(p, channel, rowWidth, Refuse), Pad, y);
             row.Changed += v => ChannelChanged(channel, v);
+            row.Entered += GiveBack;
             _channels[channel] = row;
             y += ChannelStep;
         }
@@ -844,6 +911,13 @@ public sealed class ColorsPanel : Avalonia.Controls.Canvas
     }
 
     void Refuse() => _context.Refused?.Invoke();
+
+    /// With no one to give it to, the field still lets go of the keyboard.
+    void GiveBack()
+    {
+        Focus();
+        _context.GiveKeyboardBack?.Invoke();
+    }
 
     void HexEntered()
     {

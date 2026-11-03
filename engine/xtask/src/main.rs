@@ -675,6 +675,10 @@ fn fast_parts(os: Os, has_project: bool, plan: &Result<FastPlan, String>) -> Vec
             parts.push(Part::skip("Win32 test host", WINDOWS_ONLY));
         }
     }
+    if os == Os::Windows && !plan.app.is_empty() {
+        // The app's tests load the release DLL, and a clean tree has none.
+        parts.push(Part::Command(app_steps("milestone", true).remove(0)));
+    }
     for project in plan.csharp.iter().chain(&plan.app) {
         let step = csharp_step(project);
         if os == Os::Windows {
@@ -894,6 +898,118 @@ fn window_parts() -> Vec<Part> {
         ),
     ];
     steps.into_iter().map(Part::Command).collect()
+}
+
+const FLOW_LIST: &str = "docs/windows/flows.md";
+const FLOW_ROW: &str = "9 to 12 critical flows";
+const FEWEST_FLOWS: usize = 9;
+const MOST_FLOWS: usize = 12;
+
+/// One row of `docs/windows/flows.md`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Flow {
+    number: String,
+    name: String,
+    milestone: String,
+    how: String,
+    runs_now: bool,
+}
+
+/// The rows of the flow table: `| number | name | steps | milestone | how | runs now |`.
+fn read_flows(text: &str) -> Result<Vec<Flow>, String> {
+    let mut flows = Vec::new();
+    for line in text.lines() {
+        let cells: Vec<&str> = line
+            .trim()
+            .trim_matches('|')
+            .split('|')
+            .map(str::trim)
+            .collect();
+        if !line.trim_start().starts_with('|')
+            || cells.first().is_none_or(|c| c.parse::<u32>().is_err())
+        {
+            continue;
+        }
+        let [number, name, _steps, milestone, how, runs] = cells.as_slice() else {
+            return Err(format!(
+                "{FLOW_LIST}: a row needs 6 cells, and this has {}: {line}",
+                cells.len()
+            ));
+        };
+        let runs_now = match *runs {
+            "yes" => true,
+            "no" => false,
+            other => {
+                return Err(format!(
+                    "{FLOW_LIST}: flow {number}: `{other}` is not yes or no"
+                ));
+            }
+        };
+        flows.push(Flow {
+            number: (*number).to_owned(),
+            name: (*name).to_owned(),
+            milestone: (*milestone).to_owned(),
+            how: (*how).to_owned(),
+            runs_now,
+        });
+    }
+    if !(FEWEST_FLOWS..=MOST_FLOWS).contains(&flows.len()) {
+        return Err(format!(
+            "{FLOW_LIST}: {} flows, and the level needs {FEWEST_FLOWS} to {MOST_FLOWS}",
+            flows.len()
+        ));
+    }
+    Ok(flows)
+}
+
+/// One row per flow. A flow that can run runs its one test on the AOT build, and any other
+/// prints NOT RUN by name and fails the level, as PLAN 4.1 says of a part it does not reach.
+fn flow_parts(flows: &[Flow]) -> Vec<Part> {
+    flows
+        .iter()
+        .map(|flow| {
+            let name = format!("flow {}: {}", flow.number, flow.name);
+            if !flow.runs_now {
+                return Part::NotRun {
+                    name,
+                    reason: format!("{} makes this possible ({})", flow.milestone, flow.how),
+                };
+            }
+            // A step keeps its arguments as static words, and this one lasts for the whole run.
+            let test: &'static str =
+                Box::leak(format!("FlowTests.Flow{:0>2}", flow.number).into_boxed_str());
+            Part::Command(CommandStep {
+                name,
+                program: AOT_TESTS_PROGRAM,
+                args: vec!["--only", test],
+                env: DOTNET_ENV.to_vec(),
+                in_repo: true,
+                skip_if_missing: false,
+                output: OutputRule::DotnetTotal,
+                needs_gpu: false,
+            })
+        })
+        .collect()
+}
+
+/// Puts the flow list in place of the one NOT RUN row. With no list the row stays and fails
+/// the level. With a list that does not read, the level fails by name.
+fn with_flows(parts: Vec<Part>, list: Option<&str>) -> Vec<Part> {
+    let Some(text) = list else { return parts };
+    let is_row = |part: &Part| matches!(part, Part::Unreached(row) if row.name == FLOW_ROW);
+    let Some(at) = parts.iter().position(is_row) else {
+        return parts;
+    };
+    let rows = match read_flows(text) {
+        Ok(flows) => flow_parts(&flows),
+        Err(reason) => vec![Part::Fail {
+            name: FLOW_ROW.to_owned(),
+            reason,
+        }],
+    };
+    let mut parts = parts;
+    parts.splice(at..=at, rows);
+    parts
 }
 
 /// What a level really runs. `level_parts` and `all_level_parts` keep the rows the tests
@@ -1533,7 +1649,11 @@ fn main() -> ExitCode {
         shell_env: &shell_env,
     };
     let has_project = repo.join("mac/project.yml").is_file();
-    for part in run_parts(tier, os, has_project, &plan) {
+    let flow_list = std::fs::read_to_string(repo.join(FLOW_LIST)).ok();
+    for part in with_flows(
+        run_parts(tier, os, has_project, &plan),
+        flow_list.as_deref(),
+    ) {
         run_part(&mut steps, &part, &place);
     }
     println!("\nSummary");
@@ -1733,6 +1853,93 @@ mod tests {
         };
         assert!(!row.owed);
         assert!(row.reason.contains("W8 to W10"), "{}", row.reason);
+    }
+
+    fn flow_table(rows: usize) -> String {
+        let mut text = String::from(
+            "| # | Flow | Steps | Possible from | How | Runs now |\n| --- | --- | --- | --- | --- | --- |\n",
+        );
+        for i in 1..=rows {
+            let (milestone, runs) = if i % 2 == 0 {
+                ("W8", "yes")
+            } else {
+                ("W9", "no")
+            };
+            text.push_str(&format!(
+                "| {i} | Flow {i} | a, b | {milestone} | headless | {runs} |\n"
+            ));
+        }
+        text
+    }
+
+    #[test]
+    fn a_flow_list_replaces_the_one_row_with_a_row_per_flow() {
+        let parts = run_parts("milestone", Os::Windows, true, &Ok(FastPlan::default()));
+        let table = flow_table(10);
+        let parts = with_flows(parts, Some(&table));
+        let all = names(&parts);
+        assert!(!all.iter().any(|n| n == FLOW_ROW), "{all:?}");
+        assert_eq!(all.iter().filter(|n| n.starts_with("flow ")).count(), 10);
+        // The flows run on the AOT build, so they come after its publish.
+        let publish = all.iter().position(|n| n == AOT_PUBLISH_PART).unwrap();
+        let first = all.iter().position(|n| n.starts_with("flow ")).unwrap();
+        assert!(publish < first);
+    }
+
+    #[test]
+    fn a_flow_that_can_run_runs_its_own_test_and_any_other_prints_not_run_by_name() {
+        let table = flow_table(9);
+        let parts = flow_parts(&read_flows(&table).unwrap());
+        let Part::Command(step) = &parts[1] else {
+            panic!("flow 2 must run: {:?}", parts[1]);
+        };
+        assert_eq!(step.name, "flow 2: Flow 2");
+        assert_eq!(step.program, AOT_TESTS_PROGRAM);
+        assert_eq!(step.args, ["--only", "FlowTests.Flow02"]);
+        assert_eq!(step.output, OutputRule::DotnetTotal);
+        let Part::NotRun { name, reason } = &parts[0] else {
+            panic!("flow 1 must not run: {:?}", parts[0]);
+        };
+        assert_eq!(name, "flow 1: Flow 1");
+        assert!(reason.contains("W9"), "{reason}");
+    }
+
+    #[test]
+    fn a_flow_list_of_the_wrong_size_or_shape_fails_the_level_by_name() {
+        for table in [
+            flow_table(8),
+            flow_table(13),
+            flow_table(9).replace("| yes |", "| maybe |"),
+            flow_table(9).replace("| headless |", ""),
+        ] {
+            let parts = with_flows(
+                vec![Part::Unreached(fails_level(FLOW_ROW, "no list"))],
+                Some(&table),
+            );
+            assert!(
+                matches!(&parts[..], [Part::Fail { name, .. }] if name == FLOW_ROW),
+                "{parts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn with_no_flow_file_the_row_stays() {
+        let parts = run_parts("milestone", Os::Windows, true, &Ok(FastPlan::default()));
+        let before = names(&parts);
+        assert_eq!(names(&with_flows(parts, None)), before);
+    }
+
+    #[test]
+    fn the_checked_in_flow_list_reads_and_only_the_milestone_level_takes_it() {
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let text = std::fs::read_to_string(repo.join(FLOW_LIST)).unwrap();
+        let flows = read_flows(&text).unwrap();
+        assert!(flows.iter().any(|f| f.runs_now));
+        assert!(flows.iter().any(|f| !f.runs_now));
+        let fast = run_parts("fast", Os::Windows, true, &Ok(FastPlan::default()));
+        let before = names(&fast);
+        assert_eq!(names(&with_flows(fast, Some(&text))), before);
     }
 
     #[test]
@@ -2558,6 +2765,42 @@ mod tests {
                 .filter(|part| matches!(part, Part::Unreached(_)))
                 .count();
             assert!(unreached >= 2, "{tier}");
+        }
+    }
+
+    /// The app's tests load the release DLL. A clean tree has none, and then 40 or more tests
+    /// fail with a confusing error, so the fast level builds it first.
+    #[test]
+    fn a_fast_plan_that_reaches_the_app_builds_the_release_dll_before_its_tests() {
+        let plan = Ok(FastPlan {
+            app: changed::APP_TESTS.iter().collect(),
+            ..FastPlan::default()
+        });
+        let all = names(&fast_parts(Os::Windows, true, &plan));
+        let dll = all.iter().position(|n| n == DLL_PART).unwrap();
+        let app = all.iter().position(|n| n == APP_TEST_PART).unwrap();
+        assert!(dll < app, "{all:?}");
+        assert_eq!(all.iter().filter(|n| *n == DLL_PART).count(), 1);
+    }
+
+    #[test]
+    fn a_fast_plan_that_misses_the_app_or_runs_off_windows_builds_no_dll() {
+        let none = Ok(FastPlan::default());
+        assert!(
+            !names(&fast_parts(Os::Windows, true, &none))
+                .iter()
+                .any(|n| n == DLL_PART)
+        );
+        let plan = Ok(FastPlan {
+            app: changed::APP_TESTS.iter().collect(),
+            ..FastPlan::default()
+        });
+        for os in [Os::Macos, Os::Linux] {
+            assert!(
+                !names(&fast_parts(os, true, &plan))
+                    .iter()
+                    .any(|n| n == DLL_PART)
+            );
         }
     }
 

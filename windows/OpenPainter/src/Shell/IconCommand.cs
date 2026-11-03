@@ -1,5 +1,5 @@
 // A real button that draws W6's icon target. Ui.IconButton draws the look: the icon, and
-// the pressed wash when `On`. Fluent draws hover and press until W8 settles those states.
+// the pressed wash when `On`. Hover and press come from Fluent, in ControlStates' colors.
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;

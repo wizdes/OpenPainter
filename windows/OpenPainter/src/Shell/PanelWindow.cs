@@ -91,6 +91,7 @@ public sealed partial class PanelWindow : Window
     public void ApplyLook(Palette p)
     {
         Background = Ui.B(p.Panel);
+        ControlStates.Apply(Resources, p);
         var row = new Grid { Name = "PanelTitleRow", Height = Tokens.PanelTitleHeight, Background = Ui.B(p.TitleBar), VerticalAlignment = VerticalAlignment.Top };
         WindowDecorationProperties.SetElementRole(row, WindowDecorationsElementRole.TitleBar);
         row.Children.Add(new TextBlock

@@ -13,8 +13,8 @@ namespace OpenPainter.Harness;
 
 public static class Program
 {
-    const string Usage = "usage: OpenPainter.Harness --app <OpenPainter.exe> --out <folder> [--parts report,pixels,paint-fault,panels,color,shots,pan,exit,fatal,small-screen] [--pan-seconds <s>] [--first-frame-runs <n>] [--allow-busy] [--ignore-disk]\n       OpenPainter.Harness --export-vectors";
-    public static readonly string[] AllParts = ["report", "pixels", "paint-fault", "panels", "color", "shots", "pan", "exit", "fatal", "small-screen"];
+    const string Usage = "usage: OpenPainter.Harness --app <OpenPainter.exe> --out <folder> [--parts report,pixels,paint-fault,panels,alt-states,color,shots,pan,exit,fatal,small-screen] [--pan-seconds <s>] [--first-frame-runs <n>] [--allow-busy] [--ignore-disk]\n       OpenPainter.Harness --export-vectors";
+    public static readonly string[] AllParts = ["report", "pixels", "paint-fault", "panels", "alt-states", "color", "shots", "pan", "exit", "fatal", "small-screen"];
 
     public static int Main(string[] args)
     {
@@ -135,6 +135,7 @@ public static class Program
                         case "pixels": PixelsPart(); break;
                         case "paint-fault": PaintFaultPart(); break;
                         case "panels": PanelsPart("light"); PanelsPart("dark"); break;
+                        case "alt-states": AltStatesPart("light", null); AltStatesPart("dark", null); ContrastPart(); break;
                         case "color": ColorPart("light"); ColorPart("dark"); break;
                         case "shots": ShotsPart(); break;
                         case "pan": PanPart(); break;
@@ -561,6 +562,134 @@ public static class Program
         }
 
         // ---- Done-test 3: the color check on the live window.
+        /// High contrast through a real window, with Windows' own theme colors. The system's setting
+        /// stays as it is, so the row for switching it says NOT RUN.
+        void ContrastPart()
+        {
+            var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Resources", "Ease of Access Themes");
+            foreach (var (file, label) in new[] { ("hcblack.theme", "Aquatic"), ("hcwhite.theme", "Desert") })
+            {
+                var path = Path.Combine(folder, file);
+                if (File.Exists(path)) AltStatesPart(label.ToLowerInvariant(), path);
+                else Report(PartResult.NotRun($"hover, press, focus and Alt ({label})", $"no {path} on this PC"));
+            }
+            Report(PartResult.NotRun("high contrast by the system's own switch", "it changes a setting that belongs to the user, so this run uses the theme's colors"));
+        }
+
+        /// Hover, press, focus and Alt, by messages to the app's own windows. The pointer stays put.
+        void AltStatesPart(string look, string? contrastTheme)
+        {
+            const int LimitMs = 60_000, ColorMoved = 2, AtLeast = 4;
+            var name = $"hover, press, focus and Alt ({look})";
+            var png = Path.Combine(RepoRoot(), "tests", "fixtures", "plasma_alpha_512x384.png");
+            var folder = NextFolder($"states-{look}");
+            var hook = Path.Combine(folder, "hook");
+            var args = new List<string> { "--test-load-png", png, "--test-zoom", "1", "--test-first-frame", Path.Combine(folder, "first-frame.json"), "--test-states", hook };
+            if (contrastTheme is null) args.AddRange(["--theme", look]);
+            else args.AddRange(["--test-contrast-theme", contrastTheme]);
+            using var run = new AppRun(options.App, folder, args);
+            run.WaitFirstFrame(LimitMs);
+            var problems = new List<string>();
+            var shots = Path.Combine(options.Out, "shots");
+            Directory.CreateDirectory(shots);
+            JsonElement Stage(int stage)
+            {
+                var path = Path.Combine(hook, $"ready-{stage}.json");
+                var clock = Stopwatch.StartNew();
+                while (!File.Exists(path))
+                {
+                    if (run.Exited) throw new InvalidOperationException($"the app exited {run.ExitCode} before stage {stage}: {run.Output()}");
+                    if (clock.ElapsedMilliseconds > LimitMs) throw new TimeoutException($"no stage {stage} in {LimitMs} ms");
+                    Thread.Sleep(20);
+                }
+                using var file = JsonDocument.Parse(File.ReadAllText(path));
+                return file.RootElement.Clone();
+            }
+            void Go(int stage) => File.WriteAllText(Path.Combine(hook, $"go-{stage}"), "go");
+            nint Hwnd(JsonElement r, string key) => (nint)r.GetProperty(key).GetInt64();
+            void Need(JsonElement r, string key, bool want, string words)
+            {
+                if (r.GetProperty(key).GetBoolean() != want) problems.Add(words);
+            }
+            Picture Shot(JsonElement r, string key, string state)
+            {
+                var picture = Win32.CaptureShown(Hwnd(r, key));
+                Png.Write(Path.Combine(shots, $"states-{key.Replace("_hwnd", "")}-{state}-{look}.png"), picture);
+                return picture;
+            }
+            static long Differs(Picture a, Picture b)
+            {
+                if (a.Width != b.Width || a.Height != b.Height) return long.MaxValue;
+                long count = 0;
+                for (var i = 0; i < a.Bgra.Length; i += 4)
+                    if (Math.Abs(a.Bgra[i] - b.Bgra[i]) > ColorMoved || Math.Abs(a.Bgra[i + 1] - b.Bgra[i + 1]) > ColorMoved || Math.Abs(a.Bgra[i + 2] - b.Bgra[i + 2]) > ColorMoved) count++;
+                return count;
+            }
+
+            var rest = Stage(1);
+            Win32.WaitForDisplay();
+            var restTools = Shot(rest, "tools_hwnd", "rest");
+            var restLayers = Shot(rest, "layers_hwnd", "rest");
+            var restColors = Shot(rest, "colors_hwnd", "rest");
+            Png.Write(Path.Combine(shots, $"states-main-rest-{look}.png"), Win32.CaptureShown(Hwnd(rest, "main_hwnd")));
+            if (contrastTheme is not null && rest.GetProperty("palette").GetString() != "high-contrast") problems.Add($"the palette is {rest.GetProperty("palette")}, not high contrast");
+            Go(1);
+
+            var hover = Stage(2);
+            Win32.WaitForDisplay();
+            Need(hover, "cell_hover", true, "the tool cell has no hover after a mouse message");
+            Need(hover, "row_hover", true, "the layer row has no hover after a mouse message");
+            Need(hover, "wheel_hover", true, "the wheel has no hover after a mouse message");
+            if (Differs(restTools, Shot(hover, "tools_hwnd", "hover")) < AtLeast) problems.Add("hover draws nothing new on the tool cell");
+            if (Differs(restLayers, Shot(hover, "layers_hwnd", "hover")) < AtLeast) problems.Add("hover draws nothing new on the layer row");
+            if (Differs(restColors, Shot(hover, "colors_hwnd", "hover")) < AtLeast) problems.Add("hover draws nothing new on the wheel");
+            var hoverTools = Win32.CaptureShown(Hwnd(hover, "tools_hwnd"));
+            var hoverLayers = Win32.CaptureShown(Hwnd(hover, "layers_hwnd"));
+            Go(2);
+
+            var press = Stage(3);
+            Win32.WaitForDisplay();
+            Need(press, "cell_pressed", true, "the tool cell is not pressed after a mouse message");
+            if (Differs(hoverTools, Shot(press, "tools_hwnd", "press")) < AtLeast) problems.Add("press draws nothing new on the tool cell");
+            Go(3);
+
+            var pressRow = Stage(9);
+            Win32.WaitForDisplay();
+            Need(pressRow, "row_held", true, "the layer row is not held after a mouse message");
+            if (Differs(hoverLayers, Shot(pressRow, "layers_hwnd", "press")) < AtLeast) problems.Add("press draws nothing new on the layer row");
+            Go(9);
+
+            foreach (var (stage, key, what, before) in new[] { (4, "layers_hwnd", "layer row", restLayers), (5, "tools_hwnd", "tool cell", restTools), (6, "colors_hwnd", "hex field", restColors) })
+            {
+                var focus = Stage(stage);
+                Win32.WaitForDisplay();
+                Need(focus, "focused", true, $"the {what} did not take focus");
+                if (Differs(before, Shot(focus, key, "focus")) < AtLeast) problems.Add($"focus draws nothing new on the {what}");
+                Go(stage);
+            }
+
+            var altClick = Stage(7);
+            Need(altClick, "menu_open", false, "Alt-click on the wheel opened the menu bar");
+            Need(altClick, "any_submenu", false, "Alt-click on the wheel opened a menu");
+            Need(altClick, "color_changed", true, "Alt-click on the wheel changed no color, so this run proves nothing");
+            Go(7);
+
+            var tap = Stage(8);
+            Win32.WaitForDisplay();
+            Need(tap, "menu_open", true, "a clean Alt tap in a panel did not open the menu bar");
+            Shot(tap, "main_hwnd", "alt");
+            Go(8);
+
+            var canvas = Stage(10);
+            Need(canvas, "picked", true, "a letter on the native canvas picked no tool");
+            Need(canvas, "swapped", true, "X on the native canvas swapped no color");
+            Need(canvas, "open_after_click", false, "Alt-click on the native canvas opened the menu bar");
+            Need(canvas, "open_after_tap", true, "a clean Alt tap on the native canvas did not open the menu bar");
+            Go(10);
+
+            Report(problems.Count == 0 ? PartResult.Pass(name, "by messages to the app's windows; shots in shots/states-*") : PartResult.Fail(name, string.Join("; ", problems)));
+        }
+
         void ColorPart(string theme)
         {
             const int LimitMs = 60_000;

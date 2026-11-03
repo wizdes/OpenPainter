@@ -206,12 +206,12 @@ public sealed class HistoryPanel : RowListPanel
         e.Run("history.jump", Bridge.EngineParams.Of(("index", index)));
     }
 
-    void Undo()
+    public void Undo()
     {
         if (!_context.Busy) _context.Editor?.Run("edit.undo");
     }
 
-    void Redo()
+    public void Redo()
     {
         if (!_context.Busy) _context.Editor?.Run("edit.redo");
     }

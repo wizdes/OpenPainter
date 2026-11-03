@@ -269,7 +269,7 @@ public sealed class LayersPanel : RowListPanel
         e.Run("layer.set_visible", EngineParams.Of(("index", index), ("visible", !e.Info.Layers[index].Visible)));
     }
 
-    void Act(string id)
+    public void Act(string id)
     {
         if (_context.Busy || _context.Editor is not { } e) return;
         switch (id)

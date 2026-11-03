@@ -19,4 +19,7 @@ namespace Avalonia.Headless.XUnit
 {
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class AvaloniaFactAttribute : Attribute;
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class AvaloniaTheoryAttribute : Attribute;
 }
