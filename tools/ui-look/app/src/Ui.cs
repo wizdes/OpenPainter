@@ -62,6 +62,8 @@ public static class Ui
         FontSize = Tokens.FontBody,
         Foreground = B(p.Ink),
         Background = B(p.Field),
+        SelectionBrush = B(p.Accent),
+        SelectionForegroundBrush = B(p.OnAccent),
         BorderBrush = B(p.ControlEdge),
         BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(Tokens.ControlCorner),
