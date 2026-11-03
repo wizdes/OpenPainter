@@ -40,6 +40,9 @@ public sealed partial class TestReport
     [LibraryImport("user32.dll")] private static partial int ReleaseDC(nint hwnd, nint dc);
     [LibraryImport("gdi32.dll")] private static partial uint GetPixel(nint dc, int x, int y);
 
+    // The names the harness knows the parts by.
+    const string HitTestPart = "hit test", PanelsPart = "panels", CanvasPart = "canvas input", MenusPart = "menus and options", IconsPart = "icons", MinimumPart = "window minimum size";
+
     static nint HandleOf(TopLevel window) =>
         window.TryGetPlatformHandle()?.Handle ?? throw new InvalidOperationException("TEST_REPORT: a window has no handle");
 
@@ -83,6 +86,7 @@ public sealed partial class TestReport
         foreach (var (id, panel) in manager.Panels)
         {
             var hwnd = HandleOf(panel);
+            Ran(PanelsPart, 7);
             if (!IsWindowVisible(hwnd)) problems.Add($"panel {id}: Windows says it is not visible");
             if (GetWindow(hwnd, GwOwner) != main) problems.Add($"panel {id}: it is not owned by the main window");
             if (((long)GetWindowLongPtr(hwnd, GwlExStyle) & WsExToolWindow) == 0) problems.Add($"panel {id}: it is not a tool window");
@@ -105,6 +109,7 @@ public sealed partial class TestReport
                 overCanvas = body.X >= canvas.Left && body.X < canvas.Right && body.Y >= canvas.Top && body.Y < canvas.Bottom;
             if (!overCanvas) problems.Add($"panel {id}: its middle is not over the canvas, so this run proves nothing about it");
             var top = Top(body, hwnd, main, $"panel {id}", problems);
+            Ran(PanelsPart, 2);
             var pixel = "";
             if (top == "on top")
             {
@@ -135,6 +140,7 @@ public sealed partial class TestReport
         manager.SetShown(PanelLayout.Colors, true);
         await Task.Delay(SettleMs);
         if (!IsWindowVisible(HandleOf(colors))) problems.Add("panel show: Colors did not come back");
+        Ran(PanelsPart, 2);
 
         // WM_CLOSE, as Alt+F4 sends, must hide it and not destroy it.
         SendMessage(HandleOf(colors), WmClose, 0, 0);
@@ -143,6 +149,7 @@ public sealed partial class TestReport
         manager.SetShown(PanelLayout.Colors, true);
         await Task.Delay(SettleMs);
         if (colors.PlatformImpl is null) problems.Add("panel Alt+F4: Colors was destroyed");
+        Ran(PanelsPart, 2);
 
         // Moving a panel away from the left side widens the clear rectangle.
         var moveFrom = colors.Position;
@@ -153,10 +160,66 @@ public sealed partial class TestReport
         var clearMoved = _window.View.View.ClearRect;
         text.Append($"  \"clear_before_move\": \"{clearBefore}\",\n  \"clear_after_move\": \"{clearMoved}\",\n");
         if (clearBefore == clearMoved) problems.Add("panel move: the clear rectangle did not change");
+        Ran(PanelsPart);
+        await CheckPanelOffScreen(colors, problems, text);
         manager.ResetLayout();
         await Task.Delay(SettleMs);
         var clearBack = _window.View.View.ClearRect;
         if (clearBefore != clearBack) problems.Add($"panel reset: the clear rectangle is {clearBack}, it was {clearBefore}");
+        Ran(PanelsPart);
+    }
+
+    /// A real window: moved far off every screen, a panel stays reachable. When a monitor goes
+    /// away, a panel left on it comes back, shown or hidden. Nothing here unplugs a monitor,
+    /// so the list of screens is what changes.
+    async Task CheckPanelOffScreen(PanelWindow colors, List<string> problems, StringBuilder text)
+    {
+        const int FarAway = 30_000;
+        var manager = _window.Panels;
+        var real = manager.Screens;
+        var screens = real();
+        if (!SetWindowPos(HandleOf(colors), 0, FarAway, FarAway, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate))
+            throw new InvalidOperationException($"TEST_REPORT: SetWindowPos: {Marshal.GetLastPInvokeError()}");
+        await Task.Delay(SettleMs);
+        var dragged = manager.FrameOf(colors);
+        text.Append($"  \"panel_after_far_move\": \"{dragged}\",\n");
+        if (!PanelLayout.IsReachable(dragged, screens)) problems.Add($"panel off screen: moved far away, it stopped at {dragged}, where no screen can reach it");
+        Ran(PanelsPart);
+
+        // Colors is hidden and History is shown, both on a monitor that then goes away.
+        var history = manager.Panels[PanelLayout.History];
+        var work = screens[0];
+        var gone = new Rect(work.X, work.Y, work.Width / 2, work.Height);
+        var outside = new Rect(work.Right - 400, work.Y + 100, 300, 300);
+        manager.SetFrame(history, new Rect(outside.X, outside.Y, history.ClientSize.Width, history.ClientSize.Height));
+        manager.SetFrame(colors, new Rect(outside.X, outside.Y + 40, colors.ClientSize.Width, colors.ClientSize.Height));
+        manager.SetShown(PanelLayout.Colors, false);
+        await Task.Delay(SettleMs);
+        manager.Screens = () => [gone];
+        manager.ScreensChanged();
+        await Task.Delay(SettleMs);
+        var historyBack = manager.FrameOf(history);
+        var colorsBack = manager.FrameOf(colors);
+        text.Append($"  \"panels_after_monitor_gone\": \"{historyBack} {colorsBack}\",\n");
+        if (!gone.Contains(historyBack)) problems.Add($"panel monitor gone: History is at {historyBack}, outside {gone}");
+        if (!gone.Contains(colorsBack)) problems.Add($"panel monitor gone: hidden Colors is at {colorsBack}, outside {gone}");
+        Ran(PanelsPart, 2);
+        manager.Screens = real;
+        manager.SetShown(PanelLayout.Colors, true);
+        await Task.Delay(SettleMs);
+
+        // Windows tells the main window that the screens changed, and the panels must hear of
+        // it. Nothing here changes a screen. Avalonia's own event fires only for a real change.
+        var heard = 0;
+        void Count() => heard++;
+        manager.Changed += Count;
+        const uint WmDisplayChange = 0x007E;
+        SendMessage(HandleOf(_window), WmDisplayChange, 32, 0);
+        await Task.Delay(SettleMs);
+        manager.Changed -= Count;
+        text.Append($"  \"display_change_heard\": {heard},\n");
+        if (heard == 0) problems.Add("panel screens: WM_DISPLAYCHANGE did not reach the panel manager");
+        Ran(PanelsPart);
     }
 
     static nint PointLparam(Point layout, double scale) =>
@@ -177,6 +240,7 @@ public sealed partial class TestReport
         nint Lp(Point p) => PointLparam(p, scale);
         void Same(string name)
         {
+            Ran(CanvasPart);
             var info = session.Info();
             var v = view.View;
             if (Math.Abs(info.zoom - v.Zoom) > 1e-9 || Math.Abs(info.origin_x - v.Origin.X) > 1e-6 || Math.Abs(info.origin_y - v.Origin.Y) > 1e-6)
@@ -188,6 +252,7 @@ public sealed partial class TestReport
         var clear = view.View.ClearRect ?? throw new InvalidOperationException("TEST_REPORT: no clear rectangle");
         var openZoom = view.View.Zoom;
         var openOrigin = view.View.Origin;
+        Ran(CanvasPart, 2);
         text.Append($"  \"stage\": \"{_window.Stage.Bounds.Size}\",\n  \"clear_rect\": \"{clear}\",\n  \"open_zoom\": {openZoom},\n  \"open_origin\": \"{openOrigin}\",\n");
         if (!view.IsFitted) problems.Add("placed on open: the view is not fitted");
         if (openOrigin == default) problems.Add("placed on open: the picture is still pinned to the top left");
@@ -204,6 +269,7 @@ public sealed partial class TestReport
         Same("Ctrl+wheel");
         var after = view.View.DocumentPoint(middle);
         text.Append($"  \"wheel_zoom\": [{zoomBefore}, {view.View.Zoom}],\n");
+        Ran(CanvasPart, 2);
         if (Math.Abs(view.View.Zoom - zoomBefore * 1.12) > 1e-9) problems.Add($"Ctrl+wheel: zoom went {zoomBefore} to {view.View.Zoom}");
         if (Math.Abs(after.X - before.X) > 0.01 || Math.Abs(after.Y - before.Y) > 0.01) problems.Add($"Ctrl+wheel: the point under the pointer moved {before} to {after}");
 
@@ -212,6 +278,7 @@ public sealed partial class TestReport
         SendMessage(hwnd, WmMouseWheel, unchecked((nint)((-WheelNotch) << 16)), Lparam(screen));
         Same("wheel");
         if (view.View.Origin == originBefore) problems.Add("wheel: a plain turn did not scroll");
+        Ran(CanvasPart);
 
         // The Pan tool, by a pointer drag.
         _window.Tools.Current = ToolState.Pan;
@@ -225,6 +292,7 @@ public sealed partial class TestReport
         Same("pan");
         var delta = view.View.Origin - originBefore;
         text.Append($"  \"pan_delta\": \"{delta}\",\n");
+        Ran(CanvasPart);
         if (Math.Abs(delta.X + 40) > 1e-6 || Math.Abs(delta.Y - 20) > 1e-6) problems.Add($"pan: the view moved by {delta}, expected -40, 20");
 
         // Space held pans with any tool.
@@ -232,18 +300,21 @@ public sealed partial class TestReport
         originBefore = view.View.Origin;
         SendMessage(hwnd, WmKeyDown, VkSpace, 0);
         if (view.Cursor != CanvasCursor.Move) problems.Add("space: the cursor did not change");
+        Ran(CanvasPart);
         SendMessage(hwnd, WmLeftDown, MkLeft, Lp(start));
         SendMessage(hwnd, WmMouseMove, MkLeft, Lp(new Point(310, 305)));
         SendMessage(hwnd, WmLeftUp, 0, Lp(new Point(310, 305)));
         SendMessage(hwnd, WmKeyUp, VkSpace, 0);
         var spaceDelta = view.View.Origin - originBefore;
         text.Append($"  \"space_pan_delta\": \"{spaceDelta}\",\n");
+        Ran(CanvasPart);
         if (Math.Abs(spaceDelta.X - 10) > 1e-6 || Math.Abs(spaceDelta.Y - 5) > 1e-6) problems.Add($"space pan: the view moved by {spaceDelta}, expected 10, 5");
         originBefore = view.View.Origin;
         SendMessage(hwnd, WmLeftDown, MkLeft, Lp(start));
         SendMessage(hwnd, WmMouseMove, MkLeft, Lp(new Point(330, 330)));
         SendMessage(hwnd, WmLeftUp, 0, Lp(new Point(330, 330)));
         if (view.View.Origin != originBefore) problems.Add("space up: a drag still pans with the Paintbrush");
+        Ran(CanvasPart);
 
         // The Zoom tool: click, right click, drag.
         _window.Tools.Current = ToolState.Zoom;
@@ -255,6 +326,7 @@ public sealed partial class TestReport
         SendMessage(hwnd, WmRightDown, 2, Lp(start));
         SendMessage(hwnd, WmRightUp, 0, Lp(start));
         if (view.View.Zoom != 1) problems.Add($"zoom right click: 200% stepped to {view.View.Zoom}, not 100%");
+        Ran(CanvasPart, 2);
         SendMessage(hwnd, WmLeftDown, MkLeft, Lp(start));
         SendMessage(hwnd, WmMouseMove, MkLeft, Lp(new Point(400, 360)));
         await Task.Delay(100);
@@ -264,6 +336,7 @@ public sealed partial class TestReport
         Same("zoom rectangle");
         text.Append($"  \"zoom_rectangle_zoom\": {view.View.Zoom},\n");
         if (view.View.Zoom <= 1) problems.Add($"zoom rectangle: the zoom is {view.View.Zoom}, it should grow");
+        Ran(CanvasPart);
 
         // The status bar's buttons and the keys.
         var status = _window.Status;
@@ -279,6 +352,7 @@ public sealed partial class TestReport
         status.ZoomField.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter });
         if (view.View.Zoom != 2.5) problems.Add($"zoom field: 250 gave {view.View.Zoom}");
         if (Math.Abs(status.ZoomSlider.Value - Math.Log(2.5)) > 1e-6) problems.Add($"zoom slider: {status.ZoomSlider.Value} at 250%");
+        Ran(CanvasPart, 6);
 
         SendMessage(hwnd, WmKeyDown, 'Z', 0);
         if (_window.Tools.Current != ToolState.Zoom) problems.Add($"key Z: the tool is {_window.Tools.Current}");
@@ -288,10 +362,12 @@ public sealed partial class TestReport
         if (_window.Panels.IsShown(PanelLayout.Colors)) problems.Add("key F8: Colors did not hide");
         SendMessage(hwnd, WmKeyDown, VkF8, 0);
         if (!_window.Panels.IsShown(PanelLayout.Colors)) problems.Add("key F8: Colors did not come back");
+        Ran(CanvasPart, 4);
         await Task.Delay(SettleMs);
 
         var framesAfter = session.Info();
         text.Append($"  \"frames_during_input\": {framesAfter.frames - framesBefore},\n");
+        Ran(CanvasPart, 2);
         if (framesAfter.frames == framesBefore) problems.Add("canvas input: no frame came from all that input");
         if (framesAfter.frame_errors != 0) problems.Add($"canvas input: {framesAfter.frame_errors} frame errors, last {framesAfter.last_error}");
 
@@ -307,6 +383,7 @@ public sealed partial class TestReport
         var row = _window.Options;
         var hidden = row.HiddenGroups();
         text.Append($"  \"options_hidden_groups\": {hidden.Count},\n  \"options_right_cover\": {row.RightCover},\n");
+        Ran(MenusPart);
         var cell = row.MoreOptions.Parent as Control;
         if (hidden.Count > 0 && cell?.IsVisible != true) problems.Add("options: groups are hidden but the more button is not there");
         if (hidden.Count == 0)
@@ -316,6 +393,7 @@ public sealed partial class TestReport
         }
         row.OpenMore();
         await Task.Delay(SettleMs);
+        Ran(MenusPart);
         var top = TopLevel.GetTopLevel(row.MorePopup.Child);
         if (!row.MorePopup.IsOpen || top is null || ReferenceEquals(top, _window))
         {
@@ -329,6 +407,7 @@ public sealed partial class TestReport
             var moved = row.MoreGroups.Children.Count;
             text.Append($"  \"more_popup_groups\": {moved},\n");
             if (moved != hidden.Count) problems.Add($"options more: it holds {moved} groups, expected {hidden.Count}");
+            Ran(MenusPart, 2);
         }
         if (native is not null)
         {
@@ -336,6 +415,7 @@ public sealed partial class TestReport
             SendMessage(native.Hwnd, WmLeftUp, 0, PointLparam(new Point(300, 300), _window.RenderScaling));
             await Task.Delay(SettleMs);
             if (row.MorePopup.IsOpen) problems.Add("options more: a press on the canvas did not close it");
+            Ran(MenusPart);
 
             var menu = _window.TitleBar.Menus.Items.OfType<MenuItem>().First();
             menu.Open();
@@ -344,12 +424,14 @@ public sealed partial class TestReport
             SendMessage(native.Hwnd, WmLeftUp, 0, PointLparam(new Point(300, 300), _window.RenderScaling));
             await Task.Delay(SettleMs);
             if (menu.IsSubMenuOpen) problems.Add("menu: a press on the canvas did not close it");
+            Ran(MenusPart);
         }
 
         row.ScrollBy(120);
         await Task.Delay(SettleMs);
         text.Append($"  \"options_scrolled\": {row.Scroller.Offset.X},\n");
         if (row.Scroller.Offset.X != 120) problems.Add($"options scroll: the offset is {row.Scroller.Offset.X}, not 120");
+        Ran(MenusPart);
         row.ScrollBy(-120);
         await Task.Delay(SettleMs);
     }
@@ -373,6 +455,7 @@ public sealed partial class TestReport
         }
         Look(_window, _window.RenderScaling);
         foreach (var panel in _window.Panels.Panels.Values) Look(panel, panel.RenderScaling);
+        Ran(IconsPart, count);
         text.Append($"  \"icons_checked\": {count},\n  \"icons_off_pixel\": {off.Count},\n");
         if (count == 0) problems.Add("icons: none was on screen");
         if (off.Count != 0) problems.Add($"icons: {off.Count} are not on whole pixels: {string.Join(" ", off.Take(5))}");
@@ -390,8 +473,9 @@ public sealed partial class TestReport
         await Task.Delay(SettleMs);
         var client = _window.ClientSize;
         text.Append($"  \"minimum_client\": \"{client}\",\n");
-        if (client.Width != MainWindow.MinimumClient.Width || client.Height != MainWindow.MinimumClient.Height)
-            problems.Add($"window minimum: the client stops at {client}, not {MainWindow.MinimumClient}");
+        Ran(MinimumPart);
+        if (client.Width != _window.LeastClient.Width || client.Height != _window.LeastClient.Height)
+            problems.Add($"window minimum: the client stops at {client}, not {_window.LeastClient}");
         if (!SetWindowPos(main, 0, 0, 0, before.Right - before.Left, before.Bottom - before.Top, SwpNoMove | SwpNoZOrder | SwpNoActivate))
             throw new InvalidOperationException($"TEST_REPORT: SetWindowPos: {Marshal.GetLastPInvokeError()}");
         await Task.Delay(SettleMs);

@@ -64,6 +64,7 @@ public static unsafe partial class Win32
     [DllImport("user32.dll")] static extern int ReleaseDC(nint hwnd, nint dc);
     [DllImport("gdi32.dll")] static extern uint GetPixel(nint dc, int x, int y);
     [DllImport("user32.dll")] static extern nint WindowFromPoint(NativePoint point);
+    [DllImport("user32.dll")] static extern bool IsChild(nint parent, nint hwnd);
     [DllImport("user32.dll", SetLastError = true)] static extern bool SetWindowPos(nint hwnd, nint after, int x, int y, int cx, int cy, uint flags);
     [DllImport("gdi32.dll")] static extern nint CreateCompatibleDC(nint dc);
     [DllImport("gdi32.dll")] static extern bool DeleteDC(nint dc);
@@ -237,6 +238,24 @@ public static unsafe partial class Win32
         return new Rgb((byte)value, (byte)(value >> 8), (byte)(value >> 16));
     }
 
+    /// One pixel from the screen, read only when the app's window or one of its children is at
+    /// that point. A canvas held back until its first frame is not there, and the stage is.
+    public static Rgb? ScreenPixelInApp(nint main, int x, int y, out string coveredBy)
+    {
+        coveredBy = "";
+        var there = WindowFromPoint(new NativePoint { X = x, Y = y });
+        if (there != main && !IsChild(main, there))
+        {
+            coveredBy = ClassOf(there);
+            return null;
+        }
+        var screen = GetDC(0);
+        if (screen == 0) throw new InvalidOperationException("HARNESS: GetDC");
+        var value = GetPixel(screen, x, y);
+        ReleaseDC(0, screen);
+        return new Rgb((byte)value, (byte)(value >> 8), (byte)(value >> 16));
+    }
+
     /// Puts the app above other programs and leaves the focus where it is.
     public static void RaiseWithoutFocus(nint hwnd)
     {
@@ -261,6 +280,38 @@ public static unsafe partial class Win32
     public static void AskToClose(nint hwnd)
     {
         if (!PostMessageW(hwnd, WmClose, 0, 0)) throw new InvalidOperationException($"HARNESS: PostMessage WM_CLOSE: {Marshal.GetLastWin32Error()}");
+    }
+
+    /// Posts a key press to one window of the app. It reaches nothing else.
+    public static void PostKey(nint hwnd, int virtualKey)
+    {
+        const uint WmKeyDown = 0x0100, WmKeyUp = 0x0101;
+        if (!PostMessageW(hwnd, WmKeyDown, virtualKey, 0) || !PostMessageW(hwnd, WmKeyUp, virtualKey, 0))
+            throw new InvalidOperationException($"HARNESS: PostMessage key: {Marshal.GetLastWin32Error()}");
+    }
+
+    public static void Minimize(nint hwnd)
+    {
+        const uint WmSysCommand = 0x0112;
+        const nint ScMinimize = 0xF020;
+        if (!PostMessageW(hwnd, WmSysCommand, ScMinimize, 0)) throw new InvalidOperationException($"HARNESS: PostMessage minimize: {Marshal.GetLastWin32Error()}");
+    }
+
+    /// Asks one window of the app for a size, with no focus change.
+    public static void Resize(nint hwnd, int width, int height)
+    {
+        const uint NoMove = 2, NoZOrder = 4, NoActivate = 0x10;
+        if (!SetWindowPos(hwnd, 0, 0, 0, width, height, NoMove | NoZOrder | NoActivate))
+            throw new InvalidOperationException($"HARNESS: SetWindowPos: {Marshal.GetLastWin32Error()}");
+    }
+
+    /// Moves one window of the app a little, with no focus change.
+    public static void MoveBy(nint hwnd, int pixels)
+    {
+        const uint NoSize = 1, NoZOrder = 4, NoActivate = 0x10;
+        if (!GetWindowRect(hwnd, out var r)) throw new InvalidOperationException($"HARNESS: GetWindowRect: {Marshal.GetLastWin32Error()}");
+        if (!SetWindowPos(hwnd, 0, r.Left + pixels, r.Top + pixels, 0, 0, NoSize | NoZOrder | NoActivate))
+            throw new InvalidOperationException($"HARNESS: SetWindowPos: {Marshal.GetLastWin32Error()}");
     }
 
     public static int RefreshRate(nint hwnd)
@@ -290,13 +341,19 @@ public static unsafe partial class Win32
         }
     }
 
+    /// The whole machine's time so far, in 100 ns units across all cores.
+    public static (long Busy, long Total) CpuTimes()
+    {
+        if (!GetSystemTimes(out var idle, out var kernel, out var user)) throw new InvalidOperationException($"HARNESS: GetSystemTimes: {Marshal.GetLastWin32Error()}");
+        return (kernel + user - idle, kernel + user);
+    }
+
     /// The whole machine's busy share over a time, from 0 to 100.
     public static double CpuBusyPercent(int ms)
     {
-        if (!GetSystemTimes(out var idleA, out var kernelA, out var userA)) throw new InvalidOperationException($"HARNESS: GetSystemTimes: {Marshal.GetLastWin32Error()}");
+        var a = CpuTimes();
         Thread.Sleep(ms);
-        if (!GetSystemTimes(out var idleB, out var kernelB, out var userB)) throw new InvalidOperationException($"HARNESS: GetSystemTimes: {Marshal.GetLastWin32Error()}");
-        var total = kernelB - kernelA + userB - userA;
-        return total <= 0 ? 0 : 100.0 * (total - (idleB - idleA)) / total;
+        var b = CpuTimes();
+        return b.Total <= a.Total ? 0 : 100.0 * (b.Busy - a.Busy) / (b.Total - a.Total);
     }
 }

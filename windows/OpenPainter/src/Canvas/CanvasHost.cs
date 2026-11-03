@@ -9,7 +9,6 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
-using Avalonia.Threading;
 
 namespace OpenPainter.Canvas;
 
@@ -58,6 +57,9 @@ public sealed unsafe class CanvasHost : NativeControlHost
     [DllImport("user32.dll")] static extern bool ScreenToClient(nint hwnd, ref NativePoint point);
     [DllImport("user32.dll", SetLastError = true)] static extern bool SystemParametersInfoW(uint action, uint param, uint* value, uint winIni);
     [DllImport("user32.dll", SetLastError = true)] static extern bool TrackMouseEvent(ref TrackEvent track);
+    [DllImport("user32.dll", SetLastError = true)] static extern int SetWindowRgn(nint hwnd, nint region, bool redraw);
+    [DllImport("gdi32.dll")] static extern nint CreateRectRgn(int left, int top, int right, int bottom);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(nint thing);
 
     [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] struct TrackEvent { public uint Size, Flags; public nint Target; public uint Hover; }
@@ -87,6 +89,31 @@ public sealed unsafe class CanvasHost : NativeControlHost
     public event Func<int, bool, bool>? KeyPressed;
 
     bool _leaveTracked;
+    nint _holder;
+
+    /// Until the engine's first frame this window has nothing to show, so it shows black. A
+    /// plain Win32 fill does not help: a real run still read black on the screen. Avalonia's
+    /// main window has WS_EX_NOREDIRECTIONBITMAP, so it keeps no surface for GDI to reach. So
+    /// the window Avalonia holds this one in clips away all of it, and Avalonia's stage shows
+    /// through in the right color, in both themes. The engine draws as usual meanwhile, and
+    /// later frames pay nothing.
+    void ClipAway()
+    {
+        var empty = CreateRectRgn(0, 0, 0, 0);
+        if (empty == 0) throw new InvalidOperationException("CANVAS_CLIP: CreateRectRgn failed");
+        if (SetWindowRgn(_holder, empty, false) == 0)
+        {
+            DeleteObject(empty);
+            throw new InvalidOperationException($"CANVAS_CLIP: SetWindowRgn: {Marshal.GetLastWin32Error()}");
+        }
+    }
+
+    /// The engine has shown a frame, so the canvas may show it.
+    public void ShowCanvas()
+    {
+        if (_holder != 0 && SetWindowRgn(_holder, 0, true) == 0)
+            throw new InvalidOperationException($"CANVAS_CLIP: SetWindowRgn: {Marshal.GetLastWin32Error()}");
+    }
 
     Point Points(nint l) => new((short)(l & 0xffff) / Scale, (short)((l >> 16) & 0xffff) / Scale);
 
@@ -143,6 +170,8 @@ public sealed unsafe class CanvasHost : NativeControlHost
         }
         Hwnd = CreateWindowExW(0, ClassName, "Canvas", WsChild | WsVisible | WsTabStop, 0, 0, 100, 100, parent.Handle, 0, instance, 0);
         if (Hwnd == 0) throw new InvalidOperationException($"CANVAS_HWND: {Marshal.GetLastWin32Error()}");
+        _holder = parent.Handle;
+        ClipAway();
         return new PlatformHandle(Hwnd, "HWND");
     }
 
@@ -150,6 +179,7 @@ public sealed unsafe class CanvasHost : NativeControlHost
     {
         if (!DestroyWindow(control.Handle)) throw new InvalidOperationException($"DESTROY_CANVAS: {Marshal.GetLastWin32Error()}");
         Hwnd = 0;
+        _holder = 0;
         s_current = null;
     }
 
@@ -168,7 +198,7 @@ public sealed unsafe class CanvasHost : NativeControlHost
     }
 
     /// A throw must not cross this native boundary, because it would end the process with
-    /// no words. It goes to the UI thread, which shows it and stops the program.
+    /// no words. It goes to the fatal path, which shows it and stops the program.
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
     static nint OnMessage(nint hwnd, uint message, nuint w, nint l)
     {
@@ -178,7 +208,7 @@ public sealed unsafe class CanvasHost : NativeControlHost
         }
         catch (Exception e)
         {
-            Dispatcher.UIThread.Post(() => throw new InvalidOperationException($"CANVAS_INPUT: {e.Message}", e));
+            OpenPainter.Shell.Fatal.Raise("CANVAS_INPUT", e);
             return 0;
         }
     }

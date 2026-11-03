@@ -62,4 +62,32 @@ public sealed class StartOptionsTests
         Assert.Equal(TestReport.HtClient, TestReport.Expected["top menu"]);
         Assert.Equal(TestReport.HtCaption, TestReport.Expected["title text"]);
     }
+
+    [Theory]
+    [InlineData("--test-zoom", "NaN")]
+    [InlineData("--test-zoom", "Infinity")]
+    [InlineData("--test-zoom", "-Infinity")]
+    [InlineData("--test-zoom", "-1")]
+    [InlineData("--test-pan-seconds", "NaN")]
+    [InlineData("--test-pan-seconds", "Infinity")]
+    [InlineData("--test-pan-seconds", "1e300")]
+    [InlineData("--test-pan-seconds", "-Infinity")]
+    [InlineData("--test-work-area", "NaNxNaN")]
+    [InlineData("--test-work-area", "1000")]
+    [InlineData("--test-work-area", "0x600")]
+    [InlineData("--test-throw", "nowhere")]
+    public void ANumberThatIsNotOneFailsAndNamesTheArgument(string argument, string value)
+    {
+        var error = Assert.Throws<ArgumentException>(() => StartOptions.Parse([argument, value]));
+        Assert.Contains(argument, error.Message);
+        Assert.Contains(value, error.Message);
+    }
+
+    [Fact]
+    public void TheWindowRuleHooksAreRead()
+    {
+        var o = StartOptions.Parse(["--test-work-area", "1000x620", "--test-throw", Fatal.ClosedPlace]);
+        Assert.Equal(new Avalonia.PixelSize(1000, 620), o.TestWorkArea);
+        Assert.Equal(Fatal.ClosedPlace, o.TestThrow);
+    }
 }

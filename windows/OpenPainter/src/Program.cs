@@ -14,18 +14,22 @@ public sealed class App : Application
 
     public override void Initialize() => Styles.Add(new FluentTheme());
 
+    /// The app ends when its main window closes. Avalonia's default waits for every window,
+    /// and a hidden panel is one that nothing would ever close.
+    public static void ConfigureLifetime(IClassicDesktopStyleApplicationLifetime desktop) =>
+        desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose;
+
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // An exception that escapes into a window message would end the process
-            // with no words. This shows it, then ends the program with exit code 1.
+            ConfigureLifetime(desktop);
+            Fatal.Shutdown = () => desktop.Shutdown(1);
+            Fatal.TestPlace = Options.TestThrow;
             Dispatcher.UIThread.UnhandledException += (_, e) =>
             {
                 e.Handled = true;
-                Program.ShowFatal(e.Exception);
-                ExitCode = 1;
-                desktop.Shutdown(1);
+                Fatal.Raise(e.Exception);
             };
             var window = new MainWindow(Options);
             if (Options.TestOpenMenu is { } menu)

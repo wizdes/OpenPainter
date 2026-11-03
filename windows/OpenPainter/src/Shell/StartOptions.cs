@@ -5,9 +5,11 @@ using System.Globalization;
 namespace OpenPainter.Shell;
 
 public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? ReportPath, string? Theme, string? TestTool = null, bool TestOpenMore = false, string? TestOpenMenu = null,
-    string? DataRoot = null, double? TestZoom = null, string? FirstFramePath = null, string? PanTracePath = null, double PanSeconds = 30)
+    string? DataRoot = null, double? TestZoom = null, string? FirstFramePath = null, string? PanTracePath = null, double PanSeconds = 30, string? TestThrow = null, Avalonia.PixelSize? TestWorkArea = null)
 {
-    public const string Usage = "usage: OpenPainter [--data-root <folder>] [--test-load-png <file>] [--exit-after-ms <n>] [--test-report <file.json>] [--theme light|dark] [--test-tool <id>] [--test-open-more] [--test-open-menu <title>] [--test-zoom <ratio>] [--test-first-frame <file.json>] [--test-pan-trace <file.json>] [--test-pan-seconds <s>]";
+    public const double MostPanSeconds = 3600;
+
+    public const string Usage = "usage: OpenPainter [--data-root <folder>] [--test-load-png <file>] [--exit-after-ms <n>] [--test-report <file.json>] [--theme light|dark] [--test-tool <id>] [--test-open-more] [--test-open-menu <title>] [--test-zoom <ratio>] [--test-first-frame <file.json>] [--test-pan-trace <file.json>] [--test-pan-seconds <s>] [--test-throw <place>] [--test-work-area <width>x<height>]";
 
     public static StartOptions Parse(IReadOnlyList<string> args)
     {
@@ -16,6 +18,8 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
         int? exit = null;
         double? zoom = null;
         var panSeconds = 30.0;
+        string? testThrow = null;
+        Avalonia.PixelSize? workArea = null;
         for (var i = 0; i < args.Count; i++)
         {
             string Value() => ++i < args.Count ? args[i] : throw new ArgumentException($"ARGUMENTS: {args[i - 1]} needs a value. {Usage}");
@@ -52,7 +56,7 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
                     break;
                 case "--test-zoom":
                     var zoomText = Value();
-                    if (!double.TryParse(zoomText, NumberStyles.Float, CultureInfo.InvariantCulture, out var ratio) || ratio <= 0) throw new ArgumentException($"ARGUMENTS: --test-zoom: {zoomText} is not a positive ratio");
+                    if (!double.TryParse(zoomText, NumberStyles.Float, CultureInfo.InvariantCulture, out var ratio) || !double.IsFinite(ratio) || ratio <= 0) throw new ArgumentException($"ARGUMENTS: --test-zoom: {zoomText} is not a positive ratio");
                     zoom = ratio;
                     break;
                 case "--test-first-frame":
@@ -63,13 +67,25 @@ public sealed record StartOptions(string? TestPng, int? ExitAfterMs, string? Rep
                     break;
                 case "--test-pan-seconds":
                     var secondsText = Value();
-                    if (!double.TryParse(secondsText, NumberStyles.Float, CultureInfo.InvariantCulture, out panSeconds) || panSeconds <= 0) throw new ArgumentException($"ARGUMENTS: --test-pan-seconds: {secondsText} is not a positive number");
+                    if (!double.TryParse(secondsText, NumberStyles.Float, CultureInfo.InvariantCulture, out panSeconds) || !double.IsFinite(panSeconds) || panSeconds <= 0 || panSeconds > MostPanSeconds)
+                        throw new ArgumentException($"ARGUMENTS: --test-pan-seconds: {secondsText} is not a number of seconds from 0 to {MostPanSeconds}");
+                    break;
+                case "--test-throw":
+                    testThrow = Value();
+                    if (!Fatal.Places.Contains(testThrow)) throw new ArgumentException($"ARGUMENTS: --test-throw: {testThrow} is not one of {string.Join(", ", Fatal.Places)}");
+                    break;
+                case "--test-work-area":
+                    var areaText = Value();
+                    var sides = areaText.Split('x');
+                    if (sides.Length != 2 || !int.TryParse(sides[0], out var areaWidth) || !int.TryParse(sides[1], out var areaHeight) || areaWidth <= 0 || areaHeight <= 0)
+                        throw new ArgumentException($"ARGUMENTS: --test-work-area: {areaText} is not <width>x<height>");
+                    workArea = new Avalonia.PixelSize(areaWidth, areaHeight);
                     break;
                 default:
                     throw new ArgumentException($"ARGUMENTS: unknown argument {args[i]}. {Usage}");
             }
         }
         if (report is not null && exit is null) throw new ArgumentException("ARGUMENTS: --test-report needs --exit-after-ms, so the run ends by itself");
-        return new StartOptions(png, exit, report, theme, tool, openMore, menu, dataRoot, zoom, firstFrame, panTrace, panSeconds);
+        return new StartOptions(png, exit, report, theme, tool, openMore, menu, dataRoot, zoom, firstFrame, panTrace, panSeconds, testThrow, workArea);
     }
 }

@@ -23,6 +23,7 @@ public static partial class TestProbe
     const int PanMoveEveryMs = 4;       // 250 moves a second, more than any display here shows.
     const int SettleMs = 1000;          // The strip's preview and first layouts end before the count.
     const int LastMessagesMs = 200;     // The last posted messages reach the canvas.
+    const int SampleEveryMs = 250;      // How often the trace reads the engine's view.
 
     [LibraryImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -62,7 +63,9 @@ public static partial class TestProbe
             $"\"frames\": {info.frames}, \"frame_errors\": {info.frame_errors}, \"last_error\": {info.last_error}, " +
             $"\"validation_errors\": {session.Counters().validation_errors}, " +
             $"\"has_display_table\": {info.has_display_table}, \"display_icc_len\": {info.display_icc_len}, \"doc_uploads\": {info.doc_uploads}, " +
-            $"\"stage\": [{stage.R}, {stage.G}, {stage.B}], \"theme\": \"{window.ActualThemeVariant}\"";
+            $"\"stage\": [{stage.R}, {stage.G}, {stage.B}], \"theme\": \"{window.ActualThemeVariant}\", " +
+            $"\"client_width\": {Text(window.ClientSize.Width)}, \"client_height\": {Text(window.ClientSize.Height)}, " +
+            $"\"status_bottom\": {Text(window.Status.TranslatePoint(new Point(0, window.Status.Bounds.Height), window)?.Y ?? double.MaxValue)}";
     }
 
     /// Runs on the UI thread, and each long wait runs on another thread.
@@ -77,6 +80,7 @@ public static partial class TestProbe
             if (!await Task.Run(() => session.WaitFrames(1, FirstFrameLimitMs)))
                 throw new InvalidOperationException($"no frame in {FirstFrameLimitMs} ms: frame errors {session.Info().frame_errors}, last {session.Info().last_error}");
             var first = SinceStart();
+            await window.CanvasShown;
 
             if (options.TestZoom is { } zoom)
             {
@@ -91,8 +95,8 @@ public static partial class TestProbe
 
             if (options.PanTracePath is { } tracePath)
             {
+                // The window stays open, so the harness can read what it shows after the trace.
                 await PanTraceRun(window, options.PanSeconds, tracePath);
-                window.Close();
             }
         }
         catch (Exception e)
@@ -123,7 +127,7 @@ public static partial class TestProbe
         var errorsBefore = session.Info().frame_errors;
         var originStart = v.Origin;
 
-        var moves = await Task.Run(() => DriveTrace(hwnd, trace, seconds));
+        var drive = await Task.Run(() => DriveTrace(session, hwnd, trace, seconds, framesBefore));
         await Task.Delay(LastMessagesMs);
         var times = session.TakeFrameTimes();
         view.Changed -= CountChange;
@@ -131,7 +135,13 @@ public static partial class TestProbe
         var info = session.Info();
         var list = new StringBuilder();
         foreach (var time in times) list.Append(list.Length == 0 ? "" : ", ").Append(Text(time));
-        WriteAtOnce(path, $"{{ \"seconds\": {Text(seconds)}, \"moves_posted\": {moves}, \"view_changes\": {viewChanges}, " +
+        var samples = string.Join(", ", drive.Samples.Select(s => $"[{Text(s.Seconds)}, {s.X}, {s.Y}, {Text(s.OriginX)}, {Text(s.OriginY)}, {s.Frames}]"));
+        // The frame log has its own clock, so the first frame ties it to this one. A run that
+        // never saw a frame reports the whole time as lost at both ends.
+        var startGap = drive.FirstFrameMs is { } firstAt ? firstAt - drive.FirstMoveMs : drive.EndMs - drive.FirstMoveMs;
+        var endGap = drive.FirstFrameMs is { } seenAt && times.Length != 0 ? drive.EndMs - seenAt - (times[^1] - times[0]) : drive.EndMs - drive.FirstMoveMs;
+        WriteAtOnce(path, $"{{ \"seconds\": {Text(seconds)}, \"moves_posted\": {drive.Moves}, \"view_changes\": {viewChanges}, " +
+            $"\"start_gap_ms\": {Text(startGap)}, \"end_gap_ms\": {Text(endGap)}, \"view_samples\": [{samples}], " +
             $"\"trace\": {{ \"start_x\": {trace.StartX}, \"start_y\": {trace.StartY}, \"reach_x\": {trace.ReachX}, \"reach_y\": {trace.ReachY} }}, " +
             $"\"origin_start\": [{Text(originStart.X)}, {Text(originStart.Y)}], \"origin_end\": [{Text(info.origin_x)}, {Text(info.origin_y)}], " +
             $"\"frames_counted\": {info.frames - framesBefore}, \"frame_errors_during\": {info.frame_errors - errorsBefore}, " +
@@ -145,9 +155,12 @@ public static partial class TestProbe
         if (!PostMessage(hwnd, message, w, l)) throw new InvalidOperationException($"PostMessage {message}: {Marshal.GetLastPInvokeError()}");
     }
 
+    sealed record DriveResult(long Moves, double FirstMoveMs, double? FirstFrameMs, double EndMs, List<(double Seconds, int X, int Y, double OriginX, double OriginY, ulong Frames)> Samples);
+
     /// Posts the drag from its own thread. A late wake makes one bigger step, as a real
     /// pointer does. It never waits on the UI thread, so a slow UI shows up in the counts.
-    static long DriveTrace(nint hwnd, PanTrace trace, double seconds)
+    /// It reads the engine's view now and then, which takes the engine's short lock and no UI.
+    static DriveResult DriveTrace(CanvasSession session, nint hwnd, PanTrace trace, double seconds, ulong framesBefore)
     {
         if (timeBeginPeriod(1) != 0) throw new InvalidOperationException("timeBeginPeriod refused 1 ms");
         try
@@ -156,17 +169,32 @@ public static partial class TestProbe
             var (lastX, lastY) = trace.At(0);
             Post(hwnd, WmLeftDown, MkLeft, PointLparam(lastX, lastY));
             long moves = 0;
+            double? firstMove = null, firstFrame = null;
+            var nextSample = 0.0;
+            var samples = new List<(double, int, int, double, double, ulong)>();
             while (clock.Elapsed.TotalSeconds < seconds)
             {
                 Thread.Sleep(PanMoveEveryMs);
                 var (x, y) = trace.At(clock.Elapsed.TotalSeconds);
-                if (x == lastX && y == lastY) continue;
-                (lastX, lastY) = (x, y);
-                Post(hwnd, WmMouseMove, MkLeft, PointLparam(x, y));
-                moves++;
+                if (x != lastX || y != lastY)
+                {
+                    (lastX, lastY) = (x, y);
+                    Post(hwnd, WmMouseMove, MkLeft, PointLparam(x, y));
+                    moves++;
+                    firstMove ??= clock.Elapsed.TotalMilliseconds;
+                }
+                var now = clock.Elapsed.TotalMilliseconds;
+                if (firstFrame is null && firstMove is not null && session.Info().frames > framesBefore) firstFrame = clock.Elapsed.TotalMilliseconds;
+                if (now >= nextSample)
+                {
+                    var info = session.Info();
+                    samples.Add((now / 1000, lastX, lastY, info.origin_x, info.origin_y, info.frames));
+                    nextSample = now + SampleEveryMs;
+                }
             }
+            var end = clock.Elapsed.TotalMilliseconds;
             Post(hwnd, WmLeftUp, 0, PointLparam(lastX, lastY));
-            return moves;
+            return new DriveResult(moves, firstMove ?? end, firstFrame, end, samples);
         }
         finally
         {

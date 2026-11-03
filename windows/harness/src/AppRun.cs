@@ -66,6 +66,16 @@ public sealed class AppRun : IDisposable
         _process.BeginErrorReadLine();
     }
 
+    /// The app's own CPU time so far, so a busy check can leave it out.
+    public TimeSpan CpuTime
+    {
+        get
+        {
+            _process.Refresh();
+            return _process.TotalProcessorTime;
+        }
+    }
+
     public double MsSinceStart => (DateTime.Now - Started).TotalMilliseconds;
 
     public string Output()

@@ -235,4 +235,126 @@ public sealed class MenuTests
         Assert.IsType<UiLook.IconView>(open.Icon);
         window.Close();
     }
+
+    /// Held apart from WindowsMenus.Removed, so a row added to that table fails here and not
+    /// only hides an item from the check above, which reads the table it checks.
+    static readonly string[] PinnedRemoved =
+    [
+        "OpenPainter > Hide OpenPainter",
+        "OpenPainter > Hide Others",
+        "OpenPainter > Show All",
+        "Window > Minimize",
+        "Window > Zoom",
+        "Window > Bring All to Front",
+    ];
+
+    [Fact]
+    public void TheRemovedTableIsThePinnedList() =>
+        Assert.Equal(PinnedRemoved.Order(StringComparer.Ordinal), WindowsMenus.Removed.Keys.Order(StringComparer.Ordinal));
+
+    /// The rows the Mac has and Windows must show too, separators included, by the rules
+    /// written out here and not by the code under test.
+    static IEnumerable<string> MacLines(IEnumerable<CatalogEntry> items, string parent)
+    {
+        var kept = new List<CatalogEntry>();
+        foreach (var item in items)
+        {
+            if (PinnedRemoved.Contains(item.Path)) continue;
+            if (item.Kind == EntryKind.Separator && (kept.Count == 0 || kept[^1].Kind == EntryKind.Separator)) continue;
+            kept.Add(item);
+        }
+        if (kept.Count != 0 && kept[^1].Kind == EntryKind.Separator) kept.RemoveAt(kept.Count - 1);
+        foreach (var item in kept)
+        {
+            if (item.Kind == EntryKind.Separator)
+            {
+                yield return $"{parent} > ---";
+                continue;
+            }
+            yield return item.Path;
+            foreach (var line in MacLines(item.Items, item.Path)) yield return line;
+        }
+    }
+
+    [Fact]
+    public void SeparatorsSitWhereTheMacHasThem()
+    {
+        var catalog = Catalog();
+        var windows = WindowsMenus.Build(catalog);
+        // Windows adds a separator and an item for each row the Mac's app menu moves here.
+        var moved = WindowsMenus.Moved.ToDictionary(m => $"{m.Menu} > {m.Title}", m => m.Menu);
+        var separators = 0;
+        foreach (var menu in catalog.Menus.Where(m => m.Title != WindowsMenus.AppMenu))
+        {
+            var want = MacLines(menu.Items, menu.Title).ToList();
+            var got = Rows(windows.Single(m => m.Title == menu.Title).Items).ToList();
+            for (var i = got.Count - 1; i >= 0; i--)
+            {
+                if (!moved.ContainsKey(got[i])) continue;
+                got.RemoveAt(i);
+                Assert.Equal($"{menu.Title} > ---", got[i - 1]);
+                got.RemoveAt(i - 1);
+                i--;
+            }
+            Assert.Equal(want, got);
+            separators += want.Count(line => line.EndsWith("> ---", StringComparison.Ordinal));
+        }
+        Assert.True(separators >= 19, $"only {separators} separators were compared");
+
+        static IEnumerable<string> Rows(IEnumerable<MenuEntry> entries)
+        {
+            foreach (var entry in entries)
+            {
+                yield return entry.Path;
+                foreach (var row in Rows(entry.Items)) yield return row;
+            }
+        }
+    }
+
+    [Fact]
+    public void AMissingSeparatorInTheWindowsMenusIsSeen()
+    {
+        var catalog = Catalog();
+        var withSeparators = MacLines(catalog.Menus.Single(m => m.Title == "File").Items, "File").ToList();
+        Assert.Contains("File > ---", withSeparators);
+        Assert.NotEqual(withSeparators, withSeparators.Where(line => line != "File > ---"));
+    }
+
+    /// Each tool's hint against the Swift source, read again each run.
+    static Dictionary<string, string> SwiftHints()
+    {
+        var swift = Repo.Read("mac/OpenPainterKit/Sources/Shell/ToolState.swift");
+        var from = swift.IndexOf("public var hint: String", StringComparison.Ordinal);
+        Assert.True(from >= 0, "ToolState.swift has no hint");
+        var body = swift[from..swift.IndexOf("/// The next tool for a key press", from, StringComparison.Ordinal)];
+        var hints = new Dictionary<string, string>();
+        foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(body, @"case \.(\w+):\s*return ""([^""]*)"""))
+            hints[match.Groups[1].Value] = match.Groups[2].Value;
+        return hints;
+    }
+
+    /// The Windows names for the Mac's keys, written out, because the code under test does the same.
+    static string InWindowsWords(string mac) => mac
+        .Replace("Option-click", "Alt-click").Replace("Command-click", "Ctrl-click")
+        .Replace("Command adds", "Ctrl adds").Replace("Option subtracts", "Alt subtracts");
+
+    [Fact]
+    public void EveryToolHintIsTheSwiftOneInWindowsWords()
+    {
+        var hints = SwiftHints();
+        Assert.Equal(11, hints.Count);
+        var tools = Catalog().Tools;
+        foreach (var id in hints.Keys) Assert.Contains(tools, tool => tool.Id == id);
+        Assert.True(tools.Count >= 19, $"only {tools.Count} tools");
+        foreach (var tool in tools)
+        {
+            var want = !tool.Functional ? $"{tool.Label} is coming soon"
+                : hints.TryGetValue(tool.Id, out var hint) ? InWindowsWords(hint)
+                : $"{tool.Label}: drag to paint";
+            Assert.Equal(want, ToolState.Hint(tool));
+        }
+        var moved = ToolState.Hint(tools.Single(t => t.Id == "rectangleSelect"));
+        Assert.DoesNotContain("Command", moved);
+        Assert.DoesNotContain("Option", moved);
+    }
 }

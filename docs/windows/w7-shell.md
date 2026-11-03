@@ -11,7 +11,7 @@ This file says what each done-test item needs and how to run it. Root finishes i
 | 3 | The color check on the live window | The harness's `color check` part, light and dark | `--parts color` |
 | 4 | Menu order and words match `opcli dump-catalog`, with Ctrl for Command | `MenuTests` in the app tests | `dotnet test windows/OpenPainter.Tests/OpenPainter.Tests.csproj` |
 | 5 | The DLL's exports match the bridge by name | `BridgeTests` in the app tests | The same command, after a release `op_ffi.dll` build |
-| 6 | Layout matches the W6 pictures, light and dark, at 100% and 200% | Root looks at each shot | `--parts shots`. 200% is not in this set yet |
+| 6 | Layout matches the W6 pictures, light and dark, at 100% and 200% | Root looks at each shot | `--parts shots`. The harness never changes the display's scale, so a scale the display is not at prints its own NOT RUN row |
 | 7 | `--tier milestone` passes, and `--tier window` passes when the screen is free | The level's summary | See "The levels" below |
 | 8 | The 15 overlay hours in `w5-overlay.md` still fit | Root's written judgement | No command |
 
@@ -28,7 +28,7 @@ dotnet run --project windows/harness/OpenPainter.Harness.csproj -c Release -- --
 
 `cargo xtask check --tier window` runs the same steps.
 
-Each part prints one line: PASS, FAIL or NOT RUN with a reason. The last line is `HARNESS: PASS` or `HARNESS: FAIL` with the names. Any part that did not pass fails the run.
+Each part prints one line: PASS, FAIL or NOT RUN with a reason. A PASS must come from evidence that the check ran. The last line is `HARNESS: PASS` or `HARNESS: FAIL` with the names. Any part that did not pass fails the run.
 
 Before any part, the harness runs `scripts/windows/preflight.ps1 -Level window`, then looks for known dialogs: `consent`, `CredentialUIBroker`, `WerFault` and `WerFaultSecure`, when they have a window. A locked screen, a known dialog, a wrong session or under 40 GB free prints `UI TESTS: NOT RUN (reason)`, and every part prints NOT RUN.
 
@@ -36,7 +36,7 @@ Switches for a proof run. The window level passes none of them:
 
 | Switch | What it does |
 | --- | --- |
-| `--parts report,pixels,color,shots,pan` | Runs only these parts |
+| `--parts report,pixels,color,shots,pan,exit,fatal,small-screen` | Runs only these parts |
 | `--pan-seconds <s>` | A shorter trace. The part then prints NOT RUN with its numbers |
 | `--allow-busy` | Runs the trace on a busy PC. The part then prints NOT RUN with its numbers |
 | `--first-frame-runs <n>` | How many launches `pixels` measures. The default is 3 |
@@ -46,17 +46,40 @@ Switches for a proof run. The window level passes none of them:
 
 **Rules for all of them (PLAN 4.3).** Every run passes a temp `--data-root`. The harness fails if the real settings folders change. Pictures come from `PrintWindow` on one of the app's own windows. A screen pixel is read only after `WindowFromPoint` says the app's own window is there. Input is messages posted to the canvas's own window. `SendInput` and moving the pointer are not used, and a test fails if the harness or the probe calls them. The app's windows rise above other programs with no focus change.
 
-**Pan trace.** The harness writes a 6000 by 4000 PNG to its temp folder. The app opens it through `--test-load-png` at 100%. The Pan tool then drags along a fixed path, posted from its own thread 250 times a second. Each axis runs a triangle wave, so the pointer never rests. A pointer at rest asks for no frame, and that would look like a stall. Frame times come from `op_view_take_frame_times`, which the engine stamps on its render thread. No Avalonia callback is in the count. The part fails if the frames cover under 98% of the time asked, the average is under 59 fps, or a gap is over 50 ms. A PC at 15% CPU or more before the start prints NOT RUN, because a busy run does not count.
+**Pan trace.** The harness writes a 6000 by 4000 PNG to its temp folder. The app opens it through `--test-load-png` at 100%. The Pan tool then drags along a fixed path, posted from its own thread 250 times a second. Each axis runs a triangle wave, so the pointer never rests. A pointer at rest asks for no frame, and that would look like a stall. Frame times come from `op_view_take_frame_times`, which the engine stamps on its render thread. No Avalonia callback is in the count.
 
-**Pixel read-back.** The test image is flat colored cells from a formula, and no cell is near black. The harness knows what each document pixel must be. After the first-frame signal it captures the main window 5 times, and each capture's grid of up to 2,560 points must match within 1 of 255. It also reads the real screen at the canvas's middle, and that pixel must match too. It does this for 3 launches of a small image, 24 MP at 100%, and 24 MP at Fit. Before the signal it counts black captures and black screen pixels, so the time a black canvas shows is measured.
+These fail the part, on any PC:
+
+- The engine's view did not follow the pointer. The hook reads the view 4 times a second. The view must sweep at least 90% of what the pointer sweeps, stay within 150 pixels of the pointer's path, and get a new frame between any two reads.
+- Real pixels do not move. The harness reads one real screen pixel 4 times a second during the trace, and its color must change in at least 25% of the reads, because flat cells pass under it.
+- After the trace, the canvas does not show the view. The app stays open, and a capture must match the image at the last view.
+
+These fail the part on a quiet PC and only make it NOT RUN on a busy one:
+
+- The average is under 59 fps, or a gap between frames is over 50 ms.
+- The first frame comes over 50 ms after the first move, or the last comes over 50 ms before the end. The two ends together may lose at most 100 ms of the time asked. Before this rule, a freeze of up to 0.6 s at an end went unseen.
+
+**A busy run (PLAN 4.3).** The harness reads CPU and GPU use before the launch and during the trace, and throws out a busy run as NOT RUN with its numbers. The limits are the whole PC at 15% CPU before the start, other programs at 15% CPU on average during the trace (the PC's use less the app's own), and the GPU at 15% before or 50% on average during. GPU use that cannot be read counts as busy. Sunshine and LM Studio are named when they run, and they count as busy when a stream or a loaded model is in use or when nobody can tell, as in `scripts/windows/preflight.ps1`.
+
+**Pixel read-back.** The test image is flat colored cells from a formula, and no cell is near black. The harness knows what each document pixel must be. After the first-frame signal it captures the main window 5 times, and each capture's grid of up to 2,560 points must match within 1 of 255. It does this for 3 launches of a small image, a dark launch of it, 24 MP at 100%, 24 MP at Fit, and 24 MP in dark.
+
+**Screen pixels.** The same launches read the real screen at up to 8 points away from color edges, from the middle outward. A point another window covers does not count. A launch with no point judged prints NOT RUN by the launch's name, so this row cannot pass with nothing judged.
+
+**Launch paint.** The same launches read the real screen in the canvas's area from launch. The window first shows what is behind it for a moment, until Avalonia paints, at most 250 ms. From then until the first frame every pixel must be the stage color, and none may be black.
 
 **First-frame signal.** `--test-first-frame <file>` makes the app write the file once the engine has presented a frame at the asked zoom. The harness waits for that file, then calls `DwmFlush` twice. No part waits a fixed time for the first frame.
 
 **Color check.** The image has 18 patches: primaries, secondaries, a gray ramp and mixed colors. Each must match within 1 of 255 at 100%. The stage around the image must match the palette, so no seam shows beside Avalonia's stage. Expected values exist only for an sRGB display profile. Another profile with a difference prints NOT RUN and names the profile.
 
-**Shots.** The harness saves 6 pictures in `<out>/shots`: the main window, the File menu open and the "more" popup open, each in light and dark. Each is the app's windows painted over each other, with nothing from any other program. Root must look at them. A headless shot is never the visual check.
+**Shots.** The harness saves 6 pictures in `<out>/shots`: the main window, the File menu open and the "more" popup open, each in light and dark. Each is the app's windows painted over each other, with nothing from any other program. Root must look at them. A headless shot is never the visual check. `window shots at 100%` and `window shots at 200%` are their own rows, and the one the display is not at prints NOT RUN. So a run on one display scale prints HARNESS: FAIL and the `window` level cannot pass there.
 
-**The report.** `--test-report` runs as before, in light and dark, and the harness splits it into `hit test`, `panels`, `canvas input`, `menus and options`, `icons` and `window minimum size`.
+**The report.** `--test-report` runs as before, in light and dark, and the harness splits it into `hit test`, `panels`, `canvas input`, `menus and options`, `icons` and `window minimum size`. Each check that runs adds to `checks_run` in the report, and each part needs at least the count a full run gives, which `ReportJudge.LeastChecks` holds. So a check taken out of the report fails its part. A panel or the "more" popup under another program prints NOT RUN in its own part.
+
+**App exit.** The main window closes in 5 states: all panels shown, one hidden, all four hidden, one hidden and shown again, one hidden and the window minimized. Each must end the process with exit code 0 within 15 s. A hidden panel has no owner, and Avalonia's default shutdown waits for every window, so the app now ends on its main window's close, and the main window ends every panel.
+
+**Fatal path.** `--test-throw <place>` plants a throw in the main window's `Closed`, in each window's `WM_GETMINMAXINFO` hook, and in each window's move. Each must end the process with exit code 1 and the message.
+
+**Small screen.** `--test-work-area 1000x620` makes the app take that as its monitor's work area. The window must fit it at launch and when asked for a tiny size, and the status bar must end inside it. The part saves `shots/small-screen-light.png` for root to look at.
 
 ## The levels
 
@@ -92,6 +115,8 @@ Root writes the done-test results here.
 
 The PC was running a 10,000-case test in another copy, so the speed numbers do not count. C: had under 40 GB free, so the runs passed `--ignore-disk`.
 
+These are stage 3's runs. The fix round's are in the next section.
+
 | Run | Result |
 | --- | --- |
 | App tests, `dotnet test windows/OpenPainter.Tests/OpenPainter.Tests.csproj` | 239 passed, 0 failed |
@@ -107,11 +132,56 @@ The PC was running a 10,000-case test in another copy, so the speed numbers do n
 
 ### The black canvas at launch
 
-It is a real fault, and it is small. The canvas's window exists before its first frame, and nothing paints it. Reading the real screen at the canvas's middle before the first frame:
+It was a real fault, and it is fixed. The canvas's window exists before its first frame. Nothing could paint it: a plain Win32 fill still read black on the screen, because Avalonia's main window has `WS_EX_NOREDIRECTIONBITMAP`, and the window Avalonia holds the canvas in is layered. So that holder now clips away all of the canvas until the first frame, and Avalonia's stage shows there in the right color. The engine draws as usual meanwhile. Once a frame is presented, the clip goes and the view is sent once more.
 
-| Image | Screen pixels that were black | Canvas window to first frame |
+Real screen pixels before the first frame, at 100% display scale:
+
+| Build | Pixels before the first frame | Black | The stage color |
+| --- | --- | --- | --- |
+| Stage 3's, the 3 launches of 24 MP, light and dark | 111 | 106 | 0 |
+| This fix, the same 3 launches | 111 | 0 | All after the window's first paint |
+
+The window itself shows what is behind it for at most 84 ms before Avalonia's first paint. That is not the canvas, and the harness allows up to 250 ms of it. Small images reach their first frame too fast for a read before it, about 100 ms after the canvas window, so their launches count only when a read lands there.
+
+### What Avalonia does with a throw
+
+I planted a throw at each place on a build with no guard, and ran it on a real window.
+
+| Place | What happened with no guard | Now |
 | --- | --- | --- |
-| 24 MP, two launches | 14 of 14 | About 0.7 to 1 s |
-| Small image, four launches | 2 of 4. Only one pixel was read per launch | About 0.1 s |
+| The main window's `Closed` | Avalonia runs it through `Dispatcher.Send`, so it reached the app's `UnhandledException` handler. The message and exit code 1 came through | The same, through `Fatal.Guard` |
+| `WindowLimits.OnMessage`, main and panels | It crossed the native boundary. The process died with exit code -1073740791 (`0xC0000409`). A WinExe has no console, so a user sees nothing | Message, exit code 1 |
+| `PositionChanged`, main and panels | The same death | Message, exit code 1 |
 
-Over 14 launches, a small image's first frame came 624 to 808 ms after launch, and a 24 MP image's 1,224 and 1,261 ms. After the signal, none of the 70 captures was black. Stage 2's one black shot in 12 at a fixed 5 s came from a slow load on a busy PC. The harness now waits on the signal, so this cannot fail a check by chance. The fault is still there for a user: a black box shows in a light window until the image is ready.
+So the `Closed` part of the finding was not a fault, and the message-hook part was. `Fatal.Raise` sets the exit code at once and shows the message, because on the way out the UI thread may not run another job.
+
+### Panels and screens
+
+`PanelLayout.Clamp`, `IsReachable` and `OnScreen` port the Mac's. A screen change brings every panel no screen can reach fully back onto the best screen, shown or hidden. A move from outside keeps a panel's title strip reachable. The Mac's rule that keeps panels apart is left for W8 or later.
+
+A move uses a smaller step than the Mac's `userMoved`: the shortest move that keeps the title strip reachable, and not a move fully onto the screen. Windows places a dragged window by the pointer on every move, so a move fully onto the screen would jump back and forth under a pointer held past the edge.
+
+### Fix round results, not done-test results
+
+The PC was 20% busy with other work, so the speed numbers do not count, and the pan trace printed NOT RUN. C: had over 40 GB free, and the runs passed `--ignore-disk` and `--allow-busy` all the same. The harness ran as two commands, so the summary lines differ from one full run.
+
+| Run | Result |
+| --- | --- |
+| App tests | 352 passed, 0 failed |
+| `cargo xtask check --tier fast` | PASS in 23 s |
+| AOT headless run, by itself, not the milestone level | `Failed: 0, Passed: 253, Skipped: 0, Total: 253, 177 test methods on the AOT build` |
+| Pan trace, 30 s, PC 20% busy | Average 60.0 fps, longest stall 33.4 ms, 1,803 frames, first frame 5 ms after the start, last frame after the end, GPU 26% during, 2,280 of 2,280 real pixels right after the trace. Printed NOT RUN, because the PC was busy |
+| Report, light and dark | PASS. Checks: hit test 15, panels 46, canvas input 36, menus and options 9, icons 16, window minimum size 1 |
+| Pixel read-back, 7 launches | PASS |
+| Screen pixels, 7 launches | PASS. 56 points judged |
+| Launch paint, 7 launches | PASS. 98 pixels before a first frame, over 3 launches |
+| Color check, light and dark | PASS. 18 patches, sRGB |
+| App exit, 5 states | PASS. Each exit code 0, in 181 to 229 ms |
+| Fatal path, 5 places | PASS. Each exit code 1 with the message |
+| Small screen, 1000 by 620 | PASS. The status bar ends at 612 of 612 |
+| Window shots at 100% | PASS |
+| Window shots at 200% | NOT RUN. The display is at 100% |
+
+Not proven by a real run: a drag with the real mouse, because tests do not move the pointer, so a panel's move came from `SetWindowPos`; a real monitor going away, so the screen list was replaced and `WM_DISPLAYCHANGE` was sent to the main window; and a real display at 150% or 200%, so the size math is proven by tests and by the `--test-work-area` hook.
+
+A pan trace on a quiet PC still needs root's run.

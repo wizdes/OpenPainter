@@ -173,7 +173,9 @@ public sealed class HarnessTests
         Assert.Equal("HARNESS: FAIL (no part ran)", PartResult.Summary([]));
     }
 
-    const string CleanReport = """{ "panels": { "colors": { "screen": "on top" } }, "problems": [] }""";
+    /// Every part's evidence, as a full run writes it.
+    static readonly string AllChecks = string.Join(", ", ReportJudge.LeastChecks.Select(c => $"\"{c.Part}\": {c.Least}"));
+    static readonly string CleanReport = $$"""{ "panels": { "colors": { "screen": "on top" } }, "checks_run": { {{AllChecks}} }, "problems": [] }""";
 
     [Fact]
     public void ACleanReportPassesEveryPart()
@@ -193,7 +195,7 @@ public sealed class HarnessTests
     [InlineData("window minimum: the client stops at 1100, 824, not 1100, 792", "window minimum size")]
     public void AReportProblemFailsItsOwnPart(string problem, string part)
     {
-        var parts = ReportJudge.Parts($$"""{ "problems": ["{{problem}}"] }""", 1, "");
+        var parts = ReportJudge.Parts($$"""{ "checks_run": { {{AllChecks}} }, "problems": ["{{problem}}"] }""", 1, "");
         Assert.Equal(PartStatus.Fail, parts.Single(p => p.Name == part).Status);
         Assert.Single(parts, p => p.Status != PartStatus.Pass);
     }
@@ -230,17 +232,305 @@ public sealed class HarnessTests
         }
     }
 
+    static readonly string[] BannedCalls = ["SendInput", "keybd_event", "mouse_event", "SetCursorPos", "CopyFromScreen", "BitBlt"];
+
+    static IEnumerable<string> BannedIn(string text) => BannedCalls.Where(banned => text.Contains($"{banned}(", StringComparison.Ordinal));
+
     [Fact]
-    public void TheHarnessHoldsNoBannedCall()
+    public void NothingUnderWindowsHoldsABannedCall()
     {
-        // PLAN 4.3: tests use messages to the app's own window, and capture one window.
-        foreach (var file in Directory.GetFiles(Repo.File("windows/harness/src"), "*.cs").Concat([Repo.File("windows/OpenPainter/src/Shell/TestProbe.cs")]))
-        {
-            var text = File.ReadAllText(file);
-            foreach (var banned in new[] { "SendInput", "keybd_event", "mouse_event", "SetCursorPos", "CopyFromScreen", "BitBlt" })
-                Assert.False(text.Contains($"{banned}(", StringComparison.Ordinal), $"{Path.GetFileName(file)} calls {banned}");
-        }
+        // PLAN 4.3: tests use messages to the app's own window, and capture one window. No
+        // part of windows/ has a reason to send raw input or read the whole screen.
+        static bool IsBuildOutput(string file) =>
+            file.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj");
+        var files = Directory.GetFiles(Repo.File("windows"), "*.cs", SearchOption.AllDirectories).Where(f => !IsBuildOutput(f)).ToList();
+        Assert.True(files.Count > 50, $"only {files.Count} source files under windows/");
+        Assert.Contains(files, f => f.EndsWith("MainWindow.cs", StringComparison.Ordinal));
+        Assert.Contains(files, f => f.EndsWith(Path.Combine("harness", "src", "Win32.cs"), StringComparison.Ordinal));
+        foreach (var file in files)
+            Assert.True(!BannedIn(File.ReadAllText(file)).Any(), $"{file} calls {string.Join(", ", BannedIn(File.ReadAllText(file)))}");
     }
+
+    [Fact]
+    public void ThePlantedBannedCallIsFound() =>
+        Assert.Equal(["SendInput"], BannedIn("static extern uint Send" + "Input(uint count);"));
+
+    // ---- A freeze at either end of the trace.
+
+    static double[] Frames(double fromSeconds, double toSeconds)
+    {
+        var count = (int)((toSeconds - fromSeconds) * 60);
+        return Enumerable.Range(0, count + 1).Select(i => (fromSeconds + i / 60.0) * 1000).ToArray();
+    }
+
+    [Theory]
+    [InlineData(.6, 30)]    // Frozen for its first 0.6 s, which 98% cover let through.
+    [InlineData(0, 29.4)]   // Frozen for its last 0.6 s.
+    [InlineData(.06, 29.94)] // A little at each end, 120 ms together, over two allowed stalls.
+    public void AFreezeAtAnEndOfTheTraceFails(double from, double to) =>
+        Assert.Contains("cover", FrameStats.From(Frames(from, to)).Problem(30));
+
+    [Theory]
+    [InlineData(51.0, 0.0, "first frame")]
+    [InlineData(0.0, 51.0, "last frame")]
+    public void AGapOverOneStallAtEitherEndFailsByName(double start, double end, string words) =>
+        Assert.Contains(words, FrameStats.From(Frames(0, 30)).Problem(30, start, end));
+
+    [Fact]
+    public void GapsOfUpToOneStallPass() => Assert.Null(FrameStats.From(Frames(0, 30)).Problem(30, 50, 50));
+
+    // ---- The pan must really move the image.
+
+    /// A view that follows the pointer one to one, with `lag` pixels behind it.
+    static List<PanSample> Following(double lag = 20)
+    {
+        var trace = PanTrace.For(6000, 4000, 1280, 672, 1, 1);
+        return Enumerable.Range(0, 120).Select(i =>
+        {
+            var at = trace.At(i * .25);
+            return new PanSample(i * .25, at.X, at.Y, at.X - trace.StartX - lag, at.Y - trace.StartY - lag, i * 15 + 1);
+        }).ToList();
+    }
+
+    [Fact]
+    public void AViewThatFollowsThePointerPasses() => Assert.Null(PanMotion.Problem(Following(), 1, 1));
+
+    [Fact]
+    public void APanThatDoesNothingFailsThoughFramesKeepComing()
+    {
+        var still = Following().Select(s => s with { OriginX = -300, OriginY = -200 }).ToList();
+        Assert.Contains("the view moved 0 by 0", PanMotion.Problem(still, 1, 1));
+    }
+
+    [Fact]
+    public void AViewThatLeavesThePointersPathFails()
+    {
+        var mirrored = Following().Select(s => s with { OriginX = -s.OriginX, OriginY = -s.OriginY }).ToList();
+        Assert.Contains("off the pointer", PanMotion.Problem(mirrored, 1, 1));
+    }
+
+    [Fact]
+    public void AViewWithNoNewFrameFails()
+    {
+        var stuck = Following().Select(s => s with { Frames = 7 }).ToList();
+        Assert.Contains("no frame was shown", PanMotion.Problem(stuck, 1, 1));
+    }
+
+    [Fact]
+    public void ATraceWithFewSamplesProvesNothing() => Assert.Contains("only 2", PanMotion.Problem(Following().Take(2).ToList(), 1, 1));
+
+    [Fact]
+    public void ScreenPixelsThatDoNotChangeMeanTheImageDidNotMove()
+    {
+        var still = Enumerable.Repeat<Rgb?>(new Rgb(9, 9, 9), 100).ToList();
+        Assert.Contains("did not move", PanMotion.ScreenProblem(still, out var judged));
+        Assert.True(judged);
+        var moving = Enumerable.Range(0, 100).Select(i => (Rgb?)new Rgb((byte)i, 0, 0)).ToList();
+        Assert.Null(PanMotion.ScreenProblem(moving, out judged));
+        Assert.True(judged);
+        Assert.Null(PanMotion.ScreenProblem(Enumerable.Repeat<Rgb?>(null, 100).ToList(), out judged));
+        Assert.False(judged);
+    }
+
+    // ---- Report parts need evidence.
+
+    [Theory]
+    [InlineData("hit test")]
+    [InlineData("panels")]
+    [InlineData("canvas input")]
+    [InlineData("menus and options")]
+    [InlineData("icons")]
+    [InlineData("window minimum size")]
+    public void APartWhoseCheckDidNotRunFails(string part)
+    {
+        var ran = string.Join(", ", ReportJudge.LeastChecks.Where(c => c.Part != part).Select(c => $"\"{c.Part}\": {c.Least}"));
+        var parts = ReportJudge.Parts($$"""{ "checks_run": { {{ran}} }, "problems": [] }""", 0, "");
+        var mine = parts.Single(p => p.Name == part);
+        Assert.Equal(PartStatus.Fail, mine.Status);
+        Assert.Contains("ran 0 checks", mine.Detail);
+        Assert.Single(parts, p => p.Status != PartStatus.Pass);
+    }
+
+    [Fact]
+    public void AReportWithNoEvidenceAtAllPassesNothing() =>
+        Assert.All(ReportJudge.Parts("""{ "problems": [] }""", 0, ""), part => Assert.Equal(PartStatus.Fail, part.Status));
+
+    [Fact]
+    public void APartThatRanTooFewChecksFails()
+    {
+        var ran = string.Join(", ", ReportJudge.LeastChecks.Select(c => $"\"{c.Part}\": {(c.Part == "icons" ? c.Least - 1 : c.Least)}"));
+        var parts = ReportJudge.Parts($$"""{ "checks_run": { {{ran}} }, "problems": [] }""", 0, "");
+        Assert.Equal(PartStatus.Fail, parts.Single(p => p.Name == "icons").Status);
+    }
+
+    [Fact]
+    public void APassCountsItsChecks() => Assert.Contains(ReportJudge.Parts(CleanReport, 0, ""), part => part.Line == $"panels: PASS ({ReportJudge.LeastChecks.Single(c => c.Part == "panels").Least} checks)");
+
+    [Fact]
+    public void ACoveredPopupIsNotRunInTheMenusPart()
+    {
+        var json = $$"""{ "more_popup_screen": "NOT RUN: class Chrome covers it", "checks_run": { {{AllChecks}} }, "problems": [] }""";
+        var menus = ReportJudge.Parts(json, 0, "").Single(p => p.Name == "menus and options");
+        Assert.Equal(PartStatus.NotRun, menus.Status);
+        Assert.Contains("class Chrome", menus.Detail);
+    }
+
+    [Fact]
+    public void APopupUnderTheCanvasIsAFaultOfTheMenusPart() =>
+        Assert.Equal(PartStatus.Fail, ReportJudge.Parts($$"""{ "checks_run": { {{AllChecks}} }, "problems": ["more popup: the main window or canvas answers"] }""", 1, "").Single(p => p.Name == "menus and options").Status);
+
+    // ---- A real screen pixel must have been judged.
+
+    [Fact]
+    public void AScreenRowWithNoPointJudgedIsNotRunAndNotAPass()
+    {
+        var part = ScreenCheck.Part([new ScreenRead("a", 3, 3, 0, null), new ScreenRead("24 MP at Fit", 0, 0, 4, null)]);
+        Assert.Equal(PartStatus.NotRun, part.Status);
+        Assert.Contains("24 MP at Fit", part.Detail);
+    }
+
+    [Fact]
+    public void AScreenPixelThatDiffersFails() =>
+        Assert.Equal(PartStatus.Fail, ScreenCheck.Part([new ScreenRead("a", 3, 2, 0, "#000000 at 1,1")]).Status);
+
+    [Fact]
+    public void AScreenRowSaysHowManyPointsItJudged() =>
+        Assert.Equal("screen pixels: PASS (5 points judged over 2 launches, all matched)", ScreenCheck.Part([new ScreenRead("a", 3, 3, 0, null), new ScreenRead("b", 2, 2, 1, null)]).Line);
+
+    [Fact]
+    public void ScreenPointsStayOffColorEdgesAtFitToo()
+    {
+        var fit = new ViewMap(.126, 40, 20, 1, TestImages.Width24Mp, TestImages.Height24Mp);
+        var margin = 4 / .126;
+        var points = PixelCheck.ScreenPoints(1280, 672, fit, (x, y) => TestImages.CellColorInside(x, y, margin));
+        Assert.True(points.Count >= 4, $"only {points.Count} points");
+        foreach (var (x, y, want) in points)
+        {
+            var (docX, docY) = fit.DocumentPoint(x + .5, y + .5);
+            Assert.Equal(want, TestImages.CellColorInside(docX, docY, margin));
+        }
+        var distance = (int X, int Y) => Math.Abs(X - 640) + Math.Abs(Y - 336);
+        Assert.True(distance(points[0].X, points[0].Y) <= distance(points[^1].X, points[^1].Y));
+    }
+
+    // ---- The black canvas at launch.
+
+    static readonly Rgb Stage = new(30, 30, 30);
+
+    static LaunchRead Launch(params (double Ms, Rgb Color)[] pixels) =>
+        new("a", Stage, 1000, pixels.Select(p => new LaunchPixel(p.Ms, p.Color)).ToList());
+
+    [Fact]
+    public void AStageColoredCanvasBeforeTheFirstFramePasses()
+    {
+        var part = LaunchPaint.Part([Launch((300, new Rgb(12, 12, 12)), (340, Stage), (500, Stage), (820, Stage), (1100, new Rgb(0, 200, 0)))]);
+        Assert.Equal(PartStatus.Pass, part.Status);
+        Assert.Contains("3 real screen pixels", part.Detail);
+    }
+
+    [Fact]
+    public void ABlackCanvasBeforeTheFirstFrameFails()
+    {
+        var part = LaunchPaint.Part([Launch((300, new Rgb(0, 0, 0)), (500, new Rgb(0, 0, 0)), (800, new Rgb(0, 0, 0)))]);
+        Assert.Equal(PartStatus.Fail, part.Status);
+        Assert.Contains("3 were black", part.Detail);
+    }
+
+    [Fact]
+    public void BlackAfterTheStageShowedFails()
+    {
+        var part = LaunchPaint.Part([Launch((300, Stage), (500, new Rgb(0, 0, 0)), (800, Stage))]);
+        Assert.Equal(PartStatus.Fail, part.Status);
+        Assert.Contains("1 of them black", part.Detail);
+    }
+
+    [Fact]
+    public void AWindowThatTakesLongToPaintFails() =>
+        Assert.Contains("took 400 ms", LaunchPaint.Part([Launch((300, new Rgb(12, 12, 12)), (700, Stage))]).Detail);
+
+    [Fact]
+    public void NoPixelReadBeforeAFirstFrameIsNotRun() =>
+        Assert.Equal(PartStatus.NotRun, LaunchPaint.Part([Launch((950, Stage))]).Status);
+
+    // ---- Busy runs are thrown out, and GPU use counts.
+
+    [Fact]
+    public void AQuietRunHasNoBusyReason()
+    {
+        Assert.Empty(BusyJudge.Before(3, 5, []));
+        Assert.Empty(BusyJudge.During([4, 6], [20, 25]));
+    }
+
+    [Fact]
+    public void ABusyCpuOrGpuBeforeOrDuringTheTraceIsAReason()
+    {
+        Assert.Contains("15% busy", BusyJudge.Before(15, 5, []).Single());
+        Assert.Contains("GPU was 40%", BusyJudge.Before(3, 40, []).Single());
+        Assert.Contains("15% of the CPU", BusyJudge.During([10, 20], [20]).Single());
+        Assert.Contains("GPU was 60%", BusyJudge.During([1], [50, 70]).Single());
+    }
+
+    [Fact]
+    public void GpuUseThatCannotBeReadIsAReason()
+    {
+        Assert.Contains("could not be read", BusyJudge.Before(3, null, []).Single());
+        Assert.Contains("could not be read", BusyJudge.During([1], [null, null]).Single());
+        Assert.Contains("could not be read", BusyJudge.During([], [10]).Single());
+    }
+
+    [Fact]
+    public void SunshineAndLmStudioAreNamedAndBusyOnlyWhenInUse()
+    {
+        Assert.Equal((null, null), BusyJudge.Program("Sunshine", false, null, "encoder sessions"));
+        Assert.Equal(("Sunshine is running, with no encoder sessions", null), BusyJudge.Program("Sunshine", true, 0, "encoder sessions"));
+        var streaming = BusyJudge.Program("Sunshine", true, 1, "encoder sessions");
+        Assert.Contains("Sunshine", streaming.Busy);
+        var unknown = BusyJudge.Program("LM Studio", true, null, "models loaded");
+        Assert.Contains("LM Studio", unknown.Busy);
+        Assert.Contains("LM Studio is running, with 2 models loaded", BusyJudge.Before(1, 1, [BusyJudge.Program("LM Studio", true, 2, "models loaded").Busy!]));
+    }
+
+    [Fact]
+    public void NvidiaSmisWordsAreRead()
+    {
+        var gpu = GpuFacts.Parse("NVIDIA GeForce RTX 3060 Ti, 12, 0\r\n");
+        Assert.Equal("NVIDIA GeForce RTX 3060 Ti", gpu.Name);
+        Assert.Equal(12, gpu.UsePercent);
+        Assert.Equal(0, gpu.EncoderSessions);
+        Assert.Null(GpuFacts.Parse("NVIDIA GeForce RTX 3060 Ti, [N/A], [N/A]").UsePercent);
+        Assert.Null(GpuFacts.Parse("garbage").UsePercent);
+    }
+
+    // ---- 200% is its own row.
+
+    [Fact]
+    public void AScaleTheDisplayWasNotAtIsItsOwnNotRunRow()
+    {
+        var rows = ShotScales.Rows([1.0]).ToList();
+        Assert.Equal("window shots at 100%: PASS", rows[0].Line);
+        Assert.Equal(PartStatus.NotRun, rows[1].Status);
+        Assert.Equal("window shots at 200%", rows[1].Name);
+    }
+
+    // ---- The harness's own arguments.
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("-Infinity")]
+    [InlineData("0")]
+    [InlineData("-3")]
+    [InlineData("1e300")]
+    [InlineData("soon")]
+    public void ABadPanLengthStopsTheHarnessByName(string value)
+    {
+        var error = Assert.Throws<ArgumentException>(() => OpenPainter.Harness.Program.Options.Parse(["--app", Environment.ProcessPath!, "--out", ".", "--pan-seconds", value]));
+        Assert.Contains("--pan-seconds", error.Message);
+    }
+
+    [Fact]
+    public void AGoodPanLengthIsRead() =>
+        Assert.Equal(5.5, OpenPainter.Harness.Program.Options.Parse(["--app", Environment.ProcessPath!, "--out", ".", "--pan-seconds", "5.5"]).PanSeconds);
 
     [Theory]
     [InlineData(1, 0, 0, 1100, 792)]

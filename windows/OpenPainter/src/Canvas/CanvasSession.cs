@@ -40,7 +40,7 @@ public sealed unsafe class CanvasSession : IDisposable
             }
             catch (Exception e)
             {
-                Dispatcher.UIThread.Post(() => throw new InvalidOperationException($"CANVAS_THREAD: {e.Message}", e));
+                OpenPainter.Shell.Fatal.Raise("CANVAS_THREAD", e);
             }
         }
     }
@@ -132,6 +132,22 @@ public sealed unsafe class CanvasSession : IDisposable
         }
         var item = new OpOverlayItem { kind = StaticZoomRectangle, x = r.X, y = r.Y, width = r.Width, height = r.Height };
         Check(Native.op_view_set_overlay(_engine, _view, &item, 1), "VIEW_OVERLAY");
+    }
+
+    /// Runs `shown` on the UI thread once the engine has presented a frame. It waits on the
+    /// canvas thread in short steps, so closing the window never waits long for it.
+    public void WhenFirstFrame(Action shown)
+    {
+        const uint StepMs = 100;
+        _work.Add(() =>
+        {
+            while (!_work.IsAddingCompleted)
+            {
+                if (!WaitFrames(1, StepMs)) continue;
+                Dispatcher.UIThread.Post(shown);
+                return;
+            }
+        });
     }
 
     /// Makes a small straight-alpha RGBA copy of the image on the canvas thread, then gives

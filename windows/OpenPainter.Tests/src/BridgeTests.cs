@@ -131,4 +131,110 @@ public sealed class BridgeTests
         var text = Writer.Write(Header.Parse("void op_x(bool flag);\n"));
         Assert.Contains("[MarshalAs(UnmanagedType.U1)] bool flag", text);
     }
+
+    // ---- Each call's types against the header. Written apart from the generator's table, so a
+    // wrong row there or a hand edit in the bridge shows here.
+
+    static readonly Dictionary<string, string> CTypes = new()
+    {
+        ["void"] = "void", ["bool"] = "bool", ["char"] = "byte",
+        ["uint8_t"] = "byte", ["int8_t"] = "sbyte", ["uint16_t"] = "ushort", ["int16_t"] = "short",
+        ["uint32_t"] = "uint", ["int32_t"] = "int", ["uint64_t"] = "ulong", ["int64_t"] = "long",
+        ["uintptr_t"] = "nuint", ["intptr_t"] = "nint", ["float"] = "float", ["double"] = "double",
+    };
+
+    static string WantedType(Header header, string c)
+    {
+        var text = c.Replace("const ", "").Replace("enum ", "").Replace("struct ", "").Trim();
+        var stars = new string('*', text.Count(ch => ch == '*'));
+        var name = text.Replace("*", "").Trim();
+        if (header.FunctionPointers.FirstOrDefault(p => p.Name == name) is { } pointer)
+        {
+            var types = pointer.Parameters.Append(pointer.Return).Select(t => WantedType(header, t));
+            return $"delegate* unmanaged[Cdecl]<{string.Join(", ", types)}>{stars}";
+        }
+        if (CTypes.TryGetValue(name, out var plain)) return plain + stars;
+        Assert.True(header.Structs.Any(s => s.Name == name) || header.Enums.Any(e => e.Name == name) || header.Opaque.Contains(name), $"the header names no type {name}, in `{c}`");
+        return name + stars;
+    }
+
+    /// Splits at commas that are not inside a function pointer's own type list.
+    static List<string> SplitParameters(string text)
+    {
+        var parts = new List<string>();
+        var (depth, start) = (0, 0);
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] is '<' or '[') depth++;
+            else if (text[i] is '>' or ']') depth--;
+            else if (text[i] == ',' && depth == 0)
+            {
+                parts.Add(text[start..i].Trim());
+                start = i + 1;
+            }
+        }
+        if (text[start..].Trim().Length != 0) parts.Add(text[start..].Trim());
+        return parts;
+    }
+
+    /// One line per difference, by the call's name.
+    static List<string> TypeDifferences(Header header, string bridge)
+    {
+        var calls = System.Text.RegularExpressions.Regex.Matches(bridge, @"public static partial (?<ret>[^;(]*?) (?<name>op_\w+)\((?<args>[^;]*)\);")
+            .ToDictionary(m => m.Groups["name"].Value);
+        var differences = new List<string>();
+        foreach (var function in header.Functions)
+        {
+            if (!calls.TryGetValue(function.Name, out var call))
+            {
+                differences.Add($"{function.Name}: no C# call");
+                continue;
+            }
+            var ret = WantedType(header, function.Return);
+            if (call.Groups["ret"].Value != ret) differences.Add($"{function.Name}: returns {call.Groups["ret"].Value}, the header says {ret}");
+            var got = SplitParameters(call.Groups["args"].Value);
+            if (got.Count != function.Parameters.Count)
+            {
+                differences.Add($"{function.Name}: {got.Count} parameters, the header says {function.Parameters.Count}");
+                continue;
+            }
+            for (var i = 0; i < got.Count; i++)
+            {
+                var written = got[i].Replace("[MarshalAs(UnmanagedType.U1)] ", "");
+                var type = written[..written.LastIndexOf(' ')];
+                var want = WantedType(header, function.Parameters[i].CType);
+                if (type != want) differences.Add($"{function.Name} parameter {function.Parameters[i].Name}: {type}, the header says {want}");
+                if (want == "bool" && !got[i].Contains("MarshalAs(UnmanagedType.U1)", StringComparison.Ordinal)) differences.Add($"{function.Name} parameter {function.Parameters[i].Name}: a C bool must be one byte");
+            }
+        }
+        return differences;
+    }
+
+    [Fact]
+    public void EveryCallsTypesMatchTheHeader()
+    {
+        var header = ReadHeader();
+        Assert.True(header.Functions.Count >= 50, $"only {header.Functions.Count} functions");
+        var differences = TypeDifferences(header, Repo.Read(BridgePath));
+        Assert.True(differences.Count == 0, string.Join("\n", differences));
+    }
+
+    [Theory]
+    [InlineData("public static partial OpStatus op_view_set(OpEngine* p, ulong view, OpViewState* state);", "public static partial OpStatus op_view_set(OpEngine* p, uint view, OpViewState* state);", "op_view_set parameter view: uint")]
+    [InlineData("public static partial OpStatus op_view_set(OpEngine* p, ulong view, OpViewState* state);", "public static partial int op_view_set(OpEngine* p, ulong view, OpViewState* state);", "op_view_set: returns int")]
+    [InlineData("public static partial OpStatus op_view_set(OpEngine* p, ulong view, OpViewState* state);", "public static partial OpStatus op_view_set(OpEngine* p, ulong view);", "op_view_set: 2 parameters")]
+    public void AWrongTypeInACallFailsByName(string right, string wrong, string words)
+    {
+        var bridge = Repo.Read(BridgePath);
+        Assert.Contains(right, bridge);
+        Assert.Contains(TypeDifferences(ReadHeader(), bridge.Replace(right, wrong)), line => line.StartsWith(words, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AWrongTypeInTheHeaderFailsByName()
+    {
+        var text = Repo.Read(HeaderPath).Replace("enum OpStatus op_view_set(struct OpEngine *p, uint64_t view,", "enum OpStatus op_view_set(struct OpEngine *p, uint32_t view,");
+        Assert.NotEqual(Repo.Read(HeaderPath), text);
+        Assert.Contains(TypeDifferences(Header.Parse(text), Repo.Read(BridgePath)), line => line.StartsWith("op_view_set parameter view", StringComparison.Ordinal));
+    }
 }

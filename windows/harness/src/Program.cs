@@ -13,8 +13,8 @@ namespace OpenPainter.Harness;
 
 public static class Program
 {
-    const string Usage = "usage: OpenPainter.Harness --app <OpenPainter.exe> --out <folder> [--parts report,pixels,color,shots,pan] [--pan-seconds <s>] [--first-frame-runs <n>] [--allow-busy] [--ignore-disk]\n       OpenPainter.Harness --export-vectors";
-    static readonly string[] AllParts = ["report", "pixels", "color", "shots", "pan"];
+    const string Usage = "usage: OpenPainter.Harness --app <OpenPainter.exe> --out <folder> [--parts report,pixels,color,shots,pan,exit,fatal,small-screen] [--pan-seconds <s>] [--first-frame-runs <n>] [--allow-busy] [--ignore-disk]\n       OpenPainter.Harness --export-vectors";
+    static readonly string[] AllParts = ["report", "pixels", "color", "shots", "pan", "exit", "fatal", "small-screen"];
 
     public static int Main(string[] args)
     {
@@ -54,7 +54,7 @@ public static class Program
 
     public sealed record Options(string App, string Out, string[] Parts, double PanSeconds, int FirstFrameRuns, bool AllowBusy, bool IgnoreDisk)
     {
-        public const double FullPanSeconds = 30;
+        public const double FullPanSeconds = 30, MostPanSeconds = 3600;
 
         public static Options Parse(string[] args)
         {
@@ -76,7 +76,8 @@ public static class Program
                         break;
                     case "--pan-seconds":
                         var text = Value();
-                        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds) || seconds <= 0) throw new ArgumentException($"HARNESS: --pan-seconds: {text}");
+                        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds) || !double.IsFinite(seconds) || seconds <= 0 || seconds > MostPanSeconds)
+                            throw new ArgumentException($"HARNESS: --pan-seconds: {text} is not a number of seconds from 0 to {MostPanSeconds}");
                         break;
                     case "--first-frame-runs":
                         var count = Value();
@@ -135,6 +136,9 @@ public static class Program
                         case "color": ColorPart("light"); ColorPart("dark"); break;
                         case "shots": ShotsPart(); break;
                         case "pan": PanPart(); break;
+                        case "exit": ExitPart(); break;
+                        case "fatal": FatalPart(); break;
+                        case "small-screen": SmallScreenPart(); break;
                         default: throw new InvalidOperationException($"HARNESS: no part named {part}");
                     }
                 }
@@ -226,13 +230,19 @@ public static class Program
 
             var problems = new List<string>();
             var lines = new List<string>();
-            for (var i = 0; i < options.FirstFrameRuns; i++) ReadBack($"run {i + 1}", small, "1", problems, lines);
-            ReadBack("24 MP at 100%", big, "1", problems, lines);
-            ReadBack("24 MP at Fit", big, null, problems, lines);
+            var screens = new List<ScreenRead>();
+            var launches = new List<LaunchRead>();
+            for (var i = 0; i < options.FirstFrameRuns; i++) ReadBack($"run {i + 1}", small, "1", "light", problems, lines, screens, launches);
+            ReadBack("dark run", small, "1", "dark", problems, lines, screens, launches);
+            ReadBack("24 MP at 100%", big, "1", "light", problems, lines, screens, launches);
+            ReadBack("24 MP at Fit", big, null, "light", problems, lines, screens, launches);
+            ReadBack("24 MP dark", big, "1", "dark", problems, lines, screens, launches);
             foreach (var line in lines) Console.WriteLine($"  {line}");
             Report(problems.Count == 0
-                ? PartResult.Pass("pixel read-back", $"{options.FirstFrameRuns + 2} runs, real pixels matched the image in every capture after the signal")
+                ? PartResult.Pass("pixel read-back", $"{screens.Count} runs, real pixels matched the image in every capture after the signal")
                 : PartResult.Fail("pixel read-back", string.Join("; ", problems)));
+            Report(ScreenCheck.Part(screens));
+            Report(LaunchPaint.Part(launches));
         }
 
         string Big24Mp()
@@ -244,15 +254,16 @@ public static class Program
             return path;
         }
 
-        /// Captures the canvas over and over from launch, so a black window before the signal
-        /// is measured, and any capture after the signal must show the image.
-        void ReadBack(string label, string png, string? zoom, List<string> problems, List<string> lines)
+        /// Reads the real screen in the canvas's area from launch, so anything but the stage
+        /// color before the first frame is measured. Any capture after the signal must show the image.
+        void ReadBack(string label, string png, string? zoom, string theme, List<string> problems, List<string> lines, List<ScreenRead> screens, List<LaunchRead> launches)
         {
-            const int PollMs = 40;
+            const int PollMs = 4;
             const int AfterSignalCaptures = 5;
             const int WindowLimitMs = 60_000;
+            const int ScreenPointsWanted = 8;
             var folder = NextFolder($"pixels-{label.Replace(' ', '-').Replace("%", "")}");
-            var args = new List<string> { "--test-load-png", png, "--theme", "light" };
+            var args = new List<string> { "--test-load-png", png, "--theme", theme };
             if (zoom is not null) args.AddRange(["--test-zoom", zoom]);
             var firstFramePath = Path.Combine(folder, "first-frame.json");
             args.AddRange(["--test-first-frame", firstFramePath]);
@@ -260,9 +271,9 @@ public static class Program
             var main = run.WaitMainWindow(WindowLimitMs);
             var windowMs = run.MsSinceStart;
             Win32.RaiseWithoutFocus(main);
-            double? firstCanvas = null, lastBlack = null;
-            int blackCaptures = 0, captures = 0, screenBlack = 0, screenSeen = 0;
+            double? firstCanvas = null;
             var canvasHandles = new HashSet<nint>();
+            var pixels = new List<LaunchPixel>();
             while (!File.Exists(firstFramePath))
             {
                 if (run.Exited) throw new InvalidOperationException($"{label}: the app exited {run.ExitCode} before its first frame: {run.Output()}");
@@ -272,19 +283,14 @@ public static class Program
                 {
                     canvasHandles.Add(canvas);
                     firstCanvas ??= run.MsSinceStart;
-                    Win32.RaiseWithoutFocus(main);
-                    var picture = Win32.Capture(main);
-                    captures++;
-                    if (!Win32.TryCanvasRect(main, canvas, out var rect)) continue;
-                    if (rect.Width > 0 && rect.Height > 0 && PixelCheck.IsBlack(picture, rect))
+                }
+                // Points the stage holds whatever the panels do, read from the window's own place.
+                if (Win32.GetWindowRect(main, out var mainRect))
+                {
+                    foreach (var (x, y) in new[] { (1, 2), (2, 2), (1, 3) })
                     {
-                        blackCaptures++;
-                        lastBlack = run.MsSinceStart;
-                    }
-                    if (Win32.GetWindowRect(canvas, out var onScreen) && Win32.ScreenPixelOf(canvas, onScreen.Left + onScreen.Width / 2, onScreen.Top + onScreen.Height / 2, out _) is { } middle)
-                    {
-                        screenSeen++;
-                        if (middle.IsBlack) screenBlack++;
+                        if (Win32.ScreenPixelInApp(main, mainRect.Left + mainRect.Width * x / 3 + 40, mainRect.Top + mainRect.Height * y / 4, out _) is { } seen)
+                            pixels.Add(new LaunchPixel(run.MsSinceStart, seen));
                     }
                 }
                 Thread.Sleep(PollMs);
@@ -292,6 +298,8 @@ public static class Program
             var frame = FirstFrame.Read(firstFramePath);
             if (frame.FrameErrors != 0) problems.Add($"{label}: {frame.FrameErrors} frame errors, last {frame.LastError}");
             if (frame.ValidationErrors != 0) problems.Add($"{label}: {frame.ValidationErrors} validation errors");
+            launches.Add(new LaunchRead(label, frame.Stage, frame.FirstFrameMs, pixels));
+            File.WriteAllLines(Path.Combine(folder, "launch-pixels.txt"), pixels.Select(p => $"{p.Ms:F0} {p.Color}"));
 
             Win32.WaitForDisplay();
             var margin = EdgeMarginDevicePixels / (frame.Map.Zoom * frame.Map.Scale);
@@ -311,20 +319,37 @@ public static class Program
                 if (i == 0 && firstProblem is null) lines.Add($"{label}: {result.Matched} of {result.Samples} points match at zoom {frame.Map.Zoom:0.###}");
                 Thread.Sleep(PollMs);
             }
-            // The same image on the real screen, at the canvas's middle, when nothing covers it.
+            // The same image on the real screen, at points away from color edges. A point another
+            // program covers does not count. One more round after raising the app gets past a
+            // window that came up on top of it.
             if (!Win32.GetWindowRect(frame.Canvas, out var shown)) throw new InvalidOperationException($"{label}: GetWindowRect of the canvas failed");
-            Win32.RaiseWithoutFocus(main);
-            Win32.WaitForDisplay();
-            var seen = Win32.ScreenPixelOf(frame.Canvas, shown.Left + shown.Width / 2, shown.Top + shown.Height / 2, out var coveredBy);
-            var screenWords = $"not read, class {coveredBy} covers it";
-            if (seen is { } onScreenPixel)
+            var candidates = PixelCheck.ScreenPoints(shown.Width, shown.Height, frame.Map, (x, y) => TestImages.CellColorInside(x, y, margin));
+            int judged = 0, matched = 0, covered = 0;
+            string? miss = null;
+            string? coverName = null;
+            for (var round = 0; round < 2 && judged == 0; round++)
             {
-                var (docX, docY) = frame.Map.DocumentPoint(shown.Width / 2 + .5, shown.Height / 2 + .5);
-                var wanted = frame.Map.OnDocument(docX, docY) ? TestImages.CellColorInside(docX, docY, margin) : null;
-                screenWords = wanted is null ? $"{onScreenPixel}, near a color edge so not judged" : $"{onScreenPixel}, expected {wanted}";
-                if (wanted is { } want && onScreenPixel.Distance(want) > ColorTolerance) problems.Add($"{label}: the screen shows {onScreenPixel} at the canvas's middle, expected {want}");
+                Win32.RaiseWithoutFocus(main);
+                Win32.WaitForDisplay();
+                covered = 0;
+                foreach (var (x, y, want) in candidates)
+                {
+                    if (judged >= ScreenPointsWanted) break;
+                    if (Win32.ScreenPixelOf(frame.Canvas, shown.Left + x, shown.Top + y, out var by) is not { } seen)
+                    {
+                        covered++;
+                        coverName = by;
+                        continue;
+                    }
+                    judged++;
+                    if (seen.Distance(want) <= ColorTolerance) matched++;
+                    else miss ??= $"{seen} at {x},{y}, expected {want}";
+                }
             }
-            lines.Add($"{label}: window {windowMs:F0} ms, canvas window {firstCanvas?.ToString("F0") ?? "before the first poll"} ms, view attached {frame.AttachedMs:F0} ms, first frame {frame.FirstFrameMs:F0} ms, signal {frame.SignalMs:F0} ms; before the signal {blackCaptures} of {captures} captures and {screenBlack} of {screenSeen} screen pixels were black, last capture at {lastBlack?.ToString("F0") ?? "none"} ms, {canvasHandles.Count} canvas handles; screen after the signal: {screenWords}");
+            screens.Add(new ScreenRead(label, judged, matched, covered, miss));
+            var screenWords = $"{judged} points judged of {candidates.Count} away from color edges, {matched} matched, {covered} covered{(coverName is null ? "" : $" by class {coverName}")}";
+            var early = pixels.Count(p => p.Ms < frame.FirstFrameMs - LaunchPaint.FrameClockSlackMs);
+            lines.Add($"{label}: window {windowMs:F0} ms, canvas window {firstCanvas?.ToString("F0") ?? "before the first poll"} ms, view attached {frame.AttachedMs:F0} ms, first frame {frame.FirstFrameMs:F0} ms, signal {frame.SignalMs:F0} ms; before the signal {pixels.Count} screen pixels, {early} before the first frame, {pixels.Count(p => p.Color.IsBlack)} black, {pixels.Count(p => p.Color.Distance(frame.Stage) <= 1)} the stage color; {canvasHandles.Count} canvas handles; screen after the signal: {screenWords}");
             if (failedAfterSignal != 0) problems.Add($"{label}: {failedAfterSignal} of {AfterSignalCaptures} captures after the signal failed: {firstProblem}");
             run.Close(main);
             if (run.ExitCode != 0) problems.Add($"{label}: the app exited {run.ExitCode}: {run.Output()}");
@@ -401,6 +426,7 @@ public static class Program
             var png = Path.Combine(RepoRoot(), "tests", "fixtures", "plasma_alpha_512x384.png");
             var saved = new List<string>();
             var failures = new List<string>();
+            var scales = new HashSet<double>();
             var shots = Path.Combine(options.Out, "shots");
             Directory.CreateDirectory(shots);
             (string Name, string[] Args, bool PopupWindow)[] screens =
@@ -417,6 +443,7 @@ public static class Program
                     var firstFrame = Path.Combine(folder, "first-frame.json");
                     using var run = new AppRun(options.App, folder, new[] { "--test-load-png", png, "--theme", theme, "--test-first-frame", firstFrame }.Concat(extra));
                     var frame = run.WaitFirstFrame(LimitMs);
+                    scales.Add(frame.Map.Scale);
                     Win32.WaitForDisplay();
                     // The panels appear with the window. A menu or popup adds one more of the app's windows.
                     var clock = Stopwatch.StartNew();
@@ -436,83 +463,337 @@ public static class Program
                 }
             }
             Report(failures.Count == 0
-                ? PartResult.Pass("window shots", $"{saved.Count} saved in {shots}; root must look at each, and 200% is not in this set")
+                ? PartResult.Pass("window shots", $"{saved.Count} saved in {shots}; root must look at each")
                 : PartResult.Fail("window shots", string.Join("; ", failures)));
+            foreach (var row in ShotScales.Rows(scales)) Report(row);
         }
 
         // ---- Done-test 1: the 24 MP pan trace.
         void PanPart()
         {
-            const int BusyCpuPercent = 15, BusySampleMs = 3000, SpareMs = 180_000, WindowLimitMs = 60_000;
+            const int BusySampleMs = 3000, SpareMs = 180_000, WindowLimitMs = 60_000, SettleMs = 1000;
+            const int ScreenEveryMs = 250, CpuEveryMs = 1000, GpuEveryMs = 5000, PollMs = 20;
             const string Name = "pan trace";
-            var cpu = Win32.CpuBusyPercent(BusySampleMs);
-            var gpu = GpuFacts();
-            var busy = cpu >= BusyCpuPercent;
+            var cpuBefore = Win32.CpuBusyPercent(BusySampleMs);
+            var gpuBefore = ReadGpu();
+            var (programNotes, busyPrograms) = WatchedPrograms(gpuBefore);
+            var reasons = BusyJudge.Before(cpuBefore, gpuBefore.UsePercent, busyPrograms);
             var proofReasons = new List<string>();
             if (Math.Abs(options.PanSeconds - Options.FullPanSeconds) > .001) proofReasons.Add($"{options.PanSeconds:0.#} s, not {Options.FullPanSeconds:0} s");
-            if (busy) proofReasons.Add($"the PC was {cpu:F0}% busy before it started");
-            if (busy && !options.AllowBusy)
+            if (reasons.Count != 0 && !options.AllowBusy)
             {
-                Report(PartResult.NotRun(Name, $"the PC is {cpu:F0}% busy, and a busy run does not count (PLAN 4.3); pass --allow-busy for a proof run"));
+                Report(PartResult.NotRun(Name, $"a busy run does not count (PLAN 4.3), and this PC is busy: {string.Join("; ", reasons)}; pass --allow-busy for a proof run"));
                 return;
             }
-            if (!gpu.Contains("RTX", StringComparison.Ordinal)) proofReasons.Add($"nvidia-smi names no RTX: {gpu}");
+            proofReasons.AddRange(reasons);
+            if (!gpuBefore.Name.Contains("RTX", StringComparison.Ordinal)) proofReasons.Add($"nvidia-smi names no RTX: {gpuBefore}");
 
             var big = Big24Mp();
             var folder = NextFolder("pan");
             var path = Path.Combine(folder, "pan.json");
-            using var run = new AppRun(options.App, folder, ["--test-load-png", big, "--theme", "light", "--test-zoom", "1", "--test-pan-trace", path, "--test-pan-seconds", options.PanSeconds.ToString(CultureInfo.InvariantCulture)]);
+            var signal = Path.Combine(folder, "first-frame.json");
+            using var run = new AppRun(options.App, folder, ["--test-load-png", big, "--theme", "light", "--test-zoom", "1", "--test-first-frame", signal, "--test-pan-trace", path, "--test-pan-seconds", options.PanSeconds.ToString(CultureInfo.InvariantCulture)]);
             var main = run.WaitMainWindow(WindowLimitMs);
             var refresh = Win32.RefreshRate(main);
             var limit = (int)(options.PanSeconds * 1000) + SpareMs;
-            if (!run.WaitExit(limit))
+            var clock = Stopwatch.StartNew();
+            while (!File.Exists(signal))
             {
-                Report(PartResult.Fail(Name, $"the app did not end in {limit} ms"));
-                return;
+                if (run.Exited || clock.ElapsedMilliseconds > limit)
+                {
+                    Report(PartResult.Fail(Name, $"no first-frame signal: exited {run.Exited}: {run.Output()}"));
+                    return;
+                }
+                Thread.Sleep(PollMs);
             }
-            if (!File.Exists(path))
+            Thread.Sleep(SettleMs);
+
+            // The trace runs now. These reads cost the app nothing: they only look from outside.
+            var canvas = Win32.CanvasOf(main);
+            if (canvas == 0 || !Win32.GetWindowRect(canvas, out var shown)) throw new InvalidOperationException("the canvas window is gone");
+            var cpuOthers = new List<double>();
+            var gpuDuring = new List<double?>();
+            var seen = new List<Rgb?>();
+            var lastCpu = Win32.CpuTimes();
+            var lastApp = run.CpuTime;
+            var lastCpuAt = clock.ElapsedMilliseconds;
+            long lastGpuAt = clock.ElapsedMilliseconds, lastScreenAt = 0;
+            while (!File.Exists(path))
             {
-                Report(PartResult.Fail(Name, $"the app exited {run.ExitCode} and wrote no frame times: {run.Output()}"));
-                return;
+                if (run.Exited || clock.ElapsedMilliseconds > limit)
+                {
+                    Report(PartResult.Fail(Name, run.Exited ? $"the app exited {run.ExitCode} and wrote no frame times: {run.Output()}" : $"the app wrote no frame times in {limit} ms"));
+                    return;
+                }
+                var now = clock.ElapsedMilliseconds;
+                if (now - lastScreenAt >= ScreenEveryMs)
+                {
+                    lastScreenAt = now;
+                    seen.Add(Win32.ScreenPixelOf(canvas, shown.Left + shown.Width / 2, shown.Top + shown.Height / 2, out _));
+                }
+                if (now - lastCpuAt >= CpuEveryMs)
+                {
+                    var cpu = Win32.CpuTimes();
+                    var app = run.CpuTime;
+                    var machineShare = cpu.Total <= lastCpu.Total ? 0 : 100.0 * (cpu.Busy - lastCpu.Busy) / (cpu.Total - lastCpu.Total);
+                    var appShare = 100.0 * (app - lastApp).TotalMilliseconds / ((now - lastCpuAt) * Environment.ProcessorCount);
+                    cpuOthers.Add(Math.Max(0, machineShare - appShare));
+                    (lastCpu, lastApp, lastCpuAt) = (cpu, app, now);
+                }
+                if (now - lastGpuAt >= GpuEveryMs)
+                {
+                    lastGpuAt = now;
+                    gpuDuring.Add(ReadGpu().UsePercent);
+                }
+                Thread.Sleep(PollMs);
             }
+            proofReasons.AddRange(BusyJudge.During(cpuOthers, gpuDuring));
+
             using var file = JsonDocument.Parse(File.ReadAllText(path));
             var root = file.RootElement;
+            var frame = FirstFrame.From(root);
             var times = root.GetProperty("frame_times_ms").EnumerateArray().Select(t => t.GetDouble()).ToArray();
             var stats = FrameStats.From(times);
             var moves = root.GetProperty("moves_posted").GetInt64();
             var changes = root.GetProperty("view_changes").GetInt64();
             var errors = root.GetProperty("frame_errors_during").GetInt64();
-            var validation = root.GetProperty("validation_errors").GetInt64();
-            var drawable = $"{root.GetProperty("drawable_width").GetInt64()}x{root.GetProperty("drawable_height").GetInt64()}";
-            var zoom = root.GetProperty("zoom").GetDouble();
-            var facts = $"{stats}; {moves} moves posted, {changes} view changes, canvas {drawable} at zoom {zoom:0.###}, display {refresh} Hz, {gpu}, PC {cpu:F0}% busy before";
-            var problem = stats.Problem(options.PanSeconds);
-            if (errors != 0) problem = $"{errors} frame errors; {problem}";
-            if (validation != 0) problem = $"{validation} validation errors; {problem}";
-            if (zoom != 1) problem = $"zoom is {zoom}, not 1; {problem}";
-            if (changes < moves / 2) problem = $"the UI thread handled only {changes} of {moves} moves; {problem}";
-            if (run.ExitCode != 0) problem = $"the app exited {run.ExitCode}: {run.Output()}; {problem}";
-            if (refresh < 59 && problem is not null) proofReasons.Add($"the display runs at {refresh} Hz, under the 59 fps asked");
+            var drawable = $"{frame.DrawableWidth}x{frame.DrawableHeight}";
+            var zoom = frame.Map.Zoom;
+            var startGap = root.GetProperty("start_gap_ms").GetDouble();
+            var endGap = root.GetProperty("end_gap_ms").GetDouble();
+            var samples = root.GetProperty("view_samples").EnumerateArray().Select(a =>
+            {
+                var v = a.EnumerateArray().Select(n => n.GetDouble()).ToArray();
+                return new PanSample(v[0], (int)v[1], (int)v[2], v[3], v[4], (long)v[5]);
+            }).ToList();
+            var gpuRead = gpuDuring.Where(g => g is not null).Select(g => g!.Value).ToList();
+            var busyWords = $"PC {cpuBefore:F0}% busy before, others {(cpuOthers.Count == 0 ? "not read" : $"{cpuOthers.Average():F0}%")} during; GPU {gpuBefore} before, {(gpuRead.Count == 0 ? "not read" : $"{gpuRead.Average():F0}%")} during{(programNotes.Count == 0 ? "" : $"; {string.Join("; ", programNotes)}")}";
+            var facts = $"{stats}, first frame {startGap:F1} ms after the start, last frame {endGap:F1} ms before the end; {moves} moves posted, {changes} view changes, {samples.Count} view samples, canvas {drawable} at zoom {zoom:0.###}, display {refresh} Hz; {busyWords}";
+
+            // A fault in what the trace did is a fault on any PC, so these never become NOT RUN.
+            var faults = new List<string>();
+            if (errors != 0) faults.Add($"{errors} frame errors");
+            if (frame.ValidationErrors != 0) faults.Add($"{frame.ValidationErrors} validation errors");
+            if (zoom != 1) faults.Add($"zoom is {zoom}, not 1");
+            if (PanMotion.Problem(samples, zoom, frame.Map.Scale) is { } motion) faults.Add(motion);
+            if (PanMotion.ScreenProblem(seen, out var screenJudged) is { } still) faults.Add(still);
+            if (!screenJudged) proofReasons.Add($"another program covered the canvas's middle, so only {seen.Count(c => c is not null)} of {seen.Count} screen reads during the trace counted");
+            // The last view must be what the canvas shows: real pixels, read after the trace.
+            Win32.WaitForDisplay();
+            var margin = EdgeMarginDevicePixels / (frame.Map.Zoom * frame.Map.Scale);
+            var picture = Win32.Capture(main);
+            var endPixels = PixelCheck.Judge(picture, Win32.CanvasRect(main, frame.Canvas), frame.Map, (x, y) => TestImages.CellColorInside(x, y, margin), ColorTolerance, columns: 64, rows: 40);
+            if (endPixels.Problem() is { } pixelsProblem)
+            {
+                faults.Add($"after the trace the canvas does not show the view: {pixelsProblem}");
+                Png.Write(Path.Combine(folder, "bad-end-capture.png"), picture);
+            }
+            run.Close(main);
+            if (run.ExitCode != 0) faults.Add($"the app exited {run.ExitCode}: {run.Output()}");
             CheckDataRootEmpty(run, Name);
-            if (problem is not null && proofReasons.Count == 0) Report(PartResult.Fail(Name, $"{problem}; {facts}"));
-            else if (proofReasons.Count != 0) Report(PartResult.NotRun(Name, $"proof run only, these numbers do not count ({string.Join("; ", proofReasons)}): {(problem is null ? "met the limits" : problem)}; {facts}"));
+            facts = $"{facts}; {endPixels.Matched} of {endPixels.Samples} real pixels matched after the trace; screen color read {seen.Count(c => c is not null)} times during it";
+
+            var speed = stats.Problem(options.PanSeconds, startGap, endGap);
+            if (changes < moves / 2) speed = $"the UI thread handled only {changes} of {moves} moves; {speed}";
+            if (refresh < 59 && speed is not null) proofReasons.Add($"the display runs at {refresh} Hz, under the 59 fps asked");
+            if (faults.Count != 0) Report(PartResult.Fail(Name, $"{string.Join("; ", faults)}; {facts}"));
+            else if (proofReasons.Count != 0) Report(PartResult.NotRun(Name, $"proof run only, these numbers do not count ({string.Join("; ", proofReasons)}): {speed ?? "met the limits"}; {facts}"));
+            else if (speed is not null) Report(PartResult.Fail(Name, $"{speed}; {facts}"));
             else Report(PartResult.Pass(Name, facts));
         }
 
-        static string GpuFacts()
+        static GpuFacts ReadGpu()
         {
             try
             {
-                var info = new ProcessStartInfo("nvidia-smi", "--query-gpu=name,utilization.gpu --format=csv,noheader") { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+                var info = new ProcessStartInfo("nvidia-smi", "--query-gpu=name,utilization.gpu,encoder.stats.sessionCount --format=csv,noheader,nounits") { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
                 using var process = Process.Start(info) ?? throw new InvalidOperationException("no process");
-                var text = process.StandardOutput.ReadToEnd().Trim();
+                var text = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();
-                return process.ExitCode == 0 ? text : $"nvidia-smi exited {process.ExitCode}";
+                return process.ExitCode == 0 ? GpuFacts.Parse(text) : new GpuFacts($"nvidia-smi exited {process.ExitCode}", null, null);
             }
             catch (System.ComponentModel.Win32Exception e)
             {
-                return $"nvidia-smi could not start: {e.Message}";
+                return new GpuFacts($"nvidia-smi could not start: {e.Message}", null, null);
             }
+        }
+
+        /// Sunshine and LM Studio, as scripts/windows/preflight.ps1 looks at them: a stream
+        /// holds an encoder session, and a model loaded in LM Studio holds the GPU's memory.
+        static (List<string> Notes, List<string> Busy) WatchedPrograms(GpuFacts gpu)
+        {
+            var notes = new List<string>();
+            var busy = new List<string>();
+            void Add((string? Note, string? Busy) words)
+            {
+                if (words.Note is not null) notes.Add(words.Note);
+                if (words.Busy is not null) busy.Add(words.Busy);
+            }
+            static bool Running(params string[] names) => names.SelectMany(Process.GetProcessesByName).Any();
+            Add(BusyJudge.Program("Sunshine", Running("sunshine"), gpu.EncoderSessions, "encoder sessions"));
+            var lmStudio = Running("LM Studio", "LMStudio");
+            Add(BusyJudge.Program("LM Studio", lmStudio, lmStudio ? LoadedModels() : null, "models loaded"));
+            return (notes, busy);
+        }
+
+        /// Asks only LM Studio's own local server, because its `lms` command would wake it.
+        static int? LoadedModels()
+        {
+            const int LimitSeconds = 3;
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(LimitSeconds) };
+                using var body = JsonDocument.Parse(client.GetStringAsync("http://127.0.0.1:1234/api/v0/models").GetAwaiter().GetResult());
+                return body.RootElement.GetProperty("data").EnumerateArray().Count(m => m.GetProperty("state").GetString() == "loaded");
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
+            {
+                Console.WriteLine($"Note: LM Studio's server did not answer: {e.Message}");
+                return null;
+            }
+        }
+
+        // ---- The app ends when its main window closes, whatever the panels are doing.
+        void ExitPart()
+        {
+            const string Name = "app exit";
+            const int LimitMs = 60_000, ChangeLimitMs = 8000, ExitLimitMs = 15_000, VkF8 = 0x77;
+            var png = Path.Combine(RepoRoot(), "tests", "fixtures", "plasma_alpha_512x384.png");
+            var problems = new List<string>();
+            var words = new List<string>();
+
+            (string State, Action<AppRun, FirstFrame, List<nint>> Arrange)[] states =
+            [
+                ("all panels shown", (_, _, _) => { }),
+                ("one panel hidden", (run, frame, panels) => { Win32.AskToClose(panels[0]); Wait(run, frame, 3); }),
+                ("all four hidden", (run, frame, panels) => { foreach (var panel in panels) Win32.AskToClose(panel); Wait(run, frame, 0); }),
+                ("one hidden, then shown again", (run, frame, _) =>
+                {
+                    Win32.PostKey(frame.Canvas, VkF8);
+                    Wait(run, frame, 3);
+                    Win32.PostKey(frame.Canvas, VkF8);
+                    Wait(run, frame, 4);
+                }),
+                ("one hidden, then minimized", (_, frame, panels) => { Win32.AskToClose(panels[0]); Thread.Sleep(500); Win32.Minimize(frame.Main); Thread.Sleep(500); }),
+            ];
+            void Wait(AppRun run, FirstFrame frame, int panels)
+            {
+                var clock = Stopwatch.StartNew();
+                while (Win32.WindowsOf(run.Pid).Count(h => h != frame.Main) != panels)
+                {
+                    if (clock.ElapsedMilliseconds > ChangeLimitMs) throw new TimeoutException($"{Win32.WindowsOf(run.Pid).Count - 1} panels show, expected {panels}");
+                    Thread.Sleep(20);
+                }
+            }
+            foreach (var (state, arrange) in states)
+            {
+                var folder = NextFolder($"exit-{state.Replace(' ', '-').Replace(",", "")}");
+                using var run = new AppRun(options.App, folder, ["--test-load-png", png, "--theme", "light", "--test-first-frame", Path.Combine(folder, "first-frame.json")]);
+                try
+                {
+                    var frame = run.WaitFirstFrame(LimitMs);
+                    Wait(run, frame, 4);
+                    var panels = Win32.WindowsOf(run.Pid).Where(h => h != frame.Main).ToList();
+                    arrange(run, frame, panels);
+                    var clock = Stopwatch.StartNew();
+                    Win32.AskToClose(frame.Main);
+                    if (!run.WaitExit(ExitLimitMs))
+                    {
+                        problems.Add($"{state}: the process was still running {ExitLimitMs} ms after the main window closed, with {Win32.WindowsOf(run.Pid).Count} visible windows");
+                        continue;
+                    }
+                    if (run.ExitCode != 0) problems.Add($"{state}: the app exited {run.ExitCode}: {run.Output()}");
+                    else words.Add($"{state} {clock.ElapsedMilliseconds} ms");
+                }
+                catch (TimeoutException e)
+                {
+                    problems.Add($"{state}: {e.Message}");
+                }
+                CheckDataRootEmpty(run, Name);
+            }
+            Report(problems.Count == 0
+                ? PartResult.Pass(Name, $"{states.Length} states, each exit code 0: {string.Join(", ", words)}")
+                : PartResult.Fail(Name, string.Join("; ", problems)));
+        }
+
+        // ---- An exception on the way through a window message must reach the fatal path.
+        void FatalPart()
+        {
+            const string Name = "fatal path";
+            const int LimitMs = 60_000, ExitLimitMs = 20_000, Asked = 900, MoveBy = 10;
+            var png = Path.Combine(RepoRoot(), "tests", "fixtures", "plasma_alpha_512x384.png");
+            var problems = new List<string>();
+            var words = new List<string>();
+            foreach (var place in new[] { "closed", "size-limit", "panel-size-limit", "moved", "panel-moved" })
+            {
+                var folder = NextFolder($"fatal-{place}");
+                using var run = new AppRun(options.App, folder, ["--test-load-png", png, "--theme", "light", "--test-first-frame", Path.Combine(folder, "first-frame.json"), "--test-throw", place]);
+                // A size limit and a move both run at launch, so the throw may come before the first frame.
+                var clock = Stopwatch.StartNew();
+                while (!run.Exited && !File.Exists(run.FirstFramePath) && clock.ElapsedMilliseconds < LimitMs) Thread.Sleep(10);
+                if (!run.Exited && File.Exists(run.FirstFramePath))
+                {
+                    var frame = FirstFrame.Read(run.FirstFramePath);
+                    var panel = Win32.WindowsOf(run.Pid).First(h => h != frame.Main);
+                    switch (place)
+                    {
+                        case "closed": Win32.AskToClose(frame.Main); break;
+                        case "size-limit": Win32.Resize(frame.Main, Asked + 400, Asked); break;
+                        case "panel-size-limit": Win32.Resize(panel, Asked / 2, Asked / 2); break;
+                        case "moved": Win32.MoveBy(frame.Main, MoveBy); break;
+                        default: Win32.MoveBy(panel, MoveBy); break;
+                    }
+                }
+                var exited = run.WaitExit(ExitLimitMs);
+                if (!exited) problems.Add($"{place}: the app was still running {ExitLimitMs} ms later");
+                else if (run.ExitCode != 1) problems.Add($"{place}: the app exited {run.ExitCode}, not 1: {run.Output()}");
+                else if (!run.Output().Contains("TEST_THROW", StringComparison.Ordinal)) problems.Add($"{place}: exit code 1 with no message: {run.Output()}");
+                else words.Add(place);
+            }
+            Report(problems.Count == 0
+                ? PartResult.Pass(Name, $"exit code 1 and the message, from: {string.Join(", ", words)}")
+                : PartResult.Fail(Name, string.Join("; ", problems)));
+        }
+
+        // ---- A work area smaller than the Mac's minimum: the window must still fit.
+        void SmallScreenPart()
+        {
+            const string Name = "small screen";
+            const int LimitMs = 60_000, Tiny = 200, SettleMs = 500;
+            const int WorkWidth = 1000, WorkHeight = 620;
+            var png = Path.Combine(RepoRoot(), "tests", "fixtures", "plasma_alpha_512x384.png");
+            var problems = new List<string>();
+            var folder = NextFolder("small-screen");
+            var path = Path.Combine(folder, "first-frame.json");
+            using var run = new AppRun(options.App, folder, ["--test-load-png", png, "--theme", "light", "--test-first-frame", path, "--test-work-area", $"{WorkWidth}x{WorkHeight}"]);
+            var frame = run.WaitFirstFrame(LimitMs);
+            Win32.WaitForDisplay();
+            void Measure(string when)
+            {
+                if (!Win32.GetWindowRect(frame.Main, out var r)) throw new InvalidOperationException("GetWindowRect of the main window failed");
+                if (r.Width > WorkWidth || r.Height > WorkHeight) problems.Add($"{when}: the window is {r.Width} by {r.Height}, over the {WorkWidth} by {WorkHeight} work area");
+            }
+            Measure("at launch");
+            double statusBottom, clientHeight;
+            using (var facts = JsonDocument.Parse(File.ReadAllText(path)))
+            {
+                statusBottom = facts.RootElement.GetProperty("status_bottom").GetDouble();
+                clientHeight = facts.RootElement.GetProperty("client_height").GetDouble();
+            }
+            if (statusBottom > clientHeight + .5) problems.Add($"at launch: the status bar ends at {statusBottom:F0}, under the client's {clientHeight:F0}");
+            Win32.Resize(frame.Main, Tiny, Tiny);
+            Thread.Sleep(SettleMs);
+            Measure("asked for a tiny window");
+            if (Win32.GetWindowRect(frame.Main, out var least) && (least.Width <= Tiny || least.Height <= Tiny)) problems.Add($"asked for a tiny window: it became {least.Width} by {least.Height}, so no limit held");
+            var shots = Path.Combine(options.Out, "shots");
+            Directory.CreateDirectory(shots);
+            Png.Write(Path.Combine(shots, "small-screen-light.png"), Win32.CaptureApp(run.Pid));
+            run.Close(frame.Main);
+            if (run.ExitCode != 0) problems.Add($"the app exited {run.ExitCode}: {run.Output()}");
+            CheckDataRootEmpty(run, Name);
+            Report(problems.Count == 0
+                ? PartResult.Pass(Name, $"window fits a {WorkWidth} by {WorkHeight} work area at launch and when asked for less; the status bar ends at {statusBottom:F0} of {clientHeight:F0}")
+                : PartResult.Fail(Name, string.Join("; ", problems)));
         }
     }
 }

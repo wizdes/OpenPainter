@@ -33,7 +33,12 @@ public sealed partial class TestReport
     const int SettleMs = 500;   // Time for the window to lay out after it changes state.
 
     readonly MainWindow _window;
+    readonly Dictionary<string, int> _checksRun = [];
     public TestReport(MainWindow window) => _window = window;
+
+    /// Counts checks that really ran. The harness passes a part only with this evidence,
+    /// so a check taken out of the report fails instead of passing with no problem named.
+    void Ran(string part, int count = 1) => _checksRun[part] = _checksRun.GetValueOrDefault(part) + count;
 
     /// Each part's expected answer, so a wrong one fails by the part's name.
     public static IReadOnlyDictionary<string, int> Expected { get; } = new Dictionary<string, int>
@@ -68,6 +73,7 @@ public sealed partial class TestReport
         var close = CenterOf(row.CloseButton);
         SendMessage(hwnd, WmNcMouseMove, HtClose, Lparam(close));
         Dispatcher.UIThread.RunJobs();
+        Ran(HitTestPart, 2);
         var fill = row.CloseButton.CurrentFill;
         text.Append($"  \"close_hover_fill\": \"{fill}\",\n");
         if (fill != CaptionLook.CloseHover) problems.Add($"close hover: the fill is {fill}, not the red {CaptionLook.CloseHover}");
@@ -100,6 +106,7 @@ public sealed partial class TestReport
             return true;
         }
         if (!await ClickMaximize()) return;
+        Ran(HitTestPart, 3);
         text.Append($"  \"after_maximize_click\": \"{_window.WindowState}\",\n");
         if (_window.WindowState != WindowState.Maximized)
         {
@@ -113,6 +120,7 @@ public sealed partial class TestReport
         var got = Ask(hwnd, CenterOf(_window.TitleBar.CloseButton));
         if (got != HtClose) problems.Add($"maximized close: Windows says {got}, expected {HtClose}");
         if (!await ClickMaximize()) return;
+        Ran(HitTestPart, 3);
         text.Append($"  \"after_restore_click\": \"{_window.WindowState}\",\n");
         if (_window.WindowState != WindowState.Normal) problems.Add($"restore click: the window is {_window.WindowState}");
     }
@@ -139,6 +147,7 @@ public sealed partial class TestReport
         foreach (var (name, point) in points)
         {
             var got = Ask(hwnd, point);
+            Ran(HitTestPart);
             text.Append($"    \"{name}\": {got},\n");
             if (got != Expected[name]) problems.Add($"{name}: Windows says {got}, expected {Expected[name]}");
         }
@@ -152,6 +161,7 @@ public sealed partial class TestReport
         menu.Open();
         await Task.Delay(SettleMs);
         var shownIcons = menu.Items.OfType<MenuItem>().Count(i => i.Icon is not null);
+        Ran(MenusPart, 2);
         text.Append($"  \"menu_open\": {(menu.IsSubMenuOpen ? "true" : "false")},\n  \"menu_icons\": {shownIcons},\n");
         if (!menu.IsSubMenuOpen) problems.Add("menu: the first top menu did not open");
         if (shownIcons == 0) problems.Add("menu: the first top menu loaded no icons");
@@ -174,6 +184,7 @@ public sealed partial class TestReport
             if (under != native.Hwnd && !IsChild(under, native.Hwnd))
                 problems.Add($"canvas: the child under its center is class {ClassOf(under)}, not the canvas");
             var info = session.Info();
+            Ran(CanvasPart, 3);
             if (info.frames == 0) problems.Add("canvas: no frame was presented");
             if (info.frame_errors != 0) problems.Add($"canvas: {info.frame_errors} frame errors, last {info.last_error}");
             text.Append($"  \"frames\": {info.frames},\n  \"frame_errors\": {info.frame_errors},\n");
@@ -181,6 +192,7 @@ public sealed partial class TestReport
         }
         text.Append($"  \"image\": \"{_window.Status.ImageValue.Text}\",\n");
         text.Append($"  \"title\": \"{_window.Title}\",\n  \"palette\": \"{_window.Palette.Name}\",\n  \"theme\": \"{_window.ActualThemeVariant}\",\n");
+        text.Append($"  \"checks_run\": {{ {string.Join(", ", _checksRun.Select(c => $"\"{c.Key}\": {c.Value}"))} }},\n");
         text.Append($"  \"problems\": [{string.Join(", ", problems.Select(p => $"\"{p}\""))}]\n}}\n");
         File.WriteAllText(path, text.ToString());
         return problems;
@@ -194,7 +206,7 @@ public sealed partial class TestReport
         while (window.Session is not { Attached: true } && clock.ElapsedMilliseconds < LimitMs) await Task.Delay(StepMs);
         if (window.Session is not { Attached: true } session) return;
         var left = (uint)Math.Max(1, LimitMs - clock.ElapsedMilliseconds);
-        await Task.Run(() => session.WaitFrames(1, left));
+        if (await Task.Run(() => session.WaitFrames(1, left))) await window.CanvasShown;
     }
 
     /// Ends the run after `ms`, with a nonzero exit code when a check failed.

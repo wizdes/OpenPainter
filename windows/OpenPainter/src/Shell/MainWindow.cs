@@ -31,10 +31,14 @@ sealed class NoDrawnDecorations : IWindowDrawnDecorationsTemplate
 public sealed class MainWindow : Window
 {
     public const string AppName = "OpenPainter";
+    const uint WmDisplayChange = 0x007E;
     const int PreviewWidth = 112, PreviewHeight = 80;   // Editor.updateThumbnail: 56 by 40 at 2x.
 
     /// EditorWindowController.minimumSize.
     public static readonly Size MinimumClient = new(1100, 792);
+
+    /// The minimum in force: the Mac's, or less on a monitor that cannot show that.
+    public Size LeastClient { get; private set; } = MinimumClient;
 
     readonly StartOptions _options;
     readonly MacCatalog _catalog;
@@ -67,6 +71,11 @@ public sealed class MainWindow : Window
 
     /// Runs on the UI thread once the first image is on screen in the view.
     public event Action? ImageReady;
+
+    readonly TaskCompletionSource _canvasShown = new();
+
+    /// Ends when the canvas shows the engine's first frame. Until then the stage shows there.
+    public Task CanvasShown => _canvasShown.Task;
 
     public MainWindow(StartOptions options, bool headless = false)
     {
@@ -119,8 +128,14 @@ public sealed class MainWindow : Window
             {
                 if (e.NavigationMethod == NavigationMethod.Tab) Native.TakeFocus();
             };
-            Closed += (_, _) => StopCanvas();
         }
+        // Closed runs in a window message, where Avalonia would keep an exception to itself.
+        Closed += (_, _) => Fatal.Guard("WINDOW_CLOSED", () =>
+        {
+            Fatal.TestThrow(Fatal.ClosedPlace);
+            StopCanvas();
+            Panels.EndAll();
+        });
         Stage.SizeChanged += (_, _) =>
         {
             View.Resize(Stage.Bounds.Size);
@@ -131,12 +146,23 @@ public sealed class MainWindow : Window
             if (Native is not null)
             {
                 Win32Properties.AddWndProcHookCallback(this, LimitSize);
+                FitToScreen(shrink: true);
                 StartCanvas();
+                if (Screens is { } screens) screens.Changed += OnScreensChanged;
             }
             Panels.ShowAll();
         };
-        PositionChanged += (_, _) => UpdateClearRect();
-        ScalingChanged += (_, _) => PushView();
+        PositionChanged += (_, _) => Fatal.Guard("WINDOW_MOVED", () =>
+        {
+            Fatal.TestThrow(Fatal.MovedPlace);
+            UpdateClearRect();
+            FitToScreen(shrink: false);
+        });
+        ScalingChanged += (_, _) => Fatal.Guard("WINDOW_SCALE", () =>
+        {
+            FitToScreen(shrink: false);
+            PushView();
+        });
         Panels.Changed += OnPanelsChanged;
         Tools.Changed += OnToolChanged;
         View.Tool = Tools.CanvasMode;
@@ -159,8 +185,75 @@ public sealed class MainWindow : Window
 
     /// Avalonia's MinHeight counts a title bar this window has turned off, so the window
     /// stopped 31 pixels short of the Mac's minimum. Here the limit is the client size.
-    nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled) =>
-        WindowLimits.OnMessage(hwnd, message, l, ClientSize, RenderScaling, MinimumClient, null, null, ref handled);
+    nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled)
+    {
+        try
+        {
+            Fatal.TestThrow(Fatal.SizeLimitPlace);
+            // Avalonia hears this too and fires its Screens event when the list really changed.
+            // This one goes after that, so the screens are fresh, and a test can send it.
+            if (message == WmDisplayChange) Avalonia.Threading.Dispatcher.UIThread.Post(() => OnScreensChanged(this, EventArgs.Empty));
+            return WindowLimits.OnMessage(hwnd, message, l, ClientSize, RenderScaling, MinimumClient, null, null, _options.TestWorkArea, ref handled);
+        }
+        catch (Exception e)
+        {
+            Fatal.Raise("WINDOW_SIZE", e);
+            return 0;
+        }
+    }
+
+    void OnScreensChanged(object? sender, EventArgs e) => Fatal.Guard("SCREENS_CHANGED", () =>
+    {
+        FitToScreen(shrink: false);
+        Panels.ScreensChanged();
+    });
+
+    /// Keeps the window usable on the monitor it is on. The minimum follows the monitor on every
+    /// move and scale change. Only a launch shrinks the window, because a user may spread a big
+    /// window over two monitors, and a move must not undo that.
+    void FitToScreen(bool shrink)
+    {
+        if (TryGetPlatformHandle() is not { HandleDescriptor: "HWND", Handle: var hwnd }) return;
+        var scale = RenderScaling;
+        var (frameX, frameY) = WindowLimits.FrameOf(hwnd, ClientSize, scale);
+        var work = WindowLimits.WorkAreaOf(hwnd);
+        if (_options.TestWorkArea is { } size) work = new PixelRect(work.X, work.Y, size.Width, size.Height);
+        CapMinimum(work.Size, scale, frameX, frameY);
+        if (!shrink || !FitTo(work.Size, scale, frameX, frameY)) return;
+        // The size just changed, so the panels and the view must see the new layout.
+        UpdateLayout();
+        var (right, bottom) = (Position.X + (int)Math.Round(Width * scale) + frameX, Position.Y + (int)Math.Round(Height * scale) + frameY);
+        Position = new PixelPoint(Math.Max(work.X, Position.X - Math.Max(0, right - work.Right)), Math.Max(work.Y, Position.Y - Math.Max(0, bottom - work.Bottom)));
+    }
+
+    /// The minimum in force is the Mac's, less what this work area cannot show.
+    public void CapMinimum(PixelSize work, double scale, int frameX, int frameY)
+    {
+        LeastClient = WindowLimits.Capped(MinimumClient, scale, work, frameX, frameY);
+        MinWidth = LeastClient.Width;
+        MinHeight = LeastClient.Height;
+    }
+
+    /// Caps the minimum, and shrinks a window too big for this work area. It says whether the
+    /// size changed. A maximized window already fits, so it keeps its size to come back to.
+    public bool FitTo(PixelSize work, double scale, int frameX, int frameY)
+    {
+        CapMinimum(work, scale, frameX, frameY);
+        if (WindowState != WindowState.Normal) return false;
+        var room = WindowLimits.RoomOn(work, scale, frameX, frameY);
+        var changed = false;
+        if (Width > room.Width)
+        {
+            Width = room.Width;
+            changed = true;
+        }
+        if (Height > room.Height)
+        {
+            Height = room.Height;
+            changed = true;
+        }
+        return changed;
+    }
 
     /// The commands that work in W7. Every other menu item and button is present and off.
     Dictionary<string, Action> BuildActions()
@@ -369,6 +462,15 @@ public sealed class MainWindow : Window
             View.SetDocumentSize(new Size(width, height));
             UpdateClearRect();
             PushView();
+            _session.WhenFirstFrame(() =>
+            {
+                // The window may have closed while this waited in the queue.
+                if (_session is null) return;
+                Native.ShowCanvas();
+                // The first frame may have gone to a window with nothing on screen.
+                PushView();
+                _canvasShown.TrySetResult();
+            });
             ImageReady?.Invoke();
             _image = _image with { ImageWidth = width, ImageHeight = height };
             Strip.Show([_image]);

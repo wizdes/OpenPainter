@@ -39,6 +39,15 @@ public sealed partial class PanelWindow : Window
     /// Close asks to hide the panel. Only the app's end really closes it.
     public event Action<PanelWindow>? HideRequested;
 
+    bool _ending;
+
+    /// The app is ending: this close is real, even for a hidden panel.
+    public void End()
+    {
+        _ending = true;
+        Close();
+    }
+
     public PanelWindow(CatalogPanel panel, Palette palette)
     {
         Panel = panel;
@@ -66,7 +75,7 @@ public sealed partial class PanelWindow : Window
         Opened += (_, _) => MakeToolWindow();
         Closing += (_, e) =>
         {
-            if (e.CloseReason != WindowCloseReason.WindowClosing) return;
+            if (_ending || e.CloseReason != WindowCloseReason.WindowClosing) return;
             // The close button and Alt+F4 hide the panel and clear its toggle.
             e.Cancel = true;
             HideRequested?.Invoke(this);
@@ -114,8 +123,19 @@ public sealed partial class PanelWindow : Window
 
     /// Avalonia's MinHeight counts a title bar this window has turned off, so Colors could
     /// not be its 246 pixels. Here the limits are the client sizes the Mac names.
-    nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled) =>
-        WindowLimits.OnMessage(hwnd, message, l, ClientSize, RenderScaling, MinimumClient, MaximumClientWidth, MaximumClientHeight, ref handled);
+    nint LimitSize(nint hwnd, uint message, nint w, nint l, ref bool handled)
+    {
+        try
+        {
+            Fatal.TestThrow(Fatal.PanelSizeLimitPlace);
+            return WindowLimits.OnMessage(hwnd, message, l, ClientSize, RenderScaling, MinimumClient, MaximumClientWidth, MaximumClientHeight, null, ref handled);
+        }
+        catch (Exception e)
+        {
+            Fatal.Raise("PANEL_SIZE", e);
+            return 0;
+        }
+    }
 
     /// On a real window only. Headless windows have no handle of this kind.
     void MakeToolWindow()
@@ -142,20 +162,29 @@ public sealed class PanelManager
     readonly Dictionary<string, PanelWindow> _panels = [];
     readonly HashSet<string> _shown = [];
     readonly Func<Rect> _stageOnScreen;
+    bool _applying;
 
     /// A panel showed, hid, moved or resized.
     public event Action? Changed;
+
+    /// The screens' work areas in layout points. Tests set this, as the Mac's do.
+    public Func<IReadOnlyList<Rect>> Screens { get; set; }
 
     public PanelManager(Window owner, IReadOnlyList<CatalogPanel> panels, Palette palette, Func<Rect> stageOnScreen)
     {
         _owner = owner;
         _stageOnScreen = stageOnScreen;
+        Screens = OwnerScreens;
         foreach (var panel in panels)
         {
             var window = new PanelWindow(panel, palette);
             window.HideRequested += p => SetShown(p.Panel.Id, false);
-            window.PositionChanged += (_, _) => Changed?.Invoke();
-            window.Resized += (_, _) => Changed?.Invoke();
+            window.PositionChanged += (_, _) => Fatal.Guard("PANEL_MOVED", () =>
+            {
+                Fatal.TestThrow(Fatal.PanelMovedPlace);
+                OnPanelMoved(window);
+            });
+            window.Resized += (_, _) => Fatal.Guard("PANEL_RESIZED", () => Changed?.Invoke());
             _panels[panel.Id] = window;
             _shown.Add(panel.Id);
         }
@@ -166,6 +195,73 @@ public sealed class PanelManager
     public bool AnyActive => _panels.Values.Any(p => p.IsActive);
 
     public void Toggle(string id) => SetShown(id, !IsShown(id));
+
+    IReadOnlyList<Rect> OwnerScreens()
+    {
+        var scale = _owner.RenderScaling;
+        return _owner.Screens is { } screens
+            ? screens.All.Select(s => new Rect(s.WorkingArea.X / scale, s.WorkingArea.Y / scale, s.WorkingArea.Width / scale, s.WorkingArea.Height / scale)).ToList()
+            : [];
+    }
+
+    /// What a panel's window shows, in screen layout points: its client area, with no resize edges.
+    public Rect FrameOf(PanelWindow panel)
+    {
+        var scale = _owner.RenderScaling;
+        var at = panel.PointToScreen(default);
+        return new Rect(at.X / scale, at.Y / scale, panel.ClientSize.Width, panel.ClientSize.Height);
+    }
+
+    /// Puts a panel at a frame without taking it for a user's move.
+    public void SetFrame(PanelWindow panel, Rect frame)
+    {
+        var scale = _owner.RenderScaling;
+        var wasApplying = _applying;
+        _applying = true;
+        try
+        {
+            if (frame.Width != panel.ClientSize.Width) panel.Width = frame.Width;
+            if (frame.Height != panel.ClientSize.Height) panel.Height = frame.Height;
+            var edge = panel.PointToScreen(default) - panel.Position;
+            panel.Position = new PixelPoint((int)Math.Round(frame.X * scale) - edge.X, (int)Math.Round(frame.Y * scale) - edge.Y);
+        }
+        finally
+        {
+            _applying = wasApplying;
+        }
+    }
+
+    /// A user's drag or any other move from outside: the panel may not leave every screen.
+    void OnPanelMoved(PanelWindow panel)
+    {
+        if (!_applying)
+        {
+            var frame = FrameOf(panel);
+            var kept = PanelLayout.Reachable(frame, Screens());
+            if (kept != frame) SetFrame(panel, kept);
+        }
+        Changed?.Invoke();
+    }
+
+    /// PanelManager.screensChanged's on-screen part: a screen went away or changed, so every
+    /// panel, shown or hidden, that no screen can reach comes back onto one.
+    public void ScreensChanged()
+    {
+        var screens = Screens();
+        foreach (var panel in _panels.Values)
+        {
+            var frame = FrameOf(panel);
+            var back = PanelLayout.OnScreen(frame, screens);
+            if (back != frame) SetFrame(panel, back);
+        }
+        Changed?.Invoke();
+    }
+
+    /// The main window closed. A hidden panel has no owner, so nothing else would close it.
+    public void EndAll()
+    {
+        foreach (var panel in _panels.Values) panel.End();
+    }
 
     public void SetShown(string id, bool on)
     {
@@ -202,7 +298,10 @@ public sealed class PanelManager
             panel.Height = frame.Height;
             if (!panel.IsVisible) continue;
             var edge = panel.PointToScreen(default) - panel.Position;
+            var wasApplying = _applying;
+            _applying = true;
             panel.Position = new PixelPoint((int)Math.Round(frame.X * scale) - edge.X, (int)Math.Round(frame.Y * scale) - edge.Y);
+            _applying = wasApplying;
         }
     }
 

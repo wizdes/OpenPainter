@@ -43,12 +43,15 @@ public sealed record FrameStats(int Frames, double Seconds, double AverageFps, d
         return new FrameStats(times.Count, seconds, seconds > 0 ? (times.Count - 1) / seconds : 0, longest);
     }
 
-    /// Why this run fails done-test 1, or null when it meets it. A frame log that stops early
-    /// must fail, so the frames must cover the asked time too.
-    public string? Problem(double askedSeconds)
+    /// Why this run fails done-test 1, or null when it meets it. Gaps between frames see no
+    /// freeze before the first frame or after the last, so those two times are stalls too.
+    /// Each may be up to one allowed stall. The frame log alone gives only their sum, and the
+    /// app's hook measures each one.
+    public string? Problem(double askedSeconds, double? startGapMs = null, double? endGapMs = null)
     {
-        const double LeastCover = .98;
-        if (Seconds < askedSeconds * LeastCover) return $"the frames cover {Seconds:F1} s of the {askedSeconds:F1} s asked";
+        if ((askedSeconds - Seconds) * 1000 > 2 * MostStallMs) return $"the frames cover {Seconds:F2} s of the {askedSeconds:F2} s asked";
+        if (startGapMs > MostStallMs) return $"the first frame came {startGapMs:F1} ms after the trace began, over {MostStallMs} ms";
+        if (endGapMs > MostStallMs) return $"the last frame came {endGapMs:F1} ms before the trace ended, over {MostStallMs} ms";
         if (AverageFps < LeastFps) return $"average {AverageFps:F1} fps is under {LeastFps}";
         if (LongestStallMs > MostStallMs) return $"the longest stall, {LongestStallMs:F1} ms, is over {MostStallMs} ms";
         return null;
@@ -137,6 +140,24 @@ public static class PixelCheck
         return new PixelResult(samples, matched, black, miss);
     }
 
+    /// Points on the canvas where a screen pixel can be judged: on the image and away from
+    /// any color edge, in window pixels from the canvas's corner, from the middle outward.
+    public static IReadOnlyList<(int X, int Y, Rgb Want)> ScreenPoints(int width, int height, ViewMap map, Func<double, double, Rgb?> expected, int columns = 16, int rows = 10)
+    {
+        var points = new List<(int X, int Y, Rgb Want)>();
+        for (var row = 0; row < rows; row++)
+        {
+            for (var column = 0; column < columns; column++)
+            {
+                var x = (int)((column + .5) * width / columns);
+                var y = (int)((row + .5) * height / rows);
+                var (docX, docY) = map.DocumentPoint(x + .5, y + .5);
+                if (map.OnDocument(docX, docY) && expected(docX, docY) is { } want) points.Add((x, y, want));
+            }
+        }
+        return points.OrderBy(p => Math.Abs(p.X - width / 2.0) + Math.Abs(p.Y - height / 2.0)).ToList();
+    }
+
     /// True when nearly all of a grid of pixels in the rectangle is black: what a canvas
     /// with no frame yet shows.
     public static bool IsBlack(Picture picture, PixelRect canvas)
@@ -155,12 +176,24 @@ public static class ReportJudge
 {
     static readonly string[] HitTestWords = ["top menu", "title text", "gap beside", "minimize", "maximize", "maximized", "restore", "close", "top resize"];
 
+    /// The fewest checks each part must have run, from a full run of the report. A part that
+    /// names no problem passes only with this evidence, so a check taken out of the report fails.
+    public static readonly IReadOnlyList<(string Part, int Least)> LeastChecks =
+    [
+        ("hit test", 15),
+        ("panels", 46),
+        ("canvas input", 36),
+        ("menus and options", 9),
+        ("icons", 10),
+        ("window minimum size", 1),
+    ];
+
     static string PartOf(string problem)
     {
         if (problem.StartsWith("panel", StringComparison.Ordinal)) return "panels";
         if (problem.StartsWith("icons", StringComparison.Ordinal)) return "icons";
         if (problem.StartsWith("window minimum", StringComparison.Ordinal)) return "window minimum size";
-        if (problem.StartsWith("menu", StringComparison.Ordinal) || problem.StartsWith("options", StringComparison.Ordinal)) return "menus and options";
+        if (problem.StartsWith("menu", StringComparison.Ordinal) || problem.StartsWith("options", StringComparison.Ordinal) || problem.StartsWith("more popup", StringComparison.Ordinal)) return "menus and options";
         if (HitTestWords.Any(word => problem.StartsWith(word, StringComparison.Ordinal))) return "hit test";
         return "canvas input";
     }
@@ -171,7 +204,7 @@ public static class ReportJudge
         var root = report.RootElement;
         var problems = root.GetProperty("problems").EnumerateArray().Select(p => p.GetString() ?? "").ToList();
         var parts = new List<PartResult>();
-        foreach (var name in new[] { "hit test", "panels", "canvas input", "menus and options", "icons", "window minimum size" })
+        foreach (var (name, least) in LeastChecks)
         {
             var mine = problems.Where(p => PartOf(p) == name).ToList();
             var label = $"{name}{suffix}";
@@ -180,23 +213,237 @@ public static class ReportJudge
                 parts.Add(PartResult.Fail(label, string.Join("; ", mine)));
                 continue;
             }
-            var covered = name == "panels" ? CoveredPanels(root) : [];
-            parts.Add(covered.Count != 0
-                ? PartResult.NotRun(label, $"another program covers: {string.Join("; ", covered)}")
-                : PartResult.Pass(label));
+            var covered = Covered(root, name);
+            if (covered.Count != 0)
+            {
+                parts.Add(PartResult.NotRun(label, $"another program covers: {string.Join("; ", covered)}"));
+                continue;
+            }
+            var ran = ChecksRun(root, name);
+            parts.Add(ran >= least
+                ? PartResult.Pass(label, $"{ran} checks")
+                : PartResult.Fail(label, $"the report ran {ran} checks here and this part needs at least {least}, so a pass would have no evidence"));
         }
         if (exitCode != 0 && problems.Count == 0) parts.Add(PartResult.Fail($"report{suffix}", $"the app exited {exitCode} with no problem named"));
         return parts;
     }
 
-    static List<string> CoveredPanels(JsonElement root)
+    static int ChecksRun(JsonElement root, string part) =>
+        root.TryGetProperty("checks_run", out var ran) && ran.TryGetProperty(part, out var count) ? count.GetInt32() : 0;
+
+    /// What a part could not see because another program sat on top of it.
+    static List<string> Covered(JsonElement root, string part)
     {
         var covered = new List<string>();
-        if (!root.TryGetProperty("panels", out var panels)) return covered;
-        foreach (var panel in panels.EnumerateObject())
-            if (panel.Value.GetProperty("screen").GetString() is { } screen && screen.StartsWith("NOT RUN", StringComparison.Ordinal))
-                covered.Add($"{panel.Name} ({screen})");
+        if (part == "panels" && root.TryGetProperty("panels", out var panels))
+        {
+            foreach (var panel in panels.EnumerateObject())
+                if (panel.Value.GetProperty("screen").GetString() is { } screen && screen.StartsWith("NOT RUN", StringComparison.Ordinal))
+                    covered.Add($"{panel.Name} ({screen})");
+        }
+        if (part == "menus and options" && root.TryGetProperty("more_popup_screen", out var popup)
+            && popup.GetString() is { } shown && shown.StartsWith("NOT RUN", StringComparison.Ordinal))
+            covered.Add($"the more popup ({shown})");
         return covered;
+    }
+}
+
+/// One launch's real screen pixels after the first-frame signal.
+public sealed record ScreenRead(string Label, int Judged, int Matched, int Covered, string? FirstMiss);
+
+public static class ScreenCheck
+{
+    /// A real screen pixel proves something only when one was judged. A launch where other
+    /// programs covered every point, or every point was near a color edge, is NOT RUN.
+    public static PartResult Part(IReadOnlyList<ScreenRead> reads)
+    {
+        const string Name = "screen pixels";
+        if (reads.Count == 0) return PartResult.NotRun(Name, "no launch read the screen");
+        var missed = reads.Where(r => r.Matched != r.Judged).ToList();
+        if (missed.Count != 0) return PartResult.Fail(Name, string.Join("; ", missed.Select(r => $"{r.Label}: {r.Judged - r.Matched} of {r.Judged} differ, first {r.FirstMiss}")));
+        var blind = reads.Where(r => r.Judged == 0).ToList();
+        if (blind.Count != 0) return PartResult.NotRun(Name, $"no screen pixel was judged in {string.Join(", ", blind.Select(r => $"{r.Label} ({r.Covered} points covered)"))}");
+        return PartResult.Pass(Name, $"{reads.Sum(r => r.Judged)} points judged over {reads.Count} launches, all matched");
+    }
+}
+
+/// A real screen pixel in the canvas's area before the first-frame signal.
+public readonly record struct LaunchPixel(double Ms, Rgb Color);
+
+/// What the canvas's area showed while the image was loading.
+public sealed record LaunchRead(string Label, Rgb Stage, double FirstFrameMs, IReadOnlyList<LaunchPixel> Pixels);
+
+public static class LaunchPaint
+{
+    /// The two clocks start a little apart, and a frame shows before the app can say so.
+    public const double FrameClockSlackMs = 150;
+
+    /// How long a new window may show what is behind it before its first paint.
+    public const double MostOpeningMs = 250;
+
+    /// The window first shows what is behind it, for a moment, until Avalonia paints. From
+    /// that paint until the first frame only the stage color may show, and black never may.
+    /// After the first frame the image shows, so only black means anything there.
+    public static PartResult Part(IReadOnlyList<LaunchRead> reads)
+    {
+        const string Name = "launch paint";
+        const int Tolerance = 1;
+        if (reads.Count == 0) return PartResult.NotRun(Name, "no launch was measured");
+        var problems = new List<string>();
+        int judged = 0, launches = 0;
+        double longestOpening = 0;
+        foreach (var read in reads)
+        {
+            bool IsStage(LaunchPixel p) => p.Color.Distance(read.Stage) <= Tolerance;
+            var early = read.Pixels.Where(p => p.Ms < read.FirstFrameMs - FrameClockSlackMs).ToList();
+            if (early.Count == 0) continue;
+            launches++;
+            var painted = early.FindIndex(IsStage);
+            if (painted < 0)
+            {
+                var black = early.Count(p => p.Color.IsBlack);
+                problems.Add($"{read.Label}: none of {early.Count} pixels before the first frame at {read.FirstFrameMs:F0} ms was the stage color {read.Stage}, {black} were black");
+                continue;
+            }
+            var opening = early[painted].Ms - early[0].Ms;
+            longestOpening = Math.Max(longestOpening, opening);
+            if (opening > MostOpeningMs) problems.Add($"{read.Label}: the stage color took {opening:F0} ms to show, over {MostOpeningMs} ms");
+            var after = early.Skip(painted).ToList();
+            judged += after.Count;
+            var wrong = after.Where(p => !IsStage(p)).ToList();
+            if (wrong.Count != 0) problems.Add($"{read.Label}: {wrong.Count} of {after.Count} pixels after the first paint were not the stage color {read.Stage}, {wrong.Count(p => p.Color.IsBlack)} of them black, first {wrong[0].Color} at {wrong[0].Ms:F0} ms");
+        }
+        if (problems.Count != 0) return PartResult.Fail(Name, string.Join("; ", problems));
+        if (judged == 0) return PartResult.NotRun(Name, $"no pixel was read before a first frame in any of {reads.Count} launches");
+        return PartResult.Pass(Name, $"{judged} real screen pixels before the first frame over {launches} of {reads.Count} launches, all the stage color, none black; the window showed what is behind it for at most {longestOpening:F0} ms");
+    }
+}
+
+/// One moment of the pan trace, read from the engine by the app's hook.
+public readonly record struct PanSample(double Seconds, int PointerX, int PointerY, double OriginX, double OriginY, long Frames);
+
+public static class PanMotion
+{
+    /// In window pixels: about 0.2 s of the trace's fastest speed, the lag a slow UI may show.
+    public const double MostLagPixels = 150;
+    const double LeastSweep = .9;
+    const int LeastSamples = 4;
+
+    /// Why the engine's view did not follow the pointer, or null when it did. A pan that does
+    /// nothing can still get frames from the engine, so the frame numbers alone cannot see one.
+    public static string? Problem(IReadOnlyList<PanSample> samples, double zoom, double scale)
+    {
+        if (samples.Count < LeastSamples) return $"the trace has only {samples.Count} view samples";
+        var first = samples[0];
+        var sweepX = samples.Max(s => s.PointerX) - samples.Min(s => s.PointerX);
+        var sweepY = samples.Max(s => s.PointerY) - samples.Min(s => s.PointerY);
+        if (sweepX == 0 || sweepY == 0) return $"the pointer did not move on both axes: {sweepX} by {sweepY} pixels";
+        var movedX = (samples.Max(s => s.OriginX) - samples.Min(s => s.OriginX)) * zoom * scale;
+        var movedY = (samples.Max(s => s.OriginY) - samples.Min(s => s.OriginY)) * zoom * scale;
+        if (movedX < sweepX * LeastSweep || movedY < sweepY * LeastSweep)
+            return $"the view moved {movedX:F0} by {movedY:F0} pixels while the pointer moved {sweepX} by {sweepY}";
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var s = samples[i];
+            var offX = (s.OriginX - first.OriginX) * zoom * scale - (s.PointerX - first.PointerX);
+            var offY = (s.OriginY - first.OriginY) * zoom * scale - (s.PointerY - first.PointerY);
+            if (Math.Abs(offX) > MostLagPixels || Math.Abs(offY) > MostLagPixels)
+                return $"at {s.Seconds:F2} s the view is {offX:F0} by {offY:F0} pixels off the pointer's path";
+            if (i != 0 && s.Frames <= samples[i - 1].Frames) return $"no frame was shown between {samples[i - 1].Seconds:F2} s and {s.Seconds:F2} s";
+        }
+        return null;
+    }
+
+    /// Real pixels at one screen point during the trace. Flat cells pass under it, so the
+    /// color must keep changing. `judged` is false when too few were read to say.
+    public static string? ScreenProblem(IReadOnlyList<Rgb?> seen, out bool judged)
+    {
+        const int LeastRead = 8;
+        const double LeastChangeShare = .25;
+        var read = seen.Where(c => c is not null).Select(c => c!.Value).ToList();
+        judged = read.Count >= LeastRead;
+        if (!judged) return null;
+        var changes = 0;
+        for (var i = 1; i < read.Count; i++) if (read[i] != read[i - 1]) changes++;
+        return changes < (read.Count - 1) * LeastChangeShare
+            ? $"the screen's color changed only {changes} times in {read.Count} reads, so the image did not move"
+            : null;
+    }
+}
+
+/// PLAN 4.3: a busy run is reported and thrown out.
+public static class BusyJudge
+{
+    public const double MostCpuPercent = 15;        // The whole PC less the app, on average.
+    public const double MostGpuBeforePercent = 15;
+    public const double MostGpuDuringPercent = 50;  // The app's own pan sits far under this on the RTX.
+
+    /// Why a run must not start. GPU use that cannot be read counts, because then nobody knows.
+    public static List<string> Before(double cpu, double? gpu, IEnumerable<string> busyPrograms)
+    {
+        var reasons = new List<string>();
+        if (cpu >= MostCpuPercent) reasons.Add($"the PC was {cpu:F0}% busy before the trace");
+        if (gpu is null) reasons.Add("GPU use before the trace could not be read");
+        else if (gpu >= MostGpuBeforePercent) reasons.Add($"the GPU was {gpu:F0}% busy before the trace");
+        reasons.AddRange(busyPrograms);
+        return reasons;
+    }
+
+    /// Why a finished run does not count.
+    public static List<string> During(IReadOnlyList<double> cpuOthers, IReadOnlyList<double?> gpu)
+    {
+        var reasons = new List<string>();
+        if (cpuOthers.Count == 0) reasons.Add("CPU use during the trace could not be read");
+        else if (cpuOthers.Average() >= MostCpuPercent) reasons.Add($"other programs took {cpuOthers.Average():F0}% of the CPU during the trace");
+        var read = gpu.Where(g => g is not null).Select(g => g!.Value).ToList();
+        if (read.Count == 0) reasons.Add("GPU use during the trace could not be read");
+        else if (read.Average() >= MostGpuDuringPercent) reasons.Add($"the GPU was {read.Average():F0}% busy during the trace");
+        return reasons;
+    }
+
+    /// The words for one program that preflight.ps1 watches. Running with nothing in use is
+    /// only named. A null count means it is running and nobody could tell.
+    public static (string? Note, string? Busy) Program(string name, bool running, int? inUse, string unit)
+    {
+        if (!running) return (null, null);
+        if (inUse is null) return ($"{name} is running", $"{name} is running, and its {unit} could not be read");
+        if (inUse == 0) return ($"{name} is running, with no {unit}", null);
+        return ($"{name} is running, with {inUse} {unit}", $"{name} is running, with {inUse} {unit}");
+    }
+}
+
+/// What nvidia-smi says about the GPU.
+public sealed record GpuFacts(string Name, double? UsePercent, int? EncoderSessions)
+{
+    /// One line of `--query-gpu=name,utilization.gpu,encoder.stats.sessionCount --format=csv,noheader,nounits`.
+    public static GpuFacts Parse(string output)
+    {
+        var line = output.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length != 0) ?? "";
+        var fields = line.Split(',').Select(f => f.Trim()).ToArray();
+        if (fields.Length != 3) return new GpuFacts($"nvidia-smi printed: {line}", null, null);
+        double? use = double.TryParse(fields[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) ? value : null;
+        int? sessions = int.TryParse(fields[2], out var count) ? count : null;
+        return new GpuFacts(fields[0], use, sessions);
+    }
+
+    public override string ToString() => UsePercent is { } use ? $"{Name} {use:F0}%" : Name;
+}
+
+public static class ShotScales
+{
+    public static readonly double[] Wanted = [1, 2];
+
+    /// One row per display scale the shots must cover. A scale this display was not at is NOT
+    /// RUN and says so, because the harness does not change the user's display settings.
+    public static IEnumerable<PartResult> Rows(IReadOnlyCollection<double> seen)
+    {
+        foreach (var scale in Wanted)
+        {
+            var name = $"window shots at {scale * 100:0}%";
+            yield return seen.Contains(scale)
+                ? PartResult.Pass(name)
+                : PartResult.NotRun(name, $"the display scale is {string.Join(", ", seen.Select(s => $"{s * 100:0}%"))}, and the harness does not change the user's display settings");
+        }
     }
 }
 

@@ -50,6 +50,66 @@ public static class PanelLayout
         return frames;
     }
 
+    /// PanelLayout.titleStrip: the top of a frame, which a pointer must be able to reach.
+    const double TitleStrip = 24, LeastTitleWidth = 60, LeastTitleHeight = 20;
+
+    /// PanelLayout.clamp: keeps a frame inside `bounds`, shrinking it only when it is larger.
+    public static Rect Clamp(Rect frame, Rect bounds)
+    {
+        var width = Math.Min(frame.Width, bounds.Width);
+        var height = Math.Min(frame.Height, bounds.Height);
+        return new Rect(
+            Math.Min(Math.Max(frame.X, bounds.X), bounds.Right - width),
+            Math.Min(Math.Max(frame.Y, bounds.Y), bounds.Bottom - height),
+            width, height);
+    }
+
+    /// PanelLayout.isReachable: the frame's title strip is mostly on one screen.
+    public static bool IsReachable(Rect frame, IEnumerable<Rect> screens)
+    {
+        var title = new Rect(frame.X, frame.Y, frame.Width, TitleStrip);
+        return screens.Any(s =>
+        {
+            var i = s.Intersect(title);
+            return i.Width >= Math.Min(LeastTitleWidth, title.Width) && i.Height >= LeastTitleHeight;
+        });
+    }
+
+    /// The screen a frame overlaps most, or else the one nearest to it.
+    static Rect BestScreen(Rect frame, IReadOnlyList<Rect> screens)
+    {
+        static double Area(Rect a, Rect b)
+        {
+            var i = a.Intersect(b);
+            return i.Width * i.Height;
+        }
+        static double Distance(Rect a, Rect b) => Math.Sqrt(Math.Pow(a.Center.X - b.Center.X, 2) + Math.Pow(a.Center.Y - b.Center.Y, 2));
+        var best = screens[0];
+        foreach (var s in screens.Skip(1))
+        {
+            var (area, bestArea) = (Area(s, frame), Area(best, frame));
+            if (area > bestArea || (area == bestArea && Distance(s, frame) < Distance(best, frame))) best = s;
+        }
+        return best;
+    }
+
+    /// PanelLayout.onScreen: moves a frame no screen can reach fully inside the best screen.
+    public static Rect OnScreen(Rect frame, IReadOnlyList<Rect> screens) =>
+        screens.Count == 0 || IsReachable(frame, screens) ? frame : Clamp(frame, BestScreen(frame, screens));
+
+    /// For a drag: the shortest move that keeps the title strip reachable. A move fully inside
+    /// the screen, as OnScreen makes, would jump back and forth under a pointer held past the
+    /// edge, because Windows places a dragged window by the pointer on every move.
+    public static Rect Reachable(Rect frame, IReadOnlyList<Rect> screens)
+    {
+        if (screens.Count == 0 || IsReachable(frame, screens)) return frame;
+        var s = BestScreen(frame, screens);
+        var overlap = Math.Min(LeastTitleWidth, frame.Width);
+        var x = Math.Min(Math.Max(frame.X, s.X + overlap - frame.Width), s.Right - overlap);
+        var y = Math.Min(Math.Max(frame.Y, s.Y + LeastTitleHeight - TitleStrip), s.Bottom - LeastTitleHeight);
+        return new Rect(x, y, frame.Width, frame.Height);
+    }
+
     /// The rectangle the document fits into: the stage less the space the visible panels
     /// take on its left and right, less 16 points on every side.
     public static Rect ClearRect(Rect stage, IEnumerable<Rect> panels)
